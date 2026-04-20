@@ -1,7 +1,7 @@
-'use client'
-
 import Sidebar from '@/components/layout/Sidebar'
 import BottomNav from '@/components/layout/BottomNav'
+
+export const dynamic = 'force-dynamic'
 
 const dashboardNav = [
   { href: '/dashboard', label: 'طلباتي', icon: '📋' },
