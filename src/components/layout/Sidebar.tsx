@@ -19,7 +19,7 @@ export default function Sidebar({ items, title }: SidebarProps) {
   const pathname = usePathname()
 
   return (
-    <aside className="hidden md:flex flex-col w-60 bg-card border-l border-border min-h-[calc(100vh-64px)] sticky top-16">
+    <aside className="hidden md:flex flex-col w-60 bg-card border-l border-border min-h-[calc(100vh-80px)] sticky top-20">
       <div className="p-4 border-b border-border">
         <h2 className="font-black text-dark text-sm">{title}</h2>
       </div>

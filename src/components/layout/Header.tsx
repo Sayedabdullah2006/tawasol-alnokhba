@@ -195,70 +195,96 @@ export default function Header() {
         </button>
       </div>
 
-      {/* Mobile menu */}
-      <div className={cn(
-        'md:hidden overflow-hidden transition-all duration-300 bg-card border-b border-border',
-        menuOpen ? 'max-h-96' : 'max-h-0 border-b-0'
-      )}>
-        <nav className="flex flex-col px-4 py-3 gap-1">
-          {navLinks.map(l => (
-            <Link
-              key={l.href}
-              href={l.href}
-              onClick={() => setMenuOpen(false)}
-              className="py-3 text-sm font-medium text-dark/80 hover:text-green transition-colors"
-            >
-              {l.label}
-            </Link>
-          ))}
-
-          {loading ? null : user ? (
-            <>
-              <div className="border-t border-border my-2" />
-              <div className="flex items-center gap-2 py-2">
-                <div className="w-8 h-8 bg-green text-white rounded-full flex items-center justify-center text-sm font-black">
+      {/* Mobile menu — fullscreen overlay so it always fits everything */}
+      {menuOpen && (
+        <div className="md:hidden fixed inset-0 top-20 z-50 bg-cream flex flex-col"
+          onClick={() => setMenuOpen(false)}>
+          <nav className="flex-1 overflow-y-auto px-4 pt-2 pb-6"
+            onClick={e => e.stopPropagation()}>
+            {/* User card on top when logged in */}
+            {user && (
+              <div className="flex items-center gap-3 p-4 mb-3 bg-card rounded-2xl border border-border">
+                <div className="w-12 h-12 bg-green text-white rounded-full flex items-center justify-center text-lg font-black flex-shrink-0">
                   {user.fullName.charAt(0)}
                 </div>
-                <div>
-                  <p className="text-sm font-bold text-dark">{user.fullName}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-dark truncate">{user.fullName}</p>
                   <p className="text-xs text-muted">{user.role === 'admin' ? 'مدير المنصة' : 'عميل'}</p>
                 </div>
               </div>
+            )}
 
-              <Link
-                href={dashboardLink}
-                onClick={() => setMenuOpen(false)}
-                className="py-3 text-sm font-medium text-dark/80 hover:text-green transition-colors"
-              >
-                {user.role === 'admin' ? '🛡️ لوحة الإدارة' : '📋 طلباتي'}
-              </Link>
+            {/* Quick account links when logged in */}
+            {user && (
+              <div className="bg-card rounded-2xl border border-border overflow-hidden mb-3">
+                <Link
+                  href={dashboardLink}
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-3 px-4 py-4 text-dark hover:bg-cream transition-colors border-b border-border"
+                >
+                  <span className="text-xl">{user.role === 'admin' ? '🛡️' : '📋'}</span>
+                  <span className="font-medium">{user.role === 'admin' ? 'لوحة الإدارة' : 'طلباتي'}</span>
+                </Link>
+                {user.role === 'admin' && (
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-4 text-dark hover:bg-cream transition-colors border-b border-border"
+                  >
+                    <span className="text-xl">📋</span>
+                    <span className="font-medium">لوحة العميل</span>
+                  </Link>
+                )}
+                <Link
+                  href="/dashboard/profile"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-3 px-4 py-4 text-dark hover:bg-cream transition-colors"
+                >
+                  <span className="text-xl">👤</span>
+                  <span className="font-medium">الملف الشخصي</span>
+                </Link>
+              </div>
+            )}
 
-              <Link
-                href="/dashboard"
-                onClick={() => setMenuOpen(false)}
-                className="py-3 text-sm font-medium text-dark/80 hover:text-green transition-colors"
-              >
-                👤 الملف الشخصي
-              </Link>
+            {/* Site nav */}
+            <div className="bg-card rounded-2xl border border-border overflow-hidden mb-3">
+              {navLinks.map((l, i) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  onClick={() => setMenuOpen(false)}
+                  className={cn(
+                    'block px-4 py-4 text-dark hover:bg-cream transition-colors font-medium',
+                    i < navLinks.length - 1 && 'border-b border-border'
+                  )}
+                >
+                  {l.label}
+                </Link>
+              ))}
+            </div>
 
+            {/* Auth action — last so it's never clipped */}
+            {loading ? (
+              <div className="h-14 bg-border/30 rounded-2xl animate-pulse" />
+            ) : user ? (
               <button
                 onClick={handleLogout}
-                className="py-3 text-sm font-medium text-red-500 text-right cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 py-4 bg-red-50 border border-red-200 text-red-600 rounded-2xl font-bold cursor-pointer hover:bg-red-100 transition-colors"
               >
                 🚪 تسجيل الخروج
               </button>
-            </>
-          ) : (
-            <Link
-              href="/auth/login"
-              onClick={() => setMenuOpen(false)}
-              className="py-3 text-sm font-medium text-green"
-            >
-              تسجيل الدخول
-            </Link>
-          )}
-        </nav>
-      </div>
+            ) : (
+              <Link
+                href="/auth/login"
+                onClick={() => setMenuOpen(false)}
+                className="w-full flex items-center justify-center gap-2 py-4 bg-green text-white rounded-2xl font-bold"
+              >
+                تسجيل الدخول
+              </Link>
+            )}
+          </nav>
+        </div>
+      )}
     </header>
   )
 }
