@@ -172,6 +172,33 @@ export function freeGiftToClient(d: {
   }
 }
 
+// 5a. Quote approved by user (paid path) — reminder to complete payment
+export function quoteApprovedAwaitingPaymentToClient(d: {
+  requestNumber: string
+  clientName: string
+  total: number
+}) {
+  return {
+    subject: `📋 اعتمدت تسعيرة طلبك · ${d.requestNumber} · بانتظار الدفع`,
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <p style="margin:0 0 16px 0; font-size:15px;">📋 <strong>تم اعتماد التسعيرة</strong></p>
+      <p style="margin:0 0 16px 0; font-size:13px; line-height:1.8;">
+        شكراً لاعتمادك تسعيرة طلب <strong>${escapeHtml(d.requestNumber)}</strong>.
+        لإطلاق التنفيذ نحتاج تأكيد الدفع.
+      </p>
+      <div style="background:#F7F4ED; border-radius:10px; padding:14px; margin-bottom:16px; text-align:center;">
+        <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">المبلغ المستحق</p>
+        <p style="margin:0; font-size:24px; font-weight:900; color:${BRAND_GOLD};">${d.total.toLocaleString('ar-SA')} ر.س</p>
+      </div>
+      <p style="margin:0 0 18px 0; font-size:13px; line-height:1.8;">
+        من صفحة الدفع يمكنك التحويل البنكي ورفع الإيصال — وسنبدأ التنفيذ فور التحقق.
+      </p>
+      <p style="margin:0; text-align:center;">${button('الانتقال للدفع', `${SITE_URL}/dashboard`)}</p>
+    `),
+  }
+}
+
 // 5b. Free request approved — to client (skips payment)
 export function freeApprovedToClient(d: {
   requestNumber: string

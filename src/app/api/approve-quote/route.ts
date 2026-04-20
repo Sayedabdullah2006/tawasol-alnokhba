@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { calculateReach, EXTRAS_REACH_BOOST } from '@/lib/pricing-engine'
-import { notifyFreeApprovedToClient } from '@/lib/email'
+import { notifyFreeApprovedToClient, notifyQuoteApprovedAwaitingPaymentToClient } from '@/lib/email'
 
 interface OfferedExtra {
   id: string
@@ -123,14 +123,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'فشل اعتماد التسعيرة' }, { status: 500 })
     }
 
-    // Free gift → status jumped to in_progress (no payment); notify the client
-    if (newStatus === 'in_progress' && req.client_email) {
+    // Notify the client of the new state
+    if (req.client_email) {
       const requestNumber = `ATH-${String(req.request_number).padStart(4, '0')}`
-      notifyFreeApprovedToClient({
+      const base = {
         email: req.client_email,
         requestNumber,
         clientName: req.client_name ?? 'عزيزنا',
-      }).catch(e => console.error('Free-approve email failed:', e))
+      }
+      const p = newStatus === 'in_progress'
+        ? notifyFreeApprovedToClient(base)
+        : notifyQuoteApprovedAwaitingPaymentToClient({ ...base, total: finalTotal })
+      p.catch(e => console.error('Approve-quote email failed:', e))
     }
 
     const redirectTo = newStatus === 'in_progress' ? `/dashboard/${requestId}` : `/payment/${requestId}`
