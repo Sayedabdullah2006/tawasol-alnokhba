@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { notifyQuoteReadyToClient, notifyFreeGiftToClient } from '@/lib/email'
 
 interface OfferedExtra {
   id: string
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'السعر غير صالح' }, { status: 400 })
     }
 
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from('publish_requests')
       .update({
         admin_quoted_price: quotedPrice,
@@ -49,10 +50,26 @@ export async function POST(request: Request) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', requestId)
+      .select('request_number, client_name, client_email')
+      .single()
 
     if (error) {
       console.error('Send quote error:', error)
       return NextResponse.json({ error: 'فشل إرسال التسعيرة' }, { status: 500 })
+    }
+
+    // Notify client — free vs paid gets a different template
+    if (updated?.client_email) {
+      const requestNumber = `ATH-${String(updated.request_number).padStart(4, '0')}`
+      const args = {
+        email: updated.client_email,
+        requestNumber,
+        clientName: updated.client_name ?? 'عزيزنا',
+      }
+      const promise = quotedPrice <= 0
+        ? notifyFreeGiftToClient({ ...args, adminMessage: adminNotes ?? '' })
+        : notifyQuoteReadyToClient({ ...args, price: quotedPrice, reach: baseReach ?? 0 })
+      promise.catch(e => console.error('Quote email failed:', e))
     }
 
     return NextResponse.json({ success: true })

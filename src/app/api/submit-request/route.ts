@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { generateRequestNumber } from '@/lib/utils'
-import { sendNewRequestEmail } from '@/lib/email'
+import { notifyNewRequestToAdmin, notifyRequestReceivedToClient } from '@/lib/email'
 import { CATEGORIES } from '@/lib/constants'
 
 export async function POST(request: Request) {
@@ -88,9 +88,9 @@ export async function POST(request: Request) {
 
     const requestNumber = generateRequestNumber(data.request_number)
 
-    // Send admin notification — don't let email failure block the success response
+    // Notify both admin and client; failures must never block the success response
     const cat = CATEGORIES.find(c => c.id === body.category)
-    sendNewRequestEmail({
+    const emailData = {
       requestNumber,
       clientName: body.client_name,
       clientEmail: body.client_email,
@@ -99,7 +99,11 @@ export async function POST(request: Request) {
       title: body.title,
       content: body.content,
       channels,
-    }).catch(e => console.error('Email notify failed:', e))
+    }
+    Promise.all([
+      notifyNewRequestToAdmin(emailData),
+      notifyRequestReceivedToClient(emailData),
+    ]).catch(e => console.error('Email notify failed:', e))
 
     return NextResponse.json({ requestNumber })
   } catch (err) {

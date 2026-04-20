@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { calculateReach, EXTRAS_REACH_BOOST } from '@/lib/pricing-engine'
+import { notifyPaymentConfirmedToClient } from '@/lib/email'
 
 interface OfferedExtra {
   id: string
@@ -119,6 +120,17 @@ export async function POST(request: Request) {
     if (updErr) {
       console.error('Approve update error:', updErr)
       return NextResponse.json({ error: 'فشل اعتماد التسعيرة' }, { status: 500 })
+    }
+
+    // Free gift → status jumped straight to paid; let the client know
+    if (newStatus === 'paid' && req.client_email) {
+      const requestNumber = `ATH-${String(req.request_number).padStart(4, '0')}`
+      notifyPaymentConfirmedToClient({
+        email: req.client_email,
+        requestNumber,
+        clientName: req.client_name ?? 'عزيزنا',
+        total: finalTotal,
+      }).catch(e => console.error('Free-gift email failed:', e))
     }
 
     const redirectTo = newStatus === 'paid' ? `/dashboard/${requestId}` : `/payment/${requestId}`

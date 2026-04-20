@@ -1,81 +1,90 @@
-import { Resend } from 'resend'
+// Email dispatch — calls the `send-email` Supabase Edge Function so that the
+// Resend API key never leaves Supabase secrets. Failures are logged but do not
+// throw, so a missing key or transient network blip never blocks the request
+// pipeline that triggered the email.
+
+import { createServiceRoleClient } from './supabase-server'
+import * as templates from './email-templates'
 
 const ADMIN_EMAIL = 'first1saudi@gmail.com'
 
-// Resend requires a verified "from" domain. Until nukhba.media is verified,
-// we fall back to their sandbox sender (onboarding@resend.dev) which only
-// accepts the team's own inbox as recipient in free tier — our admin email above
-// must match the Resend account's verified inbox.
-const FROM = process.env.RESEND_FROM_EMAIL || 'Tawasol Al-Nokhba <onboarding@resend.dev>'
-
-export interface NewRequestEmailData {
-  requestNumber: string
-  clientName: string
-  clientEmail: string
-  clientPhone: string
-  category: string
-  title: string
-  content: string
-  channels: string[]
-}
-
-export async function sendNewRequestEmail(data: NewRequestEmailData): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) {
-    console.warn('RESEND_API_KEY missing — skipping email notification')
-    return
-  }
-
-  const resend = new Resend(apiKey)
-  const CHANNEL_LABELS: Record<string, string> = { x: 'X', ig: 'Instagram', li: 'LinkedIn', tk: 'TikTok' }
-
-  const subject = `طلب نشر جديد · ${data.requestNumber}`
-  const html = `
-    <div style="font-family: -apple-system, Segoe UI, Cairo, sans-serif; direction: rtl; max-width: 560px; margin: 0 auto; padding: 24px; color: #0E2855;">
-      <h1 style="color: #0E2855; font-size: 20px; margin-bottom: 8px;">📩 وصل طلب نشر جديد</h1>
-      <p style="color: #6B7C99; font-size: 14px; margin-bottom: 24px;">رقم الطلب: <strong>${data.requestNumber}</strong></p>
-
-      <div style="background: #F7F4ED; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
-        <h2 style="font-size: 14px; margin: 0 0 12px 0; color: #C9A961;">بيانات العميل</h2>
-        <p style="margin: 4px 0; font-size: 14px;"><strong>الاسم:</strong> ${escapeHtml(data.clientName)}</p>
-        <p style="margin: 4px 0; font-size: 14px;"><strong>البريد:</strong> ${escapeHtml(data.clientEmail)}</p>
-        <p style="margin: 4px 0; font-size: 14px;"><strong>الجوال:</strong> <span dir="ltr">${escapeHtml(data.clientPhone)}</span></p>
-      </div>
-
-      <div style="background: #F7F4ED; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
-        <h2 style="font-size: 14px; margin: 0 0 12px 0; color: #C9A961;">المحتوى</h2>
-        <p style="margin: 4px 0; font-size: 14px;"><strong>الفئة:</strong> ${escapeHtml(data.category)}</p>
-        <p style="margin: 4px 0; font-size: 14px;"><strong>العنوان:</strong> ${escapeHtml(data.title)}</p>
-        <p style="margin: 4px 0; font-size: 14px;"><strong>القنوات:</strong> ${data.channels.map(c => CHANNEL_LABELS[c] ?? c).join('، ')}</p>
-        <p style="margin: 12px 0 4px 0; font-size: 13px; color: #6B7C99; white-space: pre-line;">${escapeHtml(data.content)}</p>
-      </div>
-
-      <a href="https://nukhba.media/admin/requests"
-        style="display: inline-block; background: #0E2855; color: #C9A961; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: bold; font-size: 14px;">
-        فتح لوحة الإدارة
-      </a>
-
-      <p style="color: #6B7C99; font-size: 12px; margin-top: 32px;">
-        تواصل النخبة · Tawasol Al-Nokhba
-      </p>
-    </div>
-  `
-
+export async function sendEmail(to: string | string[], subject: string, html: string): Promise<boolean> {
+  if (!to || (Array.isArray(to) && to.length === 0)) return false
   try {
-    const { error } = await resend.emails.send({
-      from: FROM,
-      to: ADMIN_EMAIL,
-      subject,
-      html,
+    const client = await createServiceRoleClient()
+    const { data, error } = await client.functions.invoke('send-email', {
+      body: { to, subject, html },
     })
-    if (error) console.error('Resend error:', error)
+    if (error || (data && data.ok === false)) {
+      console.error('Email send failed:', error?.message ?? data)
+      return false
+    }
+    return true
   } catch (err) {
     console.error('Email send exception:', err)
+    return false
   }
 }
 
-function escapeHtml(s: string): string {
-  return (s ?? '').replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  }[c] ?? c))
+// ─── Convenience wrappers per event ────────────────────────────────────
+
+export async function notifyNewRequestToAdmin(d: templates.ClientRequestData) {
+  const t = templates.newRequestToAdmin(d)
+  return sendEmail(ADMIN_EMAIL, t.subject, t.html)
+}
+
+export async function notifyRequestReceivedToClient(d: templates.ClientRequestData) {
+  if (!d.clientEmail) return false
+  const t = templates.requestReceivedToClient(d)
+  return sendEmail(d.clientEmail, t.subject, t.html)
+}
+
+export async function notifyQuoteReadyToClient(args: {
+  email: string; requestNumber: string; clientName: string; price: number; reach: number
+}) {
+  const t = templates.quoteReadyToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
+export async function notifyFreeGiftToClient(args: {
+  email: string; requestNumber: string; clientName: string; adminMessage: string
+}) {
+  const t = templates.freeGiftToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
+export async function notifyPaymentConfirmedToClient(args: {
+  email: string; requestNumber: string; clientName: string; total: number
+}) {
+  const t = templates.paymentConfirmedToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
+export async function notifyInProgressToClient(args: {
+  email: string; requestNumber: string; clientName: string
+}) {
+  const t = templates.inProgressToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
+export async function notifyCompletedToClient(args: {
+  email: string; requestNumber: string; clientName: string
+}) {
+  const t = templates.completedToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
+export async function notifyRejectedToClient(args: {
+  email: string; requestNumber: string; clientName: string; reason: string
+}) {
+  const t = templates.rejectedToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
+// Old name kept for compatibility with the existing submit-request route.
+export async function sendNewRequestEmail(args: {
+  requestNumber: string; clientName: string; clientEmail: string; clientPhone: string
+  category: string; title: string; content: string; channels: string[]
+}) {
+  return notifyNewRequestToAdmin(args)
 }
