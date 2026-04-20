@@ -14,6 +14,7 @@ import RStep3Details from './RStep3Details'
 import RStepChannels from './RStepChannels'
 import RStep5Contact, { type ContactData } from './RStep5Contact'
 import RStep6Terms from './RStep6Terms'
+import { validateEmail } from '@/lib/email-validation'
 import SuccessScreen from './SuccessScreen'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
@@ -96,7 +97,9 @@ export default function RequestWizard() {
       case 'subOption': return subOption !== null
       case 'details': return details.title.trim() !== '' && details.content.trim() !== ''
       case 'channels': return channels.length > 0
-      case 'contact': return contact.fullName.trim() !== '' && contact.phone.trim() !== '' && contact.email.trim() !== ''
+      case 'contact': return contact.fullName.trim() !== ''
+        && contact.phone.trim() !== ''
+        && validateEmail(contact.email).valid
       case 'terms': return termsAccepted && privacyAccepted
       case 'confirm': return true
       default: return true

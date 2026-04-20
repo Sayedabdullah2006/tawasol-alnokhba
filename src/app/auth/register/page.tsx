@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
+import { validateEmail } from '@/lib/email-validation'
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState('')
@@ -13,6 +14,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
+  const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const router = useRouter()
@@ -21,6 +23,14 @@ export default function RegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setEmailSuggestion(null)
+
+    const emailCheck = validateEmail(email)
+    if (!emailCheck.valid) {
+      setError(emailCheck.error ?? 'البريد الإلكتروني غير صحيح')
+      if (emailCheck.suggestion) setEmailSuggestion(emailCheck.suggestion)
+      return
+    }
 
     if (password.length < 6) {
       setError('كلمة المرور يجب أن تكون 6 أحرف على الأقل')
@@ -122,7 +132,20 @@ export default function RegisterPage() {
             required
           />
 
-          {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+          {error && (
+            <div className="text-sm text-center space-y-2">
+              <p className="text-red-500">{error}</p>
+              {emailSuggestion && (
+                <button
+                  type="button"
+                  onClick={() => { setEmail(emailSuggestion); setEmailSuggestion(null); setError('') }}
+                  className="text-green hover:underline cursor-pointer text-xs"
+                >
+                  استخدم {emailSuggestion}
+                </button>
+              )}
+            </div>
+          )}
 
           <Button type="submit" loading={loading} className="w-full">
             إنشاء الحساب

@@ -1,6 +1,8 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Input from '@/components/ui/Input'
+import { validateEmail } from '@/lib/email-validation'
 
 export interface ContactData {
   fullName: string
@@ -19,6 +21,29 @@ export default function RStep5Contact({ data, onChange }: Props) {
   const update = (field: keyof ContactData, value: string) => {
     onChange({ ...data, [field]: value })
   }
+
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null)
+
+  // Validate email on blur — keep it permissive while typing
+  useEffect(() => {
+    if (!data.email.trim()) {
+      setEmailError(null)
+      setEmailSuggestion(null)
+      return
+    }
+    const t = setTimeout(() => {
+      const v = validateEmail(data.email)
+      if (v.valid) {
+        setEmailError(null)
+        setEmailSuggestion(null)
+      } else {
+        setEmailError(v.error ?? null)
+        setEmailSuggestion(v.suggestion ?? null)
+      }
+    }, 500)
+    return () => clearTimeout(t)
+  }, [data.email])
 
   return (
     <div className="wizard-enter max-w-lg mx-auto">
@@ -46,16 +71,32 @@ export default function RStep5Contact({ data, onChange }: Props) {
           onChange={e => update('phone', e.target.value)}
           required
         />
-        <Input
-          id="email"
-          label="البريد الإلكتروني *"
-          dir="ltr"
-          type="email"
-          placeholder="email@example.com"
-          value={data.email}
-          onChange={e => update('email', e.target.value)}
-          required
-        />
+        <div>
+          <Input
+            id="email"
+            label="البريد الإلكتروني *"
+            dir="ltr"
+            type="email"
+            placeholder="email@example.com"
+            value={data.email}
+            onChange={e => update('email', e.target.value)}
+            required
+          />
+          {emailError && (
+            <div className="mt-1 text-xs">
+              <p className="text-red-500">{emailError}</p>
+              {emailSuggestion && (
+                <button
+                  type="button"
+                  onClick={() => update('email', emailSuggestion)}
+                  className="text-green hover:underline cursor-pointer mt-0.5"
+                >
+                  استخدم {emailSuggestion}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
         <Input
           id="city"
           label="المدينة"
