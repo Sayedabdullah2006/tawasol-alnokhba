@@ -76,10 +76,10 @@ export default function AdminStatsPage() {
           { label: 'الإيرادات الإجمالية', value: `${formatNumber(stats.revenue)} ر.س`, icon: '💰' },
           { label: 'إيرادات هذا الشهر', value: `${formatNumber(stats.monthRevenue)} ر.س`, icon: '📅' },
         ].map(s => (
-          <div key={s.label} className="bg-card rounded-2xl border border-border p-5 text-center">
-            <div className="text-3xl mb-2">{s.icon}</div>
-            <div className="text-2xl font-black text-dark">{s.value}</div>
-            <div className="text-sm text-muted mt-1">{s.label}</div>
+          <div key={s.label} className="bg-card rounded-2xl border border-border p-4 sm:p-5 text-center">
+            <div className="text-2xl sm:text-3xl mb-2">{s.icon}</div>
+            <div className="text-base sm:text-2xl font-black text-dark break-words leading-tight">{s.value}</div>
+            <div className="text-xs sm:text-sm text-muted mt-1">{s.label}</div>
           </div>
         ))}
       </div>

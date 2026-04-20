@@ -51,6 +51,11 @@ export default function AdminUsersPage() {
 
   useEffect(() => { loadUsers() }, [loadUsers])
 
+  useEffect(() => {
+    document.body.style.overflow = pwUser ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [pwUser])
+
   const handleChangePassword = async () => {
     if (!pwUser) return
     if (pwValue.length < 8) {
@@ -202,8 +207,8 @@ export default function AdminUsersPage() {
       </div>
 
       {pwUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark/50 backdrop-blur-sm p-4">
-          <div className="bg-card rounded-2xl border border-border w-full max-w-md p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark/50 p-4">
+          <div className="bg-card rounded-2xl border border-border w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div>
               <h3 className="font-black text-dark text-lg">تغيير كلمة المرور</h3>
               <p className="text-sm text-muted mt-1">{pwUser.full_name || pwUser.email}</p>

@@ -47,6 +47,11 @@ export default function AdminRequestsPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
+  useEffect(() => {
+    document.body.style.overflow = drawerOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [drawerOpen])
+
   const filteredRequests = requests.filter(r => {
     if (statusFilter && r.status !== statusFilter) return false
     if (search) {
@@ -201,8 +206,8 @@ export default function AdminRequestsPage() {
       {/* Request Drawer */}
       {drawerOpen && selectedRequest && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-dark/50 backdrop-blur-sm" onClick={() => setDrawerOpen(false)} />
-          <div className="relative bg-card w-full max-w-lg overflow-y-auto shadow-2xl">
+          <div className="absolute inset-0 bg-dark/50" onClick={() => setDrawerOpen(false)} />
+          <div className="relative bg-card w-full md:max-w-lg h-full overflow-y-auto shadow-2xl">
             <div className="sticky top-0 bg-card border-b border-border px-5 py-4 flex items-center justify-between z-10">
               <h2 className="font-bold text-dark">
                 طلب {generateRequestNumber(selectedRequest.request_number)}
