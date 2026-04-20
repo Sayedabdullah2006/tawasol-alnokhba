@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { generateRequestNumber } from '@/lib/utils'
+import { sendNewRequestEmail } from '@/lib/email'
+import { CATEGORIES } from '@/lib/constants'
 
 export async function POST(request: Request) {
   try {
@@ -84,7 +86,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'فشل حفظ الطلب' }, { status: 500 })
     }
 
-    return NextResponse.json({ requestNumber: generateRequestNumber(data.request_number) })
+    const requestNumber = generateRequestNumber(data.request_number)
+
+    // Send admin notification — don't let email failure block the success response
+    const cat = CATEGORIES.find(c => c.id === body.category)
+    sendNewRequestEmail({
+      requestNumber,
+      clientName: body.client_name,
+      clientEmail: body.client_email,
+      clientPhone: body.client_phone,
+      category: cat?.nameAr ?? body.category,
+      title: body.title,
+      content: body.content,
+      channels,
+    }).catch(e => console.error('Email notify failed:', e))
+
+    return NextResponse.json({ requestNumber })
   } catch (err) {
     console.error('Submit error:', err)
     return NextResponse.json({ error: 'حدث خطأ في الخادم' }, { status: 500 })
