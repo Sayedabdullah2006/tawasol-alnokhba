@@ -125,7 +125,7 @@ export default function QuoteApproval({
         </div>
       </div>
 
-      {offeredExtras.length > 0 && (
+      {!isFreeBase && offeredExtras.length > 0 && (
         <div className="bg-card rounded-2xl border border-border p-5">
           <h3 className="font-bold text-dark mb-1">هل تحتاج خدمات إضافية؟</h3>
           <p className="text-xs text-muted mb-4">كل خدمة تزيد السعر والوصول المتوقع</p>

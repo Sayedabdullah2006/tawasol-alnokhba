@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { calculateReach, EXTRAS_REACH_BOOST } from '@/lib/pricing-engine'
-import { notifyPaymentConfirmedToClient } from '@/lib/email'
+import { notifyFreeApprovedToClient } from '@/lib/email'
 
 interface OfferedExtra {
   id: string
@@ -100,8 +100,9 @@ export async function POST(request: Request) {
       : Array.from(availableMap.values())
 
     // If nothing is owed (admin made it free and the user added no paid extras),
-    // skip the payment screen entirely and mark the request as paid.
-    const newStatus = finalTotal <= 0 ? 'paid' : 'approved'
+    // skip the payment screen and mark the request as in_progress so the
+    // fulfilment team can start scheduling immediately.
+    const newStatus = finalTotal <= 0 ? 'in_progress' : 'approved'
 
     const { error: updErr } = await serviceClient
       .from('publish_requests')
@@ -122,18 +123,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'فشل اعتماد التسعيرة' }, { status: 500 })
     }
 
-    // Free gift → status jumped straight to paid; let the client know
-    if (newStatus === 'paid' && req.client_email) {
+    // Free gift → status jumped to in_progress (no payment); notify the client
+    if (newStatus === 'in_progress' && req.client_email) {
       const requestNumber = `ATH-${String(req.request_number).padStart(4, '0')}`
-      notifyPaymentConfirmedToClient({
+      notifyFreeApprovedToClient({
         email: req.client_email,
         requestNumber,
         clientName: req.client_name ?? 'عزيزنا',
-        total: finalTotal,
-      }).catch(e => console.error('Free-gift email failed:', e))
+      }).catch(e => console.error('Free-approve email failed:', e))
     }
 
-    const redirectTo = newStatus === 'paid' ? `/dashboard/${requestId}` : `/payment/${requestId}`
+    const redirectTo = newStatus === 'in_progress' ? `/dashboard/${requestId}` : `/payment/${requestId}`
     return NextResponse.json({ success: true, redirectTo })
   } catch (err) {
     console.error('Approve quote error:', err)

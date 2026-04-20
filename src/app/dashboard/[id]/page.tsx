@@ -198,20 +198,30 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
         {['payment_review', 'paid', 'in_progress', 'completed'].includes(effectiveStatus) && request.final_total != null && (
           <div className="mt-4 bg-card rounded-2xl border border-border p-5 space-y-2 text-sm">
             <h3 className="font-bold text-dark mb-2">تفصيل التسعيرة المعتمدة</h3>
-            <div className="flex justify-between">
-              <span className="text-muted">السعر الرئيسي</span>
-              <span>{formatNumber(request.admin_quoted_price ?? 0)} ر.س</span>
-            </div>
-            {request.extras_selected_total > 0 && (
-              <div className="flex justify-between">
-                <span className="text-muted">خدمات إضافية</span>
-                <span>+{formatNumber(request.extras_selected_total)} ر.س</span>
+            {Number(request.final_total) <= 0 ? (
+              <div className="bg-gradient-to-l from-green/10 to-gold/10 border border-gold/30 rounded-xl p-4 text-center">
+                <div className="text-3xl mb-1">🎁</div>
+                <p className="font-black text-dark">منشور مجاني من تواصل النخبة</p>
+                <p className="text-xs text-muted mt-1">لا يوجد مبلغ مستحق</p>
               </div>
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted">السعر الرئيسي</span>
+                  <span>{formatNumber(request.admin_quoted_price ?? 0)} ر.س</span>
+                </div>
+                {request.extras_selected_total > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted">خدمات إضافية</span>
+                    <span>+{formatNumber(request.extras_selected_total)} ر.س</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t border-border pt-2 mt-2 font-bold">
+                  <span>الإجمالي</span>
+                  <span className="text-gold text-lg">{formatNumber(request.final_total)} ر.س</span>
+                </div>
+              </>
             )}
-            <div className="flex justify-between border-t border-border pt-2 mt-2 font-bold">
-              <span>الإجمالي</span>
-              <span className="text-gold text-lg">{formatNumber(request.final_total)} ر.س</span>
-            </div>
             {request.estimated_reach > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted">الوصول المتوقع</span>

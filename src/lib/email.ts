@@ -60,6 +60,13 @@ export async function notifyPaymentConfirmedToClient(args: {
   return sendEmail(args.email, t.subject, t.html)
 }
 
+export async function notifyFreeApprovedToClient(args: {
+  email: string; requestNumber: string; clientName: string
+}) {
+  const t = templates.freeApprovedToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
 export async function notifyInProgressToClient(args: {
   email: string; requestNumber: string; clientName: string
 }) {

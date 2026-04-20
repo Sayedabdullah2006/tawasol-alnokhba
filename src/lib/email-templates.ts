@@ -172,6 +172,31 @@ export function freeGiftToClient(d: {
   }
 }
 
+// 5b. Free request approved — to client (skips payment)
+export function freeApprovedToClient(d: {
+  requestNumber: string
+  clientName: string
+}) {
+  return {
+    subject: `✅ تمت الموافقة على طلبك · ${d.requestNumber}`,
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <div style="text-align:center; margin-bottom:18px;">
+        <div style="font-size:48px;">✅</div>
+        <p style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${BRAND_GOLD};">تمت الموافقة على طلبك</p>
+      </div>
+      <p style="margin:0 0 16px 0; font-size:14px; line-height:1.8;">
+        🗓️ <strong>جاري جدولة المنشور</strong>
+      </p>
+      <p style="margin:0 0 18px 0; font-size:13px; line-height:1.8; color:#6B7C99;">
+        طلبك <strong style="color:${BRAND_NAVY};">${escapeHtml(d.requestNumber)}</strong> اعتُمد ودخل قائمة الجدولة.
+        سنبدأ التنفيذ قريباً ونبلغك فور اكتمال النشر.
+      </p>
+      <p style="margin:0; text-align:center;">${button('عرض الطلب', `${SITE_URL}/dashboard`)}</p>
+    `),
+  }
+}
+
 // 5. Payment confirmed — to client
 export function paymentConfirmedToClient(d: {
   requestNumber: string
