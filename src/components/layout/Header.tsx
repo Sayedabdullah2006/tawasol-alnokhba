@@ -84,6 +84,7 @@ export default function Header() {
   const dashboardLink = user?.role === 'admin' ? '/admin' : '/dashboard'
 
   return (
+    <>
     <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border shadow-sm">
       <div className="max-w-6xl mx-auto px-4 h-20 flex items-center justify-between">
         <Link href="/" className="flex items-center" aria-label="تواصل النخبة">
@@ -194,8 +195,9 @@ export default function Header() {
           </svg>
         </button>
       </div>
+    </header>
 
-      {/* Mobile menu — fullscreen overlay so it always fits everything */}
+      {/* Mobile menu — outside <header> so backdrop-blur doesn't trap fixed positioning */}
       {menuOpen && (
         <div className="md:hidden fixed inset-0 top-20 z-50 bg-cream flex flex-col"
           onClick={() => setMenuOpen(false)}>
@@ -285,6 +287,6 @@ export default function Header() {
           </nav>
         </div>
       )}
-    </header>
+    </>
   )
 }
