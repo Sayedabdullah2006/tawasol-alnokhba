@@ -31,6 +31,7 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
   const [images, setImages] = useState<'one' | 'multi'>(request.images ?? 'one')
   const [numPosts, setNumPosts] = useState<number>(request.num_posts ?? 1)
   const [manualPrice, setManualPrice] = useState<string>('')
+  const [isFree, setIsFree] = useState(false)
   const [selectedExtrasToOffer, setSelectedExtrasToOffer] = useState<string[]>([])
   const [adminNotes, setAdminNotes] = useState(request.admin_notes ?? '')
 
@@ -67,7 +68,7 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
   }, [request.category, request.sub_option, scope, images, numPosts, influencer])
 
   const autoPrice = autoBreakdown?.totalFinal ?? 0
-  const effectivePrice = manualPrice !== '' ? parseFloat(manualPrice) : autoPrice
+  const effectivePrice = isFree ? 0 : (manualPrice !== '' ? parseFloat(manualPrice) : autoPrice)
 
   const baseReach = useMemo(() => {
     if (!influencer) return 0
@@ -94,8 +95,12 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
   }
 
   const handleSend = async () => {
-    if (!effectivePrice || effectivePrice < 0) {
-      showToast('أدخل سعراً صحيحاً', 'error')
+    if (effectivePrice < 0 || (!isFree && !effectivePrice)) {
+      showToast('أدخل سعراً صحيحاً أو فعّل خيار "مجاني"', 'error')
+      return
+    }
+    if (isFree && !adminNotes.trim()) {
+      showToast('اكتب رسالة للعميل توضّح سبب جعل المنشور مجانياً', 'error')
       return
     }
     setSaving(true)
@@ -144,7 +149,18 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
         </div>
       )}
 
-      <div className="bg-cream rounded-xl p-4 space-y-3">
+      <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+        isFree ? 'bg-green/5 border-green' : 'bg-white border-border hover:border-green/40'
+      }`}>
+        <input type="checkbox" checked={isFree} onChange={e => setIsFree(e.target.checked)}
+          className="w-5 h-5 accent-green cursor-pointer" />
+        <div className="flex-1">
+          <div className="font-bold text-dark text-sm">🎁 جعل المنشور مجانياً للعميل</div>
+          <div className="text-xs text-muted mt-0.5">السعر يصبح 0 ر.س ولن يحتاج العميل للدفع — اكتب رسالة في الأسفل توضّح السبب</div>
+        </div>
+      </label>
+
+      <div className={`bg-cream rounded-xl p-4 space-y-3 ${isFree ? 'opacity-50 pointer-events-none' : ''}`}>
         <h3 className="font-bold text-dark text-sm">إعدادات الحاسبة</h3>
 
         <div className="grid grid-cols-2 gap-3 text-sm">
@@ -219,9 +235,13 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
       </div>
 
       <div className="bg-cream rounded-xl p-4 text-sm space-y-1">
-        <div className="flex justify-between">
+        <div className="flex justify-between items-center">
           <span className="text-muted">السعر المرسل:</span>
-          <span className="font-bold text-gold text-lg">{formatNumber(effectivePrice)} ر.س</span>
+          {isFree ? (
+            <span className="font-black text-green text-lg">مجاني 🎁</span>
+          ) : (
+            <span className="font-bold text-gold text-lg">{formatNumber(effectivePrice)} ر.س</span>
+          )}
         </div>
         <div className="flex justify-between">
           <span className="text-muted">الوصول الأساسي المتوقع:</span>
@@ -234,10 +254,12 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
       </div>
 
       <div>
-        <label className="text-sm font-medium text-dark block mb-1">ملاحظات للعميل (اختياري)</label>
+        <label className="text-sm font-medium text-dark block mb-1">
+          {isFree ? 'رسالة للعميل *' : 'ملاحظات للعميل (اختياري)'}
+        </label>
         <textarea value={adminNotes} onChange={e => setAdminNotes(e.target.value)}
           className="w-full px-4 py-3 rounded-xl border border-border bg-white text-sm min-h-[80px] resize-y"
-          placeholder="مثلاً: تم تعديل السعر بسبب..." />
+          placeholder={isFree ? 'مثلاً: تم منحك خدمة مجانية كهدية ترحيبية...' : 'مثلاً: تم تعديل السعر بسبب...'} />
       </div>
 
       <div className="flex gap-3">

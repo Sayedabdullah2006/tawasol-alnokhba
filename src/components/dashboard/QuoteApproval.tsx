@@ -69,12 +69,23 @@ export default function QuoteApproval({
     }
   }
 
+  const isFreeBase = quotedPrice <= 0
+  const isFreeFinal = finalTotal <= 0
+
   return (
     <div className="space-y-4">
-      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-        <p className="font-bold text-blue-700 text-sm mb-1">💰 وصلتك التسعيرة</p>
-        <p className="text-xs text-blue-600">راجع السعر واختر الخدمات الإضافية التي تريدها — السعر يتحدث تلقائياً.</p>
-      </div>
+      {isFreeBase ? (
+        <div className="bg-gradient-to-l from-green/15 to-gold/15 border-2 border-gold/40 rounded-2xl p-5 text-center">
+          <div className="text-4xl mb-2">🎁</div>
+          <p className="font-black text-dark text-lg mb-1">منشور مجاني من تواصل النخبة</p>
+          <p className="text-xs text-muted">قدّمت لك الإدارة هذه الخدمة بدون مقابل</p>
+        </div>
+      ) : (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+          <p className="font-bold text-blue-700 text-sm mb-1">💰 وصلتك التسعيرة</p>
+          <p className="text-xs text-blue-600">راجع السعر واختر الخدمات الإضافية التي تريدها — السعر يتحدث تلقائياً.</p>
+        </div>
+      )}
 
       {adminNotes && (
         <div className="bg-cream rounded-xl p-3 text-sm">
@@ -86,7 +97,11 @@ export default function QuoteApproval({
       <div className="bg-card rounded-2xl border border-border p-5 space-y-2">
         <div className="flex justify-between items-center">
           <span className="text-muted text-sm">السعر الرئيسي</span>
-          <span className="font-bold text-dark">{formatNumber(quotedPrice)} ر.س</span>
+          {isFreeBase ? (
+            <span className="font-black text-green">مجاني 🎁</span>
+          ) : (
+            <span className="font-bold text-dark">{formatNumber(quotedPrice)} ر.س</span>
+          )}
         </div>
         {extrasTotal > 0 && (
           <div className="flex justify-between items-center text-sm">
@@ -97,7 +112,11 @@ export default function QuoteApproval({
         <div className="border-t border-border pt-3 mt-2">
           <div className="flex justify-between items-center">
             <span className="font-bold text-dark">الإجمالي</span>
-            <span className="font-black text-2xl text-gold">{formatNumber(finalTotal)} ر.س</span>
+            {isFreeFinal ? (
+              <span className="font-black text-2xl text-green">مجاني</span>
+            ) : (
+              <span className="font-black text-2xl text-gold">{formatNumber(finalTotal)} ر.س</span>
+            )}
           </div>
           <div className="flex justify-between items-center text-sm mt-2">
             <span className="text-muted">الوصول المتوقع</span>
@@ -145,7 +164,9 @@ export default function QuoteApproval({
       )}
 
       <Button onClick={handleApprove} loading={submitting} className="w-full" size="lg">
-        اعتماد التسعيرة والانتقال للدفع — {formatNumber(finalTotal)} ر.س
+        {isFreeFinal
+          ? 'اعتماد وبدء التنفيذ 🎁'
+          : `اعتماد التسعيرة والانتقال للدفع — ${formatNumber(finalTotal)} ر.س`}
       </Button>
     </div>
   )
