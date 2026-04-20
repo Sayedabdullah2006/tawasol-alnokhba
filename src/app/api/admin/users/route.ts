@@ -65,30 +65,38 @@ export async function PATCH(request: Request) {
     const { data: profile } = await userClient.from('profiles').select('role').eq('id', user.id).single()
     if (profile?.role !== 'admin') return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
 
-    const { userId, action } = await request.json()
+    const body = await request.json()
+    const { userId, action } = body as { userId: string; action: string; newPassword?: string }
+
+    const serviceClient = await createServiceRoleClient()
+
+    if (action === 'set-password') {
+      const newPassword = (body.newPassword ?? '').toString()
+      if (newPassword.length < 8) {
+        return NextResponse.json({ error: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل' }, { status: 400 })
+      }
+      const { error } = await serviceClient.auth.admin.updateUserById(userId, { password: newPassword })
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ success: true })
+    }
 
     // Prevent admin from banning themselves
     if (userId === user.id) {
       return NextResponse.json({ error: 'لا يمكنك إيقاف حسابك' }, { status: 400 })
     }
 
-    const serviceClient = await createServiceRoleClient()
-
     if (action === 'ban') {
-      // Ban for 100 years (effectively permanent)
-      const banUntil = new Date()
-      banUntil.setFullYear(banUntil.getFullYear() + 100)
-
       const { error } = await serviceClient.auth.admin.updateUserById(userId, {
         ban_duration: '876000h', // ~100 years
       })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    } else {
-      // Unban
+    } else if (action === 'unban') {
       const { error } = await serviceClient.auth.admin.updateUserById(userId, {
         ban_duration: 'none',
       })
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    } else {
+      return NextResponse.json({ error: 'إجراء غير معروف' }, { status: 400 })
     }
 
     return NextResponse.json({ success: true })

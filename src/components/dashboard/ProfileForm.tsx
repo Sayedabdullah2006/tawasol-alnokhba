@@ -28,6 +28,30 @@ export default function ProfileForm({ profile: initial, email: initialEmail }: P
     x_handle: initial.x_handle ?? '',
   })
 
+  const [pwForm, setPwForm] = useState({ newPassword: '', confirmPassword: '' })
+  const [pwSaving, setPwSaving] = useState(false)
+
+  const handleChangePassword = async () => {
+    if (pwForm.newPassword.length < 8) {
+      showToast('كلمة المرور يجب أن تكون 8 أحرف على الأقل', 'error')
+      return
+    }
+    if (pwForm.newPassword !== pwForm.confirmPassword) {
+      showToast('كلمتا المرور غير متطابقتين', 'error')
+      return
+    }
+    setPwSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase.auth.updateUser({ password: pwForm.newPassword })
+    if (error) {
+      showToast(error.message ?? 'تعذّر تحديث كلمة المرور', 'error')
+    } else {
+      showToast('تم تحديث كلمة المرور بنجاح')
+      setPwForm({ newPassword: '', confirmPassword: '' })
+    }
+    setPwSaving(false)
+  }
+
   const handleSave = async () => {
     setSaving(true)
     const supabase = createClient()
@@ -98,6 +122,31 @@ export default function ProfileForm({ profile: initial, email: initialEmail }: P
         onChange={e => setForm({ ...form, x_handle: e.target.value })}
       />
       <Button onClick={handleSave} loading={saving}>حفظ التعديلات</Button>
+
+      <div className="border-t border-border pt-5 mt-5 space-y-4">
+        <h3 className="font-bold text-dark">تغيير كلمة المرور</h3>
+        <Input
+          id="new_password"
+          label="كلمة المرور الجديدة"
+          type="password"
+          dir="ltr"
+          placeholder="8 أحرف على الأقل"
+          value={pwForm.newPassword}
+          onChange={e => setPwForm({ ...pwForm, newPassword: e.target.value })}
+        />
+        <Input
+          id="confirm_password"
+          label="تأكيد كلمة المرور"
+          type="password"
+          dir="ltr"
+          value={pwForm.confirmPassword}
+          onChange={e => setPwForm({ ...pwForm, confirmPassword: e.target.value })}
+        />
+        <Button variant="outline" onClick={handleChangePassword} loading={pwSaving}
+          disabled={!pwForm.newPassword || !pwForm.confirmPassword}>
+          تحديث كلمة المرور
+        </Button>
+      </div>
     </div>
   )
 }

@@ -26,6 +26,8 @@ export default function AdminRequestsPage() {
   const [newStatus, setNewStatus] = useState('')
   const [saving, setSaving] = useState(false)
   const [composingQuote, setComposingQuote] = useState(false)
+  const [rejecting, setRejecting] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -63,7 +65,36 @@ export default function AdminRequestsPage() {
     setNewStatus(req.status)
     setAdminNotes(req.admin_notes ?? '')
     setComposingQuote(false)
+    setRejecting(false)
+    setRejectReason('')
     setDrawerOpen(true)
+  }
+
+  const handleReject = async () => {
+    if (!selectedRequest) return
+    if (rejectReason.trim().length < 5) {
+      showToast('اكتب سبب الرفض ليطّلع عليه العميل', 'error')
+      return
+    }
+    setSaving(true)
+    const res = await fetch('/api/update-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId: selectedRequest.id,
+        status: 'rejected',
+        adminNotes: rejectReason.trim(),
+      }),
+    })
+    if (res.ok) {
+      showToast('تم رفض الطلب وإرسال السبب للعميل')
+      setDrawerOpen(false)
+      loadData()
+    } else {
+      const data = await res.json().catch(() => ({}))
+      showToast(data.error ?? 'فشل رفض الطلب', 'error')
+    }
+    setSaving(false)
   }
 
   const handleUpdateStatus = async (overrideStatus?: string) => {
@@ -192,6 +223,20 @@ export default function AdminRequestsPage() {
                 <h3 className="font-bold text-dark">المحتوى</h3>
                 <p className="font-medium">{selectedRequest.title}</p>
                 <p className="bg-cream rounded-xl p-3 text-xs whitespace-pre-line">{selectedRequest.content}</p>
+                {Array.isArray(selectedRequest.content_images) && selectedRequest.content_images.length > 0 && (
+                  <div>
+                    <span className="text-muted text-xs block mb-2">الصور المرفقة ({selectedRequest.content_images.length}):</span>
+                    <div className="grid grid-cols-3 gap-2">
+                      {selectedRequest.content_images.map((url: string, i: number) => (
+                        <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                          className="aspect-square rounded-lg overflow-hidden border border-border hover:border-green/40 transition-colors block">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt={`صورة ${i + 1}`} className="w-full h-full object-cover" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {Array.isArray(selectedRequest.channels) && selectedRequest.channels.length > 0 && (
                   <div className="flex items-center gap-2 pt-1">
                     <span className="text-muted text-xs">القنوات المختارة:</span>
@@ -245,6 +290,26 @@ export default function AdminRequestsPage() {
                       onSent={() => { setDrawerOpen(false); loadData() }}
                       onCancel={() => setComposingQuote(false)}
                     />
+                  ) : rejecting ? (
+                    <div className="space-y-3">
+                      <h3 className="font-bold text-dark">رفض الطلب</h3>
+                      <p className="text-xs text-muted">اشرح للعميل سبب الرفض — سيظهر في صفحة طلبه.</p>
+                      <textarea
+                        value={rejectReason}
+                        onChange={e => setRejectReason(e.target.value)}
+                        autoFocus
+                        className="w-full px-4 py-3 rounded-xl border border-border bg-white text-sm min-h-[120px] resize-y"
+                        placeholder="مثلاً: المحتوى لا يلتزم بسياسة المنصة..."
+                      />
+                      <div className="flex gap-2">
+                        <Button variant="ghost" onClick={() => { setRejecting(false); setRejectReason('') }} className="flex-1">
+                          إلغاء
+                        </Button>
+                        <Button onClick={handleReject} loading={saving} disabled={!rejectReason.trim()} className="flex-1">
+                          تأكيد الرفض
+                        </Button>
+                      </div>
+                    </div>
                   ) : (
                     <div className="space-y-2">
                       <h3 className="font-bold text-dark">إجراءات الطلب</h3>
@@ -252,8 +317,7 @@ export default function AdminRequestsPage() {
                       <Button onClick={() => setComposingQuote(true)} className="w-full">
                         📤 إرسال التسعيرة للعميل
                       </Button>
-                      <Button variant="outline" onClick={() => handleUpdateStatus('rejected')}
-                        loading={saving} className="w-full">
+                      <Button variant="outline" onClick={() => setRejecting(true)} className="w-full">
                         رفض الطلب
                       </Button>
                     </div>

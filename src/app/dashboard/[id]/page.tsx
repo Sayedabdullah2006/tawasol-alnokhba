@@ -105,6 +105,21 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
               </p>
             </div>
 
+            {Array.isArray(request.content_images) && request.content_images.length > 0 && (
+              <div>
+                <span className="text-muted text-sm block mb-2">الصور المرفقة</span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {request.content_images.map((url: string, i: number) => (
+                    <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                      className="aspect-square rounded-xl overflow-hidden border border-border hover:border-green/40 transition-colors block">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`صورة ${i + 1}`} className="w-full h-full object-cover" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {request.link && (
               <div>
                 <span className="text-muted text-sm block mb-1">الرابط</span>
@@ -207,10 +222,17 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
         )}
 
         {request.status === 'rejected' && (
-          <div className="mt-4 bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
-            <div className="text-2xl mb-2">❌</div>
-            <p className="font-bold text-red-700 text-sm">تم رفض الطلب</p>
-            {request.admin_notes && <p className="text-xs text-red-600 mt-1">{request.admin_notes}</p>}
+          <div className="mt-4 bg-red-50 border border-red-200 rounded-2xl p-5 space-y-2">
+            <div className="text-center">
+              <div className="text-3xl mb-1">❌</div>
+              <p className="font-bold text-red-700">تم رفض الطلب</p>
+            </div>
+            {request.admin_notes && (
+              <div className="bg-white/60 rounded-xl p-3 mt-3">
+                <p className="text-xs font-bold text-red-700 mb-1">سبب الرفض من الإدارة:</p>
+                <p className="text-sm text-red-700 whitespace-pre-line">{request.admin_notes}</p>
+              </div>
+            )}
           </div>
         )}
 

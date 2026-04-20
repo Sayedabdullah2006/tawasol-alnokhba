@@ -68,6 +68,7 @@ export async function POST(request: Request) {
         link: body.link,
         hashtags: body.hashtags,
         preferred_date: body.preferred_date,
+        content_images: Array.isArray(body.content_images) ? body.content_images : [],
         client_name: body.client_name,
         client_phone: body.client_phone,
         client_email: body.client_email,

@@ -42,7 +42,7 @@ export default function RequestWizard() {
   const [clientType, setClientType] = useState<ClientType | null>(null)
   const [category, setCategory] = useState<string | null>(null)
   const [subOption, setSubOption] = useState<string | null>(null)
-  const [details, setDetails] = useState({ title: '', content: '', link: '', hashtags: '', preferredDate: '' })
+  const [details, setDetails] = useState({ title: '', content: '', link: '', hashtags: '', preferredDate: '', images: [] as string[] })
   const [channels, setChannels] = useState<string[]>([])
   const [contact, setContact] = useState<ContactData>({ fullName: '', phone: '', email: '', city: '', xHandle: '' })
   const [termsAccepted, setTermsAccepted] = useState(false)
@@ -119,6 +119,7 @@ export default function RequestWizard() {
           title: details.title, content: details.content,
           link: details.link || null, hashtags: details.hashtags || null,
           preferred_date: details.preferredDate || null,
+          content_images: details.images,
           client_name: contact.fullName, client_phone: contact.phone,
           client_email: contact.email, client_city: contact.city || null,
           x_handle: contact.xHandle || null,

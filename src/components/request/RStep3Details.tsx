@@ -2,6 +2,7 @@
 
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
+import ContentImagesUploader from './ContentImagesUploader'
 
 interface ContentDetails {
   title: string
@@ -9,6 +10,7 @@ interface ContentDetails {
   link: string
   hashtags: string
   preferredDate: string
+  images: string[]
 }
 
 interface Props {
@@ -17,7 +19,7 @@ interface Props {
 }
 
 export default function RStep3Details({ data, onChange }: Props) {
-  const update = (field: keyof ContentDetails, value: string) => {
+  const update = <K extends keyof ContentDetails>(field: K, value: ContentDetails[K]) => {
     onChange({ ...data, [field]: value })
   }
 
@@ -47,6 +49,15 @@ export default function RStep3Details({ data, onChange }: Props) {
           maxLength={5000}
           required
         />
+
+        <div>
+          <label className="text-sm font-medium text-dark block mb-2">الصور المرفقة (اختياري)</label>
+          <ContentImagesUploader
+            images={data.images}
+            onChange={imgs => update('images', imgs)}
+          />
+        </div>
+
         <Input
           id="link"
           label="رابط إضافي (اختياري)"
@@ -71,10 +82,6 @@ export default function RStep3Details({ data, onChange }: Props) {
           value={data.preferredDate}
           onChange={e => update('preferredDate', e.target.value)}
         />
-
-        <div className="bg-green/5 border border-green/20 rounded-xl p-3 text-sm text-green">
-          💡 الصور والمرفقات ترسل لاحقاً بعد تأكيد الطلب
-        </div>
       </div>
     </div>
   )
