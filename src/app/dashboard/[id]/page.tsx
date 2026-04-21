@@ -53,26 +53,28 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
     : request.status
 
   return (
-    <div>
-      <div className="max-w-3xl mx-auto px-4 py-8">
+    <div className="mobile-container-safe">
+      <div className="max-w-3xl mx-auto px-2 md:px-4 py-4 md:py-8">
         <Link href="/dashboard" className="text-sm text-green hover:underline mb-4 block">
           → العودة للطلبات
         </Link>
 
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
-          <div className="p-5 border-b border-border flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-black text-dark">
+          <div className="p-3 md:p-5 border-b border-border flex items-start md:items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg md:text-xl font-black text-dark mobile-safe">
                 طلب {generateRequestNumber(request.request_number)}
               </h1>
               <p className="text-sm text-muted">{formatDate(request.created_at)}</p>
             </div>
-            <StatusBadge status={effectiveStatus} />
+            <div className="flex-shrink-0">
+              <StatusBadge status={effectiveStatus} />
+            </div>
           </div>
 
-          <div className="p-5 space-y-4">
+          <div className="p-3 md:p-5 space-y-4">
             {/* Content — always visible */}
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
               <div>
                 <span className="text-muted block">الفئة</span>
                 <span className="font-medium">{cat?.icon} {cat?.nameAr ?? request.category}</span>
@@ -84,7 +86,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
                 </div>
               )}
               {Array.isArray(request.channels) && request.channels.length > 0 && (
-                <div className="col-span-2">
+                <div className="col-span-1 md:col-span-2">
                   <span className="text-muted block">القنوات</span>
                   <span className="font-medium">
                     {request.channels.map((c: string) => ({ x: 'X', ig: 'Instagram', li: 'LinkedIn', tk: 'TikTok' } as Record<string, string>)[c] ?? c).join('، ')}
@@ -95,12 +97,12 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
 
             <div>
               <span className="text-muted text-sm block mb-1">عنوان الخبر</span>
-              <p className="font-medium text-dark">{request.title}</p>
+              <p className="font-medium text-dark mobile-safe break-words">{request.title}</p>
             </div>
 
             <div>
               <span className="text-muted text-sm block mb-1">المحتوى</span>
-              <p className="text-dark text-sm whitespace-pre-line bg-cream rounded-xl p-3">
+              <p className="text-dark text-sm whitespace-pre-line bg-cream rounded-xl p-3 mobile-safe break-words">
                 {request.content}
               </p>
             </div>
@@ -108,7 +110,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
             {Array.isArray(request.content_images) && request.content_images.length > 0 && (
               <div>
                 <span className="text-muted text-sm block mb-2">الصور المرفقة</span>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                   {request.content_images.map((url: string, i: number) => (
                     <a key={i} href={url} target="_blank" rel="noopener noreferrer"
                       className="aspect-square rounded-xl overflow-hidden border border-border hover:border-green/40 transition-colors block">
@@ -196,7 +198,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
         )}
 
         {['payment_review', 'paid', 'in_progress', 'completed'].includes(effectiveStatus) && request.final_total != null && (
-          <div className="mt-4 bg-card rounded-2xl border border-border p-5 space-y-2 text-sm">
+          <div className="mt-4 bg-card rounded-2xl border border-border p-3 md:p-5 space-y-2 text-sm">
             <h3 className="font-bold text-dark mb-2">تفصيل التسعيرة المعتمدة</h3>
             {Number(request.final_total) <= 0 ? (
               <div className="bg-gradient-to-l from-green/10 to-gold/10 border border-gold/30 rounded-xl p-4 text-center">
