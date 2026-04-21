@@ -5,29 +5,19 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { CATEGORIES, REQUEST_STATUSES } from '@/lib/constants'
 import { formatNumber, formatDate, generateRequestNumber } from '@/lib/utils'
-import { useToast } from '@/components/ui/Toast'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
-import QuoteComposer from '@/components/admin/QuoteComposer'
 
 export default function AdminRequestsPage() {
   const router = useRouter()
   const supabase = createClient()
-  const { showToast } = useToast()
   const [loading, setLoading] = useState(true)
   const [requests, setRequests] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  const [selectedRequest, setSelectedRequest] = useState<any>(null)
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [adminNotes, setAdminNotes] = useState('')
-  const [newStatus, setNewStatus] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [composingQuote, setComposingQuote] = useState(false)
-  const [rejecting, setRejecting] = useState(false)
-  const [rejectReason, setRejectReason] = useState('')
+  // Removed drawer-related state since we now use full-page view
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -47,10 +37,7 @@ export default function AdminRequestsPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  useEffect(() => {
-    document.body.style.overflow = drawerOpen ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [drawerOpen])
+  // Removed drawer useEffect
 
   const filteredRequests = requests.filter(r => {
     if (statusFilter && r.status !== statusFilter) return false
@@ -65,68 +52,12 @@ export default function AdminRequestsPage() {
     return true
   })
 
-  const openDrawer = (req: any) => {
-    setSelectedRequest(req)
-    setNewStatus(req.status)
-    setAdminNotes(req.admin_notes ?? '')
-    setComposingQuote(false)
-    setRejecting(false)
-    setRejectReason('')
-    setDrawerOpen(true)
+  const openRequest = (req: any) => {
+    // Navigate to full-page request view
+    router.push(`/admin/requests/${req.id}`)
   }
 
-  const handleReject = async () => {
-    if (!selectedRequest) return
-    if (rejectReason.trim().length < 5) {
-      showToast('اكتب سبب الرفض ليطّلع عليه العميل', 'error')
-      return
-    }
-    setSaving(true)
-    const res = await fetch('/api/update-status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requestId: selectedRequest.id,
-        status: 'rejected',
-        adminNotes: rejectReason.trim(),
-      }),
-    })
-    if (res.ok) {
-      showToast('تم رفض الطلب وإرسال السبب للعميل')
-      setDrawerOpen(false)
-      loadData()
-    } else {
-      const data = await res.json().catch(() => ({}))
-      showToast(data.error ?? 'فشل رفض الطلب', 'error')
-    }
-    setSaving(false)
-  }
-
-  const handleUpdateStatus = async (overrideStatus?: string) => {
-    if (!selectedRequest) return
-    setSaving(true)
-
-    const statusToSend = overrideStatus ?? newStatus
-    const res = await fetch('/api/update-status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requestId: selectedRequest.id,
-        status: statusToSend,
-        adminNotes,
-      }),
-    })
-
-    if (res.ok) {
-      showToast('تم تحديث الحالة بنجاح')
-      setDrawerOpen(false)
-      loadData()
-    } else {
-      const data = await res.json().catch(() => ({}))
-      showToast(data.error ?? 'فشل تحديث الحالة', 'error')
-    }
-    setSaving(false)
-  }
+  // Removed drawer handler functions - now using full-page view
 
   const handleExport = () => {
     const params = new URLSearchParams()
@@ -179,7 +110,7 @@ export default function AdminRequestsPage() {
                 return (
                   <tr
                     key={r.id}
-                    onClick={() => openDrawer(r)}
+                    onClick={() => openRequest(r)}
                     className="border-t border-border hover:bg-cream/50 cursor-pointer transition-colors"
                   >
                     <td className="px-4 py-3 font-mono text-xs">{generateRequestNumber(r.request_number)}</td>
@@ -203,8 +134,9 @@ export default function AdminRequestsPage() {
         )}
       </div>
 
-      {/* Request Drawer */}
-      {drawerOpen && selectedRequest && (
+    </div>
+  )
+}
         <div className="fixed inset-0 z-50 flex md:justify-end">
           <div className="absolute inset-0 bg-dark/50" onClick={() => setDrawerOpen(false)} />
           <div className="relative bg-card w-full md:w-[520px] h-[100dvh] flex flex-col shadow-2xl">
