@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { notifyNegotiatedQuoteToClient } from '@/lib/email'
+import { validateRequestId, validatePrice, validateDiscountPercentage, validateAdminNotes, ValidationException, formatValidationErrors } from '@/lib/validation'
 
 export async function POST(request: Request) {
   try {
@@ -22,7 +23,20 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { requestId, newPrice, discountPercentage, adminNotes, acceptClientPrice } = body
 
-    if (!requestId || (acceptClientPrice && typeof newPrice !== 'number') || (!acceptClientPrice && typeof newPrice !== 'number') || newPrice < 0) {
+    // Validate input data
+    try {
+      validateRequestId(requestId)
+      validatePrice(newPrice)
+      if (!acceptClientPrice && discountPercentage !== undefined) {
+        validateDiscountPercentage(discountPercentage)
+      }
+      if (adminNotes !== undefined) {
+        validateAdminNotes(adminNotes)
+      }
+    } catch (error) {
+      if (error instanceof ValidationException) {
+        return NextResponse.json({ error: formatValidationErrors(error.errors) }, { status: 400 })
+      }
       return NextResponse.json({ error: 'بيانات غير صالحة' }, { status: 400 })
     }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { notifyNegotiationRequestedByClient, notifyNegotiationRequestToClient } from '@/lib/email'
+import { validateRequestId, validateNegotiationReason, validateProposedPrice, ValidationException, formatValidationErrors } from '@/lib/validation'
 
 export async function POST(request: Request) {
   try {
@@ -11,15 +12,6 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     const { requestId, negotiationReason, proposedPrice } = body
-
-    if (!requestId || !negotiationReason?.trim()) {
-      return NextResponse.json({ error: 'بيانات غير كاملة' }, { status: 400 })
-    }
-
-    // Validate proposed price if provided
-    if (proposedPrice !== undefined && (typeof proposedPrice !== 'number' || proposedPrice < 0)) {
-      return NextResponse.json({ error: 'السعر المقترح غير صالح' }, { status: 400 })
-    }
 
     // Get request details
     const { data: existingRequest } = await supabase
@@ -39,6 +31,20 @@ export async function POST(request: Request) {
 
     if (existingRequest.status !== 'quoted') {
       return NextResponse.json({ error: 'لا يمكن طلب التفاوض في هذه المرحلة' }, { status: 400 })
+    }
+
+    // Validate input data with context
+    try {
+      validateRequestId(requestId)
+      validateNegotiationReason(negotiationReason)
+      if (proposedPrice !== undefined && proposedPrice !== null) {
+        validateProposedPrice(proposedPrice, Number(existingRequest.admin_quoted_price || 0))
+      }
+    } catch (error) {
+      if (error instanceof ValidationException) {
+        return NextResponse.json({ error: formatValidationErrors(error.errors) }, { status: 400 })
+      }
+      return NextResponse.json({ error: 'بيانات غير صالحة' }, { status: 400 })
     }
 
     // Update request status to negotiation

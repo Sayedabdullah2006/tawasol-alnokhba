@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { notifyQuoteRejectedByClient, notifyQuoteRejectionToClient } from '@/lib/email'
+import { validateRequestId, validateRejectionReason, ValidationException, formatValidationErrors } from '@/lib/validation'
 
 export async function POST(request: Request) {
   try {
@@ -12,8 +13,15 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { requestId, rejectionReason } = body
 
-    if (!requestId || !rejectionReason?.trim()) {
-      return NextResponse.json({ error: 'بيانات غير كاملة' }, { status: 400 })
+    // Validate input data
+    try {
+      validateRequestId(requestId)
+      validateRejectionReason(rejectionReason)
+    } catch (error) {
+      if (error instanceof ValidationException) {
+        return NextResponse.json({ error: formatValidationErrors(error.errors) }, { status: 400 })
+      }
+      return NextResponse.json({ error: 'بيانات غير صالحة' }, { status: 400 })
     }
 
     // Get request details

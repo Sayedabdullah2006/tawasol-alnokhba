@@ -38,7 +38,7 @@ export async function POST(request: Request) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', requestId)
-      .select('request_number, client_name, client_email, final_total, admin_quoted_price')
+      .select('request_number, client_name, client_email, final_total, admin_quoted_price, estimated_reach')
       .single()
 
     if (error) {
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
           p = notifyQuoteReadyToClient({
             ...base,
             price: Number(updated.admin_quoted_price ?? 0),
-            reach: 0 // Will be calculated properly in the template
+            reach: Number(updated.estimated_reach ?? 0) // Use stored reach estimate
           })
           break
         case 'paid':

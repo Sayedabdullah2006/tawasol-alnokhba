@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { notifyContentReadyForReview } from '@/lib/email'
+import { validateRequestId, validateContent, ValidationException, formatValidationErrors } from '@/lib/validation'
 
 export async function POST(request: Request) {
   try {
@@ -22,8 +23,15 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { requestId, proposedContent, proposedImages } = body
 
-    if (!requestId || !proposedContent?.trim()) {
-      return NextResponse.json({ error: 'بيانات غير كاملة' }, { status: 400 })
+    // Validate input data
+    try {
+      validateRequestId(requestId)
+      validateContent(proposedContent)
+    } catch (error) {
+      if (error instanceof ValidationException) {
+        return NextResponse.json({ error: formatValidationErrors(error.errors) }, { status: 400 })
+      }
+      return NextResponse.json({ error: 'بيانات غير صالحة' }, { status: 400 })
     }
 
     // Get request details for email

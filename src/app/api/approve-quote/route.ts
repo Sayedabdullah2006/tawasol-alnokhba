@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { calculateReach, EXTRAS_REACH_BOOST } from '@/lib/pricing-engine'
 import { notifyFreeApprovedToClient, notifyQuoteApprovedAwaitingPaymentToClient, notifyQuoteApprovedToAdmin } from '@/lib/email'
+import { notifyAsync } from '@/lib/email-queue'
 
 interface OfferedExtra {
   id: string
@@ -123,7 +124,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'فشل اعتماد التسعيرة' }, { status: 500 })
     }
 
-    // Notify the client and admin of the new state
+    // Notify the client and admin of the new state with enhanced error handling
     if (req.client_email) {
       const requestNumber = `ATH-${String(req.request_number).padStart(4, '0')}`
       const base = {
@@ -131,20 +132,26 @@ export async function POST(request: Request) {
         requestNumber,
         clientName: req.client_name ?? 'عزيزنا',
       }
-      const clientPromise = newStatus === 'in_progress'
-        ? notifyFreeApprovedToClient(base)
-        : notifyQuoteApprovedAwaitingPaymentToClient({ ...base, total: finalTotal })
-      clientPromise.catch(e => console.error('Client approve-quote email failed:', e))
+
+      // Notify client with better error handling
+      await notifyAsync(
+        () => newStatus === 'in_progress'
+          ? notifyFreeApprovedToClient(base)
+          : notifyQuoteApprovedAwaitingPaymentToClient({ ...base, total: finalTotal }),
+        `quote-approved-client-${requestNumber}-${newStatus}`
+      )
 
       // Notify admin about the approval
-      const adminPromise = notifyQuoteApprovedToAdmin({
-        requestNumber,
-        clientName: req.client_name ?? 'العميل',
-        totalAmount: finalTotal,
-        hasExtras: valid.length > 0,
-        selectedExtras: valid
-      })
-      adminPromise.catch(e => console.error('Admin approve-quote email failed:', e))
+      await notifyAsync(
+        () => notifyQuoteApprovedToAdmin({
+          requestNumber,
+          clientName: req.client_name ?? 'العميل',
+          totalAmount: finalTotal,
+          hasExtras: valid.length > 0,
+          selectedExtras: valid
+        }),
+        `quote-approved-admin-${requestNumber}`
+      )
     }
 
     const redirectTo = newStatus === 'in_progress' ? `/dashboard/${requestId}` : `/payment/${requestId}`
