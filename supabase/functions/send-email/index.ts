@@ -70,6 +70,12 @@ Deno.serve(async (req) => {
     subject: payload.subject,
     html: payload.html,
     reply_to: payload.replyTo || REPLY_TO_EMAIL,
+    headers: {
+      'X-Mailer': 'Nukhba-Platform',
+      'X-Priority': '3',
+      'List-Unsubscribe': '<mailto:unsubscribe@nukhba.media>',
+      'Precedence': 'bulk'
+    }
   }
 
   console.log('Resend API request:', {

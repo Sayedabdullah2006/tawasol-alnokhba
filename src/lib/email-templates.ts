@@ -300,18 +300,30 @@ export function registrationCodeToClient(d: {
   ).join('')
 
   return {
-    subject: `Verification Code: ${d.code}`,
+    subject: `Account Verification - Nukhba Platform`,
     html: wrap(`
-      <p style="margin:0 0 16px 0; font-size:15px;">Hello,</p>
-      <p style="margin:0 0 16px 0; font-size:14px;">
-        Your verification code is: <strong style="font-size:18px; color:#000;">${d.code}</strong>
-      </p>
-      <p style="margin:0 0 16px 0; font-size:14px;">
-        This code expires in ${d.ttlMinutes} minutes.
-      </p>
-      <p style="margin:16px 0 0 0; font-size:12px; color:#666;">
-        If you didn't request this, please ignore this email.
-      </p>
+      <table style="width:100%; max-width:600px; margin:0 auto; font-family:Arial,sans-serif;">
+        <tr>
+          <td style="padding:40px 20px; text-align:center; background:#ffffff;">
+            <h1 style="color:#0E2855; margin:0 0 20px 0; font-size:24px;">Account Verification</h1>
+            <p style="color:#333; font-size:16px; line-height:1.5; margin:0 0 20px 0;">
+              Thank you for signing up with Nukhba Platform. Please verify your account using the code below:
+            </p>
+            <div style="background:#f8f9fa; border:2px solid #e9ecef; border-radius:8px; padding:20px; margin:20px 0;">
+              <p style="color:#0E2855; font-size:18px; font-weight:bold; margin:0 0 10px 0;">Verification Code:</p>
+              <p style="color:#0E2855; font-size:32px; font-weight:bold; letter-spacing:4px; margin:0; font-family:monospace;">${d.code}</p>
+            </div>
+            <p style="color:#666; font-size:14px; margin:20px 0;">
+              This code will expire in ${d.ttlMinutes} minutes for security reasons.
+            </p>
+            <hr style="border:none; border-top:1px solid #eee; margin:30px 0;">
+            <p style="color:#999; font-size:12px; margin:0;">
+              If you didn't create an account, please ignore this email.<br>
+              This is an automated message from Nukhba Platform.
+            </p>
+          </td>
+        </tr>
+      </table>
     `),
   }
 }
@@ -326,21 +338,30 @@ export function resetPasswordCodeToClient(d: {
   ).join('')
 
   return {
-    subject: `رمز إعادة تعيين كلمة المرور · تواصل النخبة`,
+    subject: `Password Reset - Nukhba Platform`,
     html: wrap(`
-      <p style="margin:0 0 16px 0; font-size:15px;">🔑 <strong>طلب إعادة تعيين كلمة المرور</strong></p>
-      <p style="margin:0 0 16px 0; font-size:14px; line-height:1.8;">
-        استلمنا طلب إعادة تعيين كلمة مرور حسابك. استخدم الرمز التالي لإكمال العملية:
-      </p>
-      <div style="text-align:center; margin:24px 0; direction:ltr;">
-        ${codeDigits}
-      </div>
-      <p style="margin:0 0 8px 0; font-size:13px; color:#6B7C99; text-align:center;">
-        الرمز صالح لمدة <strong style="color:${BRAND_NAVY};">${d.ttlMinutes} دقائق</strong> فقط
-      </p>
-      <p style="margin:18px 0 0 0; font-size:12px; color:#6B7C99; line-height:1.8; text-align:center;">
-        إذا لم تطلب إعادة التعيين، تجاهل الرسالة وغيّر كلمة المرور إن شعرت بأي خطر.
-      </p>
+      <table style="width:100%; max-width:600px; margin:0 auto; font-family:Arial,sans-serif;">
+        <tr>
+          <td style="padding:40px 20px; text-align:center; background:#ffffff;">
+            <h1 style="color:#0E2855; margin:0 0 20px 0; font-size:24px;">Password Reset Request</h1>
+            <p style="color:#333; font-size:16px; line-height:1.5; margin:0 0 20px 0;">
+              We received a request to reset the password for your Nukhba Platform account. Use the code below to complete the process:
+            </p>
+            <div style="background:#f8f9fa; border:2px solid #e9ecef; border-radius:8px; padding:20px; margin:20px 0;">
+              <p style="color:#0E2855; font-size:18px; font-weight:bold; margin:0 0 10px 0;">Reset Code:</p>
+              <p style="color:#0E2855; font-size:32px; font-weight:bold; letter-spacing:4px; margin:0; font-family:monospace;">${d.code}</p>
+            </div>
+            <p style="color:#666; font-size:14px; margin:20px 0;">
+              This code will expire in ${d.ttlMinutes} minutes for security reasons.
+            </p>
+            <hr style="border:none; border-top:1px solid #eee; margin:30px 0;">
+            <p style="color:#999; font-size:12px; margin:0;">
+              If you didn't request this password reset, please ignore this email and consider changing your password if you feel your account may be compromised.<br>
+              This is an automated message from Nukhba Platform.
+            </p>
+          </td>
+        </tr>
+      </table>
     `),
   }
 }
