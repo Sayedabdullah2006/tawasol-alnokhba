@@ -108,7 +108,7 @@ export default function AdminUsersPage() {
   if (loading) return <LoadingSpinner size="lg" />
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-black text-dark">إدارة المستخدمين</h1>
         <span className="text-sm text-muted">{users.length} مستخدم</span>
@@ -207,8 +207,8 @@ export default function AdminUsersPage() {
       </div>
 
       {pwUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-dark/50 p-4">
-          <div className="bg-card rounded-2xl border border-border w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-dark/50 p-0 md:p-4">
+          <div className="bg-card rounded-t-2xl md:rounded-2xl border border-border w-full md:max-w-md p-5 md:p-6 space-y-4 max-h-[90dvh] overflow-y-auto">
             <div>
               <h3 className="font-black text-dark text-lg">تغيير كلمة المرور</h3>
               <p className="text-sm text-muted mt-1">{pwUser.full_name || pwUser.email}</p>

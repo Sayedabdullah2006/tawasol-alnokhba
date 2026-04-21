@@ -42,7 +42,7 @@ export default function DashboardPage() {
   if (loading) return <LoadingSpinner size="lg" />
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <h1 className="text-2xl font-black text-dark mb-6">مرحباً، {userName} 👋</h1>
 
       {requests.length === 0 ? (

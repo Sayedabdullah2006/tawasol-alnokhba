@@ -137,7 +137,7 @@ export default function AdminRequestsPage() {
   if (loading) return <LoadingSpinner size="lg" />
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <h1 className="text-2xl font-black text-dark mb-6">إدارة الطلبات</h1>
 
       <div className="flex flex-wrap gap-3 mb-4">
@@ -205,17 +205,18 @@ export default function AdminRequestsPage() {
 
       {/* Request Drawer */}
       {drawerOpen && selectedRequest && (
-        <div className="fixed inset-0 z-50 flex justify-end">
+        <div className="fixed inset-0 z-50 flex md:justify-end">
           <div className="absolute inset-0 bg-dark/50" onClick={() => setDrawerOpen(false)} />
-          <div className="relative bg-card w-full md:max-w-lg h-full overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 bg-card border-b border-border px-5 py-4 flex items-center justify-between z-10">
-              <h2 className="font-bold text-dark">
+          <div className="relative bg-card w-full md:w-[520px] h-[100dvh] flex flex-col shadow-2xl">
+            <div className="flex-shrink-0 bg-card border-b border-border px-5 py-4 flex items-center justify-between">
+              <h2 className="font-bold text-dark text-base">
                 طلب {generateRequestNumber(selectedRequest.request_number)}
               </h2>
-              <button onClick={() => setDrawerOpen(false)} className="text-muted hover:text-dark text-xl cursor-pointer">✕</button>
+              <button onClick={() => setDrawerOpen(false)}
+                className="w-10 h-10 -ml-2 flex items-center justify-center text-muted hover:text-dark text-xl cursor-pointer">✕</button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-4">
               <div className="space-y-2 text-sm">
                 <h3 className="font-bold text-dark">بيانات العميل</h3>
                 <p>الاسم: {selectedRequest.client_name}</p>

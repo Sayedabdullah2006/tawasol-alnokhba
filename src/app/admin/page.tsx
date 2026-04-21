@@ -66,7 +66,7 @@ export default function AdminStatsPage() {
   if (loading) return <LoadingSpinner size="lg" />
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <h1 className="text-2xl font-black text-dark mb-6">الإحصائيات</h1>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

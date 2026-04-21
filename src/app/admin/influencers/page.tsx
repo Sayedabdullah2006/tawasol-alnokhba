@@ -153,7 +153,7 @@ export default function AdminInfluencersPage() {
   // ─── If pricing editor is open, show it ───
   if (pricingInfluencer) {
     return (
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <button onClick={() => setPricingInfluencer(null)} className="text-sm text-green hover:underline mb-4 block cursor-pointer">
           → العودة لقائمة المؤثرين
         </button>
@@ -297,7 +297,7 @@ export default function AdminInfluencersPage() {
 
   // ─── Influencers List ───
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-black text-dark">إدارة المؤثرين</h1>
         <Button onClick={openAddForm}>+ إضافة مؤثر</Button>

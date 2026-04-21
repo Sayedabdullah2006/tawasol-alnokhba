@@ -125,7 +125,7 @@ export default function AdminCategoriesPage() {
   if (loading) return <LoadingSpinner size="lg" />
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <div className="flex gap-2 mb-6">
         <button onClick={() => setTab('categories')} className={`px-4 py-2 rounded-xl text-sm font-medium cursor-pointer transition-all ${tab === 'categories' ? 'bg-green text-white' : 'bg-card border border-border text-dark'}`}>
           فئات المحتوى

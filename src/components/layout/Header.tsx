@@ -199,7 +199,7 @@ export default function Header() {
 
       {/* Mobile menu — outside <header> so backdrop-blur doesn't trap fixed positioning */}
       {menuOpen && (
-        <div className="md:hidden fixed inset-0 top-20 z-50 bg-cream flex flex-col"
+        <div className="md:hidden fixed inset-x-0 top-20 bottom-0 z-50 bg-cream flex flex-col"
           onClick={() => setMenuOpen(false)}>
           <nav className="flex-1 overflow-y-auto px-4 pt-2 pb-6"
             onClick={e => e.stopPropagation()}>
