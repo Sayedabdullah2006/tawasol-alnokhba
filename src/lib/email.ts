@@ -146,6 +146,20 @@ export async function notifyContentChangesRequested(args: {
   return sendEmail(ADMIN_EMAIL, t.subject, t.html)
 }
 
+export async function notifyQuoteApprovedToAdmin(args: {
+  requestNumber: string; clientName: string; totalAmount: number; hasExtras: boolean; selectedExtras: string[]
+}) {
+  const t = templates.quoteApprovedToAdmin(args)
+  return sendEmail(ADMIN_EMAIL, t.subject, t.html)
+}
+
+export async function notifyBankTransferReceivedToAdmin(args: {
+  requestNumber: string; clientName: string; totalAmount: number
+}) {
+  const t = templates.bankTransferReceivedToAdmin(args)
+  return sendEmail(ADMIN_EMAIL, t.subject, t.html)
+}
+
 // Old name kept for compatibility with the existing submit-request route.
 export async function sendNewRequestEmail(args: {
   requestNumber: string; clientName: string; clientEmail: string; clientPhone: string

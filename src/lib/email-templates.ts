@@ -601,3 +601,104 @@ export function contentChangesRequested(d: {
     `)
   }
 }
+
+// ─── Additional Admin Notifications ───
+
+export function quoteApprovedToAdmin(d: {
+  requestNumber: string; clientName: string; totalAmount: number; hasExtras: boolean; selectedExtras: string[]
+}) {
+  return {
+    subject: `تم اعتماد العرض - طلب ${d.requestNumber}`,
+    html: wrap(`
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:48px; margin-bottom:16px;">✅</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">تم اعتماد العرض</h2>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+      </div>
+
+      <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
+        قام العميل <strong style="color:${BRAND_NAVY};">${d.clientName}</strong> بالموافقة على العرض المقدم.
+      </p>
+
+      <div style="background:#E8F5E8; border-radius:12px; padding:20px; margin:24px 0;">
+        <h3 style="margin:0 0 12px 0; color:#059669; font-size:16px;">تفاصيل الموافقة</h3>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td style="padding:4px 0; color:#059669; font-size:14px;">المبلغ الإجمالي:</td>
+            <td style="padding:4px 0; color:#059669; font-weight:bold; font-size:14px; text-align:left;">${d.totalAmount} ر.س</td>
+          </tr>
+          ${d.hasExtras ? `
+            <tr>
+              <td style="padding:4px 0; color:#059669; font-size:14px;">الخدمات الإضافية:</td>
+              <td style="padding:4px 0; color:#059669; font-size:14px; text-align:left;">${d.selectedExtras.length} خدمات</td>
+            </tr>
+          ` : ''}
+        </table>
+      </div>
+
+      ${d.totalAmount > 0 ? `
+        <div style="background:#FFF8E1; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${BRAND_GOLD};">
+          <h3 style="margin:0 0 8px 0; color:#856404; font-size:16px;">💳 الخطوة التالية</h3>
+          <p style="margin:0; color:#856404; font-size:14px; line-height:1.6;">
+            العميل الآن في مرحلة الدفع. راقب الطلب لاستلام إيصال التحويل البنكي.
+          </p>
+        </div>
+      ` : `
+        <div style="background:#E8F5E8; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid #059669;">
+          <h3 style="margin:0 0 8px 0; color:#059669; font-size:16px;">🎁 طلب مجاني</h3>
+          <p style="margin:0; color:#059669; font-size:14px; line-height:1.6;">
+            هذا طلب مجاني وانتقل مباشرة لمرحلة التنفيذ. يمكنك البدء في التحضير.
+          </p>
+        </div>
+      `}
+
+      <div style="margin:32px 0; text-align:center;">
+        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+          عرض تفاصيل الطلب
+        </a>
+      </div>
+    `)
+  }
+}
+
+export function bankTransferReceivedToAdmin(d: {
+  requestNumber: string; clientName: string; totalAmount: number
+}) {
+  return {
+    subject: `إيصال تحويل بانتظار المراجعة - طلب ${d.requestNumber}`,
+    html: wrap(`
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:48px; margin-bottom:16px;">🧾</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">إيصال تحويل بانتظار المراجعة</h2>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+      </div>
+
+      <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
+        قام العميل <strong style="color:${BRAND_NAVY};">${d.clientName}</strong> برفع إيصال التحويل البنكي.
+      </p>
+
+      <div style="background:#FFF8E1; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${BRAND_GOLD};">
+        <h3 style="margin:0 0 12px 0; color:#856404; font-size:16px;">تفاصيل المبلغ</h3>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td style="padding:4px 0; color:#856404; font-size:14px;">المبلغ المطلوب:</td>
+            <td style="padding:4px 0; color:#856404; font-weight:bold; font-size:16px; text-align:left;">${d.totalAmount} ر.س</td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="background:#E3F2FD; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid #2196F3;">
+        <h3 style="margin:0 0 8px 0; color:#1976D2; font-size:16px;">🔍 مطلوب المراجعة</h3>
+        <p style="margin:0; color:#1976D2; font-size:14px; line-height:1.6;">
+          يرجى مراجعة الإيصال المرفق والتأكد من صحة المبلغ، ثم تأكيد استلام الدفع من لوحة الإدارة.
+        </p>
+      </div>
+
+      <div style="margin:32px 0; text-align:center;">
+        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+          مراجعة الإيصال وتأكيد الدفع
+        </a>
+      </div>
+    `)
+  }
+}

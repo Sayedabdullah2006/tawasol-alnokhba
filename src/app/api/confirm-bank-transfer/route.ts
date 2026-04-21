@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
+import { notifyBankTransferReceivedToAdmin } from '@/lib/email'
 
 export async function POST(request: Request) {
   try {
@@ -11,7 +12,7 @@ export async function POST(request: Request) {
 
     const { data: req } = await supabase
       .from('publish_requests')
-      .select('user_id, status')
+      .select('user_id, status, request_number, client_name, final_total, admin_quoted_price')
       .eq('id', requestId)
       .single()
 
@@ -36,6 +37,15 @@ export async function POST(request: Request) {
       console.error('Confirm transfer error:', error)
       return NextResponse.json({ error: 'فشل تأكيد التحويل' }, { status: 500 })
     }
+
+    // Notify admin about the bank transfer receipt
+    const requestNumber = `ATH-${String(req.request_number).padStart(4, '0')}`
+    const totalAmount = req.final_total ?? req.admin_quoted_price ?? 0
+    notifyBankTransferReceivedToAdmin({
+      requestNumber,
+      clientName: req.client_name ?? 'العميل',
+      totalAmount: Number(totalAmount)
+    }).catch(e => console.error('Admin bank transfer notification failed:', e))
 
     return NextResponse.json({ success: true })
   } catch (err) {
