@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from 'react'
 interface Props {
   onVerify: (token: string) => void
   onExpire?: () => void
-  theme?: 'light' | 'dark' | 'auto'
 }
 
 declare global {
@@ -22,11 +21,15 @@ declare global {
 const SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad'
 const SCRIPT_ID = 'cf-turnstile-script'
 
-export default function TurnstileWidget({ onVerify, onExpire, theme = 'light' }: Props) {
+// Invisible Turnstile challenge — no checkbox, no CAPTCHA images, no user
+// interaction unless Cloudflare flags the session. Token is generated on mount.
+export default function TurnstileWidget({ onVerify, onExpire }: Props) {
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
   const containerRef = useRef<HTMLDivElement>(null)
   const widgetIdRef = useRef<string | null>(null)
-  const [scriptReady, setScriptReady] = useState<boolean>(typeof window !== 'undefined' && Boolean(window.turnstile))
+  const [scriptReady, setScriptReady] = useState<boolean>(
+    typeof window !== 'undefined' && Boolean(window.turnstile)
+  )
 
   useEffect(() => {
     if (!siteKey) return
@@ -42,7 +45,6 @@ export default function TurnstileWidget({ onVerify, onExpire, theme = 'light' }:
       s.defer = true
       document.head.appendChild(s)
     } else {
-      // Script exists but callback may have fired before this component mounted
       const iv = setInterval(() => {
         if (window.turnstile) { setScriptReady(true); clearInterval(iv) }
       }, 100)
@@ -59,7 +61,8 @@ export default function TurnstileWidget({ onVerify, onExpire, theme = 'light' }:
       callback: (token: string) => onVerify(token),
       'expired-callback': () => onExpire?.(),
       'error-callback': () => onExpire?.(),
-      theme,
+      // Default "managed" widget — visible, auto-verifies without CAPTCHA entry
+      theme: 'light',
     })
 
     return () => {
@@ -72,5 +75,8 @@ export default function TurnstileWidget({ onVerify, onExpire, theme = 'light' }:
   }, [scriptReady])
 
   if (!siteKey) return null
+
+  // Empty container Cloudflare attaches to. Stays invisible until (if ever)
+  // a challenge becomes necessary; then it renders centered.
   return <div ref={containerRef} className="flex justify-center" />
 }
