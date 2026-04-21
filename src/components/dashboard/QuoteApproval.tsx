@@ -37,6 +37,11 @@ export default function QuoteApproval({
   const { showToast } = useToast()
   const [selected, setSelected] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const [rejecting, setRejecting] = useState(false)
+  const [negotiating, setNegotiating] = useState(false)
+  const [rejectionReason, setRejectionReason] = useState('')
+  const [negotiationReason, setNegotiationReason] = useState('')
+  const [proposedPrice, setProposedPrice] = useState('')
 
   const extrasMap = useMemo(() => new Map(offeredExtras.map(e => [e.id, e])), [offeredExtras])
 
@@ -65,6 +70,65 @@ export default function QuoteApproval({
       router.push(data.redirectTo)
     } else {
       showToast(data.error ?? 'فشل اعتماد العرض', 'error')
+      setSubmitting(false)
+    }
+  }
+
+  const handleReject = async () => {
+    if (!rejectionReason.trim()) {
+      showToast('يرجى كتابة سبب رفض العرض', 'error')
+      return
+    }
+
+    setSubmitting(true)
+    const res = await fetch('/api/reject-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId,
+        rejectionReason: rejectionReason.trim()
+      }),
+    })
+
+    if (res.ok) {
+      showToast('تم رفض العرض')
+      router.push('/dashboard')
+    } else {
+      const data = await res.json().catch(() => ({}))
+      showToast(data.error ?? 'فشل رفض العرض', 'error')
+      setSubmitting(false)
+    }
+  }
+
+  const handleNegotiate = async () => {
+    if (!negotiationReason.trim() || !proposedPrice.trim()) {
+      showToast('يرجى كتابة سبب التفاوض والسعر المقترح', 'error')
+      return
+    }
+
+    const proposedAmount = parseFloat(proposedPrice)
+    if (isNaN(proposedAmount) || proposedAmount < 0) {
+      showToast('يرجى إدخال سعر صالح', 'error')
+      return
+    }
+
+    setSubmitting(true)
+    const res = await fetch('/api/request-negotiation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId,
+        negotiationReason: negotiationReason.trim(),
+        proposedPrice: proposedAmount
+      }),
+    })
+
+    if (res.ok) {
+      showToast('تم إرسال طلب التفاوض')
+      router.push('/dashboard')
+    } else {
+      const data = await res.json().catch(() => ({}))
+      showToast(data.error ?? 'فشل إرسال طلب التفاوض', 'error')
       setSubmitting(false)
     }
   }
@@ -163,11 +227,132 @@ export default function QuoteApproval({
         </div>
       )}
 
-      <Button onClick={handleApprove} loading={submitting} className="w-full" size="lg">
-        {isFreeFinal
-          ? 'اعتماد وبدء التنفيذ 🎁'
-          : `اعتماد العرض والانتقال للدفع — ${formatNumber(finalTotal)} ر.س`}
-      </Button>
+      {rejecting ? (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-5 space-y-4">
+          <h3 className="font-bold text-red-700">رفض العرض</h3>
+          <p className="text-sm text-red-600">
+            يرجى توضيح سبب رفض العرض. هذا سيساعدنا على فهم احتياجاتك بشكل أفضل.
+          </p>
+          <textarea
+            value={rejectionReason}
+            onChange={e => setRejectionReason(e.target.value)}
+            placeholder="مثلاً: السعر أعلى من الميزانية المتاحة..."
+            className="w-full px-4 py-3 rounded-xl border border-red-200 text-sm min-h-[100px] resize-y"
+            maxLength={500}
+          />
+          <div className="flex justify-between text-xs text-red-600">
+            <span>الحد الأقصى 500 حرف</span>
+            <span>{rejectionReason.length}/500</span>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setRejecting(false)
+                setRejectionReason('')
+              }}
+              className="flex-1"
+            >
+              إلغاء
+            </Button>
+            <Button
+              onClick={handleReject}
+              loading={submitting}
+              disabled={!rejectionReason.trim()}
+              className="flex-1 bg-red-600 hover:bg-red-700"
+            >
+              تأكيد الرفض
+            </Button>
+          </div>
+        </div>
+      ) : negotiating ? (
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 space-y-4">
+          <h3 className="font-bold text-orange-700">طلب التفاوض</h3>
+          <p className="text-sm text-orange-600">
+            اقترح السعر الذي يناسبك وسبب طلب التفاوض.
+          </p>
+
+          <div>
+            <label className="block text-sm font-medium text-orange-700 mb-2">
+              السعر المقترح (ر.س) <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              value={proposedPrice}
+              onChange={e => setProposedPrice(e.target.value)}
+              placeholder={String(Math.round(quotedPrice * 0.8))}
+              className="w-full px-4 py-3 rounded-xl border border-orange-200 text-sm"
+              min="0"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-orange-700 mb-2">
+              سبب طلب التفاوض <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={negotiationReason}
+              onChange={e => setNegotiationReason(e.target.value)}
+              placeholder="مثلاً: السعر يتجاوز الميزانية، أو أرى أن القيمة المقترحة مناسبة أكثر..."
+              className="w-full px-4 py-3 rounded-xl border border-orange-200 text-sm min-h-[100px] resize-y"
+              maxLength={500}
+            />
+            <div className="flex justify-between text-xs text-orange-600 mt-1">
+              <span>الحد الأقصى 500 حرف</span>
+              <span>{negotiationReason.length}/500</span>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setNegotiating(false)
+                setNegotiationReason('')
+                setProposedPrice('')
+              }}
+              className="flex-1"
+            >
+              إلغاء
+            </Button>
+            <Button
+              onClick={handleNegotiate}
+              loading={submitting}
+              disabled={!negotiationReason.trim() || !proposedPrice.trim()}
+              className="flex-1 bg-orange-600 hover:bg-orange-700"
+            >
+              إرسال طلب التفاوض
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <Button onClick={handleApprove} loading={submitting} className="w-full" size="lg">
+            {isFreeFinal
+              ? 'اعتماد وبدء التنفيذ 🎁'
+              : `اعتماد العرض والانتقال للدفع — ${formatNumber(finalTotal)} ر.س`}
+          </Button>
+
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setNegotiating(true)}
+              className="flex-1 border-orange-300 text-orange-700 hover:bg-orange-50"
+              disabled={submitting}
+            >
+              💬 طلب التفاوض
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setRejecting(true)}
+              className="flex-1 border-red-300 text-red-700 hover:bg-red-50"
+              disabled={submitting}
+            >
+              ❌ رفض العرض
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -144,6 +144,8 @@ export const POST_COUNT_MESSAGE_11_PLUS = 'أعلى خصم متاح — وفّر
 export const REQUEST_STATUSES = {
   pending: { label: 'تحت المراجعة', color: 'yellow' },
   quoted: { label: 'بانتظار موافقتك', color: 'blue' },
+  client_rejected: { label: 'رفض العميل للعرض', color: 'red' },
+  negotiation: { label: 'تفاوض على السعر', color: 'orange' },
   approved: { label: 'بانتظار الدفع', color: 'cyan' },
   payment_review: { label: 'بانتظار تحقق الدفع', color: 'orange' },
   paid: { label: 'تم الدفع', color: 'cyan' },

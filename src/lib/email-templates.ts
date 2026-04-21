@@ -702,3 +702,236 @@ export function bankTransferReceivedToAdmin(d: {
     `)
   }
 }
+
+// ─── Quote Rejection and Negotiation Templates ───
+
+export function quoteRejectedByClient(d: {
+  requestNumber: string; clientName: string; rejectionReason: string; quotedPrice: number
+}) {
+  return {
+    subject: `رفض العميل للعرض - طلب ${d.requestNumber}`,
+    html: wrap(`
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:48px; margin-bottom:16px;">❌</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">رفض العميل للعرض</h2>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+      </div>
+
+      <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
+        قام العميل <strong style="color:${BRAND_NAVY};">${d.clientName}</strong> برفض العرض المقدم.
+      </p>
+
+      <div style="background:#FFEBEE; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid #F44336;">
+        <h3 style="margin:0 0 8px 0; color:#C62828; font-size:16px;">سبب الرفض</h3>
+        <p style="margin:0; color:#C62828; font-size:14px; line-height:1.6; white-space:pre-line;">${d.rejectionReason}</p>
+      </div>
+
+      <div style="background:#F8FAFC; border-radius:12px; padding:20px; margin:24px 0;">
+        <h3 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:16px;">العرض المرفوض</h3>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td style="padding:4px 0; color:#6B7C99; font-size:14px;">المبلغ المقترح:</td>
+            <td style="padding:4px 0; color:${BRAND_NAVY}; font-weight:bold; font-size:14px; text-align:left;">${d.quotedPrice} ر.س</td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="margin:32px 0; text-align:center;">
+        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+          مراجعة الطلب
+        </a>
+      </div>
+    `)
+  }
+}
+
+export function quoteRejectionToClient(d: {
+  email: string; requestNumber: string; clientName: string
+}) {
+  return {
+    subject: `تم استلام رفضك للعرض - طلب ${d.requestNumber} · تواصل النخبة`,
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:48px; margin-bottom:16px;">📝</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">تم استلام رفضك للعرض</h2>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+      </div>
+
+      <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
+        تم استلام رفضك للعرض المقدم لطلبك. نتفهم أن العرض قد لا يتناسب مع توقعاتك.
+      </p>
+
+      <div style="background:#E8F5E8; border-radius:12px; padding:20px; margin:24px 0;">
+        <h3 style="margin:0 0 8px 0; color:#059669; font-size:16px;">شكراً لك</h3>
+        <p style="margin:0; color:#059669; font-size:14px; line-height:1.6;">
+          نقدر الوقت الذي قضيته في مراجعة العرض. إذا غيرت رأيك أو كان لديك طلب آخر، لا تتردد في التواصل معنا.
+        </p>
+      </div>
+
+      <div style="margin:32px 0; text-align:center;">
+        <a href="${SITE_URL}/dashboard" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+          لوحة التحكم
+        </a>
+      </div>
+    `)
+  }
+}
+
+export function negotiationRequestedByClient(d: {
+  requestNumber: string; clientName: string; negotiationReason: string; originalPrice: number; proposedPrice?: number | null
+}) {
+  return {
+    subject: `طلب تفاوض على السعر - طلب ${d.requestNumber}`,
+    html: wrap(`
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:48px; margin-bottom:16px;">💬</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">طلب تفاوض على السعر</h2>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+      </div>
+
+      <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
+        طلب العميل <strong style="color:${BRAND_NAVY};">${d.clientName}</strong> التفاوض على سعر العرض.
+      </p>
+
+      <div style="background:#FFF8E1; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${BRAND_GOLD};">
+        <h3 style="margin:0 0 8px 0; color:#856404; font-size:16px;">رسالة العميل</h3>
+        <p style="margin:0; color:#856404; font-size:14px; line-height:1.6; white-space:pre-line;">${d.negotiationReason}</p>
+      </div>
+
+      <div style="background:#F8FAFC; border-radius:12px; padding:20px; margin:24px 0;">
+        <h3 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:16px;">تفاصيل السعر</h3>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td style="padding:4px 0; color:#6B7C99; font-size:14px;">السعر الأصلي:</td>
+            <td style="padding:4px 0; color:${BRAND_NAVY}; font-weight:bold; font-size:14px; text-align:left;">${d.originalPrice} ر.س</td>
+          </tr>
+          ${d.proposedPrice !== undefined && d.proposedPrice !== null ? `
+          <tr>
+            <td style="padding:4px 0; color:#6B7C99; font-size:14px;">السعر المقترح من العميل:</td>
+            <td style="padding:4px 0; color:${BRAND_GOLD}; font-weight:bold; font-size:14px; text-align:left;">${d.proposedPrice} ر.س</td>
+          </tr>` : ''}
+        </table>
+      </div>
+
+      <div style="background:#E3F2FD; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid #2196F3;">
+        <h3 style="margin:0 0 8px 0; color:#1976D2; font-size:16px;">💰 خيارات التفاوض</h3>
+        <p style="margin:0 0 12px 0; color:#1976D2; font-size:14px; line-height:1.6;">
+          راجع طلب العميل واختر أحد الخيارات التالية:
+        </p>
+        <ul style="margin:0; padding:0 0 0 16px; color:#1976D2; font-size:14px;">
+          ${d.proposedPrice !== undefined && d.proposedPrice !== null ?
+            `<li style="margin-bottom:8px;">قبول السعر المقترح من العميل (${d.proposedPrice} ر.س)</li>` : ''}
+          <li style="margin-bottom:8px;">تطبيق نسبة خصم على السعر الأصلي</li>
+        </ul>
+      </div>
+
+      <div style="margin:32px 0; text-align:center;">
+        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+          إرسال عرض معدل
+        </a>
+      </div>
+    `)
+  }
+}
+
+export function negotiationRequestToClient(d: {
+  email: string; requestNumber: string; clientName: string
+}) {
+  return {
+    subject: `تم استلام طلب التفاوض - طلب ${d.requestNumber} · تواصل النخبة`,
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:48px; margin-bottom:16px;">💬</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">تم استلام طلب التفاوض</h2>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+      </div>
+
+      <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
+        تم استلام طلبك للتفاوض على السعر. فريقنا يراجع طلبك الآن وسيرسل لك عرضاً معدلاً قريباً.
+      </p>
+
+      <div style="background:#E8F5E8; border-radius:12px; padding:20px; margin:24px 0;">
+        <h3 style="margin:0 0 8px 0; color:#059669; font-size:16px;">الخطوات التالية</h3>
+        <p style="margin:0; color:#059669; font-size:14px; line-height:1.6;">
+          • سيراجع فريقنا طلب التفاوض خلال 24 ساعة<br>
+          • سنرسل لك عرضاً معدلاً يأخذ في الاعتبار ملاحظاتك<br>
+          • ستصلك رسالة إيميل فور توفر العرض الجديد
+        </p>
+      </div>
+
+      <div style="margin:32px 0; text-align:center;">
+        <a href="${SITE_URL}/dashboard" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+          متابعة الطلب
+        </a>
+      </div>
+    `)
+  }
+}
+
+export function negotiatedQuoteToClient(d: {
+  email: string; requestNumber: string; clientName: string; originalPrice: number; newPrice: number; discountPercentage: number; adminMessage: string; priceSource?: string
+}) {
+  const isClientAccepted = d.priceSource === 'client_accepted'
+  const title = isClientAccepted ? 'تم قبول عرضك المقترح' : 'عرض معدل بخصم خاص'
+  const emoji = isClientAccepted ? '✅' : '🎯'
+
+  return {
+    subject: `${title} - طلب ${d.requestNumber} · تواصل النخبة`,
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:48px; margin-bottom:16px;">${emoji}</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">${title}</h2>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+      </div>
+
+      <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
+        ${isClientAccepted
+          ? 'تم مراجعة طلبك للتفاوض، ويسعدنا أن نقبل السعر الذي اقترحته.'
+          : 'تم مراجعة طلبك للتفاوض، ويسعدنا أن نقدم لك عرضاً معدلاً بخصم خاص.'}
+      </p>
+
+      <div style="background:#E8F5E8; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid #059669;">
+        <h3 style="margin:0 0 12px 0; color:#059669; font-size:18px;">
+          ${isClientAccepted ? '✅ السعر المتفق عليه' : '🎉 العرض الجديد'}
+        </h3>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:12px;">
+          <tr>
+            <td style="padding:4px 0; color:#059669; font-size:14px;">السعر الأصلي:</td>
+            <td style="padding:4px 0; color:#059669; font-size:14px; text-align:left; text-decoration:line-through;">${d.originalPrice} ر.س</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0; color:#059669; font-size:16px; font-weight:bold;">
+              ${isClientAccepted ? 'سعرك المقترح المقبول:' : 'السعر الجديد:'}
+            </td>
+            <td style="padding:8px 0; color:#059669; font-size:20px; font-weight:bold; text-align:left;">${d.newPrice} ر.س</td>
+          </tr>
+        </table>
+        ${d.discountPercentage > 0 ? `
+          <div style="background:#059669; color:#FFFFFF; padding:8px 12px; border-radius:8px; text-align:center; font-weight:bold;">
+            ${isClientAccepted ? 'وفرت' : 'خصم خاص'} ${d.discountPercentage}% 🏷️
+          </div>
+        ` : ''}
+      </div>
+
+      ${d.adminMessage ? `
+        <div style="background:#FFF8E1; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${BRAND_GOLD};">
+          <h3 style="margin:0 0 8px 0; color:#856404; font-size:16px;">رسالة من الإدارة</h3>
+          <p style="margin:0; color:#856404; font-size:14px; line-height:1.6; white-space:pre-line;">${d.adminMessage}</p>
+        </div>
+      ` : ''}
+
+      <div style="margin:32px 0; text-align:center;">
+        <a href="${SITE_URL}/dashboard/${d.requestNumber.replace('ATH-', '')}" style="display:inline-block; background:${BRAND_GOLD}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+          مراجعة العرض الجديد
+        </a>
+      </div>
+
+      <p style="margin:20px 0 0 0; font-size:13px; color:#6B7C99; line-height:1.8; text-align:center;">
+        هذا العرض صالح لمدة 48 ساعة من تاريخ الإرسال
+      </p>
+    `)
+  }
+}

@@ -160,6 +160,43 @@ export async function notifyBankTransferReceivedToAdmin(args: {
   return sendEmail(ADMIN_EMAIL, t.subject, t.html)
 }
 
+// ─── Quote Rejection and Negotiation Email Functions ───
+
+export async function notifyQuoteRejectedByClient(args: {
+  requestNumber: string; clientName: string; rejectionReason: string; quotedPrice: number
+}) {
+  const t = templates.quoteRejectedByClient(args)
+  return sendEmail(ADMIN_EMAIL, t.subject, t.html)
+}
+
+export async function notifyQuoteRejectionToClient(args: {
+  email: string; requestNumber: string; clientName: string
+}) {
+  const t = templates.quoteRejectionToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
+export async function notifyNegotiationRequestedByClient(args: {
+  requestNumber: string; clientName: string; negotiationReason: string; originalPrice: number; proposedPrice?: number | null
+}) {
+  const t = templates.negotiationRequestedByClient(args)
+  return sendEmail(ADMIN_EMAIL, t.subject, t.html)
+}
+
+export async function notifyNegotiationRequestToClient(args: {
+  email: string; requestNumber: string; clientName: string
+}) {
+  const t = templates.negotiationRequestToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
+export async function notifyNegotiatedQuoteToClient(args: {
+  email: string; requestNumber: string; clientName: string; originalPrice: number; newPrice: number; discountPercentage: number; adminMessage: string; priceSource?: string
+}) {
+  const t = templates.negotiatedQuoteToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
 // Old name kept for compatibility with the existing submit-request route.
 export async function sendNewRequestEmail(args: {
   requestNumber: string; clientName: string; clientEmail: string; clientPhone: string

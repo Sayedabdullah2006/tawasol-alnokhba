@@ -28,6 +28,9 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   const [rejecting, setRejecting] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [sendingContent, setSendingContent] = useState(false)
+  const [respondingToNegotiation, setRespondingToNegotiation] = useState(false)
+  const [discountPercentage, setDiscountPercentage] = useState('')
+  const [negotiationNotes, setNegotiationNotes] = useState('')
 
   useEffect(() => {
     const loadData = async () => {
@@ -116,6 +119,71 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
     } else {
       const data = await res.json().catch(() => ({}))
       showToast(data.error ?? 'فشل تحديث الحالة', 'error')
+    }
+    setSaving(false)
+  }
+
+  const handleAcceptClientPrice = async () => {
+    if (!request?.client_proposed_price) return
+    setSaving(true)
+
+    const res = await fetch('/api/send-negotiated-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId: request.id,
+        newPrice: request.client_proposed_price,
+        acceptClientPrice: true,
+        adminNotes: negotiationNotes.trim() || null
+      })
+    })
+
+    if (res.ok) {
+      showToast('تم قبول السعر المقترح وإرسال إشعار للعميل')
+      router.push('/admin/requests')
+    } else {
+      const data = await res.json().catch(() => ({}))
+      showToast(data.error ?? 'فشل قبول السعر المقترح', 'error')
+    }
+    setSaving(false)
+  }
+
+  const handleApplyDiscount = async () => {
+    if (!request || !discountPercentage.trim()) {
+      showToast('يرجى إدخال نسبة الخصم', 'error')
+      return
+    }
+
+    const discount = parseFloat(discountPercentage)
+    if (isNaN(discount) || discount < 0 || discount > 100) {
+      showToast('يرجى إدخال نسبة خصم صالحة (0-100)', 'error')
+      return
+    }
+
+    const originalPrice = request.admin_quoted_price || 0
+    const discountAmount = (originalPrice * discount) / 100
+    const newPrice = originalPrice - discountAmount
+
+    setSaving(true)
+
+    const res = await fetch('/api/send-negotiated-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId: request.id,
+        newPrice,
+        discountPercentage: discount,
+        acceptClientPrice: false,
+        adminNotes: negotiationNotes.trim() || null
+      })
+    })
+
+    if (res.ok) {
+      showToast('تم إرسال العرض المعدل للعميل')
+      router.push('/admin/requests')
+    } else {
+      const data = await res.json().catch(() => ({}))
+      showToast(data.error ?? 'فشل إرسال العرض المعدل', 'error')
     }
     setSaving(false)
   }
@@ -348,6 +416,133 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                       }}
                       onCancel={() => setSendingContent(false)}
                     />
+                  )}
+
+                  {/* Negotiation Response */}
+                  {request.status === 'negotiation' && !respondingToNegotiation && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3">
+                      <h4 className="font-bold text-orange-700">💬 طلب تفاوض من العميل</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="bg-white rounded-lg p-3">
+                          <h5 className="font-medium text-orange-700 mb-1">رسالة العميل:</h5>
+                          <p className="text-orange-600 whitespace-pre-line">{request.negotiation_reason}</p>
+                        </div>
+                        {request.client_proposed_price && (
+                          <div className="bg-white rounded-lg p-3">
+                            <h5 className="font-medium text-orange-700 mb-1">السعر المقترح من العميل:</h5>
+                            <p className="text-orange-600 font-bold text-lg">{formatNumber(request.client_proposed_price)} ر.س</p>
+                            <p className="text-xs text-orange-500 mt-1">
+                              (السعر الأصلي: {formatNumber(request.admin_quoted_price)} ر.س)
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      <Button onClick={() => setRespondingToNegotiation(true)} className="w-full">
+                        🤝 الرد على طلب التفاوض
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Negotiation Response Form */}
+                  {request.status === 'negotiation' && respondingToNegotiation && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-orange-700">🤝 الرد على طلب التفاوض</h4>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setRespondingToNegotiation(false)
+                            setDiscountPercentage('')
+                            setNegotiationNotes('')
+                          }}
+                          className="text-orange-600 hover:bg-orange-100"
+                        >
+                          إلغاء
+                        </Button>
+                      </div>
+
+                      {/* Show client's request details */}
+                      <div className="bg-white rounded-lg p-3 space-y-2 text-sm">
+                        <div>
+                          <span className="font-medium text-orange-700">رسالة العميل: </span>
+                          <span className="text-orange-600">{request.negotiation_reason}</span>
+                        </div>
+                        {request.client_proposed_price && (
+                          <div>
+                            <span className="font-medium text-orange-700">السعر المقترح: </span>
+                            <span className="text-orange-600 font-bold">{formatNumber(request.client_proposed_price)} ر.س</span>
+                          </div>
+                        )}
+                        <div>
+                          <span className="font-medium text-orange-700">السعر الأصلي: </span>
+                          <span className="text-orange-600">{formatNumber(request.admin_quoted_price)} ر.س</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        {/* Option 1: Accept client's proposed price */}
+                        {request.client_proposed_price && (
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <h5 className="font-bold text-green-700 mb-2">✅ الخيار الأول: قبول السعر المقترح</h5>
+                            <p className="text-sm text-green-600 mb-3">
+                              سيتم قبول السعر الذي اقترحه العميل: <strong>{formatNumber(request.client_proposed_price)} ر.س</strong>
+                            </p>
+                            <Button onClick={handleAcceptClientPrice} loading={saving} className="w-full bg-green-600 hover:bg-green-700">
+                              قبول السعر المقترح
+                            </Button>
+                          </div>
+                        )}
+
+                        {/* Option 2: Apply discount percentage */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <h5 className="font-bold text-blue-700 mb-2">🏷️ الخيار الثاني: تطبيق نسبة خصم</h5>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-sm font-medium text-blue-700 mb-1">
+                                نسبة الخصم (%) <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="number"
+                                value={discountPercentage}
+                                onChange={e => setDiscountPercentage(e.target.value)}
+                                min="0"
+                                max="100"
+                                step="1"
+                                className="w-full px-3 py-2 border border-blue-300 rounded-lg text-sm"
+                                placeholder="مثلاً: 20"
+                              />
+                              {discountPercentage && !isNaN(parseFloat(discountPercentage)) && (
+                                <p className="text-xs text-blue-600 mt-1">
+                                  السعر الجديد سيكون: <strong>{formatNumber((request.admin_quoted_price || 0) * (1 - parseFloat(discountPercentage) / 100))} ر.س</strong>
+                                </p>
+                              )}
+                            </div>
+                            <Button
+                              onClick={handleApplyDiscount}
+                              loading={saving}
+                              disabled={!discountPercentage.trim()}
+                              className="w-full bg-blue-600 hover:bg-blue-700"
+                            >
+                              تطبيق الخصم وإرسال العرض
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Optional notes */}
+                        <div>
+                          <label className="block text-sm font-medium text-orange-700 mb-1">
+                            رسالة للعميل (اختيارية)
+                          </label>
+                          <textarea
+                            value={negotiationNotes}
+                            onChange={e => setNegotiationNotes(e.target.value)}
+                            className="w-full px-3 py-2 border border-orange-300 rounded-lg text-sm min-h-[80px] resize-y"
+                            placeholder="رسالة توضيحية للعميل..."
+                          />
+                        </div>
+                      </div>
+                    </div>
                   )}
 
                   {/* Show content review status */}
