@@ -11,10 +11,12 @@ const dashboardNav = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-1 w-full">
+    <div className="flex flex-1 w-full min-h-0">
       <Sidebar items={dashboardNav} title="لوحة التحكم" />
-      <div className="flex-1 pb-20 md:pb-0">
-        {children}
+      <div className="flex-1 pb-20 md:pb-0 min-w-0 overflow-hidden">
+        <div className="h-full w-full p-4 md:p-6 overflow-auto">
+          {children}
+        </div>
       </div>
       <BottomNav items={dashboardNav} />
     </div>

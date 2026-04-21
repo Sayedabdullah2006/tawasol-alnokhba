@@ -22,10 +22,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ar" dir="rtl" className={`${cairo.className} h-full`}>
-      <body className="min-h-full flex flex-col antialiased bg-cream">
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+      </head>
+      <body className="min-h-full flex flex-col antialiased bg-cream overflow-x-hidden">
         <ToastProvider>
           <Header />
-          <main className="flex-1 flex flex-col">{children}</main>
+          <main className="flex-1 flex flex-col min-w-0">{children}</main>
           <Footer />
         </ToastProvider>
       </body>
