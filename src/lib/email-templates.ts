@@ -300,7 +300,7 @@ export function registrationCodeToClient(d: {
   ).join('')
 
   return {
-    subject: `رمز تفعيل حسابك · تواصل النخبة`,
+    subject: `Account Verification Code - Nukhba Platform`,
     html: wrap(`
       ${d.clientName ? greeting(d.clientName) : '<p style="margin:0 0 16px 0; font-size:15px;">مرحباً 👋</p>'}
       <p style="margin:0 0 16px 0; font-size:14px; line-height:1.8;">
