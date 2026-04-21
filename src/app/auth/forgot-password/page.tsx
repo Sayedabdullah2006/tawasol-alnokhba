@@ -23,6 +23,7 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState('')
   const captchaOn = turnstileEnabled()
 
   const handleSendCode = async (e: React.FormEvent) => {
@@ -46,6 +47,7 @@ export default function ForgotPasswordPage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { setError(data.error || 'تعذّر الإرسال'); setLoading(false); return }
+      setSuccessMessage(data.message || 'تم إرسال رمز التحقق')
       setStep('code')
       startCooldown()
     } catch {
@@ -151,7 +153,7 @@ export default function ForgotPasswordPage() {
           {step === 'code' && (
             <form onSubmit={handleVerify} className="space-y-4">
               <div className="bg-green/5 border border-green/20 rounded-xl p-4 text-center text-sm">
-                <p className="text-dark mb-1">📨 إن كان البريد مسجّلاً، أرسلنا الرمز إلى:</p>
+                <p className="text-dark mb-1">📨 {successMessage}</p>
                 <p className="font-bold text-green" dir="ltr">{email}</p>
                 <p className="text-xs text-muted mt-2">الرمز صالح لمدة 10 دقائق</p>
               </div>

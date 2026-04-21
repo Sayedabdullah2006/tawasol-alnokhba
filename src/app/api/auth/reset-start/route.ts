@@ -50,11 +50,18 @@ export async function POST(request: Request) {
         email: normalizedEmail,
         code,
         ttlMinutes: CODE_TTL_MINUTES,
+      }).then(success => {
+        console.log(`Reset email for ${normalizedEmail}: ${success ? 'SUCCESS' : 'FAILED'}`)
       }).catch(e => console.error('Reset code email failed:', e))
     }
 
-    // Neutral success response regardless of existence
-    return NextResponse.json({ success: true })
+    // Improved user feedback while maintaining security
+    return NextResponse.json({
+      success: true,
+      message: exists ?
+        'تم إرسال رمز إعادة تعيين كلمة المرور إلى بريدك الإلكتروني' :
+        'إذا كان هذا البريد مسجلاً، ستتلقى رمز إعادة التعيين خلال دقائق'
+    })
   } catch (err) {
     console.error('Reset-start error:', err)
     return NextResponse.json({ error: 'حدث خطأ في الخادم' }, { status: 500 })
