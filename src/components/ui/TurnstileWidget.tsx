@@ -21,8 +21,8 @@ declare global {
 const SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad'
 const SCRIPT_ID = 'cf-turnstile-script'
 
-// Invisible Turnstile challenge — no checkbox, no CAPTCHA images, no user
-// interaction unless Cloudflare flags the session. Token is generated on mount.
+// Visible Turnstile challenge — always shows a checkbox that users must click
+// to verify they are human. Token is generated after user interaction.
 export default function TurnstileWidget({ onVerify, onExpire }: Props) {
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
   const containerRef = useRef<HTMLDivElement>(null)
@@ -61,8 +61,9 @@ export default function TurnstileWidget({ onVerify, onExpire }: Props) {
       callback: (token: string) => onVerify(token),
       'expired-callback': () => onExpire?.(),
       'error-callback': () => onExpire?.(),
-      // Default "managed" widget — visible, auto-verifies without CAPTCHA entry
+      // Always visible checkbox - user must click to verify
       theme: 'light',
+      size: 'normal',
     })
 
     return () => {
@@ -76,7 +77,6 @@ export default function TurnstileWidget({ onVerify, onExpire }: Props) {
 
   if (!siteKey) return null
 
-  // Empty container Cloudflare attaches to. Stays invisible until (if ever)
-  // a challenge becomes necessary; then it renders centered.
+  // Container where Cloudflare renders the visible checkbox widget
   return <div ref={containerRef} className="flex justify-center" />
 }
