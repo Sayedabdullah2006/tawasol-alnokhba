@@ -64,7 +64,7 @@ export default function QuoteApproval({
     if (res.ok && data.redirectTo) {
       router.push(data.redirectTo)
     } else {
-      showToast(data.error ?? 'فشل اعتماد التسعيرة', 'error')
+      showToast(data.error ?? 'فشل اعتماد العرض', 'error')
       setSubmitting(false)
     }
   }
@@ -82,7 +82,7 @@ export default function QuoteApproval({
         </div>
       ) : (
         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-          <p className="font-bold text-blue-700 text-sm mb-1">💰 وصلتك التسعيرة</p>
+          <p className="font-bold text-blue-700 text-sm mb-1">💰 وصلك العرض</p>
           <p className="text-xs text-blue-600">راجع السعر واختر الخدمات الإضافية التي تريدها — السعر يتحدث تلقائياً.</p>
         </div>
       )}
@@ -166,7 +166,7 @@ export default function QuoteApproval({
       <Button onClick={handleApprove} loading={submitting} className="w-full" size="lg">
         {isFreeFinal
           ? 'اعتماد وبدء التنفيذ 🎁'
-          : `اعتماد التسعيرة والانتقال للدفع — ${formatNumber(finalTotal)} ر.س`}
+          : `اعتماد العرض والانتقال للدفع — ${formatNumber(finalTotal)} ر.س`}
       </Button>
     </div>
   )

@@ -12,6 +12,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import QuoteComposer from '@/components/admin/QuoteComposer'
+import ContentSender from '@/components/admin/ContentSender'
 
 export default function AdminRequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -26,6 +27,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   const [composingQuote, setComposingQuote] = useState(false)
   const [rejecting, setRejecting] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
+  const [sendingContent, setSendingContent] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
@@ -227,7 +229,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
             {/* Pricing Info */}
             {request.status !== 'pending' && request.admin_quoted_price != null && (
               <div className="bg-card rounded-2xl border border-border p-5">
-                <h2 className="font-bold text-dark mb-4">معلومات التسعيرة</h2>
+                <h2 className="font-bold text-dark mb-4">معلومات العرض</h2>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted">السعر المعتمد:</span>
@@ -300,9 +302,9 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <p className="text-xs text-muted">راجع المحتوى ثم أرسل التسعيرة للعميل، أو ارفض الطلب.</p>
+                    <p className="text-xs text-muted">راجع المحتوى ثم أرسل العرض للعميل، أو ارفض الطلب.</p>
                     <Button onClick={() => setComposingQuote(true)} className="w-full">
-                      📤 إرسال التسعيرة للعميل
+                      📤 إرسال العرض للعميل
                     </Button>
                     <Button variant="outline" onClick={() => setRejecting(true)} className="w-full">
                       رفض الطلب
@@ -319,6 +321,54 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                         loading={saving} className="w-full">
                         ✓ تأكيد استلام الدفع
                       </Button>
+                    </div>
+                  )}
+
+                  {/* Content sending for in_progress status */}
+                  {request.status === 'in_progress' && !sendingContent && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+                      <h4 className="font-bold text-blue-700">📝 إرسال المحتوى للمراجعة</h4>
+                      <p className="text-sm text-blue-600">
+                        أرسل النص والتصميم المقترح للعميل للمراجعة والموافقة
+                      </p>
+                      <Button onClick={() => setSendingContent(true)} className="w-full">
+                        📤 إرسال المحتوى للعميل
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Content sender component */}
+                  {sendingContent && request.status === 'in_progress' && (
+                    <ContentSender
+                      request={request}
+                      onSent={() => {
+                        setSendingContent(false)
+                        // Reload the request to get updated data
+                        window.location.reload()
+                      }}
+                      onCancel={() => setSendingContent(false)}
+                    />
+                  )}
+
+                  {/* Show content review status */}
+                  {request.status === 'content_review' && (
+                    <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+                      <h4 className="font-bold text-purple-700 mb-2">👁️ في انتظار مراجعة العميل</h4>
+                      <p className="text-sm text-purple-600 mb-3">
+                        تم إرسال المحتوى للعميل. سيتم إشعارك عند الموافقة أو طلب التعديلات.
+                      </p>
+                      {request.proposed_content && (
+                        <div className="bg-white rounded-lg p-3 mt-3">
+                          <h5 className="font-medium text-purple-700 mb-1">المحتوى المرسل:</h5>
+                          <p className="text-sm text-purple-600 whitespace-pre-line">{request.proposed_content}</p>
+                        </div>
+                      )}
+                      {request.user_feedback && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-3">
+                          <h5 className="font-medium text-yellow-700 mb-1">ملاحظات العميل:</h5>
+                          <p className="text-sm text-yellow-600 whitespace-pre-line">{request.user_feedback}</p>
+                        </div>
+                      )}
                     </div>
                   )}
 

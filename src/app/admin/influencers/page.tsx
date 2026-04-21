@@ -143,8 +143,8 @@ export default function AdminInfluencersPage() {
       ...pricing,
       updated_at: new Date().toISOString(),
     })
-    if (error) showToast('فشل حفظ التسعير', 'error')
-    else showToast(`تم حفظ تسعير ${pricingInfluencer.name_ar}`)
+    if (error) showToast('فشل حفظ الأسعار', 'error')
+    else showToast(`تم حفظ أسعار ${pricingInfluencer.name_ar}`)
     setSaving(false)
   }
 
@@ -163,7 +163,7 @@ export default function AdminInfluencersPage() {
             {pricingInfluencer.name_ar?.charAt(0)}
           </div>
           <div>
-            <h1 className="text-2xl font-black text-dark">تسعير {pricingInfluencer.name_ar}</h1>
+            <h1 className="text-2xl font-black text-dark">أسعار {pricingInfluencer.name_ar}</h1>
             {pricingInfluencer.name_en && <p className="text-sm text-muted" dir="ltr">{pricingInfluencer.name_en}</p>}
           </div>
         </div>
@@ -288,7 +288,7 @@ export default function AdminInfluencersPage() {
           </div>
 
           <Button onClick={handleSavePricing} loading={saving} size="lg" className="w-full">
-            حفظ تسعير {pricingInfluencer.name_ar}
+            حفظ أسعار {pricingInfluencer.name_ar}
           </Button>
         </div>
       </div>
@@ -333,7 +333,7 @@ export default function AdminInfluencersPage() {
                     تعديل
                   </button>
                   <button onClick={() => openPricing(inf)} className="px-4 py-2 rounded-xl text-sm font-medium cursor-pointer bg-gold/10 text-gold hover:bg-gold/20 transition-all">
-                    التسعير
+                    الأسعار
                   </button>
                   <button onClick={() => handleToggle(inf.id, inf.is_active)} className={`px-4 py-2 rounded-xl text-sm font-medium cursor-pointer ${inf.is_active ? 'bg-green/10 text-green' : 'bg-red-50 text-red-500'}`}>
                     {inf.is_active ? 'مفعّل ✓' : 'معطّل ✕'}

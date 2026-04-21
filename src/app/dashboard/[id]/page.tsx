@@ -7,17 +7,23 @@ import Link from 'next/link'
 import { CATEGORIES } from '@/lib/constants'
 import { formatNumber, formatDate, formatNumberShort, generateRequestNumber } from '@/lib/utils'
 import StatusBadge from '@/components/dashboard/StatusBadge'
+import ProgressTracker from '@/components/dashboard/ProgressTracker'
 import QuoteApproval from '@/components/dashboard/QuoteApproval'
 import EditableExtras from '@/components/dashboard/EditableExtras'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import { useToast } from '@/components/ui/Toast'
 
 export default function RequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
   const supabase = createClient()
+  const { showToast } = useToast()
   const [request, setRequest] = useState<any>(null)
   const [influencer, setInfluencer] = useState<any>(null)
+  const [providingFeedback, setProvidingFeedback] = useState(false)
+  const [feedback, setFeedback] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -42,6 +48,64 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
     load()
   }, [id, router, supabase])
 
+  const handleApproveContent = async () => {
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/approve-content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: request.id }),
+      })
+
+      if (res.ok) {
+        showToast('تم إعتماد المحتوى بنجاح')
+        // Reload to get updated status
+        window.location.reload()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        showToast(data.error ?? 'فشل إعتماد المحتوى', 'error')
+      }
+    } catch (err) {
+      showToast('حدث خطأ في الإعتماد', 'error')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleRequestChanges = async () => {
+    if (!feedback.trim()) {
+      showToast('يرجى كتابة ملاحظاتك', 'error')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/request-content-changes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: request.id,
+          feedback: feedback.trim()
+        }),
+      })
+
+      if (res.ok) {
+        showToast('تم إرسال ملاحظاتك للإدارة')
+        setProvidingFeedback(false)
+        setFeedback('')
+        // Reload to get updated status
+        window.location.reload()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        showToast(data.error ?? 'فشل إرسال الملاحظات', 'error')
+      }
+    } catch (err) {
+      showToast('حدث خطأ في الإرسال', 'error')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   if (loading) return <LoadingSpinner size="lg" />
   if (!request) return null
 
@@ -58,6 +122,8 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
         <Link href="/dashboard" className="text-sm text-green hover:underline mb-4 block">
           → العودة للطلبات
         </Link>
+
+        <ProgressTracker status={request.status} className="mb-6" />
 
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
           <div className="p-3 md:p-5 border-b border-border flex items-start md:items-center justify-between gap-2">
@@ -147,7 +213,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
           <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">
             <div className="text-2xl mb-2">⏳</div>
             <p className="font-bold text-yellow-700 text-sm">طلبك قيد المراجعة</p>
-            <p className="text-xs text-yellow-600 mt-1">ستصلك التسعيرة مع خيارات الخدمات الإضافية فور موافقة الإدارة على المحتوى</p>
+            <p className="text-xs text-yellow-600 mt-1">سيصلك العرض مع خيارات الخدمات الإضافية فور موافقة الإدارة على المحتوى</p>
           </div>
         )}
 
@@ -199,7 +265,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
 
         {['payment_review', 'paid', 'in_progress', 'completed'].includes(effectiveStatus) && request.final_total != null && (
           <div className="mt-4 bg-card rounded-2xl border border-border p-3 md:p-5 space-y-2 text-sm">
-            <h3 className="font-bold text-dark mb-2">تفصيل التسعيرة المعتمدة</h3>
+            <h3 className="font-bold text-dark mb-2">تفصيل العرض المعتمد</h3>
             {Number(request.final_total) <= 0 ? (
               <div className="bg-gradient-to-l from-green/10 to-gold/10 border border-gold/30 rounded-xl p-4 text-center">
                 <div className="text-3xl mb-1">🎁</div>
@@ -245,6 +311,97 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
                 <p className="text-sm text-red-700 whitespace-pre-line">{request.admin_notes}</p>
               </div>
             )}
+          </div>
+        )}
+
+        {request.status === 'content_review' && (
+          <div className="mt-4 space-y-4">
+            <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5">
+              <div className="text-center mb-4">
+                <div className="text-3xl mb-2">👁️</div>
+                <h3 className="font-bold text-purple-700 text-lg">المحتوى جاهز للمراجعة</h3>
+                <p className="text-sm text-purple-600 mt-1">
+                  راجع النص والتصميم المقترح أدناه واختر الموافقة أو طلب التعديلات
+                </p>
+              </div>
+
+              {request.proposed_content && (
+                <div className="bg-white rounded-xl p-4 mb-4">
+                  <h4 className="font-bold text-purple-700 mb-2">النص المقترح:</h4>
+                  <p className="text-dark text-sm leading-relaxed whitespace-pre-line">
+                    {request.proposed_content}
+                  </p>
+                </div>
+              )}
+
+              {request.proposed_images && Array.isArray(request.proposed_images) && request.proposed_images.length > 0 && (
+                <div className="bg-white rounded-xl p-4 mb-4">
+                  <h4 className="font-bold text-purple-700 mb-2">التصاميم المقترحة:</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {request.proposed_images.map((img: string, i: number) => (
+                      <a key={i} href={img} target="_blank" rel="noopener noreferrer"
+                        className="aspect-square rounded-lg overflow-hidden border border-border hover:border-purple-300 transition-colors block">
+                        <img src={img} alt={`تصميم ${i + 1}`} className="w-full h-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!providingFeedback ? (
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleApproveContent}
+                    loading={submitting}
+                    className="flex-1"
+                  >
+                    ✅ موافق على المحتوى
+                  </Button>
+                  <Button
+                    onClick={() => setProvidingFeedback(true)}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    ✏️ طلب تعديلات
+                  </Button>
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl p-4">
+                  <h4 className="font-bold text-dark mb-2">ملاحظاتك على المحتوى:</h4>
+                  <textarea
+                    value={feedback}
+                    onChange={e => setFeedback(e.target.value)}
+                    placeholder="اكتب ملاحظاتك والتعديلات المطلوبة..."
+                    className="w-full px-3 py-2 rounded-lg border border-border text-sm min-h-[100px] resize-y"
+                    maxLength={500}
+                  />
+                  <div className="flex justify-between items-center mt-2 mb-3">
+                    <span className="text-xs text-muted">الحد الأقصى 500 حرف</span>
+                    <span className="text-xs text-muted">{feedback.length}/500</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setProvidingFeedback(false)
+                        setFeedback('')
+                      }}
+                      className="flex-1"
+                    >
+                      إلغاء
+                    </Button>
+                    <Button
+                      onClick={handleRequestChanges}
+                      loading={submitting}
+                      disabled={!feedback.trim()}
+                      className="flex-1"
+                    >
+                      📤 إرسال الملاحظات
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

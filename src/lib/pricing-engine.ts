@@ -2,6 +2,8 @@
 // PRICING ENGINE — مصدر الحقيقة الوحيد
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+import { COMPETITION_SUBCATEGORIES, getCompetitionPositions } from './constants'
+
 export const BASE_PRICES: Record<string, number> = {
   inventions: 3000,
   competitions: 3000,
@@ -107,7 +109,7 @@ export const VAT_RATE = 0.15
 
 export interface PriceInput {
   category: string
-  subOption?: string | null
+  subOption?: string | { subcategory: string; position: string } | null
   scope: 'single' | 'all'
   images: 'one' | 'multi'
   extras: string[]
@@ -117,7 +119,7 @@ export interface PriceInput {
 
 export interface PriceBreakdown {
   category: string
-  subOption: string | null
+  subOption: string | { subcategory: string; position: string } | null
   isFree: boolean
   isHalfOff: boolean
   basePrice: number
@@ -188,8 +190,26 @@ export function calculatePrice(input: PriceInput): PriceBreakdown {
     if (input.subOption === 'no_patent') { isHalfOff = true }
   }
   if (input.category === 'competitions') {
-    if (input.subOption === 'first_place') { basePrice = 0; isFree = true }
-    if (input.subOption === 'other_place') { isHalfOff = true }
+    // Handle new competition structure with position multipliers
+    if (typeof input.subOption === 'object' && input.subOption?.subcategory && input.subOption?.position) {
+      const { subcategory, position } = input.subOption
+      const positions = getCompetitionPositions(subcategory)
+      const positionData = positions.find(p => p.id === position)
+      if (positionData) {
+        if (position === 'first' && subcategory !== 'hackathon') {
+          // First place in international/local competitions is free
+          basePrice = 0
+          isFree = true
+        } else {
+          // Apply position multiplier
+          basePrice = basePrice * positionData.multiplier
+        }
+      }
+    } else if (typeof input.subOption === 'string') {
+      // Legacy support for old competition structure
+      if (input.subOption === 'first_place') { basePrice = 0; isFree = true }
+      if (input.subOption === 'other_place') { isHalfOff = true }
+    }
   }
 
   // Step 2: Scope multiplier

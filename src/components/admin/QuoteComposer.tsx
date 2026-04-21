@@ -127,11 +127,11 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
     })
 
     if (res.ok) {
-      showToast('تم إرسال التسعيرة للعميل')
+      showToast('تم إرسال العرض للعميل')
       onSent()
     } else {
       const data = await res.json().catch(() => ({}))
-      showToast(data.error ?? 'فشل إرسال التسعيرة', 'error')
+      showToast(data.error ?? 'فشل إرسال العرض', 'error')
     }
     setSaving(false)
   }
@@ -213,7 +213,7 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
 
       <div className="bg-cream rounded-xl p-4">
         <h3 className="font-bold text-dark text-sm mb-1">الخدمات الإضافية المعروضة</h3>
-        <p className="text-xs text-muted mb-3">اختر الخدمات التي سيراها العميل في شاشة التسعيرة</p>
+        <p className="text-xs text-muted mb-3">اختر الخدمات التي سيراها العميل في شاشة العرض</p>
 
         <div className="grid grid-cols-1 gap-2 max-h-72 overflow-y-auto">
           {availableExtras.map(e => (
@@ -264,7 +264,7 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
 
       <div className="flex gap-3">
         <Button variant="ghost" onClick={onCancel} className="flex-1">إلغاء</Button>
-        <Button onClick={handleSend} loading={saving} className="flex-1">إرسال التسعيرة</Button>
+        <Button onClick={handleSend} loading={saving} className="flex-1">إرسال العرض</Button>
       </div>
     </div>
   )

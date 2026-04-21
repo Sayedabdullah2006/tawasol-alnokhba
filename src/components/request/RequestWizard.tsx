@@ -14,6 +14,7 @@ import RStep3Details from './RStep3Details'
 import RStepChannels from './RStepChannels'
 import RStep5Contact, { type ContactData } from './RStep5Contact'
 import RStep6Terms from './RStep6Terms'
+import StepCompetition from '@/components/pricing/StepCompetition'
 import { validateEmail } from '@/lib/email-validation'
 import SuccessScreen from './SuccessScreen'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -43,6 +44,7 @@ export default function RequestWizard() {
   const [clientType, setClientType] = useState<ClientType | null>(null)
   const [category, setCategory] = useState<string | null>(null)
   const [subOption, setSubOption] = useState<string | null>(null)
+  const [competitionSelection, setCompetitionSelection] = useState<{ subcategory: string; position: string } | null>(null)
   const [details, setDetails] = useState({ title: '', content: '', link: '', hashtags: '', preferredDate: '', images: [] as string[] })
   const [channels, setChannels] = useState<string[]>([])
   const [contact, setContact] = useState<ContactData>({ fullName: '', phone: '', email: '', city: '', xHandle: '' })
@@ -51,13 +53,14 @@ export default function RequestWizard() {
 
   const selectedCat: DBCategory | null = categories.find(c => c.id === category) ?? null
   const needsSubOption = selectedCat?.has_sub_option && selectedCat?.sub_options?.length
+  const isCompetitionCategory = category === 'competitions'
 
   const steps: StepId[] = useMemo(() => {
     const base: StepId[] = ['influencer', 'clientType', 'category']
-    if (needsSubOption) base.push('subOption')
+    if (isCompetitionCategory || needsSubOption) base.push('subOption')
     base.push('details', 'channels', 'contact', 'terms', 'confirm')
     return base
-  }, [needsSubOption])
+  }, [isCompetitionCategory, needsSubOption])
 
   const currentStep = steps[stepIndex]
   const totalSteps = steps.length
@@ -94,7 +97,13 @@ export default function RequestWizard() {
       case 'influencer': return selectedInfluencer !== null
       case 'clientType': return clientType !== null
       case 'category': return category !== null
-      case 'subOption': return subOption !== null
+      case 'subOption':
+        if (isCompetitionCategory) {
+          return competitionSelection !== null &&
+                 competitionSelection.subcategory !== '' &&
+                 competitionSelection.position !== ''
+        }
+        return subOption !== null
       case 'details': return details.title.trim() !== '' && details.content.trim() !== ''
       case 'channels': return channels.length > 0
       case 'contact': return contact.fullName.trim() !== ''
@@ -112,13 +121,18 @@ export default function RequestWizard() {
   const handleSubmit = async () => {
     setSubmitting(true)
     try {
+      // Prepare sub_option data - for competitions, send the selection object
+      const subOptionData = isCompetitionCategory
+        ? competitionSelection
+        : subOption
+
       const res = await fetch('/api/submit-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           influencer_id: selectedInfluencer,
           client_type: clientType,
-          category, sub_option: subOption,
+          category, sub_option: subOptionData,
           title: details.title, content: details.content,
           link: details.link || null, hashtags: details.hashtags || null,
           preferred_date: details.preferredDate || null,
@@ -158,10 +172,16 @@ export default function RequestWizard() {
             <RStep1ClientType selected={clientType} onSelect={(v) => { if (clientType !== v) { setCategory(null); setSubOption(null) }; setClientType(v) }} />
           )}
           {currentStep === 'category' && (
-            <Step1Category selected={category} onSelect={(id) => { setCategory(id); setSubOption(null) }} categories={categories} clientType={clientType} />
+            <Step1Category selected={category} onSelect={(id) => { setCategory(id); setSubOption(null); setCompetitionSelection(null) }} categories={categories} clientType={clientType} />
           )}
-          {currentStep === 'subOption' && selectedCat && (
-            <StepSubOption category={selectedCat} selected={subOption} onSelect={setSubOption} />
+          {currentStep === 'subOption' && (
+            <>
+              {isCompetitionCategory ? (
+                <StepCompetition selected={competitionSelection} onSelect={setCompetitionSelection} />
+              ) : selectedCat ? (
+                <StepSubOption category={selectedCat} selected={subOption} onSelect={setSubOption} />
+              ) : null}
+            </>
           )}
           {currentStep === 'details' && (
             <RStep3Details data={details} onChange={setDetails} />
@@ -182,7 +202,7 @@ export default function RequestWizard() {
           {currentStep === 'confirm' && (
             <div className="wizard-enter max-w-lg mx-auto space-y-6">
               <h2 className="text-xl md:text-2xl font-black text-dark text-center mb-2">تأكيد وإرسال الطلب</h2>
-              <p className="text-sm text-muted text-center">راجع ملخص طلبك — سيُراجع من قبل فريق تواصل النخبة وستصلك التسعيرة لاحقاً</p>
+              <p className="text-sm text-muted text-center">راجع ملخص طلبك — سيُراجع من قبل فريق تواصل النخبة وسيصلك العرض لاحقاً</p>
               <div className="bg-card rounded-2xl border border-border overflow-hidden">
                 <div className="p-5 space-y-3 text-sm">
                   {selectedInf && <div className="flex justify-between"><span className="text-muted">المؤثر:</span><span className="font-medium">{selectedInf.name_ar}</span></div>}

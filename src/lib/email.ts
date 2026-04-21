@@ -116,6 +116,36 @@ export async function notifyStatusUpdateToClient(args: {
   return sendEmail(args.email, t.subject, t.html)
 }
 
+// ─── Content Review Email Functions ───
+
+export async function notifyContentReadyForReview(args: {
+  email: string; requestNumber: string; clientName: string; proposedContent: string; proposedImages: string[]
+}) {
+  const t = templates.contentReadyForReview(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
+export async function notifyContentApprovedToAdmin(args: {
+  requestNumber: string; clientName: string
+}) {
+  const t = templates.contentApprovedToAdmin(args)
+  return sendEmail(ADMIN_EMAIL, t.subject, t.html)
+}
+
+export async function notifyContentApprovedToClient(args: {
+  email: string; requestNumber: string; clientName: string
+}) {
+  const t = templates.contentApprovedToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
+export async function notifyContentChangesRequested(args: {
+  requestNumber: string; clientName: string; feedback: string; proposedContent: string
+}) {
+  const t = templates.contentChangesRequested(args)
+  return sendEmail(ADMIN_EMAIL, t.subject, t.html)
+}
+
 // Old name kept for compatibility with the existing submit-request route.
 export async function sendNewRequestEmail(args: {
   requestNumber: string; clientName: string; clientEmail: string; clientPhone: string

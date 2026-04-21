@@ -69,6 +69,15 @@ export async function POST(request: Request) {
         case 'in_progress':
           p = notifyInProgressToClient(base)
           break
+        case 'content_review':
+          // When admin manually changes status to content review
+          p = notifyStatusUpdateToClient({
+            ...base,
+            status,
+            statusLabel: REQUEST_STATUSES[status as keyof typeof REQUEST_STATUSES]?.label || status,
+            adminNotes
+          })
+          break
         case 'completed':
           p = notifyCompletedToClient(base)
           break

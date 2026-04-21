@@ -85,7 +85,7 @@ export function requestReceivedToClient(d: ClientRequestData) {
         فريقنا الآن يراجع المحتوى وسنتواصل معك خلال 24 ساعة بـ:
       </p>
       <ul style="margin:0 0 18px 0; padding-right:20px; font-size:13px; line-height:1.9;">
-        <li>تسعيرة مخصصة لطلبك</li>
+        <li>عرض مخصص لطلبك</li>
         <li>خيارات الخدمات الإضافية المتاحة</li>
       </ul>
       <p style="margin:0 0 20px 0; font-size:13px;">📋 يمكنك متابعة حالة طلبك في لوحة التحكم.</p>
@@ -125,11 +125,11 @@ export function quoteReadyToClient(d: {
   reach: number
 }) {
   return {
-    subject: `💰 وصلتك تسعيرة طلبك · ${d.requestNumber}`,
+    subject: `💰 وصلك العرض المخصص · ${d.requestNumber}`,
     html: wrap(`
       ${greeting(d.clientName)}
       <p style="margin:0 0 18px 0; font-size:14px; line-height:1.8;">
-        فريقنا انتهى من مراجعة طلبك <strong>${escapeHtml(d.requestNumber)}</strong> وأرسل التسعيرة:
+        فريقنا انتهى من مراجعة طلبك <strong>${escapeHtml(d.requestNumber)}</strong> وأعد العرض المخصص:
       </p>
       <div style="background:#F7F4ED; border-radius:12px; padding:18px; text-align:center; margin-bottom:18px;">
         <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">السعر الرئيسي</p>
@@ -140,7 +140,7 @@ export function quoteReadyToClient(d: {
       <p style="margin:0 0 18px 0; font-size:13px; line-height:1.8;">
         يمكنك أيضاً اختيار خدمات إضافية لتعزيز الحملة. السعر والوصول يتحدّثان فورياً مع كل اختيار.
       </p>
-      <p style="margin:0; text-align:center;">${button('مراجعة التسعيرة', `${SITE_URL}/dashboard`)}</p>
+      <p style="margin:0; text-align:center;">${button('مراجعة العرض', `${SITE_URL}/dashboard`)}</p>
     `),
   }
 }
@@ -179,12 +179,12 @@ export function quoteApprovedAwaitingPaymentToClient(d: {
   total: number
 }) {
   return {
-    subject: `📋 اعتمدت تسعيرة طلبك · ${d.requestNumber} · بانتظار الدفع`,
+    subject: `📋 اعتمدت عرض طلبك · ${d.requestNumber} · بانتظار الدفع`,
     html: wrap(`
       ${greeting(d.clientName)}
-      <p style="margin:0 0 16px 0; font-size:15px;">📋 <strong>تم اعتماد التسعيرة</strong></p>
+      <p style="margin:0 0 16px 0; font-size:15px;">📋 <strong>تم اعتماد العرض</strong></p>
       <p style="margin:0 0 16px 0; font-size:13px; line-height:1.8;">
-        شكراً لاعتمادك تسعيرة طلب <strong>${escapeHtml(d.requestNumber)}</strong>.
+        شكراً لاعتمادك عرض طلب <strong>${escapeHtml(d.requestNumber)}</strong>.
         لإطلاق التنفيذ نحتاج تأكيد الدفع.
       </p>
       <div style="background:#F7F4ED; border-radius:10px; padding:14px; margin-bottom:16px; text-align:center;">
@@ -403,6 +403,7 @@ export function statusUpdateToClient(d: {
     'payment_review': '⏳',
     'paid': '💳',
     'in_progress': '🚀',
+    'content_review': '👁️',
     'completed': '🎉',
     'rejected': '❌'
   }
@@ -410,7 +411,7 @@ export function statusUpdateToClient(d: {
   const emoji = statusEmojis[d.status] || '📋'
 
   return {
-    subject: `تحديث حالة طلب ${d.requestNumber} · ${PLATFORM_NAME_AR}`,
+    subject: `تحديث حالة طلب ${d.requestNumber} · تواصل النخبة`,
     html: wrap(`
       ${greeting(d.clientName)}
       <div style="text-align:center; margin:20px 0;">
@@ -429,7 +430,7 @@ export function statusUpdateToClient(d: {
         </div>
       ` : ''}
       <p style="margin:20px 0 0 0; font-size:13px; color:#6B7C99; line-height:1.8; text-align:center;">
-        يمكنك متابعة تفاصيل طلبك من خلال <a href="${CLIENT_PORTAL_URL}/dashboard" style="color:${BRAND_NAVY};">لوحة التحكم</a>.
+        يمكنك متابعة تفاصيل طلبك من خلال <a href="${SITE_URL}/dashboard" style="color:${BRAND_NAVY};">لوحة التحكم</a>.
       </p>
     `),
   }
@@ -439,4 +440,164 @@ function formatReach(n: number): string {
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
   if (n >= 1000) return `${Math.round(n / 1000)}K`
   return n.toString()
+}
+
+// ─── Content Review Templates ───
+
+export function contentReadyForReview(d: {
+  email: string; requestNumber: string; clientName: string; proposedContent: string; proposedImages: string[]
+}) {
+  return {
+    subject: `المحتوى جاهز للمراجعة - طلب ${d.requestNumber} · تواصل النخبة`,
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:48px; margin-bottom:16px;">👁️</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">المحتوى جاهز للمراجعة</h2>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+      </div>
+
+      <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
+        تم الانتهاء من تحضير المحتوى الخاص بطلبك. يرجى مراجعة النص والتصميم المقترح أدناه والموافقة عليه أو طلب التعديلات المطلوبة.
+      </p>
+
+      <div style="background:#F8FAFC; border-radius:12px; padding:20px; margin:24px 0;">
+        <h3 style="margin:0 0 12px 0; color:${BRAND_NAVY}; font-size:16px;">النص المقترح</h3>
+        <div style="background:#FFFFFF; border-radius:8px; padding:16px; border-right:4px solid ${BRAND_GOLD};">
+          <p style="margin:0; color:${BRAND_NAVY}; font-size:14px; line-height:1.8; white-space:pre-line;">${d.proposedContent}</p>
+        </div>
+      </div>
+
+      ${d.proposedImages && d.proposedImages.length > 0 ? `
+        <div style="background:#F8FAFC; border-radius:12px; padding:20px; margin:24px 0;">
+          <h3 style="margin:0 0 12px 0; color:${BRAND_NAVY}; font-size:16px;">التصاميم المقترحة</h3>
+          <p style="margin:0 0 12px 0; font-size:12px; color:#6B7C99;">اضغط على الصورة لعرضها بالحجم الكامل</p>
+          <div style="text-align:center;">
+            ${d.proposedImages.map((img: string, i: number) => `
+              <a href="${img}" target="_blank" style="display:inline-block; margin:4px;">
+                <img src="${img}" alt="تصميم ${i + 1}" style="max-width:150px; max-height:150px; border-radius:8px; border:2px solid #E5E7EB;" />
+              </a>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <div style="margin:32px 0; text-align:center;">
+        <div style="background:#E8F5E8; border-radius:12px; padding:16px; margin:16px 0;">
+          <p style="margin:0 0 12px 0; font-size:14px; color:#059669; font-weight:bold;">راضٍ عن المحتوى؟</p>
+          <a href="${SITE_URL}/dashboard/${d.requestNumber.replace('ATH-', '')}" style="display:inline-block; background:#059669; color:#FFFFFF; padding:12px 24px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px; margin:0 8px;">
+            ✅ موافق على المحتوى
+          </a>
+        </div>
+
+        <div style="background:#FFF3CD; border-radius:12px; padding:16px; margin:16px 0;">
+          <p style="margin:0 0 12px 0; font-size:14px; color:#856404; font-weight:bold;">تحتاج تعديلات؟</p>
+          <a href="${SITE_URL}/dashboard/${d.requestNumber.replace('ATH-', '')}" style="display:inline-block; background:#856404; color:#FFFFFF; padding:12px 24px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px; margin:0 8px;">
+            ✏️ طلب تعديلات
+          </a>
+        </div>
+      </div>
+
+      <p style="margin:20px 0 0 0; font-size:13px; color:#6B7C99; line-height:1.8; text-align:center;">
+        يرجى المراجعة والرد خلال 24 ساعة لضمان سرعة التنفيذ
+      </p>
+    `)
+  }
+}
+
+export function contentApprovedToAdmin(d: {
+  requestNumber: string; clientName: string
+}) {
+  return {
+    subject: `تم اعتماد المحتوى - طلب ${d.requestNumber}`,
+    html: wrap(`
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:48px; margin-bottom:16px;">✅</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">تم اعتماد المحتوى</h2>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+      </div>
+
+      <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
+        قام العميل <strong style="color:${BRAND_NAVY};">${d.clientName}</strong> بالموافقة على المحتوى المقترح. يمكنك الآن المتابعة مع عملية النشر.
+      </p>
+
+      <div style="margin:32px 0; text-align:center;">
+        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+          عرض الطلب
+        </a>
+      </div>
+    `)
+  }
+}
+
+export function contentApprovedToClient(d: {
+  email: string; requestNumber: string; clientName: string
+}) {
+  return {
+    subject: `تم استلام موافقتك - طلب ${d.requestNumber} · تواصل النخبة`,
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:48px; margin-bottom:16px;">🎉</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">تم استلام موافقتك</h2>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+      </div>
+
+      <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
+        شكراً لك على الموافقة على المحتوى المقترح. سنبدأ الآن بعملية النشر وتنفيذ طلبك.
+      </p>
+
+      <div style="background:#E8F5E8; border-radius:12px; padding:20px; margin:24px 0;">
+        <h3 style="margin:0 0 8px 0; color:#059669; font-size:16px;">الخطوات القادمة</h3>
+        <p style="margin:0; color:#059669; font-size:14px; line-height:1.6;">
+          • جاري نشر المحتوى على المنصات المختارة<br>
+          • ستصلك تقارير الأداء عند اكتمال النشر<br>
+          • يمكنك متابعة التقدم من لوحة التحكم
+        </p>
+      </div>
+
+      <div style="margin:32px 0; text-align:center;">
+        <a href="${SITE_URL}/dashboard" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+          متابعة الطلب
+        </a>
+      </div>
+    `)
+  }
+}
+
+export function contentChangesRequested(d: {
+  requestNumber: string; clientName: string; feedback: string; proposedContent: string
+}) {
+  return {
+    subject: `طلب تعديلات على المحتوى - طلب ${d.requestNumber}`,
+    html: wrap(`
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:48px; margin-bottom:16px;">✏️</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">طلب تعديلات على المحتوى</h2>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+      </div>
+
+      <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
+        طلب العميل <strong style="color:${BRAND_NAVY};">${d.clientName}</strong> تعديلات على المحتوى المقترح.
+      </p>
+
+      <div style="background:#FFF3CD; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid #856404;">
+        <h3 style="margin:0 0 8px 0; color:#856404; font-size:16px;">ملاحظات العميل</h3>
+        <p style="margin:0; color:#856404; font-size:14px; line-height:1.6; white-space:pre-line;">${d.feedback}</p>
+      </div>
+
+      <div style="background:#F8FAFC; border-radius:12px; padding:20px; margin:24px 0;">
+        <h3 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:16px;">المحتوى الأصلي المقترح</h3>
+        <div style="background:#FFFFFF; border-radius:8px; padding:16px;">
+          <p style="margin:0; color:#6B7C99; font-size:14px; line-height:1.6; white-space:pre-line;">${d.proposedContent}</p>
+        </div>
+      </div>
+
+      <div style="margin:32px 0; text-align:center;">
+        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+          عرض الطلب وإرسال المحتوى المعدل
+        </a>
+      </div>
+    `)
+  }
 }

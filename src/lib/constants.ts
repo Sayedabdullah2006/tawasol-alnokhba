@@ -22,7 +22,6 @@ export const CATEGORIES: Category[] = [
   { id: 'inventions', nameAr: 'الاختراعات', icon: '💡', desc: 'اختراع أو ابتكار جديد', hasSubOption: true, clientTypes: ['individual'] },
   { id: 'competitions', nameAr: 'المسابقات', icon: '🏆', desc: 'فوز أو تميز في مسابقة', hasSubOption: true, clientTypes: ['individual'] },
   { id: 'books', nameAr: 'كتب ومصنفات', icon: '📚', desc: 'كتاب أو بحث أو مصنف', clientTypes: ['individual'] },
-  { id: 'events', nameAr: 'فعاليات ومؤتمرات', icon: '🎯', desc: 'مؤتمر أو معرض أو فعالية' },
   { id: 'certs', nameAr: 'شهادات احترافية', icon: '🎖️', desc: 'شهادة مهنية أو تخصصية', clientTypes: ['individual'] },
   { id: 'graduation', nameAr: 'تهنئة تخرج', icon: '🎓', desc: 'تخرج أو إنجاز أكاديمي', clientTypes: ['individual'] },
   { id: 'appointment', nameAr: 'تعيين منصب', icon: '👔', desc: 'تعيين أو ترقية مهنية' },
@@ -37,6 +36,67 @@ export const CATEGORIES: Category[] = [
 // Helper to filter categories by client type
 export function getCategoriesForClientType(clientType: string): Category[] {
   return CATEGORIES.filter(c => !c.clientTypes || c.clientTypes.includes(clientType))
+}
+
+// ─── Competition Subcategories ───
+export interface CompetitionSubcategory {
+  id: string
+  nameAr: string
+  desc: string
+  positions: CompetitionPosition[]
+}
+
+export interface CompetitionPosition {
+  id: string
+  nameAr: string
+  multiplier: number // Price multiplier based on position
+}
+
+export const COMPETITION_POSITIONS: CompetitionPosition[] = [
+  { id: 'first', nameAr: 'المركز الأول', multiplier: 2.0 },
+  { id: 'second', nameAr: 'المركز الثاني', multiplier: 1.8 },
+  { id: 'third', nameAr: 'المركز الثالث', multiplier: 1.6 },
+  { id: 'top_10', nameAr: 'ضمن أفضل 10', multiplier: 1.4 },
+  { id: 'top_50', nameAr: 'ضمن أفضل 50', multiplier: 1.2 },
+  { id: 'participation', nameAr: 'مشاركة فقط', multiplier: 1.0 },
+]
+
+export const COMPETITION_SUBCATEGORIES: CompetitionSubcategory[] = [
+  {
+    id: 'international',
+    nameAr: 'المسابقات الدولية',
+    desc: 'مسابقات عالمية ودولية',
+    positions: COMPETITION_POSITIONS
+  },
+  {
+    id: 'local',
+    nameAr: 'المسابقات المحلية',
+    desc: 'مسابقات محلية ووطنية',
+    positions: COMPETITION_POSITIONS
+  },
+  {
+    id: 'hackathon',
+    nameAr: 'مشاركة في هاكثون',
+    desc: 'هاكثون أو تحدٍ برمجي',
+    positions: [
+      { id: 'first', nameAr: 'المركز الأول', multiplier: 1.8 },
+      { id: 'second', nameAr: 'المركز الثاني', multiplier: 1.6 },
+      { id: 'third', nameAr: 'المركز الثالث', multiplier: 1.4 },
+      { id: 'finalist', nameAr: 'وصلت للنهائي', multiplier: 1.3 },
+      { id: 'participation', nameAr: 'مشاركة فقط', multiplier: 1.0 },
+    ]
+  },
+]
+
+// Helper to get competition subcategories
+export function getCompetitionSubcategories(): CompetitionSubcategory[] {
+  return COMPETITION_SUBCATEGORIES
+}
+
+// Helper to get positions for a specific competition type
+export function getCompetitionPositions(subcategoryId: string): CompetitionPosition[] {
+  const subcategory = COMPETITION_SUBCATEGORIES.find(s => s.id === subcategoryId)
+  return subcategory?.positions ?? []
 }
 
 // ─── Platforms ───
@@ -88,8 +148,53 @@ export const REQUEST_STATUSES = {
   payment_review: { label: 'بانتظار تحقق الدفع', color: 'orange' },
   paid: { label: 'تم الدفع', color: 'cyan' },
   in_progress: { label: 'قيد التنفيذ', color: 'orange' },
+  content_review: { label: 'مراجعة المحتوى', color: 'purple' },
   completed: { label: 'مكتمل', color: 'green' },
   rejected: { label: 'مرفوض', color: 'red' },
 } as const
 
 export type RequestStatus = keyof typeof REQUEST_STATUSES
+
+// ─── Progress Steps ───
+export interface ProgressStep {
+  id: string
+  label: string
+  icon: string
+  description: string
+}
+
+export const PROGRESS_STEPS: ProgressStep[] = [
+  { id: 'pending', label: 'المراجعة الأولية', icon: '📋', description: 'جاري مراجعة الطلب' },
+  { id: 'quoted', label: 'العرض المخصص', icon: '💰', description: 'بانتظار موافقتك على العرض' },
+  { id: 'payment', label: 'الدفع', icon: '💳', description: 'إتمام عملية الدفع' },
+  { id: 'in_progress', label: 'التحضير', icon: '⚡', description: 'جاري تحضير المحتوى' },
+  { id: 'content_review', label: 'مراجعة المحتوى', icon: '👁️', description: 'مراجعة المحتوى المقترح' },
+  { id: 'completed', label: 'مكتمل', icon: '✅', description: 'تم إنجاز الطلب بنجاح' },
+]
+
+// Helper function to get the current step index
+export function getCurrentStepIndex(status: RequestStatus): number {
+  switch (status) {
+    case 'pending': return 0
+    case 'quoted': return 1
+    case 'approved':
+    case 'payment_review':
+    case 'paid': return 2
+    case 'in_progress': return 3
+    case 'content_review': return 4
+    case 'completed': return 5
+    case 'rejected': return -1 // Special case for rejected
+    default: return 0
+  }
+}
+
+// Helper function to check if a step is completed
+export function isStepCompleted(stepIndex: number, currentStatus: RequestStatus): boolean {
+  const currentIndex = getCurrentStepIndex(currentStatus)
+  return currentIndex > stepIndex
+}
+
+// Helper function to check if a step is active
+export function isStepActive(stepIndex: number, currentStatus: RequestStatus): boolean {
+  return getCurrentStepIndex(currentStatus) === stepIndex
+}
