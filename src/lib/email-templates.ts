@@ -300,20 +300,17 @@ export function registrationCodeToClient(d: {
   ).join('')
 
   return {
-    subject: `Account Verification Code - Nukhba Platform`,
+    subject: `Verification Code: ${d.code}`,
     html: wrap(`
-      ${d.clientName ? greeting(d.clientName) : '<p style="margin:0 0 16px 0; font-size:15px;">مرحباً 👋</p>'}
-      <p style="margin:0 0 16px 0; font-size:14px; line-height:1.8;">
-        شكراً لانضمامك إلى <strong>تواصل النخبة</strong>. لإكمال تفعيل حسابك، استخدم رمز التحقق التالي:
+      <p style="margin:0 0 16px 0; font-size:15px;">Hello,</p>
+      <p style="margin:0 0 16px 0; font-size:14px;">
+        Your verification code is: <strong style="font-size:18px; color:#000;">${d.code}</strong>
       </p>
-      <div style="text-align:center; margin:24px 0; direction:ltr;">
-        ${codeDigits}
-      </div>
-      <p style="margin:0 0 8px 0; font-size:13px; color:#6B7C99; text-align:center;">
-        الرمز صالح لمدة <strong style="color:${BRAND_NAVY};">${d.ttlMinutes} دقائق</strong> فقط
+      <p style="margin:0 0 16px 0; font-size:14px;">
+        This code expires in ${d.ttlMinutes} minutes.
       </p>
-      <p style="margin:18px 0 0 0; font-size:12px; color:#6B7C99; line-height:1.8; text-align:center;">
-        إذا لم تطلب إنشاء حساب، تجاهل هذه الرسالة.
+      <p style="margin:16px 0 0 0; font-size:12px; color:#666;">
+        If you didn't request this, please ignore this email.
       </p>
     `),
   }
