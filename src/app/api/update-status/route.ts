@@ -5,7 +5,10 @@ import {
   notifyInProgressToClient,
   notifyCompletedToClient,
   notifyRejectedToClient,
+  notifyQuoteReadyToClient,
+  notifyStatusUpdateToClient,
 } from '@/lib/email'
+import { REQUEST_STATUSES } from '@/lib/constants'
 
 export async function POST(request: Request) {
   try {
@@ -52,6 +55,14 @@ export async function POST(request: Request) {
       }
       let p: Promise<boolean> | null = null
       switch (status) {
+        case 'quoted':
+          // When admin manually sets status to quoted (sends quote)
+          p = notifyQuoteReadyToClient({
+            ...base,
+            price: Number(updated.admin_quoted_price ?? 0),
+            reach: 0 // Will be calculated properly in the template
+          })
+          break
         case 'paid':
           p = notifyPaymentConfirmedToClient({ ...base, total: Number(updated.final_total ?? updated.admin_quoted_price ?? 0) })
           break
@@ -63,6 +74,44 @@ export async function POST(request: Request) {
           break
         case 'rejected':
           p = notifyRejectedToClient({ ...base, reason: adminNotes ?? '' })
+          break
+        case 'payment_review':
+          // When admin manually changes status to payment review
+          p = notifyStatusUpdateToClient({
+            ...base,
+            status,
+            statusLabel: REQUEST_STATUSES[status as keyof typeof REQUEST_STATUSES]?.label || status,
+            adminNotes
+          })
+          break
+        case 'approved':
+          // When admin manually approves (rare, usually done via approve-quote)
+          p = notifyStatusUpdateToClient({
+            ...base,
+            status,
+            statusLabel: REQUEST_STATUSES[status as keyof typeof REQUEST_STATUSES]?.label || status,
+            adminNotes
+          })
+          break
+        case 'pending':
+          // When admin manually changes back to pending
+          p = notifyStatusUpdateToClient({
+            ...base,
+            status,
+            statusLabel: REQUEST_STATUSES[status as keyof typeof REQUEST_STATUSES]?.label || status,
+            adminNotes
+          })
+          break
+        default:
+          // For any other status changes, send generic notification
+          if (REQUEST_STATUSES[status as keyof typeof REQUEST_STATUSES]) {
+            p = notifyStatusUpdateToClient({
+              ...base,
+              status,
+              statusLabel: REQUEST_STATUSES[status as keyof typeof REQUEST_STATUSES].label,
+              adminNotes
+            })
+          }
           break
       }
       if (p) p.catch(e => console.error('Status email failed:', e))

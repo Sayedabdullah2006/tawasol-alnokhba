@@ -109,6 +109,13 @@ export async function sendResetPasswordCode(args: {
   return sendEmail(args.email, t.subject, t.html)
 }
 
+export async function notifyStatusUpdateToClient(args: {
+  email: string; requestNumber: string; clientName: string; status: string; statusLabel: string; adminNotes?: string
+}) {
+  const t = templates.statusUpdateToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
 // Old name kept for compatibility with the existing submit-request route.
 export async function sendNewRequestEmail(args: {
   requestNumber: string; clientName: string; clientEmail: string; clientPhone: string

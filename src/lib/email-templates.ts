@@ -389,6 +389,52 @@ export function rejectedToClient(d: {
   }
 }
 
+// Generic status update notification
+export function statusUpdateToClient(d: {
+  requestNumber: string
+  clientName: string
+  status: string
+  statusLabel: string
+  adminNotes?: string
+}) {
+  const statusEmojis: Record<string, string> = {
+    'quoted': '💰',
+    'approved': '✅',
+    'payment_review': '⏳',
+    'paid': '💳',
+    'in_progress': '🚀',
+    'completed': '🎉',
+    'rejected': '❌'
+  }
+
+  const emoji = statusEmojis[d.status] || '📋'
+
+  return {
+    subject: `تحديث حالة طلب ${d.requestNumber} · ${PLATFORM_NAME_AR}`,
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:48px; margin-bottom:16px;">${emoji}</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">تم تحديث حالة طلبك</h2>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+      </div>
+      <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:20px; margin:20px 0; text-align:center;">
+        <p style="margin:0 0 8px 0; color:#6B7C99; font-size:14px;">الحالة الجديدة:</p>
+        <p style="margin:0; color:${BRAND_NAVY}; font-size:18px; font-weight:bold;">${d.statusLabel}</p>
+      </div>
+      ${d.adminNotes ? `
+        <div style="background:#F0F9FF; border:1px solid #BAE6FD; border-radius:12px; padding:16px; margin:20px 0;">
+          <p style="margin:0 0 8px 0; color:#0369A1; font-size:14px; font-weight:bold;">ملاحظة من فريق العمل:</p>
+          <p style="margin:0; color:#0F172A; font-size:14px; line-height:1.6; white-space:pre-line;">${d.adminNotes}</p>
+        </div>
+      ` : ''}
+      <p style="margin:20px 0 0 0; font-size:13px; color:#6B7C99; line-height:1.8; text-align:center;">
+        يمكنك متابعة تفاصيل طلبك من خلال <a href="${CLIENT_PORTAL_URL}/dashboard" style="color:${BRAND_NAVY};">لوحة التحكم</a>.
+      </p>
+    `),
+  }
+}
+
 function formatReach(n: number): string {
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
   if (n >= 1000) return `${Math.round(n / 1000)}K`
