@@ -31,6 +31,13 @@ export default function TurnstileWidget({ onVerify, onExpire }: Props) {
     typeof window !== 'undefined' && Boolean(window.turnstile)
   )
 
+  // Debug logging
+  console.log('TurnstileWidget Debug:', {
+    siteKey: siteKey ? `${siteKey.substring(0, 10)}...` : 'undefined',
+    scriptReady,
+    windowTurnstile: typeof window !== 'undefined' ? !!window.turnstile : 'SSR'
+  })
+
   useEffect(() => {
     if (!siteKey) return
     if (typeof window === 'undefined') return
@@ -53,18 +60,41 @@ export default function TurnstileWidget({ onVerify, onExpire }: Props) {
   }, [siteKey])
 
   useEffect(() => {
+    console.log('TurnstileWidget Render Effect:', {
+      siteKey: !!siteKey,
+      scriptReady,
+      containerExists: !!containerRef.current,
+      turnstileExists: !!(typeof window !== 'undefined' && window.turnstile),
+      widgetIdExists: !!widgetIdRef.current
+    })
+
     if (!siteKey || !scriptReady || !containerRef.current || !window.turnstile) return
     if (widgetIdRef.current) return
 
-    widgetIdRef.current = window.turnstile.render(containerRef.current, {
-      sitekey: siteKey,
-      callback: (token: string) => onVerify(token),
-      'expired-callback': () => onExpire?.(),
-      'error-callback': () => onExpire?.(),
-      // Always visible checkbox - user must click to verify
-      theme: 'light',
-      size: 'normal',
-    })
+    console.log('Rendering Turnstile widget...')
+    try {
+      widgetIdRef.current = window.turnstile.render(containerRef.current, {
+        sitekey: siteKey,
+        callback: (token: string) => {
+          console.log('Turnstile token received:', token.substring(0, 20) + '...')
+          onVerify(token)
+        },
+        'expired-callback': () => {
+          console.log('Turnstile token expired')
+          onExpire?.()
+        },
+        'error-callback': (errorCode: string) => {
+          console.log('Turnstile error:', errorCode)
+          onExpire?.()
+        },
+        // Always visible checkbox - user must click to verify
+        theme: 'light',
+        size: 'normal',
+      })
+      console.log('Turnstile widget rendered with ID:', widgetIdRef.current)
+    } catch (error) {
+      console.error('Turnstile render error:', error)
+    }
 
     return () => {
       if (widgetIdRef.current && window.turnstile) {

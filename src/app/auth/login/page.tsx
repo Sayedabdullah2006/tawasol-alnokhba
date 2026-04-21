@@ -19,6 +19,12 @@ export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
 
+  // Debug logging
+  console.log('Login Page Debug:', {
+    captchaOn,
+    turnstileSiteKey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ? 'SET' : 'NOT SET'
+  })
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
