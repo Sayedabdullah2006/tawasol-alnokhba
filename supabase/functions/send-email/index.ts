@@ -49,22 +49,43 @@ Deno.serve(async (req) => {
     })
   }
 
+  const requestBody = {
+    from: FROM_EMAIL,
+    to: payload.to,
+    subject: payload.subject,
+    html: payload.html,
+    reply_to: payload.replyTo,
+  }
+
+  console.log('Resend API request:', {
+    from: FROM_EMAIL,
+    to: payload.to,
+    subject: payload.subject,
+    apiKeyPrefix: apiKey.substring(0, 10) + '...'
+  })
+
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      from: FROM_EMAIL,
-      to: payload.to,
-      subject: payload.subject,
-      html: payload.html,
-      reply_to: payload.replyTo,
-    }),
+    body: JSON.stringify(requestBody),
   })
 
   const data = await r.json().catch(() => ({}))
+
+  if (!r.ok) {
+    console.error('Resend API error:', {
+      status: r.status,
+      statusText: r.statusText,
+      data,
+      headers: Object.fromEntries(r.headers)
+    })
+  } else {
+    console.log('Resend API success:', data)
+  }
+
   return new Response(JSON.stringify({ ok: r.ok, status: r.status, data }), {
     status: r.ok ? 200 : r.status,
     headers: { 'Content-Type': 'application/json' },
