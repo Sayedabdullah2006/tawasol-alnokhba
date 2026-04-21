@@ -58,15 +58,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'تعذّر إنشاء طلب التسجيل' }, { status: 500 })
     }
 
+    console.log(`Attempting to send registration email to: ${normalizedEmail}`)
     const emailOk = await sendRegistrationCode({
       email: normalizedEmail,
       code,
       clientName: fullName,
       ttlMinutes: CODE_TTL_MINUTES,
     })
+    console.log(`Registration email result for ${normalizedEmail}: ${emailOk ? 'SUCCESS' : 'FAILED'}`)
 
     if (!emailOk) {
-      return NextResponse.json({ error: 'تعذّر إرسال رمز التحقق — تأكد من بريدك' }, { status: 500 })
+      console.error(`Registration email failed for: ${normalizedEmail}`)
+      return NextResponse.json({ error: 'تعذّر إرسال رمز التحقق — تأكد من بريدك وأن nukhba.media مفعّل في Resend' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, email: normalizedEmail })
