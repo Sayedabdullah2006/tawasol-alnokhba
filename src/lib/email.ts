@@ -95,6 +95,20 @@ export async function notifyRejectedToClient(args: {
   return sendEmail(args.email, t.subject, t.html)
 }
 
+export async function sendRegistrationCode(args: {
+  email: string; code: string; clientName?: string; ttlMinutes: number
+}) {
+  const t = templates.registrationCodeToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
+export async function sendResetPasswordCode(args: {
+  email: string; code: string; ttlMinutes: number
+}) {
+  const t = templates.resetPasswordCodeToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
 // Old name kept for compatibility with the existing submit-request route.
 export async function sendNewRequestEmail(args: {
   requestNumber: string; clientName: string; clientEmail: string; clientPhone: string

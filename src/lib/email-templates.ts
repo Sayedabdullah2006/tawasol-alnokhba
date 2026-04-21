@@ -289,6 +289,65 @@ export function completedToClient(d: {
   }
 }
 
+// 9. Registration verification code — to new user
+export function registrationCodeToClient(d: {
+  code: string
+  clientName?: string
+  ttlMinutes: number
+}) {
+  const codeDigits = d.code.split('').map(c =>
+    `<span style="display:inline-block; width:40px; height:50px; line-height:50px; background:${BRAND_NAVY}; color:${BRAND_GOLD}; font-size:24px; font-weight:900; border-radius:8px; margin:0 3px;">${c}</span>`
+  ).join('')
+
+  return {
+    subject: `رمز تفعيل حسابك · تواصل النخبة`,
+    html: wrap(`
+      ${d.clientName ? greeting(d.clientName) : '<p style="margin:0 0 16px 0; font-size:15px;">مرحباً 👋</p>'}
+      <p style="margin:0 0 16px 0; font-size:14px; line-height:1.8;">
+        شكراً لانضمامك إلى <strong>تواصل النخبة</strong>. لإكمال تفعيل حسابك، استخدم رمز التحقق التالي:
+      </p>
+      <div style="text-align:center; margin:24px 0; direction:ltr;">
+        ${codeDigits}
+      </div>
+      <p style="margin:0 0 8px 0; font-size:13px; color:#6B7C99; text-align:center;">
+        الرمز صالح لمدة <strong style="color:${BRAND_NAVY};">${d.ttlMinutes} دقائق</strong> فقط
+      </p>
+      <p style="margin:18px 0 0 0; font-size:12px; color:#6B7C99; line-height:1.8; text-align:center;">
+        إذا لم تطلب إنشاء حساب، تجاهل هذه الرسالة.
+      </p>
+    `),
+  }
+}
+
+// 10. Password reset code — to user
+export function resetPasswordCodeToClient(d: {
+  code: string
+  ttlMinutes: number
+}) {
+  const codeDigits = d.code.split('').map(c =>
+    `<span style="display:inline-block; width:40px; height:50px; line-height:50px; background:${BRAND_NAVY}; color:${BRAND_GOLD}; font-size:24px; font-weight:900; border-radius:8px; margin:0 3px;">${c}</span>`
+  ).join('')
+
+  return {
+    subject: `رمز إعادة تعيين كلمة المرور · تواصل النخبة`,
+    html: wrap(`
+      <p style="margin:0 0 16px 0; font-size:15px;">🔑 <strong>طلب إعادة تعيين كلمة المرور</strong></p>
+      <p style="margin:0 0 16px 0; font-size:14px; line-height:1.8;">
+        استلمنا طلب إعادة تعيين كلمة مرور حسابك. استخدم الرمز التالي لإكمال العملية:
+      </p>
+      <div style="text-align:center; margin:24px 0; direction:ltr;">
+        ${codeDigits}
+      </div>
+      <p style="margin:0 0 8px 0; font-size:13px; color:#6B7C99; text-align:center;">
+        الرمز صالح لمدة <strong style="color:${BRAND_NAVY};">${d.ttlMinutes} دقائق</strong> فقط
+      </p>
+      <p style="margin:18px 0 0 0; font-size:12px; color:#6B7C99; line-height:1.8; text-align:center;">
+        إذا لم تطلب إعادة التعيين، تجاهل الرسالة وغيّر كلمة المرور إن شعرت بأي خطر.
+      </p>
+    `),
+  }
+}
+
 // 8. Rejected — to client
 export function rejectedToClient(d: {
   requestNumber: string
