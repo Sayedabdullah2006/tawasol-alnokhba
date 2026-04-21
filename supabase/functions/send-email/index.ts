@@ -10,7 +10,7 @@
 // service-role key in its own client; the function itself is locked down by
 // the secret being non-public.
 
-const FROM_EMAIL = 'تواصل النخبة <Noreply@nukhba.media>'
+const FROM_EMAIL = 'Nukhba <noreply@nukhba.media>'
 
 interface Payload {
   to: string | string[]
