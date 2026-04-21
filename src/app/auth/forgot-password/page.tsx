@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
+import TurnstileWidget from '@/components/ui/TurnstileWidget'
+import { turnstileEnabled } from '@/lib/turnstile'
 import { validateEmail } from '@/lib/email-validation'
 
 type Step = 'email' | 'code' | 'done'
@@ -20,6 +22,8 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const captchaOn = turnstileEnabled()
 
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,13 +35,14 @@ export default function ForgotPasswordPage() {
       if (v.suggestion) setEmailSuggestion(v.suggestion)
       return
     }
+    if (captchaOn && !captchaToken) { setError('يرجى إكمال التحقق الأمني أولاً'); return }
 
     setLoading(true)
     try {
       const res = await fetch('/api/auth/reset-start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, captchaToken }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { setError(data.error || 'تعذّر الإرسال'); setLoading(false); return }
@@ -115,6 +120,10 @@ export default function ForgotPasswordPage() {
                 placeholder="email@example.com" value={email}
                 onChange={e => setEmail(e.target.value)} required />
 
+              {captchaOn && (
+                <TurnstileWidget onVerify={setCaptchaToken} onExpire={() => setCaptchaToken(null)} />
+              )}
+
               {error && (
                 <div className="text-sm text-center space-y-2">
                   <p className="text-red-500">{error}</p>
@@ -128,7 +137,10 @@ export default function ForgotPasswordPage() {
                 </div>
               )}
 
-              <Button type="submit" loading={loading} className="w-full">إرسال الرمز</Button>
+              <Button type="submit" loading={loading} className="w-full"
+                disabled={captchaOn && !captchaToken}>
+                إرسال الرمز
+              </Button>
 
               <p className="text-center text-sm">
                 <Link href="/auth/login" className="text-green hover:underline">العودة لتسجيل الدخول</Link>

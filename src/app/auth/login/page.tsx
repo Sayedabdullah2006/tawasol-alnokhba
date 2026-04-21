@@ -6,21 +6,33 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
+import TurnstileWidget from '@/components/ui/TurnstileWidget'
+import { turnstileEnabled } from '@/lib/turnstile'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const captchaOn = turnstileEnabled()
   const router = useRouter()
   const supabase = createClient()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    if (captchaOn && !captchaToken) {
+      setError('يرجى إكمال التحقق الأمني أولاً')
+      return
+    }
     setLoading(true)
 
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password })
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: captchaToken ? { captchaToken } : undefined,
+    })
     if (authError) {
       setError('البريد الإلكتروني أو كلمة المرور غير صحيحة')
       setLoading(false)
@@ -74,9 +86,14 @@ export default function LoginPage() {
             required
           />
 
+          {captchaOn && (
+            <TurnstileWidget onVerify={setCaptchaToken} onExpire={() => setCaptchaToken(null)} />
+          )}
+
           {error && <p className="text-sm text-red-500 text-center">{error}</p>}
 
-          <Button type="submit" loading={loading} className="w-full">
+          <Button type="submit" loading={loading} className="w-full"
+            disabled={captchaOn && !captchaToken}>
             تسجيل الدخول
           </Button>
 

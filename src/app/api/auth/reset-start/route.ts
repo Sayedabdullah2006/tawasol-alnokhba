@@ -3,11 +3,18 @@ import { createServiceRoleClient } from '@/lib/supabase-server'
 import { sendResetPasswordCode } from '@/lib/email'
 import { generateCode, codeExpiryISO, CODE_TTL_MINUTES } from '@/lib/auth-codes'
 import { validateEmail } from '@/lib/email-validation'
+import { verifyTurnstileToken } from '@/lib/turnstile'
 
 export async function POST(request: Request) {
   try {
-    const { email } = await request.json()
+    const { email, captchaToken } = await request.json()
     if (!email) return NextResponse.json({ error: 'البريد مطلوب' }, { status: 400 })
+
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? undefined
+    const captchaOk = await verifyTurnstileToken(captchaToken, ip)
+    if (!captchaOk) {
+      return NextResponse.json({ error: 'فشل التحقق الأمني — أعد المحاولة' }, { status: 400 })
+    }
 
     const emailCheck = validateEmail(email)
     if (!emailCheck.valid) {

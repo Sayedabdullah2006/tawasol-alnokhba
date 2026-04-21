@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
+import TurnstileWidget from '@/components/ui/TurnstileWidget'
+import { turnstileEnabled } from '@/lib/turnstile'
 import { validateEmail } from '@/lib/email-validation'
 
 type Step = 'form' | 'code'
@@ -26,6 +28,8 @@ export default function RegisterPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const captchaOn = turnstileEnabled()
 
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -40,13 +44,14 @@ export default function RegisterPage() {
     }
     if (password.length < 6) { setError('كلمة المرور يجب أن تكون 6 أحرف على الأقل'); return }
     if (password !== confirmPassword) { setError('كلمة المرور وتأكيدها غير متطابقتين'); return }
+    if (captchaOn && !captchaToken) { setError('يرجى إكمال التحقق الأمني أولاً'); return }
 
     setLoading(true)
     try {
       const res = await fetch('/api/auth/register-start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, fullName }),
+        body: JSON.stringify({ email, password, fullName, captchaToken }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'تعذّر الإرسال'); setLoading(false); return }
@@ -132,6 +137,10 @@ export default function RegisterPage() {
               placeholder="أعد كتابة كلمة المرور" value={confirmPassword}
               onChange={e => setConfirmPassword(e.target.value)} required />
 
+            {captchaOn && (
+              <TurnstileWidget onVerify={setCaptchaToken} onExpire={() => setCaptchaToken(null)} />
+            )}
+
             {error && (
               <div className="text-sm text-center space-y-2">
                 <p className="text-red-500">{error}</p>
@@ -145,7 +154,10 @@ export default function RegisterPage() {
               </div>
             )}
 
-            <Button type="submit" loading={loading} className="w-full">إرسال رمز التحقق</Button>
+            <Button type="submit" loading={loading} className="w-full"
+              disabled={captchaOn && !captchaToken}>
+              إرسال رمز التحقق
+            </Button>
 
             <p className="text-center text-sm text-muted">
               لديك حساب؟{' '}
