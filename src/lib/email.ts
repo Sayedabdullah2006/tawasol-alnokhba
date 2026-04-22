@@ -5,24 +5,56 @@
 
 import { createServiceRoleClient } from './supabase-server'
 import * as templates from './email-templates'
+import { sendEnhancedEmail, htmlToText } from './email-deliverability'
 
 const ADMIN_EMAIL = 'first1saudi@gmail.com'
+const ADMIN_CC_EMAIL = 'first1saudi@gmail.com' // نسخة لجميع إيميلات العملاء
 
 export async function sendEmail(to: string | string[], subject: string, html: string): Promise<boolean> {
   if (!to || (Array.isArray(to) && to.length === 0)) return false
+
   try {
-    const client = await createServiceRoleClient()
-    const { data, error } = await client.functions.invoke('send-email', {
-      body: { to, subject, html },
+    console.log(`[EMAIL] Sending enhanced email: ${subject} to ${Array.isArray(to) ? to.join(', ') : to}`)
+
+    // Use enhanced email with deliverability improvements
+    return await sendEnhancedEmail({
+      to,
+      subject,
+      html,
+      text: htmlToText(html), // Auto-generate text version
+      cc: ADMIN_CC_EMAIL, // نسخة للإدارة لجميع إيميلات العملاء
+      options: {
+        category: 'notification',
+        priority: 'normal',
+        trackOpens: true,
+        trackClicks: false
+      }
     })
-    if (error || (data && data.ok === false)) {
-      console.error('Email send failed:', error?.message ?? data)
+  } catch (err) {
+    console.error('[EMAIL] Enhanced email send exception:', err)
+
+    // Fallback to basic email service if enhanced version fails
+    try {
+      console.log('[EMAIL] Falling back to basic email service...')
+      const client = await createServiceRoleClient()
+      const { data, error } = await client.functions.invoke('send-email', {
+        body: {
+          to,
+          subject,
+          html,
+          cc: ADMIN_CC_EMAIL // نسخة للإدارة حتى في الـ fallback
+        },
+      })
+      if (error || (data && data.ok === false)) {
+        console.error('[EMAIL] Fallback email send failed:', error?.message ?? data)
+        return false
+      }
+      console.log('[EMAIL] Fallback email sent successfully')
+      return true
+    } catch (fallbackErr) {
+      console.error('[EMAIL] Fallback email send exception:', fallbackErr)
       return false
     }
-    return true
-  } catch (err) {
-    console.error('Email send exception:', err)
-    return false
   }
 }
 

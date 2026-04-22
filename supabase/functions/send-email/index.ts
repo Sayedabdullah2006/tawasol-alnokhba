@@ -18,6 +18,7 @@ interface Payload {
   subject: string
   html: string
   replyTo?: string
+  cc?: string | string[]
 }
 
 Deno.serve(async (req) => {
@@ -70,11 +71,23 @@ Deno.serve(async (req) => {
     subject: payload.subject,
     html: payload.html,
     reply_to: payload.replyTo || REPLY_TO_EMAIL,
+    cc: payload.cc, // إضافة CC للرسائل
     headers: {
-      'X-Mailer': 'Nukhba-Platform',
+      'X-Mailer': 'Nukhba-Platform/1.0',
       'X-Priority': '3',
       'List-Unsubscribe': '<mailto:unsubscribe@nukhba.media>',
-      'Precedence': 'bulk'
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      'Auto-Submitted': 'auto-generated',
+      'X-Auto-Response-Suppress': 'OOF, DR, RN, NRN, AutoReply',
+      'X-Entity-Ref-ID': 'nukhba-platform',
+      'Message-ID': `<${Date.now()}-${Math.random().toString(36).substr(2, 9)}@nukhba.media>`,
+      'Date': new Date().toUTCString(),
+      'MIME-Version': '1.0',
+      'Content-Type': 'text/html; charset=UTF-8',
+      'Content-Transfer-Encoding': '8bit',
+      'X-Feedback-ID': 'notifications:nukhba:platform',
+      'Return-Path': 'bounces@nukhba.media',
+      'Organization': 'Tawasol Al-Nokhba - تواصل النخبة'
     }
   }
 

@@ -49,9 +49,37 @@ td, th {
 
 /* إصلاح النصوص المختلطة (عربي + إنجليزي) */
 .arabic-text, .client-name {
+  direction: rtl !important;
+  unicode-bidi: bidi-override !important;
+  text-align: right !important;
+  font-feature-settings: "liga" off, "kern" off;
+  word-break: keep-all;
+  white-space: nowrap;
+}
+
+/* إصلاح قوي للنصوص العربية المشوهة */
+.client-name {
+  transform: scaleX(-1);
+  display: inline-block;
+}
+
+.client-name > * {
+  transform: scaleX(-1);
+}
+
+/* بديل أقل جذرية */
+.arabic-fix {
   direction: rtl;
-  unicode-bidi: embed;
+  unicode-bidi: isolate-override;
+  text-orientation: mixed;
+  writing-mode: horizontal-tb;
+}
+
+/* فرض الاتجاه العربي على كل الجداول */
+td[class*="client"], th[class*="client"] {
+  direction: rtl;
   text-align: right;
+  unicode-bidi: embed;
 }
 
 /* Custom scrollbar for terms box */

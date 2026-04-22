@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { CATEGORIES, REQUEST_STATUSES } from '@/lib/constants'
 import { formatNumber, formatDate, generateRequestNumber } from '@/lib/utils'
+import { fixTextDirection } from '@/lib/text-utils'
 import { useToast } from '@/components/ui/Toast'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import Button from '@/components/ui/Button'
@@ -225,7 +226,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-muted block">الاسم</span>
-                  <span className="font-medium client-name">{request.client_name}</span>
+                  <span className="font-medium client-name">{fixTextDirection(request.client_name || '')}</span>
                 </div>
                 <div>
                   <span className="text-muted block">البريد</span>

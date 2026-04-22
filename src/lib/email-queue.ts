@@ -1,12 +1,17 @@
 // Enhanced email notification system with better error handling and logging
 import { sendEmail } from './email'
+import { sendEnhancedEmail, validateEmailContent, htmlToText } from './email-deliverability'
 
 export interface EmailJob {
   to: string | string[]
   subject: string
   html: string
+  text?: string
   retries?: number
   context?: string // For logging what triggered this email
+  priority?: 'high' | 'normal' | 'low'
+  category?: 'transactional' | 'notification' | 'marketing'
+  enhanced?: boolean // Use enhanced deliverability features
 }
 
 export interface EmailResult {
@@ -18,19 +23,58 @@ export interface EmailResult {
 // Queue for failed emails (in-memory for now, could be moved to database/Redis later)
 const failedEmails: (EmailJob & { lastAttempt: Date; attempts: number })[] = []
 
-// Enhanced email sending with retry logic and better logging
+// Enhanced email sending with retry logic, deliverability validation, and better logging
 export async function sendEmailWithRetry(job: EmailJob): Promise<EmailResult> {
   const maxRetries = job.retries ?? 3
   const context = job.context ?? 'unknown'
+  const useEnhanced = job.enhanced !== false // Default to enhanced unless explicitly disabled
+
+  // Pre-flight validation for deliverability
+  const validation = validateEmailContent(job.subject, job.html, job.text)
+
+  if (validation.isSpammy) {
+    console.warn(`[EMAIL] ⚠️ Email content flagged as potentially spammy (score: ${validation.score}): ${job.subject}`)
+    console.warn(`[EMAIL] Warnings:`, validation.warnings)
+
+    // Don't send if spam score is too high, but log the attempt
+    if (validation.score > 8) {
+      console.error(`[EMAIL] 🚫 Email blocked due to high spam score (${validation.score}): ${job.subject}`)
+      addToFailedQueue({ ...job, context: `${context}-blocked-spam` })
+      return {
+        success: false,
+        error: `Blocked due to high spam score (${validation.score}). Warnings: ${validation.warnings.join(', ')}`,
+        attemptedAt: new Date()
+      }
+    }
+  }
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`[EMAIL] Attempting to send email (${attempt}/${maxRetries}): ${job.subject} to ${Array.isArray(job.to) ? job.to.join(', ') : job.to} [Context: ${context}]`)
+      console.log(`[EMAIL] Attempting to send ${useEnhanced ? 'enhanced' : 'basic'} email (${attempt}/${maxRetries}): ${job.subject} to ${Array.isArray(job.to) ? job.to.join(', ') : job.to} [Context: ${context}] [Spam score: ${validation.score}]`)
 
-      const success = await sendEmail(job.to, job.subject, job.html)
+      let success: boolean
+
+      if (useEnhanced) {
+        // Use enhanced email with deliverability improvements
+        success = await sendEnhancedEmail({
+          to: job.to,
+          subject: job.subject,
+          html: job.html,
+          text: job.text || htmlToText(job.html),
+          options: {
+            category: job.category || 'notification',
+            priority: job.priority || 'normal',
+            trackOpens: true,
+            trackClicks: false
+          }
+        })
+      } else {
+        // Fallback to basic email
+        success = await sendEmail(job.to, job.subject, job.html)
+      }
 
       if (success) {
-        console.log(`[EMAIL] ✅ Email sent successfully: ${job.subject} [Context: ${context}]`)
+        console.log(`[EMAIL] ✅ Email sent successfully: ${job.subject} [Context: ${context}] [Enhanced: ${useEnhanced}]`)
         return { success: true, attemptedAt: new Date() }
       } else {
         console.warn(`[EMAIL] ⚠️ Email send returned false (attempt ${attempt}/${maxRetries}): ${job.subject} [Context: ${context}]`)
@@ -47,6 +91,20 @@ export async function sendEmailWithRetry(job: EmailJob): Promise<EmailResult> {
       }
     } catch (error) {
       console.error(`[EMAIL] 💥 Email send exception (attempt ${attempt}/${maxRetries}): ${job.subject} [Context: ${context}]`, error)
+
+      // If enhanced email fails, try basic email on final attempt
+      if (useEnhanced && attempt === maxRetries) {
+        console.log(`[EMAIL] 🔄 Final attempt with basic email fallback...`)
+        try {
+          const basicSuccess = await sendEmail(job.to, job.subject, job.html)
+          if (basicSuccess) {
+            console.log(`[EMAIL] ✅ Fallback email sent successfully: ${job.subject} [Context: ${context}]`)
+            return { success: true, attemptedAt: new Date() }
+          }
+        } catch (fallbackError) {
+          console.error(`[EMAIL] 💥 Fallback email also failed:`, fallbackError)
+        }
+      }
 
       if (attempt === maxRetries) {
         addToFailedQueue(job)
@@ -159,28 +217,59 @@ export async function notifyAsync(
   }
 }
 
-// Email health check - can be called by admin endpoints to verify email system is working
+// Enhanced email health check - tests both basic and enhanced email systems
 export async function testEmailSystem(): Promise<{
   success: boolean;
   error?: string;
-  responseTime: number
+  responseTime: number;
+  enhancedFeatures?: boolean;
+  validationScore?: number;
+  warnings?: string[];
 }> {
   const startTime = Date.now()
+  const timestamp = new Date().toLocaleString('ar')
+
+  const testHtml = `
+    <div style="direction: rtl; font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #0E2855; margin-bottom: 16px;">🔧 اختبار نظام الإيميل المحسن</h2>
+
+      <div style="background: #E8F5E8; padding: 12px; border-radius: 8px; margin: 16px 0;">
+        <p style="margin: 0; color: #059669;"><strong>✅ النظام يعمل بشكل صحيح</strong></p>
+      </div>
+
+      <div style="background: #F8FAFC; padding: 16px; border-radius: 8px; margin: 16px 0;">
+        <h3 style="margin: 0 0 12px 0; color: #0E2855; font-size: 16px;">تفاصيل الاختبار</h3>
+        <ul style="margin: 0; padding-right: 20px; color: #6B7C99; font-size: 14px;">
+          <li>اختبار إرسال البريد الإلكتروني</li>
+          <li>تحليل محتوى ضد spam filters</li>
+          <li>تطبيق تحسينات deliverability</li>
+          <li>إنشاء نسخة نصية تلقائية</li>
+          <li>إضافة headers محسنة</li>
+        </ul>
+      </div>
+
+      <p style="color: #6B7C99; font-size: 12px; margin: 16px 0 0 0;">
+        <strong>وقت الإرسال:</strong> ${timestamp}<br>
+        <strong>نوع الاختبار:</strong> نظام محسن مع تحسينات deliverability
+      </p>
+    </div>
+  `
 
   try {
+    // Pre-validate the test content
+    const validation = validateEmailContent('اختبار نظام الإيميل المحسن - تواصل النخبة', testHtml)
+
     const testResult = await sendEmailWithRetry({
       to: 'first1saudi@gmail.com', // Admin email
-      subject: 'نظام الإيميل يعمل بشكل صحيح',
-      html: `
-        <div style="direction: rtl; font-family: Arial, sans-serif; padding: 20px;">
-          <h2>اختبار نظام الإيميل</h2>
-          <p>هذه رسالة اختبار للتأكد من أن نظام الإيميل يعمل بشكل صحيح.</p>
-          <p><strong>الوقت:</strong> ${new Date().toLocaleString('ar')}</p>
-          <p><strong>حالة النظام:</strong> ✅ يعمل</p>
-        </div>
-      `,
-      context: 'system-health-check',
-      retries: 1
+      subject: '🔧 اختبار نظام الإيميل المحسن - تواصل النخبة',
+      html: testHtml,
+      text: htmlToText(testHtml),
+      context: 'enhanced-system-health-check',
+      category: 'transactional',
+      priority: 'normal',
+      enhanced: true,
+      retries: 2
+      // لا نحتاج CC هنا لأنه اختبار إداري
     })
 
     const responseTime = Date.now() - startTime
@@ -188,13 +277,19 @@ export async function testEmailSystem(): Promise<{
     return {
       success: testResult.success,
       error: testResult.error,
-      responseTime
+      responseTime,
+      enhancedFeatures: true,
+      validationScore: validation.score,
+      warnings: validation.warnings
     }
   } catch (error) {
+    const responseTime = Date.now() - startTime
+
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
-      responseTime: Date.now() - startTime
+      responseTime,
+      enhancedFeatures: false
     }
   }
 }

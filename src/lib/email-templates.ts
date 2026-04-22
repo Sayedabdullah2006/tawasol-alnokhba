@@ -9,34 +9,101 @@ const wrap = (innerHtml: string): string => `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>تواصل النخبة</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="format-detection" content="telephone=no">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>تواصل النخبة - Tawasol Al-Nokhba</title>
+<!--[if mso]>
+<noscript>
+<xml>
+<o:OfficeDocumentSettings>
+<o:AllowPNG/>
+<o:PixelsPerInch>96</o:PixelsPerInch>
+</o:OfficeDocumentSettings>
+</xml>
+</noscript>
+<![endif]-->
+<style type="text/css">
+/* Client-specific styles for better compatibility */
+#outlook a { padding:0; }
+.ReadMsgBody { width:100%; }
+.ExternalClass { width:100%; }
+.ExternalClass, .ExternalClass p, .ExternalClass span, .ExternalClass font, .ExternalClass td, .ExternalClass div { line-height:100%; }
+body, table, td, p, a, li, blockquote { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
+img { -ms-interpolation-mode:bicubic; }
+/* Reset styles for clean rendering */
+body { margin:0 !important; padding:0 !important; width:100% !important; min-width:100% !important; }
+img { border:0; height:auto; line-height:100%; outline:none; text-decoration:none; }
+a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !important; }
+</style>
 </head>
-<body style="margin:0; padding:0; background:#F7F4ED; font-family: -apple-system, 'Segoe UI', Cairo, Arial, sans-serif; color:${BRAND_NAVY};">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F7F4ED; padding:24px 12px;">
-    <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px; background:#FFFFFF; border-radius:16px; overflow:hidden; box-shadow:0 2px 8px rgba(14,40,85,0.08);">
-        <!-- Header -->
-        <tr><td style="background:${BRAND_NAVY}; padding:24px; text-align:center;">
-          <h1 style="margin:0; color:#FFFFFF; font-size:22px; font-weight:900; letter-spacing:0.5px;">تواصل النخبة</h1>
-          <p style="margin:4px 0 0 0; color:${BRAND_GOLD}; font-size:11px; letter-spacing:2px; font-weight:bold;">TAWASOL ALNOKHBA</p>
-        </td></tr>
+<body style="margin:0 !important; padding:0 !important; width:100% !important; min-width:100% !important; background-color:#F7F4ED; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:${BRAND_NAVY}; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
+  <!-- Preheader text for better inbox preview -->
+  <div style="display:none; font-size:1px; color:#F7F4ED; line-height:1px; max-height:0px; max-width:0px; opacity:0; overflow:hidden; mso-hide:all;">
+    تحديث من منصة تواصل النخبة للتسويق والإعلان
+  </div>
 
-        <!-- Body -->
-        <tr><td style="padding:32px 28px;">
-          ${innerHtml}
-        </td></tr>
+  <!-- 100% background wrapper -->
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="background-color:#F7F4ED; min-width:100%;">
+    <tr>
+      <td align="center" valign="top" style="padding:24px 12px;">
+        <!-- Main container -->
+        <table width="560" cellpadding="0" cellspacing="0" border="0" role="presentation" style="max-width:560px; width:100%; background-color:#FFFFFF; border-radius:16px; overflow:hidden; box-shadow:0 2px 8px rgba(14,40,85,0.08);">
 
-        <!-- Footer -->
-        <tr><td style="background:#F7F4ED; padding:18px; text-align:center; border-top:1px solid #E3DCC9;">
-          <p style="margin:0 0 6px 0; color:${BRAND_NAVY}; font-size:12px; font-weight:bold;">تواصل النخبة · Tawasol Al-Nokhba</p>
-          <p style="margin:0; color:#6B7C99; font-size:11px;">هذه رسالة من نظام آلي، يرجى عدم الرد عليها.</p>
-          <p style="margin:8px 0 0 0;">
-            <a href="${SITE_URL}" style="color:${BRAND_GOLD}; text-decoration:none; font-size:11px;">${SITE_URL.replace('https://','')}</a>
-          </p>
-        </td></tr>
-      </table>
-    </td></tr>
+          <!-- Header with logo and branding -->
+          <tr>
+            <td style="background-color:${BRAND_NAVY}; padding:24px; text-align:center;">
+              <h1 style="margin:0; color:#FFFFFF; font-size:22px; font-weight:900; letter-spacing:0.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">تواصل النخبة</h1>
+              <p style="margin:4px 0 0 0; color:${BRAND_GOLD}; font-size:11px; letter-spacing:2px; font-weight:bold; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">TAWASOL ALNOKHBA</p>
+            </td>
+          </tr>
+
+          <!-- Main content body -->
+          <tr>
+            <td style="padding:32px 28px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height:1.6;">
+              ${innerHtml}
+            </td>
+          </tr>
+
+          <!-- Footer with contact info and unsubscribe -->
+          <tr>
+            <td style="background-color:#F7F4ED; padding:18px; text-align:center; border-top:1px solid #E3DCC9;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation">
+                <tr>
+                  <td style="text-align:center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+                    <p style="margin:0 0 6px 0; color:${BRAND_NAVY}; font-size:12px; font-weight:bold;">تواصل النخبة · Tawasol Al-Nokhba</p>
+                    <p style="margin:0 0 8px 0; color:#6B7C99; font-size:11px;">منصة متخصصة في التسويق والإعلان الرقمي</p>
+                    <p style="margin:0 0 8px 0; color:#6B7C99; font-size:11px;">هذه رسالة من نظام آلي، يرجى عدم الرد عليها مباشرة</p>
+                    <p style="margin:8px 0 0 0; font-size:11px;">
+                      <a href="${SITE_URL}" style="color:${BRAND_GOLD}; text-decoration:none;">${SITE_URL.replace('https://','')}</a>
+                      <span style="color:#6B7C99; margin:0 8px;">|</span>
+                      <a href="mailto:support@nukhba.media" style="color:${BRAND_GOLD}; text-decoration:none;">دعم العملاء</a>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Additional footer for deliverability -->
+        <table width="560" cellpadding="0" cellspacing="0" border="0" role="presentation" style="max-width:560px; width:100%; margin-top:12px;">
+          <tr>
+            <td style="text-align:center; padding:8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+              <p style="margin:0; color:#9CA3AF; font-size:10px; line-height:1.4;">
+                هذه رسالة تجارية من تواصل النخبة، المملكة العربية السعودية<br>
+                تم إرسال هذه الرسالة إليك كونك عميل أو مهتم بخدماتنا<br>
+                <a href="mailto:unsubscribe@nukhba.media?subject=إلغاء الاشتراك" style="color:#9CA3AF; text-decoration:underline;">إلغاء الاشتراك</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
   </table>
 </body>
 </html>`

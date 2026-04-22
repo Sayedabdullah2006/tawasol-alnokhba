@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { CATEGORIES, REQUEST_STATUSES } from '@/lib/constants'
 import { formatNumber, formatDate, generateRequestNumber } from '@/lib/utils'
+import { fixTextDirection } from '@/lib/text-utils'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -114,7 +115,7 @@ export default function AdminRequestsPage() {
                     className="border-t border-border hover:bg-cream/50 cursor-pointer transition-colors"
                   >
                     <td className="px-4 py-3 font-mono text-xs">{generateRequestNumber(r.request_number)}</td>
-                    <td className="px-4 py-3 client-name">{r.client_name}</td>
+                    <td className="px-4 py-3 client-name">{fixTextDirection(r.client_name || '')}</td>
                     <td className="px-4 py-3">{cat?.icon} {cat?.nameAr}</td>
                     <td className="px-4 py-3">
                       {r.final_total ?? r.admin_quoted_price
