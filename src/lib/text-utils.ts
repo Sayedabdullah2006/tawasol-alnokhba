@@ -95,8 +95,9 @@ export function normalizeArabicText(text: string): string {
 export function fixTextDirection(text: string): string {
   if (!text) return text
 
-  // تنظيف النص الأساسي
+  // تنظيف النص الأساسي وإزالة أي direction markers موجودة
   text = text.trim()
+    .replace(/[‪-‮⁦-⁩]/g, '') // إزالة Unicode direction markers
 
   // فحص نوع النص
   const hasArabic = /[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/.test(text)
@@ -114,6 +115,29 @@ export function fixTextDirection(text: string): string {
   }
 
   // إذا كان النص إنجليزي فقط
+  return text
+}
+
+/**
+ * إضافة direction markers للتحكم في عرض النص
+ */
+export function addDirectionMarkers(text: string): string {
+  if (!text) return text
+
+  const hasArabic = /[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/.test(text)
+  const hasEnglish = /[a-zA-Z]/.test(text)
+
+  if (hasArabic && !hasEnglish) {
+    // عربي فقط - RLE (Right-to-Left Embedding)
+    return '‫' + text + '‬'
+  } else if (!hasArabic && hasEnglish) {
+    // إنجليزي فقط - LRE (Left-to-Right Embedding)
+    return '‪' + text + '‬'
+  } else if (hasArabic && hasEnglish) {
+    // مختلط - LRO (Left-to-Right Override) للتحكم الكامل
+    return '‭' + text + '‬'
+  }
+
   return text
 }
 

@@ -23,39 +23,45 @@ export default function ClientName({ name, className = '', maxLength }: ClientNa
   const hasArabic = /[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/.test(fixedName)
   const hasEnglish = /[a-zA-Z]/.test(fixedName)
 
-  // تحديد الاتجاه والمحاذاة
-  let textDirection: 'ltr' | 'rtl' | 'auto' = 'auto'
-  let textAlign: 'left' | 'right' | 'center' = 'left'
+  // إضافة Unicode direction markers للتحكم في العرض
+  let finalDisplayName = displayName
+  let textDirection: 'ltr' | 'rtl' = 'ltr'
+  let textAlign: 'left' | 'right' = 'left'
 
   if (hasArabic && !hasEnglish) {
-    // عربي فقط
+    // عربي فقط - أضف RLE (Right-to-Left Embedding)
+    finalDisplayName = '‫' + displayName + '‬'
     textDirection = 'rtl'
     textAlign = 'right'
   } else if (!hasArabic && hasEnglish) {
-    // إنجليزي فقط
+    // إنجليزي فقط - أضف LRE (Left-to-Right Embedding)
+    finalDisplayName = '‪' + displayName + '‬'
     textDirection = 'ltr'
     textAlign = 'left'
   } else if (hasArabic && hasEnglish) {
-    // مختلط - دع المتصفح يحدد
-    textDirection = 'auto'
+    // مختلط - استخدم LRO (Left-to-Right Override) للتحكم الكامل
+    finalDisplayName = '‭' + displayName + '‬'
+    textDirection = 'ltr'
     textAlign = 'left'
   }
 
   return (
     <span
-      className={`client-name inline-block ${className}`}
+      className={`client-name-fixed inline-block ${className}`}
       dir={textDirection}
       style={{
         textAlign,
-        unicodeBidi: 'plaintext',
+        unicodeBidi: 'bidi-override',
+        direction: textDirection,
         maxWidth: maxLength ? `${maxLength * 0.6}em` : undefined,
         whiteSpace: 'nowrap',
         overflow: 'hidden',
-        textOverflow: 'ellipsis'
+        textOverflow: 'ellipsis',
+        display: 'inline-block'
       }}
       title={fixedName} // عرض الاسم الكامل عند hover
     >
-      {displayName}
+      {finalDisplayName}
     </span>
   )
 }

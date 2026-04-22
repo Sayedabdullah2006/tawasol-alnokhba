@@ -11,7 +11,8 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useToast } from '@/components/ui/Toast'
-import ClientName from '@/components/ui/ClientName'
+import ClientNameFixed from '@/components/ui/ClientNameFixed'
+import NameDisplayTest from '@/components/debug/NameDisplayTest'
 
 export default function AdminRequestsPage() {
   const router = useRouter()
@@ -194,22 +195,34 @@ export default function AdminRequestsPage() {
 
       {/* Debug Panel */}
       {showDebug && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4">
-          <h3 className="font-bold text-yellow-700 mb-2">🔍 معلومات التشخيص</h3>
-          <div className="text-xs text-yellow-600 space-y-1">
-            <div>إجمالي الطلبات: {requests.length}</div>
-            <div>الطلبات المفلترة: {filteredRequests.length}</div>
-            <div>حالة البحث: "{search || 'فارغ'}"</div>
-            <div>فلتر الحالة: "{statusFilter || 'جميع الحالات'}"</div>
-            {filteredRequests.length > 0 && (
-              <div>عينة من البيانات: {JSON.stringify({
-                id: filteredRequests[0]?.id?.substring(0, 8),
-                client_email: filteredRequests[0]?.client_email ? 'موجود' : 'مفقود',
-                status: filteredRequests[0]?.status
-              })}</div>
-            )}
+        <>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4">
+            <h3 className="font-bold text-yellow-700 mb-2">🔍 معلومات التشخيص</h3>
+            <div className="text-xs text-yellow-600 space-y-1">
+              <div>إجمالي الطلبات: {requests.length}</div>
+              <div>الطلبات المفلترة: {filteredRequests.length}</div>
+              <div>حالة البحث: "{search || 'فارغ'}"</div>
+              <div>فلتر الحالة: "{statusFilter || 'جميع الحالات'}"</div>
+              {filteredRequests.length > 0 && (
+                <div>عينة من البيانات: {JSON.stringify({
+                  id: filteredRequests[0]?.id?.substring(0, 8),
+                  client_email: filteredRequests[0]?.client_email ? 'موجود' : 'مفقود',
+                  status: filteredRequests[0]?.status
+                })}</div>
+              )}
+            </div>
           </div>
-        </div>
+
+          {/* Name Display Test */}
+          {filteredRequests.length > 0 && (
+            <NameDisplayTest
+              names={filteredRequests
+                .slice(0, 3)
+                .map(r => r.client_name)
+                .filter(Boolean)}
+            />
+          )}
+        </>
       )}
 
       <div className="bg-card rounded-2xl border border-border overflow-hidden">
@@ -259,7 +272,7 @@ export default function AdminRequestsPage() {
 
                     {/* العميل */}
                     <td className="px-3 py-3 text-sm">
-                      <ClientName
+                      <ClientNameFixed
                         name={r.client_name || ''}
                         maxLength={20}
                         className="font-medium"

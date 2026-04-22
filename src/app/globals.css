@@ -70,6 +70,35 @@ td, th {
   unicode-bidi: plaintext;
   text-align: left;
 }
+
+/* إصلاح عرض أسماء العملاء - فرض قوي */
+.client-name-fixed {
+  isolation: isolate;
+  display: inline-block !important;
+  unicode-bidi: bidi-override !important;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+
+/* فرض LTR للنصوص الإنجليزية */
+.client-name-fixed[dir="ltr"] {
+  direction: ltr !important;
+  text-align: left !important;
+  unicode-bidi: bidi-override !important;
+}
+
+/* فرض RTL للنصوص العربية */
+.client-name-fixed[dir="rtl"] {
+  direction: rtl !important;
+  text-align: right !important;
+  unicode-bidi: bidi-override !important;
+}
+
+/* منع تداخل الاتجاهات */
+.client-name-fixed * {
+  direction: inherit !important;
+  unicode-bidi: inherit !important;
+}
 .arabic-text, .client-name {
   direction: rtl !important;
   unicode-bidi: bidi-override !important;
