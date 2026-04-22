@@ -25,7 +25,7 @@ async function handleRequest(request: NextRequest) {
                     request.headers.get('authorization')?.replace('Bearer ', '')
 
     if (authKey !== CRON_API_KEY) {
-      console.warn('[CRON] Unauthorized access attempt from:', request.ip)
+      console.warn('[CRON] Unauthorized access attempt from:', request.headers.get('x-forwarded-for') || 'unknown')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

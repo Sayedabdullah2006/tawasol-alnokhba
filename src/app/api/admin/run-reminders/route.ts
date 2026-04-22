@@ -304,9 +304,8 @@ async function handleGetReminderStats() {
     // إحصائيات الطلبات الحالية
     const { data: currentRequests } = await supabase
       .from('publish_requests')
-      .select('status, COUNT(*)')
+      .select('status')
       .in('status', ['quoted', 'approved', 'content_review'])
-      .groupBy('status')
 
     // تلخيص الإحصائيات
     const statsSummary = stats?.reduce((acc, log) => {

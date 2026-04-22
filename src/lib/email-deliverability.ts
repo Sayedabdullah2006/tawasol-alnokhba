@@ -27,7 +27,7 @@ const ADMIN_CC_EMAIL = 'first1saudi@gmail.com'
 export function htmlToText(html: string): string {
   return html
     // Remove script and style elements completely
-    .replace(/<(script|style)[^>]*>.*?<\/\1>/gsi, '')
+    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '')
     // Convert headers to text with proper spacing
     .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, '\n\n$1\n\n')
     // Convert paragraphs
@@ -121,7 +121,7 @@ export function validateEmailContent(subject: string, html: string, text?: strin
   }
 
   // Check for suspicious links
-  const linkMatches = html.match(/href=['"](.*?)['"/gi) || []
+  const linkMatches = html.match(/href=['"](.*?)['"]/gi) || []
   linkMatches.forEach(link => {
     const url = link.replace(/href=['"]/, '').replace(/['"].*/, '')
 
