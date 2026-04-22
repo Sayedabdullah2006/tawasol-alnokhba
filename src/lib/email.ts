@@ -14,47 +14,29 @@ export async function sendEmail(to: string | string[], subject: string, html: st
   if (!to || (Array.isArray(to) && to.length === 0)) return false
 
   try {
-    console.log(`[EMAIL] Sending enhanced email: ${subject} to ${Array.isArray(to) ? to.join(', ') : to}`)
+    console.log(`[EMAIL] Sending basic email: ${subject} to ${Array.isArray(to) ? to.join(', ') : to}`)
 
-    // Use enhanced email with deliverability improvements
-    return await sendEnhancedEmail({
-      to,
-      subject,
-      html,
-      text: htmlToText(html), // Auto-generate text version
-      cc: ADMIN_CC_EMAIL, // نسخة للإدارة لجميع إيميلات العملاء
-      options: {
-        category: 'notification',
-        priority: 'normal',
-        trackOpens: true,
-        trackClicks: false
-      }
+    // Use basic email service directly (enhanced system temporarily disabled)
+    const client = await createServiceRoleClient()
+    const { data, error } = await client.functions.invoke('send-email', {
+      body: {
+        to,
+        subject,
+        html,
+        cc: ADMIN_CC_EMAIL // نسخة للإدارة
+      },
     })
-  } catch (err) {
-    console.error('[EMAIL] Enhanced email send exception:', err)
 
-    // Fallback to basic email service if enhanced version fails
-    try {
-      console.log('[EMAIL] Falling back to basic email service...')
-      const client = await createServiceRoleClient()
-      const { data, error } = await client.functions.invoke('send-email', {
-        body: {
-          to,
-          subject,
-          html,
-          cc: ADMIN_CC_EMAIL // نسخة للإدارة حتى في الـ fallback
-        },
-      })
-      if (error || (data && data.ok === false)) {
-        console.error('[EMAIL] Fallback email send failed:', error?.message ?? data)
-        return false
-      }
-      console.log('[EMAIL] Fallback email sent successfully')
-      return true
-    } catch (fallbackErr) {
-      console.error('[EMAIL] Fallback email send exception:', fallbackErr)
+    if (error || (data && data.ok === false)) {
+      console.error('[EMAIL] Basic email send failed:', error?.message ?? data)
       return false
     }
+
+    console.log('[EMAIL] ✅ Basic email sent successfully')
+    return true
+  } catch (err) {
+    console.error('[EMAIL] Basic email send exception:', err)
+    return false
   }
 }
 
