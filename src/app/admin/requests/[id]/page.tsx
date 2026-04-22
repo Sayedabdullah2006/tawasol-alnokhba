@@ -13,6 +13,7 @@ import Input from '@/components/ui/Input'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import QuoteComposer from '@/components/admin/QuoteComposer'
 import ContentSender from '@/components/admin/ContentSender'
+import { getAdminActions, requiresAdminAction, waitingForClient, isFinalStatus, messageColors } from '@/lib/admin-actions'
 
 export default function AdminRequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -341,6 +342,22 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
             <div className="bg-card rounded-2xl border border-border p-5">
               <h3 className="font-bold text-dark mb-4">إجراءات الطلب</h3>
 
+              {(() => {
+                const adminActions = getAdminActions(request.status as any)
+
+                return (
+                  <>
+                    {/* Status Message */}
+                    <div className={`rounded-xl p-4 mb-4 border ${messageColors[adminActions.message.type]}`}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{adminActions.message.icon}</span>
+                        <p className="text-sm font-medium">{adminActions.message.text}</p>
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
+
               {request.status === 'pending' ? (
                 composingQuote ? (
                   <QuoteComposer
@@ -567,33 +584,67 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                     </div>
                   )}
 
-                  {/* Status Update */}
-                  <div>
-                    <label className="text-sm font-medium text-dark block mb-2">تحديث الحالة</label>
-                    <select
-                      value={newStatus}
-                      onChange={e => setNewStatus(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-border bg-white text-sm min-h-[48px] mb-3"
-                    >
-                      {Object.entries(REQUEST_STATUSES).map(([k, v]) => (
-                        <option key={k} value={k}>{v.label}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* Conditional Admin Controls */}
+                  {(() => {
+                    const adminActions = getAdminActions(request.status as any)
 
-                  <div>
-                    <label className="text-sm font-medium text-dark block mb-2">ملاحظات الإدارة</label>
-                    <textarea
-                      value={adminNotes}
-                      onChange={e => setAdminNotes(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-border bg-white text-sm min-h-[100px] resize-y"
-                      placeholder="أضف ملاحظة..."
-                    />
-                  </div>
+                    return (
+                      <>
+                        {adminActions.showStatusUpdate && (
+                          <div>
+                            <label className="text-sm font-medium text-dark block mb-2">تحديث الحالة</label>
+                            <select
+                              value={newStatus}
+                              onChange={e => setNewStatus(e.target.value)}
+                              className="w-full px-4 py-3 rounded-xl border border-border bg-white text-sm min-h-[48px] mb-3"
+                            >
+                              {Object.entries(REQUEST_STATUSES).map(([k, v]) => (
+                                <option key={k} value={k}>{v.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
 
-                  <Button onClick={() => handleUpdateStatus()} loading={saving} className="w-full">
-                    حفظ وإرسال إشعار للعميل
-                  </Button>
+                        {adminActions.showAdminNotes && (
+                          <div>
+                            <label className="text-sm font-medium text-dark block mb-2">ملاحظات الإدارة</label>
+                            <textarea
+                              value={adminNotes}
+                              onChange={e => setAdminNotes(e.target.value)}
+                              className="w-full px-4 py-3 rounded-xl border border-border bg-white text-sm min-h-[100px] resize-y"
+                              placeholder="أضف ملاحظة..."
+                            />
+                          </div>
+                        )}
+
+                        {(adminActions.showStatusUpdate || adminActions.showAdminNotes) && (
+                          <Button onClick={() => handleUpdateStatus()} loading={saving} className="w-full">
+                            حفظ وإرسال إشعار للعميل
+                          </Button>
+                        )}
+
+                        {/* No actions needed message for waiting states */}
+                        {waitingForClient(request.status as any) && (
+                          <div className="text-center py-6">
+                            <div className="inline-flex items-center gap-2 text-muted">
+                              <span className="text-lg">⏳</span>
+                              <span className="text-sm">لا توجد إجراءات مطلوبة حالياً</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Final status message */}
+                        {isFinalStatus(request.status as any) && (
+                          <div className="text-center py-6">
+                            <div className="inline-flex items-center gap-2 text-muted">
+                              <span className="text-lg">{request.status === 'completed' ? '🎉' : '📋'}</span>
+                              <span className="text-sm">طلب منتهي - أرشفة تلقائية</span>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )
+                  })()}
                 </div>
               )}
             </div>
