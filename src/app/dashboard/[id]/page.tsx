@@ -118,12 +118,28 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="mobile-container-safe">
-      <div className="max-w-3xl mx-auto px-2 md:px-4 py-4 md:py-8">
+      <div className="max-w-6xl mx-auto px-2 md:px-4 py-4 md:py-8">
         <Link href="/dashboard" className="text-sm text-green hover:underline mb-4 block">
           → العودة للطلبات
         </Link>
 
-        <ProgressTracker status={request.status} className="mb-6" />
+        {/* Progress على الموبايل في الأعلى */}
+        <div className="block md:hidden mb-6">
+          <ProgressTracker status={request.status} />
+        </div>
+
+        {/* Layout عمودين على Desktop */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+
+          {/* العمود الأيسر: Progress Tracker (1/4) - مخفي على الموبايل */}
+          <div className="hidden md:block md:col-span-1">
+            <div className="sticky top-6">
+              <ProgressTracker status={request.status} />
+            </div>
+          </div>
+
+          {/* العمود الأيمن: تفاصيل الطلب (3/4) */}
+          <div className="md:col-span-3">
 
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
           <div className="p-3 md:p-5 border-b border-border flex items-start md:items-center justify-between gap-2">
@@ -411,6 +427,10 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
             <p className="text-sm text-blue-600">{request.admin_notes}</p>
           </div>
         )}
+
+          </div> {/* End العمود الأيمن */}
+
+        </div> {/* End Layout عمودين */}
       </div>
     </div>
   )

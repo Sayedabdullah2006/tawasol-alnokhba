@@ -47,11 +47,19 @@ export default function AdminRequestsPage() {
       return (
         r.client_name?.toLowerCase().includes(q) ||
         r.client_email?.toLowerCase().includes(q) ||
+        r.title?.toLowerCase().includes(q) ||
+        r.content?.toLowerCase().includes(q) ||
         generateRequestNumber(r.request_number).toLowerCase().includes(q)
       )
     }
     return true
   })
+
+  // قطع المحتوى لعرض جزء منه فقط
+  const truncateContent = (text: string, maxLength: number = 60) => {
+    if (!text) return ''
+    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
+  }
 
   const openRequest = (req: any) => {
     // Navigate to full-page request view
@@ -98,7 +106,8 @@ export default function AdminRequestsPage() {
             <thead className="bg-cream">
               <tr>
                 <th className="px-4 py-3 text-right font-bold">#</th>
-                <th className="px-4 py-3 text-right font-bold">الاسم</th>
+                <th className="px-4 py-3 text-right font-bold">العنوان والمحتوى</th>
+                <th className="px-4 py-3 text-right font-bold">العميل</th>
                 <th className="px-4 py-3 text-right font-bold">الفئة</th>
                 <th className="px-4 py-3 text-right font-bold">المبلغ</th>
                 <th className="px-4 py-3 text-right font-bold">الحالة</th>
@@ -115,15 +124,44 @@ export default function AdminRequestsPage() {
                     className="border-t border-border hover:bg-cream/50 cursor-pointer transition-colors"
                   >
                     <td className="px-4 py-3 font-mono text-xs">{generateRequestNumber(r.request_number)}</td>
-                    <td className="px-4 py-3 client-name">{fixTextDirection(r.client_name || '')}</td>
-                    <td className="px-4 py-3">{cat?.icon} {cat?.nameAr}</td>
-                    <td className="px-4 py-3">
+
+                    {/* العنوان والمحتوى */}
+                    <td className="px-3 py-3 max-w-xs">
+                      <div className="space-y-1">
+                        {r.title && (
+                          <div className="font-bold text-dark text-sm leading-tight line-clamp-2">
+                            {r.title}
+                          </div>
+                        )}
+                        {r.content && (
+                          <div className="text-muted text-xs leading-relaxed">
+                            {truncateContent(r.content)}
+                          </div>
+                        )}
+                        {!r.title && !r.content && (
+                          <span className="text-muted text-xs">لا يوجد محتوى</span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* العميل */}
+                    <td className="px-3 py-3 client-name text-sm">{fixTextDirection(r.client_name || '')}</td>
+
+                    {/* الفئة */}
+                    <td className="px-3 py-3 text-sm">{cat?.icon} {cat?.nameAr}</td>
+
+                    {/* المبلغ */}
+                    <td className="px-3 py-3 text-sm">
                       {r.final_total ?? r.admin_quoted_price
                         ? formatNumber(r.final_total ?? r.admin_quoted_price)
                         : <span className="text-muted text-xs">—</span>}
                     </td>
-                    <td className="px-4 py-3"><StatusBadge status={r.status} userRole="admin" /></td>
-                    <td className="px-4 py-3 text-muted">{formatDate(r.created_at)}</td>
+
+                    {/* الحالة */}
+                    <td className="px-3 py-3"><StatusBadge status={r.status} userRole="admin" /></td>
+
+                    {/* التاريخ */}
+                    <td className="px-3 py-3 text-muted text-xs">{formatDate(r.created_at)}</td>
                   </tr>
                 )
               })}

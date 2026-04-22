@@ -29,19 +29,25 @@ export default function PaymentForm({
 }: PaymentFormProps) {
   const { isLoaded, isLoading, error, initPayment } = useMoyasar();
   const hasInitialized = useRef(false);
+  const formRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Initialize payment form when Moyasar is loaded
-    if (isLoaded && !hasInitialized.current && amount > 0) {
+    if (isLoaded && !hasInitialized.current && amount > 0 && formRef.current) {
       hasInitialized.current = true;
 
-      // Small delay to ensure DOM is ready
+      // تنظيف أي محتوى سابق
+      formRef.current.innerHTML = '';
+
+      // تأخير قصير لضمان تحديث DOM
       setTimeout(() => {
-        initPayment(amount, description, metadata).catch((err) => {
-          console.error('Failed to initialize payment:', err);
-          hasInitialized.current = false; // Allow retry
-        });
-      }, 100);
+        if (formRef.current) {
+          initPayment(amount, description, metadata, formRef.current).catch((err) => {
+            console.error('Failed to initialize payment:', err);
+            hasInitialized.current = false; // Allow retry
+          });
+        }
+      }, 200);
     }
   }, [isLoaded, amount, description, metadata, initPayment]);
 
@@ -109,7 +115,7 @@ export default function PaymentForm({
 
       {/* Moyasar Payment Form Container */}
       <div className="p-5">
-        <div id="moyasar-form"></div>
+        <div id="moyasar-form" ref={formRef}></div>
 
         {/* Payment info */}
         <div className="mt-4 p-3 bg-cream rounded-lg">

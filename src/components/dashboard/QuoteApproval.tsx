@@ -147,7 +147,12 @@ export default function QuoteApproval({
       ) : (
         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
           <p className="font-bold text-blue-700 text-sm mb-1">💰 وصلك العرض</p>
-          <p className="text-xs text-blue-600">راجع السعر واختر الخدمات الإضافية التي تريدها — السعر يتحدث تلقائياً.</p>
+          <p className="text-xs text-blue-600">
+            {offeredExtras.length > 0
+              ? "راجع السعر واختر الخدمات الإضافية التي تريدها — السعر يتحدث تلقائياً."
+              : "راجع السعر المقترح واعتمد العرض للانتقال للدفع."
+            }
+          </p>
         </div>
       )}
 

@@ -149,7 +149,7 @@ export const REQUEST_STATUSES = {
   approved: { label: 'بانتظار الدفع', color: 'cyan' },
   payment_review: { label: 'بانتظار تحقق الدفع', color: 'orange' },
   paid: { label: 'تم الدفع', color: 'cyan' },
-  in_progress: { label: 'قيد التنفيذ', color: 'orange' },
+  in_progress: { label: 'التحضير', color: 'orange' },
   content_review: { label: 'مراجعة المحتوى', color: 'purple' },
   completed: { label: 'مكتمل', color: 'green' },
   rejected: { label: 'مرفوض', color: 'red' },
@@ -167,8 +167,8 @@ export interface ProgressStep {
 
 export const PROGRESS_STEPS: ProgressStep[] = [
   { id: 'pending', label: 'المراجعة الأولية', icon: '📋', description: 'جاري مراجعة الطلب' },
-  { id: 'quoted', label: 'العرض المخصص', icon: '💰', description: 'بانتظار موافقتك على العرض' },
-  { id: 'payment', label: 'الدفع', icon: '💳', description: 'إتمام عملية الدفع' },
+  { id: 'quoted', label: 'العرض والموافقة', icon: '💰', description: 'بانتظار موافقة العميل' },
+  { id: 'approved', label: 'الدفع', icon: '💳', description: 'بانتظار إتمام الدفع' },
   { id: 'in_progress', label: 'التحضير', icon: '⚡', description: 'جاري تحضير المحتوى' },
   { id: 'content_review', label: 'مراجعة المحتوى', icon: '👁️', description: 'مراجعة المحتوى المقترح' },
   { id: 'completed', label: 'مكتمل', icon: '✅', description: 'تم إنجاز الطلب بنجاح' },

@@ -43,23 +43,53 @@ export default function PaymentCallbackPage() {
       }
 
       try {
-        // Verify payment server-side
-        const response = await fetch(`/api/payment/verify?paymentId=${paymentId}`);
+        console.log('🔍 [CALLBACK] Starting payment verification for ID:', paymentId);
+
+        // Verify payment server-side using POST to trigger status update
+        console.log('📤 [CALLBACK] Sending POST request to /api/payment/verify');
+        const response = await fetch(`/api/payment/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paymentId })
+        });
+        console.log('📡 [CALLBACK] Verification response status:', response.status);
+        console.log('📡 [CALLBACK] Verification response headers:', response.headers);
+
         const data = await response.json();
+        console.log('📡 [CALLBACK] Verification response data:', JSON.stringify(data, null, 2));
 
         if (response.ok && data.success) {
+          console.log('✅ [CALLBACK] Payment verification successful');
+
+          // اختبار تحديث مباشر إضافي في حالة فشل التحديث التلقائي
+          if (data.payment?.metadata?.request_id) {
+            console.log('🔧 [CALLBACK] Testing direct update as backup...');
+            try {
+              const directResponse = await fetch('/api/debug/direct-update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ requestId: data.payment.metadata.request_id })
+              });
+              const directData = await directResponse.json();
+              console.log('🔧 [CALLBACK] Direct update result:', directData);
+            } catch (error) {
+              console.error('🔧 [CALLBACK] Direct update failed:', error);
+            }
+          }
+
           setResult({
             success: true,
             payment: data.payment,
           });
         } else {
+          console.error('❌ [CALLBACK] Payment verification failed:', data);
           setResult({
             success: false,
             error: data.error || 'فشل في التحقق من حالة الدفع',
           });
         }
       } catch (error) {
-        console.error('Payment verification error:', error);
+        console.error('❌ [CALLBACK] Payment verification error:', error);
         setResult({
           success: false,
           error: 'خطأ في الاتصال بالخادم',

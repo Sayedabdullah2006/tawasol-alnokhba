@@ -14,7 +14,8 @@ interface UseMoyasarReturn {
   initPayment: (
     amount: number,
     description: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
+    elementRef?: HTMLElement
   ) => Promise<void>;
 }
 
@@ -87,16 +88,35 @@ export function useMoyasar(): UseMoyasarReturn {
     async (
       amount: number,
       description: string,
-      metadata?: Record<string, any>
+      metadata?: Record<string, any>,
+      elementRef?: HTMLElement
     ): Promise<void> => {
       if (!isLoaded || !window.Moyasar) {
         throw new Error('مكتبة الدفع الإلكتروني غير محملة بعد');
       }
 
       try {
+        // استخدام العنصر المُمرر مباشرة أو البحث عنه
+        let element: HTMLElement | null = elementRef || document.getElementById('moyasar-form');
+
+        if (!element) {
+          console.error('Moyasar form element not found in DOM');
+          throw new Error('عنصر نموذج الدفع غير موجود في الصفحة');
+        }
+
+        console.log('Initializing Moyasar with element:', element);
+        console.log('Element is connected to DOM:', element.isConnected);
+        console.log('Element parent:', element.parentElement);
+
+        const publishableKey = getPublishableKey();
+        const callbackUrl = getCallbackUrl();
+        console.log('Moyasar publishable key:', publishableKey);
+        console.log('Moyasar callback URL:', callbackUrl);
+        console.log('Payment metadata:', metadata);
+
         const paymentMethods = getPaymentMethods();
         const config: MoyasarConfig = {
-          element: '#moyasar-form',
+          element: element, // تمرير العنصر مباشرة بدلاً من CSS selector
           amount: toHalalas(amount), // Convert SAR to halalas
           currency: 'SAR',
           description,
@@ -110,8 +130,51 @@ export function useMoyasar(): UseMoyasarReturn {
           }),
           metadata,
           on_completed: (payment: MoyasarPayment) => {
-            console.log('Payment completed:', payment);
-            // Redirect will be handled by callback_url
+            console.log('🎉 Payment completed:', payment);
+            console.log('🔍 Payment status:', payment.status);
+            console.log('🆔 Request ID from metadata:', metadata?.request_id);
+
+            // تحديث حالة الطلب فوراً عند نجاح الدفع
+            if (payment.status === 'paid' && metadata?.request_id) {
+              console.log('✅ Updating request status...');
+
+              fetch('/api/payment/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  paymentId: payment.id,
+                  requestId: metadata.request_id
+                })
+              }).then(async response => {
+                console.log('📡 Status update response status:', response.status);
+                console.log('📡 Status update response ok:', response.ok);
+
+                const responseData = await response.json().catch(() => null);
+                console.log('📡 Status update response data:', responseData);
+
+                if (response.ok) {
+                  console.log('✅ Status updated successfully');
+                  // تأخير قصير للتأكد من تحديث قاعدة البيانات
+                  setTimeout(() => {
+                    window.location.href = `/payment/callback?id=${payment.id}&status=paid&updated=true`;
+                  }, 1000);
+                } else {
+                  console.error('❌ Failed to update status:', responseData);
+                  // إعادة توجيه حتى لو فشل التحديث
+                  window.location.href = `/payment/callback?id=${payment.id}&status=paid&error=update_failed`;
+                }
+              }).catch(error => {
+                console.error('❌ Network error updating status:', error);
+                // إعادة توجيه حتى لو فشل التحديث
+                window.location.href = `/payment/callback?id=${payment.id}&status=paid&error=network`;
+              });
+            } else {
+              console.warn('⚠️ Cannot update status - missing payment status or request_id');
+              console.log('⚠️ Payment status:', payment.status);
+              console.log('⚠️ Request ID:', metadata?.request_id);
+              // إعادة توجيه للـ callback
+              window.location.href = `/payment/callback?id=${payment.id}&status=${payment.status}`;
+            }
           },
           on_failed: (error: any) => {
             console.error('Payment failed:', error);
@@ -119,7 +182,9 @@ export function useMoyasar(): UseMoyasarReturn {
           },
         };
 
+        console.log('Moyasar config:', config);
         window.Moyasar.init(config);
+        console.log('Moyasar initialized successfully');
       } catch (err) {
         console.error('Error initializing Moyasar:', err);
         throw new Error('فشل في تهيئة نموذج الدفع');

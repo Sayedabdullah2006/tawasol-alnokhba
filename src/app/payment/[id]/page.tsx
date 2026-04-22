@@ -48,7 +48,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
         return
       }
 
-      if (data.status !== 'approved' && data.status !== 'paid') {
+      if (data.status !== 'approved') {
         router.push(`/dashboard/${id}`)
         return
       }
