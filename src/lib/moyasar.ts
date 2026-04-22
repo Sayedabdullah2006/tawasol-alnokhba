@@ -8,17 +8,40 @@
  * Uses test key in development, live key in production
  */
 export function getSecretKey(): string {
-  if (process.env.NODE_ENV === 'production') {
-    return process.env.MOYASAR_SECRET_KEY!;
+  const isProduction = process.env.NODE_ENV === 'production';
+  const key = isProduction
+    ? process.env.MOYASAR_SECRET_KEY
+    : process.env.MOYASAR_SECRET_KEY_Test;
+
+  if (!key) {
+    const varName = isProduction ? 'MOYASAR_SECRET_KEY' : 'MOYASAR_SECRET_KEY_Test';
+    throw new Error(`${varName} is not configured for ${process.env.NODE_ENV} environment`);
   }
-  return process.env.MOYASAR_SECRET_KEY_Test!;
+
+  // Log key type for debugging (safely)
+  const keyType = key.startsWith('sk_live_') ? 'LIVE' :
+                 key.startsWith('sk_test_') ? 'TEST' : 'INVALID';
+  console.log(`[MOYASAR] Using ${keyType} secret key for ${process.env.NODE_ENV}`);
+
+  return key;
 }
 
 /**
  * Get the publishable key for frontend usage
  */
 export function getPublishableKey(): string {
-  return process.env.NEXT_PUBLIC_MOYASAR_PUBLISHABLE_KEY!;
+  const key = process.env.NEXT_PUBLIC_MOYASAR_PUBLISHABLE_KEY;
+
+  if (!key) {
+    throw new Error('NEXT_PUBLIC_MOYASAR_PUBLISHABLE_KEY is not configured');
+  }
+
+  // Log key type for debugging (safely)
+  const keyType = key.startsWith('pk_live_') ? 'LIVE' :
+                 key.startsWith('pk_test_') ? 'TEST' : 'INVALID';
+  console.log(`[MOYASAR] Using ${keyType} publishable key`);
+
+  return key;
 }
 
 /**
@@ -69,14 +92,15 @@ export function getWebhookUrl(): string {
 
 /**
  * Get available payment methods based on environment
- * Disables Apple Pay in development until properly configured
+ * Disables Apple Pay until properly configured with merchant validation
  */
 export function getPaymentMethods(): string[] {
-  // Only enable credit card in development to avoid Apple Pay configuration issues
-  if (process.env.NODE_ENV !== 'production') {
-    return ['creditcard'];
-  }
+  // Only enable credit card for now - Apple Pay needs additional merchant configuration
+  return ['creditcard'];
 
-  // In production, enable both when Apple Pay is properly configured
-  return ['creditcard', 'applepay'];
+  // TODO: Enable Apple Pay after setting up:
+  // 1. Merchant validation URL in Moyasar dashboard
+  // 2. Apple Developer account verification
+  // 3. Country and currency settings
+  // return ['creditcard', 'applepay'];
 }
