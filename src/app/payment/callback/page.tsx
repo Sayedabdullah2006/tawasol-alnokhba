@@ -26,10 +26,9 @@ export default function PaymentCallbackPage() {
   const [result, setResult] = useState<PaymentResult | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Extract payment details from URL params
+  // Extract ONLY payment ID from URL params
+  // NEVER trust status/message from URL - Moyasar docs are clear about this
   const paymentId = searchParams.get('id');
-  const status = searchParams.get('status');
-  const message = searchParams.get('message');
 
   useEffect(() => {
     const verifyPayment = async () => {
@@ -60,22 +59,6 @@ export default function PaymentCallbackPage() {
 
         if (response.ok && data.success) {
           console.log('✅ [CALLBACK] Payment verification successful');
-
-          // اختبار تحديث مباشر إضافي في حالة فشل التحديث التلقائي
-          if (data.payment?.metadata?.request_id) {
-            console.log('🔧 [CALLBACK] Testing direct update as backup...');
-            try {
-              const directResponse = await fetch('/api/debug/direct-update', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ requestId: data.payment.metadata.request_id })
-              });
-              const directData = await directResponse.json();
-              console.log('🔧 [CALLBACK] Direct update result:', directData);
-            } catch (error) {
-              console.error('🔧 [CALLBACK] Direct update failed:', error);
-            }
-          }
 
           setResult({
             success: true,
@@ -182,8 +165,8 @@ export default function PaymentCallbackPage() {
     );
   }
 
-  // Failed state
-  if (result?.success === false || status === 'failed') {
+  // Failed state - ONLY based on server verification, not URL params
+  if (result?.success === false) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
@@ -192,7 +175,7 @@ export default function PaymentCallbackPage() {
             <div className="text-6xl mb-4">❌</div>
             <h1 className="text-2xl font-black text-red-700 mb-2">فشل في إتمام الدفع</h1>
             <p className="text-sm text-red-600">
-              {result?.error || message || 'حدث خطأ أثناء معالجة الدفع'}
+              {result?.error || 'حدث خطأ أثناء معالجة الدفع'}
             </p>
           </div>
 

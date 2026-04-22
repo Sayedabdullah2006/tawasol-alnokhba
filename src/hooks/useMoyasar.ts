@@ -160,20 +160,20 @@ export function useMoyasar(): UseMoyasarReturn {
                   }, 1000);
                 } else {
                   console.error('❌ Failed to update status:', responseData);
-                  // إعادة توجيه حتى لو فشل التحديث
-                  window.location.href = `/payment/callback?id=${payment.id}&status=paid&error=update_failed`;
+                  // إعادة توجيه للتحقق عبر الـ callback
+                  window.location.href = `/payment/callback?id=${payment.id}`;
                 }
               }).catch(error => {
                 console.error('❌ Network error updating status:', error);
-                // إعادة توجيه حتى لو فشل التحديث
-                window.location.href = `/payment/callback?id=${payment.id}&status=paid&error=network`;
+                // إعادة توجيه للتحقق عبر الـ callback
+                window.location.href = `/payment/callback?id=${payment.id}`;
               });
             } else {
               console.warn('⚠️ Cannot update status - missing payment status or request_id');
               console.log('⚠️ Payment status:', payment.status);
               console.log('⚠️ Request ID:', metadata?.request_id);
-              // إعادة توجيه للـ callback
-              window.location.href = `/payment/callback?id=${payment.id}&status=${payment.status}`;
+              // إعادة توجيه للتحقق عبر الـ callback
+              window.location.href = `/payment/callback?id=${payment.id}`;
             }
           },
           on_failed: (error: any) => {
