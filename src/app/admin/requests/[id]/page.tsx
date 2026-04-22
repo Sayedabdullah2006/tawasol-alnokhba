@@ -35,6 +35,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   const [negotiationNotes, setNegotiationNotes] = useState('')
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [sendingReminder, setSendingReminder] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
@@ -218,6 +219,35 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
     } finally {
       setDeleting(false)
       setShowDeleteDialog(false)
+    }
+  }
+
+  const handleSendReminder = async () => {
+    if (!request) return
+
+    setSendingReminder(true)
+    try {
+      const response = await fetch('/api/admin/send-reminder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: request.id,
+          reminderType: request.status // استخدام حالة الطلب كنوع التذكير
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        showToast(`تم إرسال تذكير لطلب ${generateRequestNumber(request.request_number)} بنجاح`, 'success')
+      } else {
+        showToast(data.error || 'فشل في إرسال التذكير', 'error')
+      }
+    } catch (error) {
+      console.error('Send reminder error:', error)
+      showToast('خطأ في الاتصال بالخادم', 'error')
+    } finally {
+      setSendingReminder(false)
     }
   }
 
@@ -675,8 +705,20 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                           </div>
                         )}
 
-                        {/* Delete Button - Always available for admins */}
-                        <div className="border-t border-border pt-4 mt-4">
+                        {/* Admin Actions - Always available */}
+                        <div className="border-t border-border pt-4 mt-4 space-y-3">
+                          {/* Send Reminder Button */}
+                          <Button
+                            variant="outline"
+                            onClick={handleSendReminder}
+                            className="w-full border-blue-300 text-blue-700 hover:bg-blue-50"
+                            disabled={sendingReminder || !request.client_email}
+                            loading={sendingReminder}
+                          >
+                            📧 إرسال تذكير للعميل
+                          </Button>
+
+                          {/* Delete Button */}
                           <Button
                             variant="outline"
                             onClick={() => setShowDeleteDialog(true)}

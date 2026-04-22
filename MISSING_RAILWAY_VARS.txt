@@ -1,0 +1,21 @@
+المتغيرات المفقودة في Railway - أضفها الآن:
+
+NODE_ENV = production
+
+NEXT_PUBLIC_SITE_URL = https://your-app-name.railway.app
+
+RESEND_API_KEY = your_resend_api_key_here
+
+ADMIN_EMAIL = admin@ksa-influencers.com
+
+PLATFORM_NAME_AR = مؤثرون
+
+PLATFORM_NAME_EN = KSA-Influencers
+
+PLATFORM_TAGLINE = اترك أثراً دائماً..
+
+BANK_IBAN = SA00000000000000000000
+
+BANK_NAME = بنك الراجحي
+
+ACCOUNT_NAME = مؤثرون

@@ -1,6 +1,7 @@
 /**
  * Moyasar Webhook Handler
- * Handles payment status updates from Moyasar
+ * يستقبل إشعارات من Moyasar عند تغيير حالة الدفع
+ * مهم للموثوقية في حالة فشل الـ callback العادي
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -8,134 +9,66 @@ import { createServiceRoleClient } from '@/lib/supabase-server';
 import type { MoyasarPayment } from '@/types/moyasar';
 
 export async function POST(request: NextRequest) {
+  console.log('[MOYASAR_WEBHOOK] 🔔 Webhook received');
+
   try {
-    const payload = await request.json();
-    const payment: MoyasarPayment = payload;
+    // التحقق من الأمان - Moyasar Secret Token
+    const authHeader = request.headers.get('authorization');
+    const expectedSecret = process.env.MOYASAR_WEBHOOK_SECRET;
 
-    // Log the webhook event
-    console.log(`[MOYASAR_WEBHOOK] Received ${payment.status} for payment ${payment.id}`);
-
-    // Handle different payment statuses
-    switch (payment.status) {
-      case 'paid':
-        await handlePaymentSuccess(payment);
-        break;
-
-      case 'failed':
-        await handlePaymentFailure(payment);
-        break;
-
-      case 'refunded':
-      case 'partially_refunded':
-        await handlePaymentRefund(payment);
-        break;
-
-      default:
-        console.log(`[MOYASAR_WEBHOOK] Unhandled status: ${payment.status}`);
+    if (!expectedSecret) {
+      console.error('[MOYASAR_WEBHOOK] ❌ MOYASAR_WEBHOOK_SECRET not configured');
+      return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
     }
 
-    // Always return 200 OK to acknowledge receipt
-    return NextResponse.json({ received: true });
+    if (!authHeader || authHeader !== `Bearer ${expectedSecret}`) {
+      console.error('[MOYASAR_WEBHOOK] 🚫 Invalid webhook authentication');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  } catch (error) {
-    console.error('[MOYASAR_WEBHOOK] Error processing webhook:', error);
-
-    // Still return 200 to prevent Moyasar from retrying
-    return NextResponse.json({
-      received: true,
-      error: 'Processing failed but acknowledged'
+    const body = await request.text();
+    const webhookData = JSON.parse(body);
+    
+    console.log('[MOYASAR_WEBHOOK] 📋 Webhook data:', {
+      type: webhookData.type,
+      payment_id: webhookData.data?.id,
+      payment_status: webhookData.data?.status
     });
-  }
-}
 
-/**
- * Handle successful payment
- */
-async function handlePaymentSuccess(payment: MoyasarPayment) {
-  try {
-    const supabase = await createServiceRoleClient();
+    // معالجة أحداث الدفع فقط
+    if (webhookData.type.startsWith('payment.') && webhookData.data) {
+      const payment: MoyasarPayment = webhookData.data;
+      
+      if (payment.status === 'paid' && payment.metadata?.request_id) {
+        // استدعاء نفس منطق التحقق المستخدم في payment/verify
+        const verifyResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/payment/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paymentId: payment.id,
+            requestId: payment.metadata.request_id
+          })
+        });
 
-    // Log successful payment
-    console.log(`[PAYMENT_SUCCESS] Payment ${payment.id} completed successfully`);
-
-    // TODO: Update request status in database
-    // This would require linking the payment to a specific request
-    // You can use payment.metadata to store request_id during payment creation
-
-    if (payment.metadata?.request_id) {
-      const { error } = await supabase
-        .from('publish_requests')
-        .update({
-          status: 'paid',
-          payment_id: payment.id,
-          payment_amount: payment.amount / 100, // Convert from halalas to SAR
-          payment_method: payment.source.type,
-          paid_at: new Date().toISOString(),
-        })
-        .eq('id', payment.metadata.request_id);
-
-      if (error) {
-        console.error('[PAYMENT_SUCCESS] Database update error:', error);
-      } else {
-        console.log(`[PAYMENT_SUCCESS] Updated request ${payment.metadata.request_id} to paid status`);
+        if (verifyResponse.ok) {
+          console.log(`[MOYASAR_WEBHOOK] ✅ Payment verified via webhook: ${payment.id}`);
+        } else {
+          console.error(`[MOYASAR_WEBHOOK] ❌ Failed to verify payment: ${payment.id}`);
+        }
       }
     }
 
-    // TODO: Send payment confirmation email
-    // You can integrate with your existing email system here
-
+    return NextResponse.json({ status: 'success' });
   } catch (error) {
-    console.error('[PAYMENT_SUCCESS] Error:', error);
+    console.error('[MOYASAR_WEBHOOK] 💥 Webhook error:', error);
+    return NextResponse.json({ status: 'error' }, { status: 500 });
   }
 }
 
-/**
- * Handle payment failure
- */
-async function handlePaymentFailure(payment: MoyasarPayment) {
-  try {
-    console.log(`[PAYMENT_FAILURE] Payment ${payment.id} failed`);
-
-    // TODO: Log failed payment attempt
-    // You might want to track failed payments for analytics
-
-    // TODO: Send failure notification if needed
-
-  } catch (error) {
-    console.error('[PAYMENT_FAILURE] Error:', error);
-  }
-}
-
-/**
- * Handle payment refund
- */
-async function handlePaymentRefund(payment: MoyasarPayment) {
-  try {
-    const supabase = await createServiceRoleClient();
-
-    console.log(`[PAYMENT_REFUND] Payment ${payment.id} refunded: ${payment.refunded / 100} SAR`);
-
-    // TODO: Update request status for refunds
-    if (payment.metadata?.request_id) {
-      const newStatus = payment.status === 'refunded' ? 'refunded' : 'partially_refunded';
-
-      const { error } = await supabase
-        .from('publish_requests')
-        .update({
-          status: newStatus,
-          refunded_amount: payment.refunded / 100,
-          refunded_at: new Date().toISOString(),
-        })
-        .eq('id', payment.metadata.request_id);
-
-      if (error) {
-        console.error('[PAYMENT_REFUND] Database update error:', error);
-      }
-    }
-
-    // TODO: Send refund confirmation email
-
-  } catch (error) {
-    console.error('[PAYMENT_REFUND] Error:', error);
-  }
+export async function GET() {
+  return NextResponse.json({
+    status: 'ok',
+    message: 'Moyasar webhook endpoint is running',
+    timestamp: new Date().toISOString()
+  });
 }

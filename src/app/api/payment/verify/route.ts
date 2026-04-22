@@ -11,7 +11,7 @@ import type { MoyasarPayment } from '@/types/moyasar';
 
 interface VerificationResult {
   success: boolean;
-  payment?: MoyasarPayment;
+  payment?: Partial<MoyasarPayment>;
   error?: string;
   alreadyProcessed?: boolean;
 }
@@ -171,7 +171,7 @@ async function verifyPaymentAndUpdateStatus(paymentId: string, requestId?: strin
         moyasar_payment_id: payment.id,
         payment_status: 'paid',
         paid_at: new Date().toISOString(),
-        moyasar_reference: payment.source?.reference_number || null,
+        moyasar_reference: (payment.source as any)?.reference_number || payment.id,
         updated_at: new Date().toISOString()
       })
       .eq('id', targetRequestId)

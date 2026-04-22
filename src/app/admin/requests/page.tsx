@@ -23,6 +23,8 @@ export default function AdminRequestsPage() {
   const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [requestToDelete, setRequestToDelete] = useState<any>(null)
+  const [sendingReminderId, setSendingReminderId] = useState<string | null>(null)
+  const [showDebug, setShowDebug] = useState(false)
   // Removed drawer-related state since we now use full-page view
 
   const loadData = useCallback(async () => {
@@ -81,6 +83,7 @@ export default function AdminRequestsPage() {
 
   const handleDeleteClick = (request: any, event: React.MouseEvent) => {
     event.stopPropagation() // منع فتح صفحة الطلب
+    console.log('🗑️ Delete clicked for request:', request.id, request.client_name)
     setRequestToDelete(request)
     setShowDeleteDialog(true)
   }
@@ -120,6 +123,36 @@ export default function AdminRequestsPage() {
     setRequestToDelete(null)
   }
 
+  const handleSendReminder = async (request: any, event: React.MouseEvent) => {
+    event.stopPropagation() // منع فتح صفحة الطلب
+    console.log('🔔 Sending reminder for request:', request.id, request.client_email)
+
+    setSendingReminderId(request.id)
+    try {
+      const response = await fetch('/api/admin/send-reminder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: request.id,
+          reminderType: request.status // استخدام حالة الطلب كنوع التذكير
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        showToast(`تم إرسال تذكير لطلب ${generateRequestNumber(request.request_number)} بنجاح`, 'success')
+      } else {
+        showToast(data.error || 'فشل في إرسال التذكير', 'error')
+      }
+    } catch (error) {
+      console.error('Send reminder error:', error)
+      showToast('خطأ في الاتصال بالخادم', 'error')
+    } finally {
+      setSendingReminderId(null)
+    }
+  }
+
   if (loading) return <LoadingSpinner size="lg" />
 
   return (
@@ -144,21 +177,53 @@ export default function AdminRequestsPage() {
           ))}
         </select>
         <Button variant="outline" onClick={handleExport}>تصدير CSV</Button>
+
+        <button
+          onClick={() => setShowDebug(!showDebug)}
+          className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+        >
+          {showDebug ? 'إخفاء' : 'إظهار'} التشخيص
+        </button>
+
+        {/* Debug Info */}
+        <div className="ml-auto text-xs text-muted">
+          عدد الطلبات: {requests.length} | المفلترة: {filteredRequests.length}
+        </div>
       </div>
+
+      {/* Debug Panel */}
+      {showDebug && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4">
+          <h3 className="font-bold text-yellow-700 mb-2">🔍 معلومات التشخيص</h3>
+          <div className="text-xs text-yellow-600 space-y-1">
+            <div>إجمالي الطلبات: {requests.length}</div>
+            <div>الطلبات المفلترة: {filteredRequests.length}</div>
+            <div>حالة البحث: "{search || 'فارغ'}"</div>
+            <div>فلتر الحالة: "{statusFilter || 'جميع الحالات'}"</div>
+            {filteredRequests.length > 0 && (
+              <div>عينة من البيانات: {JSON.stringify({
+                id: filteredRequests[0]?.id?.substring(0, 8),
+                client_email: filteredRequests[0]?.client_email ? 'موجود' : 'مفقود',
+                status: filteredRequests[0]?.status
+              })}</div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="bg-card rounded-2xl border border-border overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[800px]">
             <thead className="bg-cream">
               <tr>
-                <th className="px-4 py-3 text-right font-bold">#</th>
+                <th className="px-4 py-3 text-right font-bold w-20">#</th>
                 <th className="px-4 py-3 text-right font-bold">العنوان والمحتوى</th>
-                <th className="px-4 py-3 text-right font-bold">العميل</th>
-                <th className="px-4 py-3 text-right font-bold">الفئة</th>
-                <th className="px-4 py-3 text-right font-bold">المبلغ</th>
-                <th className="px-4 py-3 text-right font-bold">الحالة</th>
-                <th className="px-4 py-3 text-right font-bold">التاريخ</th>
-                <th className="px-4 py-3 text-center font-bold">إجراءات</th>
+                <th className="px-4 py-3 text-right font-bold w-32">العميل</th>
+                <th className="px-4 py-3 text-right font-bold w-24">الفئة</th>
+                <th className="px-4 py-3 text-right font-bold w-24">المبلغ</th>
+                <th className="px-4 py-3 text-right font-bold w-28">الحالة</th>
+                <th className="px-4 py-3 text-right font-bold w-20">التاريخ</th>
+                <th className="px-4 py-3 text-center font-bold w-32 min-w-[120px]">إجراءات</th>
               </tr>
             </thead>
             <tbody>
@@ -211,19 +276,36 @@ export default function AdminRequestsPage() {
                     <td className="px-3 py-3 text-muted text-xs">{formatDate(r.created_at)}</td>
 
                     {/* إجراءات */}
-                    <td className="px-3 py-3 text-center">
-                      <button
-                        onClick={(e) => handleDeleteClick(r, e)}
-                        disabled={deletingRequestId === r.id}
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="حذف الطلب نهائياً"
-                      >
-                        {deletingRequestId === r.id ? (
-                          <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-                        ) : (
-                          <span className="text-sm">🗑️</span>
-                        )}
-                      </button>
+                    <td className="px-3 py-3 text-center min-w-[120px]">
+                      <div className="flex items-center justify-center gap-1">
+                        {/* زر التذكير */}
+                        <button
+                          onClick={(e) => handleSendReminder(r, e)}
+                          disabled={sendingReminderId === r.id || !r.client_email}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                          title={!r.client_email ? "لا يوجد إيميل للعميل" : "إرسال تذكير للعميل"}
+                        >
+                          {sendingReminderId === r.id ? (
+                            <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <span className="text-xs">📧</span>
+                          )}
+                        </button>
+
+                        {/* زر الحذف */}
+                        <button
+                          onClick={(e) => handleDeleteClick(r, e)}
+                          disabled={deletingRequestId === r.id}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                          title="حذف الطلب نهائياً"
+                        >
+                          {deletingRequestId === r.id ? (
+                            <div className="w-3 h-3 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <span className="text-xs">🗑️</span>
+                          )}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -232,7 +314,17 @@ export default function AdminRequestsPage() {
           </table>
         </div>
         {filteredRequests.length === 0 && (
-          <p className="p-8 text-center text-muted">لا توجد طلبات بعد</p>
+          <div className="p-8 text-center text-muted">
+            <p>لا توجد طلبات {search || statusFilter ? 'تطابق البحث' : 'بعد'}</p>
+            {(search || statusFilter) && (
+              <button
+                onClick={() => { setSearch(''); setStatusFilter(''); }}
+                className="mt-2 text-xs text-blue-600 hover:underline"
+              >
+                إظهار جميع الطلبات
+              </button>
+            )}
+          </div>
         )}
       </div>
 
