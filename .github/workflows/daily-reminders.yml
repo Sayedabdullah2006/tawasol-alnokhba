@@ -1,0 +1,43 @@
+# جدولة التذكيرات عبر GitHub Actions (مجاني ومضمون)
+name: Daily Email Reminders
+
+on:
+  schedule:
+    # يومياً في الساعة 6:00 UTC (9:00 صباحاً بتوقيت السعودية)
+    - cron: '0 6 * * *'
+
+  # إمكانية التشغيل اليدوي
+  workflow_dispatch:
+
+jobs:
+  send-daily-reminders:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Call Daily Reminders Function
+        run: |
+          echo "🚀 Starting daily reminders job..."
+
+          # استدعاء مباشر للـ Supabase Edge Function
+          response=$(curl -s -X POST \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/daily-reminders" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"source": "github-actions"}')
+
+          echo "📊 Response: $response"
+
+          # التحقق من النجاح
+          if echo "$response" | grep -q '"success":true'; then
+            echo "✅ Daily reminders completed successfully"
+          else
+            echo "❌ Daily reminders failed"
+            echo "$response"
+            exit 1
+          fi
+
+      - name: Log Results
+        if: always()
+        run: |
+          echo "📋 Job completed at $(date)"
+          echo "🌍 Timezone: UTC (Saudi Arabia: UTC+3)"
