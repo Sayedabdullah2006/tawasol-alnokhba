@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
+import ClientNameFixed from '@/components/ui/ClientNameFixed'
 
 const navLinks = [
   { href: '/', label: 'الرئيسية' },
@@ -119,7 +120,7 @@ export default function Header() {
                 <div className="w-7 h-7 bg-green text-white rounded-full flex items-center justify-center text-xs font-black">
                   {user.fullName.charAt(0)}
                 </div>
-                <span className="max-w-[100px] truncate">{user.fullName}</span>
+                <ClientNameFixed name={user.fullName} maxLength={15} className="max-w-[100px]" />
                 <svg className={cn('w-4 h-4 transition-transform', dropdownOpen && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
@@ -128,7 +129,7 @@ export default function Header() {
               {dropdownOpen && (
                 <div className="absolute left-0 mt-2 w-56 bg-card rounded-xl border border-border shadow-xl overflow-hidden z-50">
                   <div className="px-4 py-3 border-b border-border">
-                    <p className="font-bold text-dark text-sm">{user.fullName}</p>
+                    <ClientNameFixed name={user.fullName} className="font-bold text-dark text-sm" />
                     <p className="text-xs text-muted">
                       {user.role === 'admin' ? 'مدير المنصة' : 'عميل'}
                     </p>
@@ -210,7 +211,7 @@ export default function Header() {
                   {user.fullName.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-dark truncate">{user.fullName}</p>
+                  <ClientNameFixed name={user.fullName} className="font-bold text-dark" maxLength={20} />
                   <p className="text-xs text-muted">{user.role === 'admin' ? 'مدير المنصة' : 'عميل'}</p>
                 </div>
               </div>
