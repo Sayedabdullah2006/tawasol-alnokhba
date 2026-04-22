@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { formatNumber, formatNumberShort, generateRequestNumber } from '@/lib/utils'
 import { CATEGORIES } from '@/lib/constants'
 import { useToast } from '@/components/ui/Toast'
+import PaymentForm from '@/components/payment/PaymentForm'
 import ReceiptUploader from '@/components/request/ReceiptUploader'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -219,13 +220,16 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
               )}
 
               {method === 'online' && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5 text-center">
-                  <div className="text-3xl mb-2">🔒</div>
-                  <p className="font-bold text-yellow-700 text-sm mb-1">بوابة الدفع الإلكتروني قيد التجهيز</p>
-                  <p className="text-xs text-yellow-600">
-                    سيتم تفعيل خيار الدفع بمدى وفيزا و Apple Pay قريباً. يمكنك حالياً استخدام التحويل البنكي.
-                  </p>
-                </div>
+                <PaymentForm
+                  amount={totalDue}
+                  description={`دفع طلب ${generateRequestNumber(request.request_number)} - ${cat?.nameAr}`}
+                  metadata={{
+                    request_id: request.id,
+                    request_number: request.request_number,
+                    page_source: 'payment',
+                    category: cat?.nameAr,
+                  }}
+                />
               )}
             </>
           )}
