@@ -13,6 +13,37 @@
 const FROM_EMAIL = 'Nukhba Platform <noreply@nukhba.media>'
 const REPLY_TO_EMAIL = 'support@nukhba.media'
 
+// تحويل HTML إلى نص بسيط
+function htmlToPlainText(html: string): string {
+  return html
+    // إزالة CSS و Scripts
+    .replace(/<style[^>]*>.*?<\/style>/gis, '')
+    .replace(/<script[^>]*>.*?<\/script>/gis, '')
+    // تحويل العناوين
+    .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, '\n\n$1\n\n')
+    // تحويل الفقرات
+    .replace(/<p[^>]*>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    // تحويل الأسطر الجديدة
+    .replace(/<br[^>]*>/gi, '\n')
+    // تحويل الروابط
+    .replace(/<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi, '$2 ($1)')
+    // تحويل القوائم
+    .replace(/<li[^>]*>(.*?)<\/li>/gi, '• $1\n')
+    .replace(/<ul[^>]*>|<\/ul>|<ol[^>]*>|<\/ol>/gi, '')
+    // إزالة جميع HTML tags
+    .replace(/<[^>]*>/g, '')
+    // تنظيف المساحات
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    // تنظيف الأسطر المتعددة
+    .replace(/\n\s*\n\s*\n/g, '\n\n')
+    .trim()
+}
+
 interface Payload {
   to: string | string[]
   subject: string
@@ -65,17 +96,21 @@ Deno.serve(async (req) => {
     })
   }
 
+  // تحويل HTML إلى نص بسيط
+  const plainText = htmlToPlainText(payload.html)
+
   const requestBody = {
     from: FROM_EMAIL,
     to: payload.to,
     subject: payload.subject,
     html: payload.html,
+    text: plainText, // إضافة النسخة النصية البسيطة
     reply_to: payload.replyTo || REPLY_TO_EMAIL,
     cc: payload.cc, // إضافة CC للرسائل
     headers: {
-      'X-Mailer': 'Nukhba-Platform/1.0',
+      'X-Mailer': 'Nukhba-Platform/2.0',
       'X-Priority': '3',
-      'List-Unsubscribe': '<mailto:unsubscribe@nukhba.media>',
+      'List-Unsubscribe': '<mailto:unsubscribe@nukhba.media>, <https://nukhba.media/unsubscribe>',
       'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
       'Auto-Submitted': 'auto-generated',
       'X-Auto-Response-Suppress': 'OOF, DR, RN, NRN, AutoReply',
@@ -83,11 +118,13 @@ Deno.serve(async (req) => {
       'Message-ID': `<${Date.now()}-${Math.random().toString(36).substr(2, 9)}@nukhba.media>`,
       'Date': new Date().toUTCString(),
       'MIME-Version': '1.0',
-      'Content-Type': 'text/html; charset=UTF-8',
-      'Content-Transfer-Encoding': '8bit',
       'X-Feedback-ID': 'notifications:nukhba:platform',
       'Return-Path': 'bounces@nukhba.media',
-      'Organization': 'Tawasol Al-Nokhba - تواصل النخبة'
+      'Organization': 'Tawasol Al-Nokhba - تواصل النخبة',
+      'X-Campaign-Name': 'transactional',
+      'X-SES-Configuration-Set': 'nukhba-transactional',
+      'Precedence': 'bulk',
+      'X-MC-Track': 'opens,clicks'
     }
   }
 
