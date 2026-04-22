@@ -118,22 +118,14 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="mobile-container-safe">
-      <div className="max-w-6xl mx-auto px-2 md:px-4 py-4 md:py-8">
+      <div className="max-w-3xl mx-auto px-2 md:px-4 py-4 md:py-8">
         <Link href="/dashboard" className="text-sm text-green hover:underline mb-4 block">
           → العودة للطلبات
         </Link>
 
-        {/* Mobile: Show progress tracker on top */}
-        <div className="block md:hidden mb-6">
-          <ProgressTracker status={request.status} />
-        </div>
+        <ProgressTracker status={request.status} className="mb-6" />
 
-        {/* Desktop: Two column layout */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-
-          {/* القسم الأيمن: بيانات الطلب (3 أعمدة) */}
-          <div className="md:col-span-3 order-1 md:order-1">
-            <div className="bg-card rounded-2xl border border-border overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border overflow-hidden">
           <div className="p-3 md:p-5 border-b border-border flex items-start md:items-center justify-between gap-2">
             <div className="min-w-0 flex-1">
               <h1 className="text-lg md:text-xl font-black text-dark mobile-safe">
@@ -213,21 +205,21 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
               </div>
             )}
           </div>
-            </div>
+        </div>
 
-            {/* Status-specific sections */}
+        {/* Status-specific sections BELOW content */}
 
-            {request.status === 'pending' && (
-              <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">
-                <div className="text-2xl mb-2">⏳</div>
-                <p className="font-bold text-yellow-700 text-sm">طلبك قيد المراجعة</p>
-                <p className="text-xs text-yellow-600 mt-1">سيصلك العرض مع خيارات الخدمات الإضافية فور موافقة الإدارة على المحتوى</p>
-              </div>
-            )}
+        {request.status === 'pending' && (
+          <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">
+            <div className="text-2xl mb-2">⏳</div>
+            <p className="font-bold text-yellow-700 text-sm">طلبك قيد المراجعة</p>
+            <p className="text-xs text-yellow-600 mt-1">سيصلك العرض مع خيارات الخدمات الإضافية فور موافقة الإدارة على المحتوى</p>
+          </div>
+        )}
 
-            {request.status === 'quoted' && request.admin_quoted_price != null && (
-              <div className="mt-4">
-                <QuoteApproval
+        {request.status === 'quoted' && request.admin_quoted_price != null && (
+          <div className="mt-4">
+            <QuoteApproval
               requestId={request.id}
               quotedPrice={Number(request.admin_quoted_price)}
               offeredExtras={request.admin_offered_extras ?? []}
