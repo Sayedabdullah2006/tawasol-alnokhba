@@ -121,7 +121,7 @@ export default function AdminRequestsPage() {
                         ? formatNumber(r.final_total ?? r.admin_quoted_price)
                         : <span className="text-muted text-xs">—</span>}
                     </td>
-                    <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
+                    <td className="px-4 py-3"><StatusBadge status={r.status} userRole="admin" /></td>
                     <td className="px-4 py-3 text-muted">{formatDate(r.created_at)}</td>
                   </tr>
                 )

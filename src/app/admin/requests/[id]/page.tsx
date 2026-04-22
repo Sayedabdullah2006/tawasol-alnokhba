@@ -211,7 +211,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
               </h1>
               <p className="text-muted">{formatDate(request.created_at)}</p>
             </div>
-            <StatusBadge status={request.status} />
+            <StatusBadge status={request.status} userRole="admin" showDescription />
           </div>
         </div>
 

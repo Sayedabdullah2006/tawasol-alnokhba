@@ -134,7 +134,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
               <p className="text-sm text-muted">{formatDate(request.created_at)}</p>
             </div>
             <div className="flex-shrink-0">
-              <StatusBadge status={effectiveStatus} />
+              <StatusBadge status={effectiveStatus} userRole="client" showDescription />
             </div>
           </div>
 

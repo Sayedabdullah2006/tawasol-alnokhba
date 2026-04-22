@@ -1,7 +1,18 @@
-import { REQUEST_STATUSES, type RequestStatus } from '@/lib/constants'
+import { type RequestStatus } from '@/lib/constants'
+import { getStatusLabel } from '@/lib/status-labels'
 
-export default function StatusBadge({ status }: { status: string }) {
-  const config = REQUEST_STATUSES[status as RequestStatus] ?? { label: status, color: 'gray' }
+interface StatusBadgeProps {
+  status: string
+  userRole?: 'client' | 'admin' | 'public'
+  showDescription?: boolean
+}
+
+export default function StatusBadge({
+  status,
+  userRole = 'public',
+  showDescription = false
+}: StatusBadgeProps) {
+  const config = getStatusLabel(status as RequestStatus, userRole)
 
   const colors: Record<string, string> = {
     yellow: 'bg-yellow-50 text-yellow-700 border-yellow-200',
@@ -14,8 +25,15 @@ export default function StatusBadge({ status }: { status: string }) {
   }
 
   return (
-    <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium border ${colors[config.color]}`}>
-      {config.label}
-    </span>
+    <div className="flex flex-col gap-1">
+      <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium border ${colors[config.color]}`}>
+        {config.label}
+      </span>
+      {showDescription && config.description && (
+        <p className="text-xs text-muted max-w-xs">
+          {config.description}
+        </p>
+      )}
+    </div>
   )
 }

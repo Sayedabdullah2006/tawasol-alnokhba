@@ -27,7 +27,7 @@ export default function RequestCard({ request: r }: Props) {
       <div className="bg-card rounded-2xl border border-border p-4 hover:shadow-md transition-shadow cursor-pointer">
         <div className="flex items-center justify-between mb-3">
           <span className="text-sm font-bold text-dark">{generateRequestNumber(r.request_number)}</span>
-          <StatusBadge status={effectiveStatus} />
+          <StatusBadge status={effectiveStatus} userRole="client" />
         </div>
         <div className="flex items-center gap-2 mb-2">
           <span className="text-xl">{cat?.icon ?? '📋'}</span>
