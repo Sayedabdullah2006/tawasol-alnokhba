@@ -225,7 +225,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-muted block">الاسم</span>
-                  <span className="font-medium">{request.client_name}</span>
+                  <span className="font-medium client-name">{request.client_name}</span>
                 </div>
                 <div>
                   <span className="text-muted block">البريد</span>

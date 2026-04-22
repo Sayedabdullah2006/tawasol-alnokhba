@@ -114,7 +114,7 @@ export default function AdminRequestsPage() {
                     className="border-t border-border hover:bg-cream/50 cursor-pointer transition-colors"
                   >
                     <td className="px-4 py-3 font-mono text-xs">{generateRequestNumber(r.request_number)}</td>
-                    <td className="px-4 py-3">{r.client_name}</td>
+                    <td className="px-4 py-3 client-name">{r.client_name}</td>
                     <td className="px-4 py-3">{cat?.icon} {cat?.nameAr}</td>
                     <td className="px-4 py-3">
                       {r.final_total ?? r.admin_quoted_price
