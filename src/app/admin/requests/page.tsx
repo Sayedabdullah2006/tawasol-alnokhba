@@ -10,14 +10,19 @@ import StatusBadge from '@/components/dashboard/StatusBadge'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import { useToast } from '@/components/ui/Toast'
 
 export default function AdminRequestsPage() {
   const router = useRouter()
   const supabase = createClient()
+  const { showToast } = useToast()
   const [loading, setLoading] = useState(true)
   const [requests, setRequests] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [requestToDelete, setRequestToDelete] = useState<any>(null)
   // Removed drawer-related state since we now use full-page view
 
   const loadData = useCallback(async () => {
@@ -74,6 +79,47 @@ export default function AdminRequestsPage() {
     window.open(`/api/export-csv?${params.toString()}`)
   }
 
+  const handleDeleteClick = (request: any, event: React.MouseEvent) => {
+    event.stopPropagation() // منع فتح صفحة الطلب
+    setRequestToDelete(request)
+    setShowDeleteDialog(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!requestToDelete) return
+
+    setDeletingRequestId(requestToDelete.id)
+    try {
+      const response = await fetch('/api/admin/delete-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: requestToDelete.id })
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        showToast(`تم حذف طلب ${generateRequestNumber(requestToDelete.request_number)} نهائياً`, 'success')
+        // إزالة الطلب من القائمة
+        setRequests(prev => prev.filter(r => r.id !== requestToDelete.id))
+      } else {
+        showToast(data.error || 'فشل في حذف الطلب', 'error')
+      }
+    } catch (error) {
+      console.error('Delete request error:', error)
+      showToast('خطأ في الاتصال بالخادم', 'error')
+    } finally {
+      setDeletingRequestId(null)
+      setShowDeleteDialog(false)
+      setRequestToDelete(null)
+    }
+  }
+
+  const handleDeleteCancel = () => {
+    setShowDeleteDialog(false)
+    setRequestToDelete(null)
+  }
+
   if (loading) return <LoadingSpinner size="lg" />
 
   return (
@@ -112,6 +158,7 @@ export default function AdminRequestsPage() {
                 <th className="px-4 py-3 text-right font-bold">المبلغ</th>
                 <th className="px-4 py-3 text-right font-bold">الحالة</th>
                 <th className="px-4 py-3 text-right font-bold">التاريخ</th>
+                <th className="px-4 py-3 text-center font-bold">إجراءات</th>
               </tr>
             </thead>
             <tbody>
@@ -162,6 +209,22 @@ export default function AdminRequestsPage() {
 
                     {/* التاريخ */}
                     <td className="px-3 py-3 text-muted text-xs">{formatDate(r.created_at)}</td>
+
+                    {/* إجراءات */}
+                    <td className="px-3 py-3 text-center">
+                      <button
+                        onClick={(e) => handleDeleteClick(r, e)}
+                        disabled={deletingRequestId === r.id}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="حذف الطلب نهائياً"
+                      >
+                        {deletingRequestId === r.id ? (
+                          <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <span className="text-sm">🗑️</span>
+                        )}
+                      </button>
+                    </td>
                   </tr>
                 )
               })}
@@ -172,6 +235,50 @@ export default function AdminRequestsPage() {
           <p className="p-8 text-center text-muted">لا توجد طلبات بعد</p>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteDialog && requestToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+            <div className="text-center mb-6">
+              <div className="text-6xl mb-4">⚠️</div>
+              <h3 className="text-xl font-bold text-red-700 mb-2">تأكيد حذف الطلب</h3>
+              <p className="text-sm text-gray-600">
+                هل أنت متأكد من حذف طلب <strong>{generateRequestNumber(requestToDelete.request_number)}</strong>؟
+              </p>
+              <div className="mt-4 p-4 bg-gray-50 rounded-xl text-right">
+                <div className="text-sm font-bold text-gray-700 mb-1">تفاصيل الطلب:</div>
+                <div className="text-xs text-gray-600 space-y-1">
+                  <div><strong>العميل:</strong> {requestToDelete.client_name}</div>
+                  {requestToDelete.title && <div><strong>العنوان:</strong> {requestToDelete.title}</div>}
+                  <div><strong>الحالة:</strong> <StatusBadge status={requestToDelete.status} userRole="admin" /></div>
+                </div>
+              </div>
+              <p className="text-xs text-red-600 mt-4 font-bold">
+                ⚠️ هذا الإجراء لا يمكن التراجع عنه!
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={handleDeleteCancel}
+                className="flex-1"
+                disabled={deletingRequestId === requestToDelete.id}
+              >
+                إلغاء
+              </Button>
+              <Button
+                onClick={handleDeleteConfirm}
+                loading={deletingRequestId === requestToDelete.id}
+                className="flex-1 bg-red-600 hover:bg-red-700"
+              >
+                حذف نهائياً
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )

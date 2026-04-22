@@ -33,6 +33,8 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   const [respondingToNegotiation, setRespondingToNegotiation] = useState(false)
   const [discountPercentage, setDiscountPercentage] = useState('')
   const [negotiationNotes, setNegotiationNotes] = useState('')
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
@@ -188,6 +190,35 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
       showToast(data.error ?? 'فشل إرسال العرض المعدل', 'error')
     }
     setSaving(false)
+  }
+
+  const handleDeleteRequest = async () => {
+    if (!request) return
+
+    setDeleting(true)
+    try {
+      const response = await fetch('/api/admin/delete-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: request.id })
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        showToast(`تم حذف طلب ${generateRequestNumber(request.request_number)} نهائياً`, 'success')
+        // الانتقال إلى قائمة الطلبات
+        router.push('/admin/requests')
+      } else {
+        showToast(data.error || 'فشل في حذف الطلب', 'error')
+      }
+    } catch (error) {
+      console.error('Delete request error:', error)
+      showToast('خطأ في الاتصال بالخادم', 'error')
+    } finally {
+      setDeleting(false)
+      setShowDeleteDialog(false)
+    }
   }
 
   if (loading) return <LoadingSpinner size="lg" />
@@ -643,6 +674,18 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                             </div>
                           </div>
                         )}
+
+                        {/* Delete Button - Always available for admins */}
+                        <div className="border-t border-border pt-4 mt-4">
+                          <Button
+                            variant="outline"
+                            onClick={() => setShowDeleteDialog(true)}
+                            className="w-full border-red-300 text-red-700 hover:bg-red-50"
+                            disabled={deleting}
+                          >
+                            🗑️ حذف الطلب نهائياً
+                          </Button>
+                        </div>
                       </>
                     )
                   })()}
@@ -652,6 +695,53 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+            <div className="text-center mb-6">
+              <div className="text-6xl mb-4">⚠️</div>
+              <h3 className="text-xl font-bold text-red-700 mb-2">تأكيد حذف الطلب</h3>
+              <p className="text-sm text-gray-600">
+                هل أنت متأكد من حذف طلب <strong>{generateRequestNumber(request.request_number)}</strong>؟
+              </p>
+              <div className="mt-4 p-4 bg-gray-50 rounded-xl text-right">
+                <div className="text-sm font-bold text-gray-700 mb-1">تفاصيل الطلب:</div>
+                <div className="text-xs text-gray-600 space-y-1">
+                  <div><strong>العميل:</strong> {request.client_name}</div>
+                  {request.title && <div><strong>العنوان:</strong> {request.title}</div>}
+                  <div><strong>الحالة:</strong> <StatusBadge status={request.status} userRole="admin" /></div>
+                  {(request.final_total || request.admin_quoted_price) && (
+                    <div><strong>المبلغ:</strong> {formatNumber(request.final_total || request.admin_quoted_price)} ر.س</div>
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-red-600 mt-4 font-bold">
+                ⚠️ هذا الإجراء لا يمكن التراجع عنه!
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteDialog(false)}
+                className="flex-1"
+                disabled={deleting}
+              >
+                إلغاء
+              </Button>
+              <Button
+                onClick={handleDeleteRequest}
+                loading={deleting}
+                className="flex-1 bg-red-600 hover:bg-red-700"
+              >
+                حذف نهائياً
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
