@@ -66,3 +66,17 @@ export function getCallbackUrl(): string {
 export function getWebhookUrl(): string {
   return `${process.env.NEXT_PUBLIC_SITE_URL}/api/webhooks/moyasar`;
 }
+
+/**
+ * Get available payment methods based on environment
+ * Disables Apple Pay in development until properly configured
+ */
+export function getPaymentMethods(): string[] {
+  // Only enable credit card in development to avoid Apple Pay configuration issues
+  if (process.env.NODE_ENV !== 'production') {
+    return ['creditcard'];
+  }
+
+  // In production, enable both when Apple Pay is properly configured
+  return ['creditcard', 'applepay'];
+}

@@ -7,6 +7,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useMoyasar } from '@/hooks/useMoyasar';
+import { getPaymentMethods } from '@/lib/moyasar';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface PaymentFormProps {
@@ -93,10 +94,12 @@ export default function PaymentForm({
             <span>💳</span>
             <span>مدى وفيزا</span>
           </div>
-          <div className="flex items-center gap-1">
-            <span>🍎</span>
-            <span>Apple Pay</span>
-          </div>
+          {getPaymentMethods().includes('applepay') && (
+            <div className="flex items-center gap-1">
+              <span>🍎</span>
+              <span>Apple Pay</span>
+            </div>
+          )}
           <div className="flex items-center gap-1">
             <span>🔐</span>
             <span>SSL مشفر</span>

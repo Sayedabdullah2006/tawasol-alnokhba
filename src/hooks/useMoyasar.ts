@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { getPublishableKey, toHalalas, getCallbackUrl } from '@/lib/moyasar';
+import { getPublishableKey, toHalalas, getCallbackUrl, getPaymentMethods } from '@/lib/moyasar';
 import type { MoyasarConfig, MoyasarPayment } from '@/types/moyasar';
 
 interface UseMoyasarReturn {
@@ -94,6 +94,7 @@ export function useMoyasar(): UseMoyasarReturn {
       }
 
       try {
+        const paymentMethods = getPaymentMethods();
         const config: MoyasarConfig = {
           element: '#moyasar-form',
           amount: toHalalas(amount), // Convert SAR to halalas
@@ -101,10 +102,12 @@ export function useMoyasar(): UseMoyasarReturn {
           description,
           publishable_api_key: getPublishableKey(),
           callback_url: getCallbackUrl(),
-          methods: ['creditcard', 'applepay'],
-          apple_pay: {
-            label: 'nukhba.media',
-          },
+          methods: paymentMethods as ('creditcard' | 'applepay')[],
+          ...(paymentMethods.includes('applepay') && {
+            apple_pay: {
+              label: 'nukhba.media',
+            },
+          }),
           metadata,
           on_completed: (payment: MoyasarPayment) => {
             console.log('Payment completed:', payment);
