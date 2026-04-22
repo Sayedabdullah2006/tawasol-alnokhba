@@ -10,6 +10,7 @@ import { fixTextDirection } from '@/lib/text-utils'
 import { useToast } from '@/components/ui/Toast'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import Button from '@/components/ui/Button'
+import ClientName from '@/components/ui/ClientName'
 import Input from '@/components/ui/Input'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import QuoteComposer from '@/components/admin/QuoteComposer'
@@ -287,7 +288,10 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-muted block">الاسم</span>
-                  <span className="font-medium client-name">{fixTextDirection(request.client_name || '')}</span>
+                  <ClientName
+                    name={request.client_name || ''}
+                    className="font-medium"
+                  />
                 </div>
                 <div>
                   <span className="text-muted block">البريد</span>
@@ -751,7 +755,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
               <div className="mt-4 p-4 bg-gray-50 rounded-xl text-right">
                 <div className="text-sm font-bold text-gray-700 mb-1">تفاصيل الطلب:</div>
                 <div className="text-xs text-gray-600 space-y-1">
-                  <div><strong>العميل:</strong> {request.client_name}</div>
+                  <div><strong>العميل:</strong> <ClientName name={request.client_name || ''} className="inline" /></div>
                   {request.title && <div><strong>العنوان:</strong> {request.title}</div>}
                   <div><strong>الحالة:</strong> <StatusBadge status={request.status} userRole="admin" /></div>
                   {(request.final_total || request.admin_quoted_price) && (

@@ -90,9 +90,75 @@ export function normalizeArabicText(text: string): string {
 }
 
 /**
- * فحص وإصلاح اتجاه النص
+ * فحص وإصلاح اتجاه النص للأسماء المختلطة
  */
 export function fixTextDirection(text: string): string {
-  const fixed = fixArabicText(text)
-  return normalizeArabicText(fixed)
+  if (!text) return text
+
+  // تنظيف النص الأساسي
+  text = text.trim()
+
+  // فحص نوع النص
+  const hasArabic = /[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/.test(text)
+  const hasEnglish = /[a-zA-Z]/.test(text)
+
+  // إذا كان النص مختلط (عربي + إنجليزي)
+  if (hasArabic && hasEnglish) {
+    return handleMixedText(text)
+  }
+
+  // إذا كان النص عربي فقط
+  if (hasArabic) {
+    const fixed = fixArabicText(text)
+    return normalizeArabicText(fixed)
+  }
+
+  // إذا كان النص إنجليزي فقط
+  return text
+}
+
+/**
+ * معالجة النصوص المختلطة (عربي + إنجليزي)
+ */
+function handleMixedText(text: string): string {
+  // أنماط شائعة للأسماء المختلطة
+  const mixedPatterns = [
+    // اسم إنجليزي + لقب عربي: "John الدوسري"
+    /^([a-zA-Z\s\-\.]+)\s+([؀-ۿ\s]+)$/,
+    // اسم عربي + لقب إنجليزي: "أحمد Smith"
+    /^([؀-ۿ\s]+)\s+([a-zA-Z\s\-\.]+)$/,
+    // اسم مركب: "محمد Al-Ahmed"
+    /^([؀-ۿ\s]+)\s+(Al-[a-zA-Z]+)$/i,
+    /^([a-zA-Z\s]+)\s+(آل\s+[؀-ۿ\s]+)$/,
+  ]
+
+  for (const pattern of mixedPatterns) {
+    const match = text.match(pattern)
+    if (match) {
+      const [_, part1, part2] = match
+
+      // تحديد أي جزء عربي وأي جزء إنجليزي
+      const part1IsArabic = /[؀-ۿ]/.test(part1)
+      const part2IsArabic = /[؀-ۿ]/.test(part2)
+
+      if (part1IsArabic && !part2IsArabic) {
+        // عربي + إنجليزي
+        return `${normalizeArabicText(part1)} ${part2.trim()}`
+      } else if (!part1IsArabic && part2IsArabic) {
+        // إنجليزي + عربي
+        return `${part1.trim()} ${normalizeArabicText(part2)}`
+      }
+    }
+  }
+
+  // إذا لم تطابق الأنماط، طبق التنظيف العام
+  const words = text.split(/\s+/)
+  const cleanWords = words.map(word => {
+    if (/[؀-ۿ]/.test(word)) {
+      return normalizeArabicText(fixArabicText(word))
+    }
+    return word
+  })
+
+  return cleanWords.join(' ')
 }

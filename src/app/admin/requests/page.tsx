@@ -11,6 +11,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useToast } from '@/components/ui/Toast'
+import ClientName from '@/components/ui/ClientName'
 
 export default function AdminRequestsPage() {
   const router = useRouter()
@@ -257,7 +258,13 @@ export default function AdminRequestsPage() {
                     </td>
 
                     {/* العميل */}
-                    <td className="px-3 py-3 client-name text-sm">{fixTextDirection(r.client_name || '')}</td>
+                    <td className="px-3 py-3 text-sm">
+                      <ClientName
+                        name={r.client_name || ''}
+                        maxLength={20}
+                        className="font-medium"
+                      />
+                    </td>
 
                     {/* الفئة */}
                     <td className="px-3 py-3 text-sm">{cat?.icon} {cat?.nameAr}</td>

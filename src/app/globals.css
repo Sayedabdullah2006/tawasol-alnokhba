@@ -48,6 +48,28 @@ td, th {
 }
 
 /* إصلاح النصوص المختلطة (عربي + إنجليزي) */
+.client-name {
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: plaintext;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+
+/* إصلاح الأسماء العربية */
+.client-name:has([dir="rtl"]) {
+  direction: rtl;
+  text-align: right;
+}
+
+/* تحسين عرض النصوص المختلطة */
+.mixed-text {
+  direction: ltr;
+  unicode-bidi: plaintext;
+  text-align: left;
+}
 .arabic-text, .client-name {
   direction: rtl !important;
   unicode-bidi: bidi-override !important;
