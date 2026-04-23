@@ -535,19 +535,53 @@ export function contentReadyForReview(d: {
         </div>
       </div>
 
-      ${d.proposedImages && d.proposedImages.length > 0 ? `
+      ${d.proposedImages && Array.isArray(d.proposedImages) && d.proposedImages.length > 0 ? `
         <div style="background:#F8FAFC; border-radius:12px; padding:20px; margin:24px 0;">
-          <h3 style="margin:0 0 12px 0; color:${BRAND_NAVY}; font-size:16px;">التصاميم المقترحة</h3>
-          <p style="margin:0 0 12px 0; font-size:12px; color:#6B7C99;">اضغط على الصورة لعرضها بالحجم الكامل</p>
-          <div style="text-align:center;">
+          <h3 style="margin:0 0 12px 0; color:${BRAND_NAVY}; font-size:16px;">
+            📸 التصاميم المقترحة (${d.proposedImages.length})
+          </h3>
+          <p style="margin:0 0 12px 0; font-size:12px; color:#6B7C99;">
+            اضغط على الصورة لعرضها بالحجم الكامل
+          </p>
+          <div style="text-align:center; line-height:0;">
             ${d.proposedImages.map((img: string, i: number) => `
-              <a href="${img}" target="_blank" style="display:inline-block; margin:4px;">
-                <img src="${img}" alt="تصميم ${i + 1}" style="max-width:150px; max-height:150px; border-radius:8px; border:2px solid #E5E7EB;" />
-              </a>
+              <div style="display:inline-block; margin:8px; vertical-align:top;">
+                <a href="${img}" target="_blank" style="display:block; text-decoration:none;">
+                  <img
+                    src="${img}"
+                    alt="تصميم ${i + 1}"
+                    style="
+                      max-width:150px;
+                      max-height:150px;
+                      width:150px;
+                      height:auto;
+                      border-radius:8px;
+                      border:2px solid #E5E7EB;
+                      box-shadow:0 2px 8px rgba(0,0,0,0.1);
+                      transition:transform 0.2s;
+                    "
+                    onload="this.style.opacity=1"
+                    onerror="this.style.display='none'"
+                  />
+                  <div style="font-size:11px; color:#6B7C99; margin-top:4px; text-align:center;">
+                    تصميم ${i + 1}
+                  </div>
+                </a>
+              </div>
             `).join('')}
           </div>
+          <p style="margin:12px 0 0 0; font-size:11px; color:#6B7C99; text-align:center;">
+            💡 إذا لم تظهر الصور، اضغط هنا لعرضها في متصفحك:
+            <a href="${SITE_URL}/dashboard" style="color:${BRAND_NAVY};">عرض في لوحة التحكم</a>
+          </p>
         </div>
-      ` : ''}
+      ` : `
+        <div style="background:#FFF3CD; border-radius:12px; padding:16px; margin:24px 0; border:1px solid #F9E79F;">
+          <p style="margin:0; font-size:14px; color:#856404; text-align:center;">
+            📝 النص فقط - لم يتم إرفاق تصاميم مع هذا المحتوى
+          </p>
+        </div>
+      `}
 
       <div style="margin:32px 0; text-align:center;">
         <div style="background:#E8F5E8; border-radius:12px; padding:16px; margin:16px 0;">

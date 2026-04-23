@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/Toast'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import Button from '@/components/ui/Button'
 import ClientName from '@/components/ui/ClientName'
+import ContentDebugger from '@/components/debug/ContentDebugger'
 import Input from '@/components/ui/Input'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import QuoteComposer from '@/components/admin/QuoteComposer'
@@ -486,6 +487,11 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                         📤 إرسال المحتوى للعميل
                       </Button>
                     </div>
+                  )}
+
+                  {/* Debug Content Issues */}
+                  {(request.status === 'content_review' || request.status === 'in_progress') && (
+                    <ContentDebugger requestId={request.id} />
                   )}
 
                   {/* Content sender component */}

@@ -25,6 +25,13 @@ export default function ContentSender({ request, onSent, onCancel }: ContentSend
       return
     }
 
+    console.log('📤 إرسال المحتوى:', {
+      requestId: request.id,
+      contentLength: proposedContent.trim().length,
+      imagesCount: proposedImages.length,
+      images: proposedImages
+    })
+
     setLoading(true)
     try {
       const res = await fetch('/api/send-content-for-review', {
@@ -37,14 +44,20 @@ export default function ContentSender({ request, onSent, onCancel }: ContentSend
         }),
       })
 
+      const responseData = await res.json().catch(() => ({}))
+      console.log('📡 استجابة الخادم:', { status: res.status, data: responseData })
+
       if (res.ok) {
-        showToast('تم إرسال المحتوى للعميل للمراجعة')
+        showToast(
+          `تم إرسال المحتوى للعميل (النص + ${proposedImages.length} صور)`,
+          'success'
+        )
         onSent()
       } else {
-        const data = await res.json().catch(() => ({}))
-        showToast(data.error ?? 'فشل إرسال المحتوى', 'error')
+        showToast(responseData.error ?? 'فشل إرسال المحتوى', 'error')
       }
     } catch (err) {
+      console.error('❌ خطأ في إرسال المحتوى:', err)
       showToast('حدث خطأ في الإرسال', 'error')
     } finally {
       setLoading(false)
