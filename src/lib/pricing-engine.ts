@@ -115,6 +115,11 @@ export interface PriceInput {
   extras: string[]
   numPosts: number
   influencerPriceMultiplier?: number
+  clientType?: 'individual' | 'business' | 'government' | 'charity'
+  customPricing?: {
+    base_prices: Record<string, Record<string, number>>
+    extras_prices: Record<string, Record<string, number>>
+  }
 }
 
 export interface PriceBreakdown {
@@ -171,7 +176,18 @@ export function calculateReach(input: ReachInput): number {
 }
 
 export function calculatePrice(input: PriceInput): PriceBreakdown {
-  if (!BASE_PRICES[input.category]) {
+  // Determine which pricing to use
+  const clientType = input.clientType ?? 'individual'
+  let basePrices = BASE_PRICES
+  let extrasPrices = EXTRAS_PRICES
+
+  // Use custom pricing if provided (from influencer-specific config)
+  if (input.customPricing) {
+    basePrices = input.customPricing.base_prices[clientType] ?? BASE_PRICES
+    extrasPrices = input.customPricing.extras_prices[clientType] ?? EXTRAS_PRICES
+  }
+
+  if (!basePrices[input.category] && !BASE_PRICES[input.category]) {
     throw new Error(`فئة غير معروفة: ${input.category}`)
   }
   if (input.numPosts < 1) {
@@ -181,7 +197,7 @@ export function calculatePrice(input: PriceInput): PriceBreakdown {
   const multiplier = input.influencerPriceMultiplier ?? 1.0
 
   // Step 1: Base price + special cases
-  let basePrice = BASE_PRICES[input.category] * multiplier
+  let basePrice = (basePrices[input.category] ?? BASE_PRICES[input.category] ?? 0) * multiplier
   let isFree = false
   let isHalfOff = false
 
@@ -227,7 +243,7 @@ export function calculatePrice(input: PriceInput): PriceBreakdown {
   const extrasDetail = input.extras.map(id => ({
     id,
     name: EXTRAS_NAMES[id] ?? id,
-    price: EXTRAS_PRICES[id] ?? 0,
+    price: (extrasPrices[id] ?? EXTRAS_PRICES[id] ?? 0) * multiplier,
   }))
   const extrasTotal = extrasDetail.reduce((sum, e) => sum + e.price, 0)
 

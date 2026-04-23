@@ -61,11 +61,16 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
         extras: [],
         numPosts,
         influencerPriceMultiplier: influencer?.price_multiplier ?? 1.0,
+        clientType: request.client_type ?? 'individual',
+        customPricing: pricingConfig ? {
+          base_prices: pricingConfig.base_prices ?? {},
+          extras_prices: pricingConfig.extras_prices ?? {}
+        } : undefined
       })
     } catch {
       return null
     }
-  }, [request.category, request.sub_option, scope, images, numPosts, influencer])
+  }, [request.category, request.sub_option, scope, images, numPosts, influencer, pricingConfig, request.client_type])
 
   const autoPrice = autoBreakdown?.totalFinal ?? 0
   const effectivePrice = isFree ? 0 : (manualPrice !== '' ? parseFloat(manualPrice) : autoPrice)
@@ -77,16 +82,17 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
 
   // Extras pricing — per-influencer config first, else category-filtered defaults
   const availableExtras = useMemo(() => {
+    const clientType = request.client_type ?? 'individual'
     return dbExtras
       .filter(e => !e.category_only || e.category_only === request.category)
       .map(e => ({
         id: e.id,
         name: e.name_ar,
         icon: e.icon,
-        price: pricingConfig?.extras_prices?.[e.id] ?? e.default_price,
+        price: pricingConfig?.extras_prices?.[clientType]?.[e.id] ?? e.default_price,
         reachBoost: EXTRAS_REACH_BOOST[e.id] ?? 0,
       }))
-  }, [dbExtras, pricingConfig, request.category])
+  }, [dbExtras, pricingConfig, request.category, request.client_type])
 
   const toggleOffered = (id: string) => {
     setSelectedExtrasToOffer(prev =>

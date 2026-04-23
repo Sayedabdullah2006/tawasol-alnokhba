@@ -17,9 +17,18 @@ const emptyForm = {
   tk_handle: '', tk_followers: 0, bio: '', price_multiplier: 1.0,
 }
 
+const CLIENT_TYPES = [
+  { id: 'individual', icon: '👤', title: 'الأفراد', desc: 'أسعار للأشخاص الطبيعيين' },
+  { id: 'business', icon: '🏢', title: 'الشركات', desc: 'أسعار للشركات والمؤسسات التجارية' },
+  { id: 'government', icon: '🏛️', title: 'الجهات الحكومية', desc: 'أسعار للجهات والمؤسسات الحكومية' },
+  { id: 'charity', icon: '❤️', title: 'الجمعيات الخيرية', desc: 'أسعار مخفضة للأعمال الخيرية' },
+] as const
+
+type ClientType = typeof CLIENT_TYPES[number]['id']
+
 interface PricingData {
-  base_prices: Record<string, number>
-  extras_prices: Record<string, number>
+  base_prices: Record<string, Record<string, number>>  // { individual: {category: price}, business: {category: price}, etc }
+  extras_prices: Record<string, Record<string, number>> // { individual: {extra: price}, business: {extra: price}, etc }
   scope_multipliers: { single: number; all: number }
   image_multipliers: { one: number; multi: number }
   discount_table: Record<string, number>
@@ -28,8 +37,18 @@ interface PricingData {
 }
 
 const defaultPricing: PricingData = {
-  base_prices: { inventions: 3000, competitions: 3000, books: 1200, events: 2500, certs: 800, graduation: 600, appointment: 1500, award: 2000, cv: 900, product: 3000, research: 500, charity: 400, government: 4500 },
-  extras_prices: { bilingual: 300, mention: 200, story: 150, encyclopedia: 500, pin6: 100, pin12: 200, repost: 150, campaign: 1000, video: 400, report: 800, plan: 1500, website: 5000, media: 10000, infographic: 300 },
+  base_prices: {
+    individual: { inventions: 3000, competitions: 3000, books: 1200, events: 2500, certs: 800, graduation: 600, appointment: 1500, award: 2000, cv: 900, product: 2500, research: 500 },
+    business: { inventions: 4500, competitions: 4500, books: 2000, events: 3500, certs: 1200, graduation: 1000, appointment: 2500, award: 3000, cv: 1500, product: 4000, research: 800 },
+    government: { inventions: 6000, competitions: 6000, books: 3000, events: 5000, certs: 2000, graduation: 1500, appointment: 4000, award: 4500, cv: 2500, product: 6000, research: 1200, government: 4500 },
+    charity: { inventions: 1500, competitions: 1500, books: 600, events: 1200, certs: 400, graduation: 300, appointment: 800, award: 1000, cv: 500, product: 1200, research: 250, charity: 400 }
+  },
+  extras_prices: {
+    individual: { bilingual: 300, mention: 200, story: 150, encyclopedia: 500, pin6: 100, pin12: 200, repost: 150, campaign: 1000, video: 400, report: 800, plan: 1500, website: 5000, media: 10000, infographic: 300 },
+    business: { bilingual: 450, mention: 300, story: 250, encyclopedia: 750, pin6: 150, pin12: 300, repost: 250, campaign: 1500, video: 600, report: 1200, plan: 2500, website: 8000, media: 15000, infographic: 500 },
+    government: { bilingual: 600, mention: 400, story: 350, encyclopedia: 1000, pin6: 200, pin12: 400, repost: 350, campaign: 2000, video: 800, report: 1600, plan: 3500, website: 12000, media: 20000, infographic: 700 },
+    charity: { bilingual: 150, mention: 100, story: 75, encyclopedia: 250, pin6: 50, pin12: 100, repost: 75, campaign: 500, video: 200, report: 400, plan: 750, website: 2500, media: 5000, infographic: 150 }
+  },
   scope_multipliers: { single: 1.0, all: 1.5 },
   image_multipliers: { one: 1.0, multi: 1.2 },
   discount_table: { '1': 0, '2': 5, '3': 10, '4': 15, '5': 20, '6': 25, '7': 30, '8': 35, '9': 40, '10': 45 },
@@ -53,6 +72,7 @@ export default function AdminInfluencersPage() {
   // Pricing editor
   const [pricingInfluencer, setPricingInfluencer] = useState<any>(null)
   const [pricing, setPricing] = useState<PricingData>({ ...defaultPricing })
+  const [activeClientType, setActiveClientType] = useState<ClientType>('individual')
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -120,9 +140,31 @@ export default function AdminInfluencersPage() {
     setPricingInfluencer(inf)
     const { data } = await supabase.from('pricing_config').select('*').eq('influencer_id', inf.id).single()
     if (data) {
+      // Handle migration from old format to new format
+      let basePrices = data.base_prices ?? {}
+      let extrasPrices = data.extras_prices ?? {}
+
+      // If old flat format, convert to new nested format
+      if (basePrices && typeof basePrices.inventions === 'number') {
+        const oldBasePrices = basePrices
+        const oldExtrasPrices = extrasPrices
+        basePrices = {
+          individual: oldBasePrices,
+          business: { ...oldBasePrices, ...Object.fromEntries(Object.entries(oldBasePrices).map(([k, v]) => [k, Math.round(v * 1.5)])) },
+          government: { ...oldBasePrices, ...Object.fromEntries(Object.entries(oldBasePrices).map(([k, v]) => [k, Math.round(v * 2)])) },
+          charity: { ...oldBasePrices, ...Object.fromEntries(Object.entries(oldBasePrices).map(([k, v]) => [k, Math.round(v * 0.5)])) }
+        }
+        extrasPrices = {
+          individual: oldExtrasPrices,
+          business: { ...oldExtrasPrices, ...Object.fromEntries(Object.entries(oldExtrasPrices).map(([k, v]) => [k, Math.round(v * 1.5)])) },
+          government: { ...oldExtrasPrices, ...Object.fromEntries(Object.entries(oldExtrasPrices).map(([k, v]) => [k, Math.round(v * 2)])) },
+          charity: { ...oldExtrasPrices, ...Object.fromEntries(Object.entries(oldExtrasPrices).map(([k, v]) => [k, Math.round(v * 0.5)])) }
+        }
+      }
+
       setPricing({
-        base_prices: data.base_prices ?? defaultPricing.base_prices,
-        extras_prices: data.extras_prices ?? defaultPricing.extras_prices,
+        base_prices: basePrices.individual ? basePrices : defaultPricing.base_prices,
+        extras_prices: extrasPrices.individual ? extrasPrices : defaultPricing.extras_prices,
         scope_multipliers: data.scope_multipliers ?? defaultPricing.scope_multipliers,
         image_multipliers: data.image_multipliers ?? defaultPricing.image_multipliers,
         discount_table: data.discount_table ?? defaultPricing.discount_table,
@@ -132,6 +174,7 @@ export default function AdminInfluencersPage() {
     } else {
       setPricing({ ...defaultPricing })
     }
+    setActiveClientType('individual')
   }
 
   const handleSavePricing = async () => {
@@ -168,42 +211,87 @@ export default function AdminInfluencersPage() {
           </div>
         </div>
 
-        <div className="space-y-6">
-          {/* Base Prices */}
-          <div className="bg-card rounded-2xl border border-border p-5">
-            <h2 className="font-bold text-dark text-lg mb-4">الأسعار الأساسية (ر.س)</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {CATEGORIES.map(cat => (
-                <div key={cat.id} className="flex items-center gap-2">
-                  <span className="text-lg">{cat.icon}</span>
-                  <span className="text-sm text-dark flex-1 truncate">{cat.nameAr}</span>
-                  <input type="number" dir="ltr"
-                    className="w-24 px-3 py-2 rounded-lg border border-border bg-cream text-sm text-center"
-                    value={pricing.base_prices[cat.id] ?? 0}
-                    onChange={e => setPricing({ ...pricing, base_prices: { ...pricing.base_prices, [cat.id]: parseInt(e.target.value) || 0 } })}
-                  />
+        {/* Client Type Tabs */}
+        <div className="bg-card rounded-2xl border border-border p-5 mb-6">
+          <h2 className="font-bold text-dark text-lg mb-4">أسعار حسب نوع العميل</h2>
+          <div className="flex gap-2 mb-4 overflow-x-auto">
+            {CLIENT_TYPES.map(type => (
+              <button
+                key={type.id}
+                onClick={() => setActiveClientType(type.id)}
+                className={`flex items-center gap-2 px-4 py-3 rounded-xl font-medium text-sm whitespace-nowrap transition-all ${
+                  activeClientType === type.id
+                    ? 'bg-green text-white shadow-lg'
+                    : 'bg-cream text-muted hover:bg-green/10 hover:text-green'
+                }`}
+              >
+                <span className="text-lg">{type.icon}</span>
+                <div className="text-left">
+                  <div className="font-bold">{type.title}</div>
+                  <div className="text-xs opacity-75">{type.desc}</div>
                 </div>
-              ))}
-            </div>
+              </button>
+            ))}
           </div>
 
-          {/* Extras */}
-          <div className="bg-card rounded-2xl border border-border p-5">
-            <h2 className="font-bold text-dark text-lg mb-4">أسعار المزايا الإضافية (ر.س)</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {EXTRAS.map(ext => (
-                <div key={ext.id} className="flex items-center gap-2">
-                  <span className="text-lg">{ext.icon}</span>
-                  <span className="text-sm text-dark flex-1 truncate">{ext.nameAr}</span>
-                  <input type="number" dir="ltr"
-                    className="w-24 px-3 py-2 rounded-lg border border-border bg-cream text-sm text-center"
-                    value={pricing.extras_prices[ext.id] ?? 0}
-                    onChange={e => setPricing({ ...pricing, extras_prices: { ...pricing.extras_prices, [ext.id]: parseInt(e.target.value) || 0 } })}
-                  />
-                </div>
-              ))}
+          <div className="space-y-6">
+            {/* Base Prices */}
+            <div>
+              <h3 className="font-bold text-dark mb-4">الأسعار الأساسية (ر.س)</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {CATEGORIES.map(cat => (
+                  <div key={cat.id} className="flex items-center gap-2">
+                    <span className="text-lg">{cat.icon}</span>
+                    <span className="text-sm text-dark flex-1 truncate">{cat.nameAr}</span>
+                    <input type="number" dir="ltr"
+                      className="w-24 px-3 py-2 rounded-lg border border-border bg-cream text-sm text-center"
+                      value={pricing.base_prices[activeClientType]?.[cat.id] ?? 0}
+                      onChange={e => setPricing({
+                        ...pricing,
+                        base_prices: {
+                          ...pricing.base_prices,
+                          [activeClientType]: {
+                            ...pricing.base_prices[activeClientType],
+                            [cat.id]: parseInt(e.target.value) || 0
+                          }
+                        }
+                      })}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Extras */}
+            <div>
+              <h3 className="font-bold text-dark mb-4">أسعار المزايا الإضافية (ر.س)</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {EXTRAS.map(ext => (
+                  <div key={ext.id} className="flex items-center gap-2">
+                    <span className="text-lg">{ext.icon}</span>
+                    <span className="text-sm text-dark flex-1 truncate">{ext.nameAr}</span>
+                    <input type="number" dir="ltr"
+                      className="w-24 px-3 py-2 rounded-lg border border-border bg-cream text-sm text-center"
+                      value={pricing.extras_prices[activeClientType]?.[ext.id] ?? 0}
+                      onChange={e => setPricing({
+                        ...pricing,
+                        extras_prices: {
+                          ...pricing.extras_prices,
+                          [activeClientType]: {
+                            ...pricing.extras_prices[activeClientType],
+                            [ext.id]: parseInt(e.target.value) || 0
+                          }
+                        }
+                      })}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
+        </div>
+
+        <div className="space-y-6">
 
           {/* Multipliers */}
           <div className="bg-card rounded-2xl border border-border p-5">
