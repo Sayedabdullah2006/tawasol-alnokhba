@@ -63,11 +63,22 @@ export default function ContentDebugger({ requestId }: ContentDebuggerProps) {
     try {
       const supabase = createClient()
 
-      // إنشاء ملف تجريبي صغير
-      const testBlob = new Blob(['test content'], { type: 'text/plain' })
-      const testFile = new File([testBlob], 'test.txt', { type: 'text/plain' })
+      // إنشاء صورة تجريبية صغيرة (1x1 pixel PNG)
+      const canvas = document.createElement('canvas')
+      canvas.width = 1
+      canvas.height = 1
+      const ctx = canvas.getContext('2d')!
+      ctx.fillStyle = '#FF0000'
+      ctx.fillRect(0, 0, 1, 1)
 
-      const path = `debug-test-${Date.now()}.txt`
+      // تحويل إلى blob
+      const testPromise = new Promise<Blob>((resolve) => {
+        canvas.toBlob((blob) => resolve(blob!), 'image/png')
+      })
+      const testBlob = await testPromise
+      const testFile = new File([testBlob], 'debug-test.png', { type: 'image/png' })
+
+      const path = `debug-test-${Date.now()}.png`
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('content-images')
         .upload(path, testFile)
