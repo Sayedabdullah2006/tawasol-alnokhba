@@ -9,27 +9,48 @@ import { createServiceRoleClient } from '@/lib/supabase-server';
 import type { MoyasarPayment } from '@/types/moyasar';
 
 export async function POST(request: NextRequest) {
-  console.log('[MOYASAR_WEBHOOK] 🔔 Webhook received');
+  const requestId = Math.random().toString(36).substring(7);
+  console.log(`[MOYASAR_WEBHOOK] 🔔 Webhook ${requestId} received`);
 
   try {
+    const supabase = await createServiceRoleClient();
+    const body = await request.text();
+    const webhookData = JSON.parse(body);
+
+    // تسجيل Webhook في قاعدة البيانات للمراقبة
+    await supabase
+      .from('webhook_logs')
+      .insert({
+        event_type: webhookData.type || 'unknown',
+        data: webhookData,
+        status: 'received',
+        created_at: new Date().toISOString()
+      })
+      .catch(err => console.error('[MOYASAR_WEBHOOK] ⚠️ Failed to log webhook:', err));
+
     // التحقق من الأمان - Moyasar Secret Token
     const authHeader = request.headers.get('authorization');
     const expectedSecret = process.env.MOYASAR_WEBHOOK_SECRET;
 
     if (!expectedSecret) {
-      console.error('[MOYASAR_WEBHOOK] ❌ MOYASAR_WEBHOOK_SECRET not configured');
+      console.error(`[MOYASAR_WEBHOOK] ❌ ${requestId} MOYASAR_WEBHOOK_SECRET not configured`);
+      await supabase.from('webhook_logs').update({
+        status: 'failed',
+        response_message: 'MOYASAR_WEBHOOK_SECRET not configured'
+      }).eq('id', requestId).catch(() => {});
       return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
     }
 
     if (!authHeader || authHeader !== `Bearer ${expectedSecret}`) {
-      console.error('[MOYASAR_WEBHOOK] 🚫 Invalid webhook authentication');
+      console.error(`[MOYASAR_WEBHOOK] 🚫 ${requestId} Invalid webhook authentication`);
+      await supabase.from('webhook_logs').update({
+        status: 'unauthorized',
+        response_message: 'Invalid webhook authentication'
+      }).eq('id', requestId).catch(() => {});
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.text();
-    const webhookData = JSON.parse(body);
-    
-    console.log('[MOYASAR_WEBHOOK] 📋 Webhook data:', {
+    console.log(`[MOYASAR_WEBHOOK] 📋 ${requestId} Webhook data:`, {
       type: webhookData.type,
       payment_id: webhookData.data?.id,
       payment_status: webhookData.data?.status
@@ -38,30 +59,92 @@ export async function POST(request: NextRequest) {
     // معالجة أحداث الدفع فقط
     if (webhookData.type.startsWith('payment.') && webhookData.data) {
       const payment: MoyasarPayment = webhookData.data;
-      
-      if (payment.status === 'paid' && payment.metadata?.request_id) {
-        // استدعاء نفس منطق التحقق المستخدم في payment/verify
-        const verifyResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/payment/verify`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            paymentId: payment.id,
-            requestId: payment.metadata.request_id
-          })
-        });
 
-        if (verifyResponse.ok) {
-          console.log(`[MOYASAR_WEBHOOK] ✅ Payment verified via webhook: ${payment.id}`);
-        } else {
-          console.error(`[MOYASAR_WEBHOOK] ❌ Failed to verify payment: ${payment.id}`);
+      if (payment.status === 'paid' && payment.metadata?.request_id) {
+        console.log(`[MOYASAR_WEBHOOK] 💰 ${requestId} Processing successful payment: ${payment.id}`);
+
+        try {
+          // استدعاء نفس منطق التحقق المستخدم في payment/verify مع إعادة المحاولة
+          let attempts = 0;
+          const maxAttempts = 3;
+          let verifySuccess = false;
+
+          while (attempts < maxAttempts && !verifySuccess) {
+            attempts++;
+            console.log(`[MOYASAR_WEBHOOK] 🔄 ${requestId} Verification attempt ${attempts}/${maxAttempts}`);
+
+            const verifyResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/payment/verify`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                paymentId: payment.id,
+                requestId: payment.metadata.request_id
+              })
+            });
+
+            if (verifyResponse.ok) {
+              const verifyData = await verifyResponse.json();
+              console.log(`[MOYASAR_WEBHOOK] ✅ ${requestId} Payment verified via webhook: ${payment.id}`);
+
+              await supabase.from('webhook_logs').update({
+                status: 'success',
+                response_message: `Payment verified successfully on attempt ${attempts}`
+              }).eq('id', requestId).catch(() => {});
+
+              verifySuccess = true;
+            } else {
+              const errorData = await verifyResponse.json().catch(() => ({}));
+              console.error(`[MOYASAR_WEBHOOK] ❌ ${requestId} Verification failed attempt ${attempts}:`, errorData);
+
+              if (attempts === maxAttempts) {
+                await supabase.from('webhook_logs').update({
+                  status: 'failed',
+                  response_message: `Failed to verify payment after ${attempts} attempts: ${errorData.error || 'Unknown error'}`
+                }).eq('id', requestId).catch(() => {});
+              } else {
+                // تأخير قبل إعادة المحاولة
+                await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+              }
+            }
+          }
+
+        } catch (verifyError) {
+          console.error(`[MOYASAR_WEBHOOK] 💥 ${requestId} Verification error:`, verifyError);
+          await supabase.from('webhook_logs').update({
+            status: 'error',
+            response_message: `Verification error: ${verifyError instanceof Error ? verifyError.message : 'Unknown error'}`
+          }).eq('id', requestId).catch(() => {});
         }
+
+      } else {
+        console.log(`[MOYASAR_WEBHOOK] ⚠️ ${requestId} Skipping payment - status: ${payment.status}, has request_id: ${!!payment.metadata?.request_id}`);
+        await supabase.from('webhook_logs').update({
+          status: 'skipped',
+          response_message: `Payment status: ${payment.status}, has request_id: ${!!payment.metadata?.request_id}`
+        }).eq('id', requestId).catch(() => {});
       }
+    } else {
+      console.log(`[MOYASAR_WEBHOOK] ⚠️ ${requestId} Skipping non-payment event: ${webhookData.type}`);
+      await supabase.from('webhook_logs').update({
+        status: 'skipped',
+        response_message: `Non-payment event: ${webhookData.type}`
+      }).eq('id', requestId).catch(() => {});
     }
 
-    return NextResponse.json({ status: 'success' });
+    return NextResponse.json({ status: 'success', requestId });
+
   } catch (error) {
-    console.error('[MOYASAR_WEBHOOK] 💥 Webhook error:', error);
-    return NextResponse.json({ status: 'error' }, { status: 500 });
+    console.error(`[MOYASAR_WEBHOOK] 💥 ${requestId} Webhook error:`, error);
+
+    try {
+      const supabase = await createServiceRoleClient();
+      await supabase.from('webhook_logs').update({
+        status: 'error',
+        response_message: error instanceof Error ? error.message : 'Unknown error'
+      }).eq('id', requestId).catch(() => {});
+    } catch {} // Ignore logging errors
+
+    return NextResponse.json({ status: 'error', requestId }, { status: 500 });
   }
 }
 
