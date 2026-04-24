@@ -119,16 +119,19 @@ async function notifyAdminAboutPaymentIssues(issues: any[]) {
   // يمكن إضافة إرسال بريد إلكتروني أو إشعار Slack هنا
   // لكن الآن سنكتفي بتسجيل الإشعار في قاعدة البيانات
 
-  await supabase
-    .from('admin_notifications')
-    .insert({
-      type: 'payment_issues',
-      title: `${issues.length} مشكلة في الدفعات تحتاج مراجعة`,
-      message: `تم العثور على ${issues.length} طلب يحتاج مراجعة يدوية:\n\n${issuesSummary}`,
-      priority: 'high',
-      created_at: new Date().toISOString()
-    })
-    .catch(err => console.error('[PAYMENT_CRON] ❌ Failed to create admin notification:', err))
+  try {
+    await supabase
+      .from('admin_notifications')
+      .insert({
+        type: 'payment_issues',
+        title: `${issues.length} مشكلة في الدفعات تحتاج مراجعة`,
+        message: `تم العثور على ${issues.length} طلب يحتاج مراجعة يدوية:\n\n${issuesSummary}`,
+        priority: 'high',
+        created_at: new Date().toISOString()
+      })
+  } catch (err) {
+    console.error('[PAYMENT_CRON] ❌ Failed to create admin notification:', err)
+  }
 
   console.log(`[PAYMENT_CRON] ✅ Admin notification created for ${issues.length} payment issues`)
 }

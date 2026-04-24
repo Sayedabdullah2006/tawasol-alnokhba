@@ -150,15 +150,15 @@ export default function AdminInfluencersPage() {
         const oldExtrasPrices = extrasPrices
         basePrices = {
           individual: oldBasePrices,
-          business: { ...oldBasePrices, ...Object.fromEntries(Object.entries(oldBasePrices).map(([k, v]) => [k, Math.round(v * 1.5)])) },
-          government: { ...oldBasePrices, ...Object.fromEntries(Object.entries(oldBasePrices).map(([k, v]) => [k, Math.round(v * 2)])) },
-          charity: { ...oldBasePrices, ...Object.fromEntries(Object.entries(oldBasePrices).map(([k, v]) => [k, Math.round(v * 0.5)])) }
+          business: { ...oldBasePrices, ...Object.fromEntries(Object.entries(oldBasePrices).map(([k, v]) => [k, Math.round((v as number) * 1.5)])) },
+          government: { ...oldBasePrices, ...Object.fromEntries(Object.entries(oldBasePrices).map(([k, v]) => [k, Math.round((v as number) * 2)])) },
+          charity: { ...oldBasePrices, ...Object.fromEntries(Object.entries(oldBasePrices).map(([k, v]) => [k, Math.round((v as number) * 0.5)])) }
         }
         extrasPrices = {
           individual: oldExtrasPrices,
-          business: { ...oldExtrasPrices, ...Object.fromEntries(Object.entries(oldExtrasPrices).map(([k, v]) => [k, Math.round(v * 1.5)])) },
-          government: { ...oldExtrasPrices, ...Object.fromEntries(Object.entries(oldExtrasPrices).map(([k, v]) => [k, Math.round(v * 2)])) },
-          charity: { ...oldExtrasPrices, ...Object.fromEntries(Object.entries(oldExtrasPrices).map(([k, v]) => [k, Math.round(v * 0.5)])) }
+          business: { ...oldExtrasPrices, ...Object.fromEntries(Object.entries(oldExtrasPrices).map(([k, v]) => [k, Math.round((v as number) * 1.5)])) },
+          government: { ...oldExtrasPrices, ...Object.fromEntries(Object.entries(oldExtrasPrices).map(([k, v]) => [k, Math.round((v as number) * 2)])) },
+          charity: { ...oldExtrasPrices, ...Object.fromEntries(Object.entries(oldExtrasPrices).map(([k, v]) => [k, Math.round((v as number) * 0.5)])) }
         }
       }
 

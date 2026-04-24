@@ -18,15 +18,18 @@ export async function POST(request: NextRequest) {
     const webhookData = JSON.parse(body);
 
     // تسجيل Webhook في قاعدة البيانات للمراقبة
-    await supabase
-      .from('webhook_logs')
-      .insert({
-        event_type: webhookData.type || 'unknown',
-        data: webhookData,
-        status: 'received',
-        created_at: new Date().toISOString()
-      })
-      .catch(err => console.error('[MOYASAR_WEBHOOK] ⚠️ Failed to log webhook:', err));
+    try {
+      await supabase
+        .from('webhook_logs')
+        .insert({
+          event_type: webhookData.type || 'unknown',
+          data: webhookData,
+          status: 'received',
+          created_at: new Date().toISOString()
+        })
+    } catch (err) {
+      console.error('[MOYASAR_WEBHOOK] ⚠️ Failed to log webhook:', err)
+    }
 
     // التحقق من الأمان - Moyasar Secret Token
     const authHeader = request.headers.get('authorization');
@@ -34,19 +37,23 @@ export async function POST(request: NextRequest) {
 
     if (!expectedSecret) {
       console.error(`[MOYASAR_WEBHOOK] ❌ ${requestId} MOYASAR_WEBHOOK_SECRET not configured`);
-      await supabase.from('webhook_logs').update({
-        status: 'failed',
-        response_message: 'MOYASAR_WEBHOOK_SECRET not configured'
-      }).eq('id', requestId).catch(() => {});
+      try {
+        await supabase.from('webhook_logs').update({
+          status: 'failed',
+          response_message: 'MOYASAR_WEBHOOK_SECRET not configured'
+        }).eq('id', requestId)
+      } catch {} // Ignore logging errors
       return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
     }
 
     if (!authHeader || authHeader !== `Bearer ${expectedSecret}`) {
       console.error(`[MOYASAR_WEBHOOK] 🚫 ${requestId} Invalid webhook authentication`);
-      await supabase.from('webhook_logs').update({
-        status: 'unauthorized',
-        response_message: 'Invalid webhook authentication'
-      }).eq('id', requestId).catch(() => {});
+      try {
+        await supabase.from('webhook_logs').update({
+          status: 'unauthorized',
+          response_message: 'Invalid webhook authentication'
+        }).eq('id', requestId)
+      } catch {} // Ignore logging errors
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -86,21 +93,28 @@ export async function POST(request: NextRequest) {
               const verifyData = await verifyResponse.json();
               console.log(`[MOYASAR_WEBHOOK] ✅ ${requestId} Payment verified via webhook: ${payment.id}`);
 
-              await supabase.from('webhook_logs').update({
-                status: 'success',
-                response_message: `Payment verified successfully on attempt ${attempts}`
-              }).eq('id', requestId).catch(() => {});
+              try {
+                await supabase.from('webhook_logs').update({
+                  status: 'success',
+                  response_message: `Payment verified successfully on attempt ${attempts}`
+                }).eq('id', requestId)
+              } catch {} // Ignore logging errors
 
               verifySuccess = true;
             } else {
-              const errorData = await verifyResponse.json().catch(() => ({}));
+              let errorData = {}
+              try {
+                errorData = await verifyResponse.json()
+              } catch {} // Ignore JSON parsing errors
               console.error(`[MOYASAR_WEBHOOK] ❌ ${requestId} Verification failed attempt ${attempts}:`, errorData);
 
               if (attempts === maxAttempts) {
-                await supabase.from('webhook_logs').update({
-                  status: 'failed',
-                  response_message: `Failed to verify payment after ${attempts} attempts: ${errorData.error || 'Unknown error'}`
-                }).eq('id', requestId).catch(() => {});
+                try {
+                  await supabase.from('webhook_logs').update({
+                    status: 'failed',
+                    response_message: `Failed to verify payment after ${attempts} attempts: ${(errorData as any).error || 'Unknown error'}`
+                  }).eq('id', requestId)
+                } catch {} // Ignore logging errors
               } else {
                 // تأخير قبل إعادة المحاولة
                 await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
@@ -110,25 +124,31 @@ export async function POST(request: NextRequest) {
 
         } catch (verifyError) {
           console.error(`[MOYASAR_WEBHOOK] 💥 ${requestId} Verification error:`, verifyError);
-          await supabase.from('webhook_logs').update({
-            status: 'error',
-            response_message: `Verification error: ${verifyError instanceof Error ? verifyError.message : 'Unknown error'}`
-          }).eq('id', requestId).catch(() => {});
+          try {
+            await supabase.from('webhook_logs').update({
+              status: 'error',
+              response_message: `Verification error: ${verifyError instanceof Error ? verifyError.message : 'Unknown error'}`
+            }).eq('id', requestId)
+          } catch {} // Ignore logging errors
         }
 
       } else {
         console.log(`[MOYASAR_WEBHOOK] ⚠️ ${requestId} Skipping payment - status: ${payment.status}, has request_id: ${!!payment.metadata?.request_id}`);
-        await supabase.from('webhook_logs').update({
-          status: 'skipped',
-          response_message: `Payment status: ${payment.status}, has request_id: ${!!payment.metadata?.request_id}`
-        }).eq('id', requestId).catch(() => {});
+        try {
+          await supabase.from('webhook_logs').update({
+            status: 'skipped',
+            response_message: `Payment status: ${payment.status}, has request_id: ${!!payment.metadata?.request_id}`
+          }).eq('id', requestId)
+        } catch {} // Ignore logging errors
       }
     } else {
       console.log(`[MOYASAR_WEBHOOK] ⚠️ ${requestId} Skipping non-payment event: ${webhookData.type}`);
-      await supabase.from('webhook_logs').update({
-        status: 'skipped',
-        response_message: `Non-payment event: ${webhookData.type}`
-      }).eq('id', requestId).catch(() => {});
+      try {
+        await supabase.from('webhook_logs').update({
+          status: 'skipped',
+          response_message: `Non-payment event: ${webhookData.type}`
+        }).eq('id', requestId)
+      } catch {} // Ignore logging errors
     }
 
     return NextResponse.json({ status: 'success', requestId });
@@ -141,7 +161,7 @@ export async function POST(request: NextRequest) {
       await supabase.from('webhook_logs').update({
         status: 'error',
         response_message: error instanceof Error ? error.message : 'Unknown error'
-      }).eq('id', requestId).catch(() => {});
+      }).eq('id', requestId)
     } catch {} // Ignore logging errors
 
     return NextResponse.json({ status: 'error', requestId }, { status: 500 });

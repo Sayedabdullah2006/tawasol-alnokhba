@@ -83,7 +83,7 @@ export default function PaymentMonitor() {
       }
 
       if (data.issues?.length > 0) {
-        showToast(`⚠️ وُجد ${data.issues.length} مشكلة تحتاج مراجعة`, 'warning')
+        showToast(`⚠️ وُجد ${data.issues.length} مشكلة تحتاج مراجعة`, 'info')
       }
 
       if (data.fixed?.length === 0 && data.issues?.length === 0) {
