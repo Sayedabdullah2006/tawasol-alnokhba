@@ -17,7 +17,7 @@ export async function GET() {
 
     const { data: pendingRequests, error: requestsError } = await supabase
       .from('publish_requests')
-      .select('id, request_number, client_name, client_email, final_total, updated_at')
+      .select('id, request_number, client_name, client_email, final_total, updated_at, moyasar_payment_id')
       .eq('status', 'approved')
       .lt('updated_at', oneHourAgo)
 
