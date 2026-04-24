@@ -34,64 +34,69 @@ export async function GET() {
     // فحص كل طلب معلق
     for (const request of pendingRequests) {
       try {
-        console.log(`[PENDING_PAYMENTS] 🔍 Checking request ATH-${String(request.request_number).padStart(4, '0')}...`)
+        const requestNumber = `ATH-${String(request.request_number).padStart(4, '0')}`
+        console.log(`[PENDING_PAYMENTS] 🔍 Checking request ${requestNumber}...`)
 
-        // البحث في ميسر عن دفعات لهذا الطلب
-        const moyasarSecretKey = process.env.MOYASAR_SECRET_KEY
-        if (!moyasarSecretKey) {
-          console.error('[PENDING_PAYMENTS] ❌ MOYASAR_SECRET_KEY not configured')
+        // إذا كان لديه معرف دفع محفوظ، تحقق منه مباشرة
+        if (request.moyasar_payment_id) {
+          const { verifyAndUpdatePayment } = await import('@/lib/moyasar-server')
+          const result = await verifyAndUpdatePayment(request.moyasar_payment_id, request.id)
+
+          console.log(`[PENDING_PAYMENTS] Request ${requestNumber}:`, result.reason)
+
+          if (result.success && result.reason === 'verified_and_updated') {
+            fixed.push({
+              requestNumber,
+              paymentId: request.moyasar_payment_id,
+              amount: request.final_total,
+              client: request.client_name
+            })
+          }
           continue
         }
 
-        const authString = Buffer.from(`${moyasarSecretKey}:`).toString('base64')
-        const requestNumber = `ATH-${String(request.request_number).padStart(4, '0')}`
+        // إذا لم يكن هناك معرف دفع محفوظ، ابحث في ميسر عن دفعات حديثة
+        const { buildAuthHeader } = await import('@/lib/moyasar')
 
-        // البحث بوصف الطلب
-        const searchResponse = await fetch(`https://api.moyasar.com/v1/payments?description=${encodeURIComponent(`دفع طلب ${requestNumber}`)}`, {
+        const searchResponse = await fetch('https://api.moyasar.com/v1/payments', {
           headers: {
-            'Authorization': `Basic ${authString}`,
+            Authorization: buildAuthHeader(),
             'Content-Type': 'application/json'
           }
         })
 
         if (searchResponse.ok) {
-          const searchData = await searchResponse.json()
+          const { payments } = await searchResponse.json()
 
-          // البحث عن دفعة ناجحة مطابقة
-          const expectedAmount = Math.round(request.final_total * 100)
-          const successfulPayment = searchData.payments?.find((p: any) =>
-            p.status === 'paid' &&
-            p.amount === expectedAmount &&
-            (p.metadata?.request_id === request.id ||
-             p.description?.includes(requestNumber))
+          // البحث عن دفعة مطابقة بواسطة metadata
+          const match = payments?.find((p: any) =>
+            p.metadata?.request_id === request.id &&
+            p.status === 'paid'
           )
 
-          if (successfulPayment) {
-            console.log(`[PENDING_PAYMENTS] ✅ Found successful payment for ${requestNumber}: ${successfulPayment.id}`)
+          if (match) {
+            console.log(`[PENDING_PAYMENTS] ✅ Found matching payment for ${requestNumber}: ${match.id}`)
 
-            // تحديث حالة الطلب
-            const { error: updateError } = await supabase
-              .from('publish_requests')
-              .update({
-                status: 'in_progress',
-                moyasar_payment_id: successfulPayment.id,
-                payment_status: 'paid',
-                moyasar_reference: successfulPayment.source.reference_number || successfulPayment.id,
-                admin_notes: 'تم إصلاح حالة الدفع تلقائياً - نظام مراقبة الدفعات المعلقة',
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', request.id)
+            const { verifyAndUpdatePayment } = await import('@/lib/moyasar-server')
+            const result = await verifyAndUpdatePayment(match.id, request.id)
 
-            if (!updateError) {
+            if (result.success && result.reason === 'verified_and_updated') {
               fixed.push({
                 requestNumber,
-                paymentId: successfulPayment.id,
+                paymentId: match.id,
                 amount: request.final_total,
                 client: request.client_name
               })
-              console.log(`[PENDING_PAYMENTS] ✅ Fixed ${requestNumber}`)
+              console.log(`[PENDING_PAYMENTS] ✅ Fixed request ${requestNumber}:`, result.reason)
             } else {
-              console.error(`[PENDING_PAYMENTS] ❌ Failed to update ${requestNumber}:`, updateError)
+              console.error(`[PENDING_PAYMENTS] ❌ Failed to verify ${requestNumber}:`, result.reason)
+              issues.push({
+                requestNumber,
+                client: request.client_name,
+                amount: request.final_total,
+                updatedAt: request.updated_at,
+                issue: `فشل التحقق: ${result.reason}`
+              })
             }
           } else {
             issues.push({
@@ -105,6 +110,13 @@ export async function GET() {
           }
         } else {
           console.error(`[PENDING_PAYMENTS] ❌ Moyasar API error for ${requestNumber}:`, searchResponse.status)
+          issues.push({
+            requestNumber,
+            client: request.client_name,
+            amount: request.final_total,
+            updatedAt: request.updated_at,
+            issue: 'خطأ في الاتصال بميسر'
+          })
         }
 
       } catch (error) {

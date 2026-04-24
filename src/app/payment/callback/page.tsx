@@ -15,9 +15,10 @@ import { toSAR } from '@/lib/moyasar';
 import type { MoyasarPayment } from '@/types/moyasar';
 
 interface PaymentResult {
-  success: boolean;
+  success?: boolean;
   payment?: MoyasarPayment;
   error?: string;
+  status?: string;
 }
 
 export default function PaymentCallbackPage() {
@@ -26,12 +27,24 @@ export default function PaymentCallbackPage() {
   const [result, setResult] = useState<PaymentResult | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Extract ONLY payment ID from URL params
+  // Extract payment ID and request ID from URL params
   // NEVER trust status/message from URL - Moyasar docs are clear about this
   const paymentId = searchParams.get('id');
+  const requestId = searchParams.get('requestId');
+  const isFailed = searchParams.get('failed') === 'true';
 
   useEffect(() => {
     const verifyPayment = async () => {
+      // If Moyasar already told us it failed, skip verify and show failure immediately
+      if (isFailed && !paymentId) {
+        setResult({
+          success: false,
+          error: 'تم رفض الدفع من البنك',
+        });
+        setLoading(false);
+        return;
+      }
+
       if (!paymentId) {
         setResult({
           success: false,
@@ -44,12 +57,11 @@ export default function PaymentCallbackPage() {
       try {
         console.log('🔍 [CALLBACK] Starting payment verification for ID:', paymentId);
 
-        // Verify payment server-side using POST to trigger status update
-        console.log('📤 [CALLBACK] Sending POST request to /api/payment/verify');
-        const response = await fetch(`/api/payment/verify`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ paymentId })
+        // Verify payment server-side using GET to trigger status update
+        console.log('📤 [CALLBACK] Sending GET request to /api/payment/verify');
+        const url = `/api/payment/verify?id=${paymentId}` + (requestId ? `&requestId=${requestId}` : '');
+        const response = await fetch(url, {
+          method: 'GET'
         });
         console.log('📡 [CALLBACK] Verification response status:', response.status);
         console.log('📡 [CALLBACK] Verification response headers:', response.headers);
@@ -57,18 +69,33 @@ export default function PaymentCallbackPage() {
         const data = await response.json();
         console.log('📡 [CALLBACK] Verification response data:', JSON.stringify(data, null, 2));
 
-        if (response.ok && data.success) {
-          console.log('✅ [CALLBACK] Payment verification successful');
-
-          setResult({
-            success: true,
-            payment: data.payment,
-          });
+        if (data.success) {
+          if (
+            data.reason === 'verified_and_updated' ||
+            data.reason === 'already_processed'
+          ) {
+            console.log('✅ [CALLBACK] Payment verification successful:', data.reason);
+            setResult({
+              success: true,
+              payment: data.payment ?? null,
+            });
+          } else if (data.reason === 'payment_not_paid') {
+            console.log('⏳ [CALLBACK] Payment not paid yet');
+            setResult({
+              status: 'pending',
+            });
+          } else {
+            console.error('❌ [CALLBACK] Payment verification failed:', data.reason);
+            setResult({
+              success: false,
+              error: data.reason,
+            });
+          }
         } else {
           console.error('❌ [CALLBACK] Payment verification failed:', data);
           setResult({
             success: false,
-            error: data.error || 'فشل في التحقق من حالة الدفع',
+            error: data.reason ?? 'verification_failed',
           });
         }
       } catch (error) {
@@ -83,7 +110,7 @@ export default function PaymentCallbackPage() {
     };
 
     verifyPayment();
-  }, [paymentId]);
+  }, [paymentId, requestId, isFailed]);
 
   // Loading state
   if (loading) {
@@ -98,9 +125,9 @@ export default function PaymentCallbackPage() {
   }
 
   // Success state
-  if (result?.success && result.payment && result.payment.status === 'paid') {
+  if (result?.success === true) {
     const payment = result.payment;
-    const amount = toSAR(payment.amount);
+    const amount = payment ? toSAR(payment.amount) : null;
 
     return (
       <div className="max-w-2xl mx-auto px-4 py-8">
@@ -114,30 +141,30 @@ export default function PaymentCallbackPage() {
 
           {/* Payment details */}
           <div className="p-6 space-y-4">
-            <div className="bg-cream rounded-xl p-4 space-y-3">
-              <div className="flex justify-between">
-                <span className="text-muted text-sm">رقم المعاملة:</span>
-                <span className="font-mono text-sm">{payment.id}</span>
+            {payment && (
+              <div className="bg-cream rounded-xl p-4 space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-muted text-sm">رقم المعاملة:</span>
+                  <span className="font-mono text-sm">{payment.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted text-sm">المبلغ المدفوع:</span>
+                  <span className="font-bold text-green text-lg">{formatNumber(amount!)} ر.س</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted text-sm">وسيلة الدفع:</span>
+                  <span className="font-medium">
+                    💳 {payment.source?.company?.toUpperCase()} ***{payment.source?.number?.slice(-4) ?? '****'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted text-sm">تاريخ الدفع:</span>
+                  <span className="text-sm">
+                    {new Date(payment.created_at).toLocaleString('ar-SA')}
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted text-sm">المبلغ المدفوع:</span>
-                <span className="font-bold text-green text-lg">{formatNumber(amount)} ر.س</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted text-sm">وسيلة الدفع:</span>
-                <span className="font-medium capitalize">
-                  {payment.source.type === 'creditcard' && '💳 بطاقة ائتمانية'}
-                  {payment.source.type === 'applepay' && '🍎 Apple Pay'}
-                  {payment.source.company && ` (${payment.source.company})`}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted text-sm">تاريخ الدفع:</span>
-                <span className="text-sm">
-                  {new Date(payment.created_at).toLocaleString('ar-SA')}
-                </span>
-              </div>
-            </div>
+            )}
 
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
               <div className="text-2xl mb-2">🚀</div>

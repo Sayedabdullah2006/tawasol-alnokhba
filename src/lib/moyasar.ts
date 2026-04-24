@@ -104,3 +104,4 @@ export function getPaymentMethods(): string[] {
   // 3. Country and currency settings
   // return ['creditcard', 'applepay'];
 }
+

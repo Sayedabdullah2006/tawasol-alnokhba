@@ -115,9 +115,11 @@ export function useMoyasar(): UseMoyasarReturn {
         console.log('Payment metadata:', metadata);
 
         const paymentMethods = getPaymentMethods();
-        const config: MoyasarConfig = {
-          element: element, // تمرير العنصر مباشرة بدلاً من CSS selector
-          amount: toHalalas(amount), // Convert SAR to halalas
+
+        // ✅ Define config object first to avoid circular references
+        const paymentConfig: MoyasarConfig = {
+          element: element,
+          amount: toHalalas(amount),
           currency: 'SAR',
           description,
           publishable_api_key: getPublishableKey(),
@@ -132,58 +134,37 @@ export function useMoyasar(): UseMoyasarReturn {
           on_completed: (payment: MoyasarPayment) => {
             console.log('🎉 Payment completed:', payment);
             console.log('🔍 Payment status:', payment.status);
-            console.log('🆔 Request ID from metadata:', metadata?.request_id);
+            console.log('🆔 Request ID from metadata:', payment.metadata?.request_id);
 
-            // تحديث حالة الطلب فوراً عند نجاح الدفع
-            if (payment.status === 'paid' && metadata?.request_id) {
-              console.log('✅ Updating request status...');
+            // Fire-and-forget verify call, then redirect immediately
+            if (payment.status === 'paid' && payment.metadata?.request_id) {
+              console.log('✅ Payment successful, firing verify and redirecting...');
 
-              fetch('/api/payment/verify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  paymentId: payment.id,
-                  requestId: metadata.request_id
-                })
-              }).then(async response => {
-                console.log('📡 Status update response status:', response.status);
-                console.log('📡 Status update response ok:', response.ok);
-
-                const responseData = await response.json().catch(() => null);
-                console.log('📡 Status update response data:', responseData);
-
-                if (response.ok) {
-                  console.log('✅ Status updated successfully');
-                  // تأخير قصير للتأكد من تحديث قاعدة البيانات
-                  setTimeout(() => {
-                    window.location.href = `/payment/callback?id=${payment.id}&status=paid&updated=true`;
-                  }, 1000);
-                } else {
-                  console.error('❌ Failed to update status:', responseData);
-                  // إعادة توجيه للتحقق عبر الـ callback
-                  window.location.href = `/payment/callback?id=${payment.id}`;
-                }
+              fetch(`/api/payment/verify?id=${payment.id}&requestId=${payment.metadata.request_id}`, {
+                method: 'GET'
               }).catch(error => {
-                console.error('❌ Network error updating status:', error);
-                // إعادة توجيه للتحقق عبر الـ callback
-                window.location.href = `/payment/callback?id=${payment.id}`;
+                console.error('[Moyasar] on_completed verify error:', error);
               });
+
+              window.location.href = `/payment/callback?id=${payment.id}&requestId=${payment.metadata.request_id}`;
             } else {
-              console.warn('⚠️ Cannot update status - missing payment status or request_id');
+              console.warn('⚠️ Payment not paid or missing request_id');
               console.log('⚠️ Payment status:', payment.status);
-              console.log('⚠️ Request ID:', metadata?.request_id);
-              // إعادة توجيه للتحقق عبر الـ callback
-              window.location.href = `/payment/callback?id=${payment.id}`;
+              console.log('⚠️ Request ID:', payment.metadata?.request_id);
+              window.location.href = `/payment/callback?id=${payment.id}&requestId=${payment.metadata?.request_id || ''}`;
             }
           },
           on_failed: (error: any) => {
-            console.error('Payment failed:', error);
-            // Error handling will be done in the component
+            console.error('[Moyasar] ❌ Payment failed:', error);
+            // ✅ Use paymentConfig directly — it IS defined before Moyasar.init is called
+            const reqId = paymentConfig.metadata?.request_id ?? '';
+            const paymentId = error?.id ?? '';
+            window.location.href = `/payment/callback?id=${paymentId}&requestId=${reqId}&failed=true`;
           },
         };
 
-        console.log('Moyasar config:', config);
-        window.Moyasar.init(config);
+        console.log('Moyasar config:', paymentConfig);
+        window.Moyasar.init(paymentConfig);
         console.log('Moyasar initialized successfully');
       } catch (err) {
         console.error('Error initializing Moyasar:', err);
