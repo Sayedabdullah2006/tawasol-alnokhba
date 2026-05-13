@@ -501,17 +501,63 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                   )}
 
                   {/* Content sending for in_progress status */}
-                  {request.status === 'in_progress' && !sendingContent && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
-                      <h4 className="font-bold text-blue-700">📝 إرسال المحتوى للمراجعة</h4>
-                      <p className="text-sm text-blue-600">
-                        أرسل النص والتصميم المقترح للعميل للمراجعة والموافقة
-                      </p>
-                      <Button onClick={() => setSendingContent(true)} className="w-full">
-                        📤 إرسال المحتوى للعميل
-                      </Button>
-                    </div>
-                  )}
+                  {request.status === 'in_progress' && !sendingContent && (() => {
+                    const hasClientFeedback = !!request.user_feedback
+                    const isContentApproved = !!request.content_approved_at && !hasClientFeedback
+
+                    if (hasClientFeedback) {
+                      // Case: client requested changes — show feedback + revision button
+                      return (
+                        <div className="space-y-3">
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 space-y-3">
+                            <h4 className="font-bold text-yellow-700">✏️ العميل طلب تعديلات على المحتوى</h4>
+                            <div className="bg-white rounded-lg p-3 space-y-1">
+                              <p className="text-xs font-medium text-yellow-700 mb-1">ملاحظات العميل:</p>
+                              <p className="text-sm text-yellow-800 whitespace-pre-line">{request.user_feedback}</p>
+                            </div>
+                            {request.proposed_content && (
+                              <div className="bg-white rounded-lg p-3">
+                                <p className="text-xs font-medium text-yellow-700 mb-1">المحتوى السابق:</p>
+                                <p className="text-sm text-yellow-600 whitespace-pre-line line-clamp-4">{request.proposed_content}</p>
+                              </div>
+                            )}
+                            <Button onClick={() => setSendingContent(true)} className="w-full">
+                              ✏️ تعديل المحتوى وإعادة الإرسال
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    }
+
+                    if (isContentApproved) {
+                      // Case: client approved content — show approved notice only
+                      return (
+                        <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-2">
+                          <h4 className="font-bold text-green-700">✅ تم اعتماد المحتوى من العميل</h4>
+                          {request.proposed_content && (
+                            <div className="bg-white rounded-lg p-3">
+                              <p className="text-xs font-medium text-green-700 mb-1">المحتوى المعتمد:</p>
+                              <p className="text-sm text-green-600 whitespace-pre-line line-clamp-4">{request.proposed_content}</p>
+                            </div>
+                          )}
+                          <p className="text-xs text-green-600">انتقل لمرحلة النشر</p>
+                        </div>
+                      )
+                    }
+
+                    // Case: fresh in_progress — first time sending content
+                    return (
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+                        <h4 className="font-bold text-blue-700">📝 إرسال المحتوى للمراجعة</h4>
+                        <p className="text-sm text-blue-600">
+                          أرسل النص والتصميم المقترح للعميل للمراجعة والموافقة
+                        </p>
+                        <Button onClick={() => setSendingContent(true)} className="w-full">
+                          📤 إرسال المحتوى للعميل
+                        </Button>
+                      </div>
+                    )
+                  })()}
 
                   {/* Debug Content Issues */}
                   {(request.status === 'content_review' || request.status === 'in_progress') && (
@@ -524,10 +570,12 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                       request={request}
                       onSent={() => {
                         setSendingContent(false)
-                        // Reload the request to get updated data
                         window.location.reload()
                       }}
                       onCancel={() => setSendingContent(false)}
+                      initialContent={request.user_feedback ? (request.proposed_content ?? '') : undefined}
+                      initialImages={request.user_feedback ? (request.proposed_images ?? []) : undefined}
+                      isRevision={!!request.user_feedback}
                     />
                   )}
 

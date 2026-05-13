@@ -10,14 +10,17 @@ interface ContentSenderProps {
   request: any
   onSent: () => void
   onCancel: () => void
+  initialContent?: string
+  initialImages?: string[]
+  isRevision?: boolean
 }
 
-export default function ContentSender({ request, onSent, onCancel }: ContentSenderProps) {
+export default function ContentSender({ request, onSent, onCancel, initialContent, initialImages, isRevision }: ContentSenderProps) {
   const supabase = createClient()
   const { showToast } = useToast()
   const [loading, setLoading] = useState(false)
-  const [proposedContent, setProposedContent] = useState('')
-  const [proposedImages, setProposedImages] = useState<string[]>([])
+  const [proposedContent, setProposedContent] = useState(initialContent ?? '')
+  const [proposedImages, setProposedImages] = useState<string[]>(initialImages ?? [])
 
   const handleSend = async () => {
     if (!proposedContent.trim()) {
@@ -67,7 +70,9 @@ export default function ContentSender({ request, onSent, onCancel }: ContentSend
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-bold text-dark">إرسال المحتوى للمراجعة</h3>
+        <h3 className="font-bold text-dark">
+          {isRevision ? 'تعديل المحتوى وإعادة الإرسال' : 'إرسال المحتوى للمراجعة'}
+        </h3>
         <button
           onClick={onCancel}
           className="text-muted hover:text-dark text-sm"
@@ -76,9 +81,15 @@ export default function ContentSender({ request, onSent, onCancel }: ContentSend
         </button>
       </div>
 
-      <p className="text-sm text-muted">
-        أرسل النص والتصميم المقترح للعميل للمراجعة والموافقة
-      </p>
+      {isRevision ? (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-700">
+          ✏️ عدّل النص أو الصور بناءً على ملاحظات العميل ثم أعد الإرسال
+        </div>
+      ) : (
+        <p className="text-sm text-muted">
+          أرسل النص والتصميم المقترح للعميل للمراجعة والموافقة
+        </p>
+      )}
 
       <div>
         <label className="block text-sm font-medium text-dark mb-2">

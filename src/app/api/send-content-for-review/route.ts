@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'الطلب ليس في مرحلة التنفيذ' }, { status: 400 })
     }
 
-    // Update request with proposed content
+    // Update request with proposed content — clear previous feedback on re-send
     const { error } = await supabase
       .from('publish_requests')
       .update({
@@ -57,6 +57,8 @@ export async function POST(request: Request) {
         proposed_content: proposedContent.trim(),
         proposed_images: proposedImages || [],
         content_sent_at: new Date().toISOString(),
+        user_feedback: null,
+        feedback_sent_at: null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', requestId)
