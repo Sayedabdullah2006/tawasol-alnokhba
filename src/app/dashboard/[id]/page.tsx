@@ -242,6 +242,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
               influencer={influencer}
               scope={scope}
               adminNotes={request.admin_notes}
+              negotiationRejected={!!request.negotiation_rejected}
             />
           </div>
         )}

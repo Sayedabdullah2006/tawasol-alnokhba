@@ -33,6 +33,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'لا يمكن طلب التفاوض في هذه المرحلة' }, { status: 400 })
     }
 
+    if (existingRequest.negotiation_rejected) {
+      return NextResponse.json({ error: 'تم رفض طلب التفاوض من الإدارة، السعر المعروض نهائي' }, { status: 400 })
+    }
+
     // Validate input data with context
     try {
       validateRequestId(requestId)

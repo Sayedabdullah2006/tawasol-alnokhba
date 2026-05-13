@@ -155,6 +155,30 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
     setSaving(false)
   }
 
+  const handleRejectNegotiation = async () => {
+    if (!request) return
+    setSaving(true)
+
+    const res = await fetch('/api/send-negotiated-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId: request.id,
+        rejectNegotiation: true,
+        adminNotes: negotiationNotes.trim() || null
+      })
+    })
+
+    if (res.ok) {
+      showToast('تم رفض التفاوض والإبقاء على السعر الأصلي')
+      router.push('/admin/requests')
+    } else {
+      const data = await res.json().catch(() => ({}))
+      showToast(data.error ?? 'فشل رفض التفاوض', 'error')
+    }
+    setSaving(false)
+  }
+
   const handleApplyDiscount = async () => {
     if (!request || !discountPercentage.trim()) {
       showToast('يرجى إدخال نسبة الخصم', 'error')
@@ -616,6 +640,19 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                               تطبيق الخصم وإرسال العرض
                             </Button>
                           </div>
+                        </div>
+
+                        {/* Option 3: Reject negotiation */}
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                          <h5 className="font-bold text-red-700 mb-2">❌ الخيار الثالث: رفض التفاوض والإبقاء على السعر الأصلي</h5>
+                          <p className="text-sm text-red-600 mb-3">
+                            سيتم إخطار العميل بأن السعر نهائي: <strong>{formatNumber(request.admin_quoted_price)} ر.س</strong>
+                            <br />
+                            <span className="text-xs">لن يتمكن العميل من طلب التفاوض مرة أخرى، لكن يمكنه القبول أو الرفض.</span>
+                          </p>
+                          <Button onClick={handleRejectNegotiation} loading={saving} className="w-full bg-red-600 hover:bg-red-700">
+                            رفض التفاوض والإبقاء على السعر الأصلي
+                          </Button>
                         </div>
 
                         {/* Optional notes */}
