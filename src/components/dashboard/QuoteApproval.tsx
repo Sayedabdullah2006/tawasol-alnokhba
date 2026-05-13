@@ -28,10 +28,11 @@ interface Props {
   influencer: Influencer | null
   scope: 'single' | 'all'
   adminNotes?: string | null
+  negotiationRejected?: boolean
 }
 
 export default function QuoteApproval({
-  requestId, quotedPrice, offeredExtras, influencer, scope, adminNotes
+  requestId, quotedPrice, offeredExtras, influencer, scope, adminNotes, negotiationRejected
 }: Props) {
   const router = useRouter()
   const { showToast } = useToast()
@@ -338,24 +339,30 @@ export default function QuoteApproval({
               : `اعتماد العرض والانتقال للدفع — ${formatNumber(finalTotal)} ر.س`}
           </Button>
 
-          <div className="flex gap-3">
+          {negotiationRejected ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+              <p className="text-sm font-medium text-amber-700">📋 السعر المعروض نهائي ولا يقبل التفاوض</p>
+              <p className="text-xs text-amber-600 mt-1">يمكنك اعتماد العرض أو رفضه</p>
+            </div>
+          ) : (
             <Button
               variant="outline"
               onClick={() => setNegotiating(true)}
-              className="flex-1 border-orange-300 text-orange-700 hover:bg-orange-50"
+              className="w-full border-orange-300 text-orange-700 hover:bg-orange-50"
               disabled={submitting}
             >
               💬 طلب التفاوض
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => setRejecting(true)}
-              className="flex-1 border-red-300 text-red-700 hover:bg-red-50"
-              disabled={submitting}
-            >
-              ❌ رفض العرض
-            </Button>
-          </div>
+          )}
+
+          <Button
+            variant="outline"
+            onClick={() => setRejecting(true)}
+            className="w-full border-red-300 text-red-700 hover:bg-red-50"
+            disabled={submitting}
+          >
+            ❌ رفض العرض
+          </Button>
         </div>
       )}
     </div>

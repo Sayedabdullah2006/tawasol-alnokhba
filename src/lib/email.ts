@@ -211,6 +211,13 @@ export async function notifyNegotiatedQuoteToClient(args: {
   return sendEmail(args.email, t.subject, t.html)
 }
 
+export async function notifyNegotiationRejectedToClient(args: {
+  email: string; requestNumber: string; clientName: string; originalPrice: number; adminMessage?: string
+}) {
+  const t = templates.negotiationRejectedToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
 // Old name kept for compatibility with the existing submit-request route.
 export async function sendNewRequestEmail(args: {
   requestNumber: string; clientName: string; clientEmail: string; clientPhone: string

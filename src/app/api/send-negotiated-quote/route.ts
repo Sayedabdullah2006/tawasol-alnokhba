@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { notifyNegotiatedQuoteToClient } from '@/lib/email'
+import { notifyNegotiatedQuoteToClient, notifyNegotiationRejectedToClient } from '@/lib/email'
 import { validateRequestId, validatePrice, validateDiscountPercentage, validateAdminNotes, ValidationException, formatValidationErrors } from '@/lib/validation'
 
 export async function POST(request: Request) {
@@ -21,14 +21,16 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { requestId, newPrice, discountPercentage, adminNotes, acceptClientPrice } = body
+    const { requestId, newPrice, discountPercentage, adminNotes, acceptClientPrice, rejectNegotiation } = body
 
     // Validate input data
     try {
       validateRequestId(requestId)
-      validatePrice(newPrice)
-      if (!acceptClientPrice && discountPercentage !== undefined) {
-        validateDiscountPercentage(discountPercentage)
+      if (!rejectNegotiation) {
+        validatePrice(newPrice)
+        if (!acceptClientPrice && discountPercentage !== undefined) {
+          validateDiscountPercentage(discountPercentage)
+        }
       }
       if (adminNotes !== undefined) {
         validateAdminNotes(adminNotes)
@@ -56,6 +58,39 @@ export async function POST(request: Request) {
     }
 
     const originalPrice = Number(existingRequest.admin_quoted_price ?? 0)
+    const requestNumber = `ATH-${String(existingRequest.request_number).padStart(4, '0')}`
+
+    // Handle negotiation rejection — keep original price, block future negotiation attempts
+    if (rejectNegotiation) {
+      const { error } = await supabase
+        .from('publish_requests')
+        .update({
+          status: 'quoted',
+          negotiation_rejected: true,
+          admin_notes: adminNotes ?? null,
+          negotiated_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', requestId)
+
+      if (error) {
+        console.error('Database error:', error)
+        return NextResponse.json({ error: 'فشل رفض التفاوض' }, { status: 500 })
+      }
+
+      if (existingRequest.client_email) {
+        notifyNegotiationRejectedToClient({
+          email: existingRequest.client_email,
+          requestNumber,
+          clientName: existingRequest.client_name ?? 'عزيزنا العميل',
+          originalPrice,
+          adminMessage: adminNotes ?? undefined,
+        }).catch(e => console.error('Negotiation rejection email failed:', e))
+      }
+
+      return NextResponse.json({ success: true })
+    }
+
     const clientProposedPrice = Number(existingRequest.client_proposed_price ?? 0)
 
     let finalPrice = newPrice
@@ -82,9 +117,10 @@ export async function POST(request: Request) {
       .update({
         status: 'quoted',
         admin_quoted_price: finalPrice,
-        original_quoted_price: originalPrice, // Keep track of original price
+        original_quoted_price: originalPrice,
         negotiated_discount_percentage: actualDiscountPercentage,
         negotiation_price_source: priceSource,
+        negotiation_rejected: false,
         admin_notes: adminNotes ?? null,
         negotiated_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -102,7 +138,6 @@ export async function POST(request: Request) {
 
     // Send notification email to client
     if (existingRequest.client_email) {
-      const requestNumber = `ATH-${String(existingRequest.request_number).padStart(4, '0')}`
       notifyNegotiatedQuoteToClient({
         email: existingRequest.client_email,
         requestNumber,

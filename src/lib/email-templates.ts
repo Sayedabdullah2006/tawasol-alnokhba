@@ -1036,3 +1036,46 @@ export function negotiatedQuoteToClient(d: {
     `)
   }
 }
+
+export function negotiationRejectedToClient(d: {
+  email: string; requestNumber: string; clientName: string; originalPrice: number; adminMessage?: string
+}) {
+  return {
+    subject: `بخصوص طلب التفاوض - طلب ${d.requestNumber} · تواصل النخبة`,
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:48px; margin-bottom:16px;">📋</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">السعر النهائي غير قابل للتعديل</h2>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+      </div>
+
+      <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
+        شكراً لتواصلك معنا. بعد مراجعة طلب التفاوض، لا يمكننا تعديل السعر المقترح في الوقت الحالي.
+      </p>
+
+      <div style="background:#FEF3C7; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${BRAND_GOLD};">
+        <h3 style="margin:0 0 8px 0; color:#856404; font-size:16px;">💰 السعر المعتمد النهائي</h3>
+        <p style="margin:0; color:#856404; font-size:24px; font-weight:bold;">${d.originalPrice} ر.س</p>
+        <p style="margin:8px 0 0 0; color:#856404; font-size:13px;">هذا هو السعر النهائي لهذا الطلب</p>
+      </div>
+
+      ${d.adminMessage ? `
+        <div style="background:#F0F4FF; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${BRAND_NAVY};">
+          <h3 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:16px;">رسالة من الإدارة</h3>
+          <p style="margin:0; color:${BRAND_NAVY}; font-size:14px; line-height:1.6; white-space:pre-line;">${d.adminMessage}</p>
+        </div>
+      ` : ''}
+
+      <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
+        لا يزال بإمكانك قبول العرض الحالي والمضي قدماً، أو رفضه إن كان لا يناسب احتياجاتك.
+      </p>
+
+      <div style="margin:32px 0; text-align:center;">
+        <a href="${SITE_URL}/dashboard" style="display:inline-block; background:${BRAND_GOLD}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+          مراجعة العرض
+        </a>
+      </div>
+    `)
+  }
+}
