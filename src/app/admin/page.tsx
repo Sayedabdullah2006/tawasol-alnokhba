@@ -11,7 +11,7 @@ export default function AdminStatsPage() {
   const supabase = createClient()
   const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({ total: 0, pending: 0, revenue: 0, monthRevenue: 0 })
+  const [stats, setStats] = useState({ total: 0, pending: 0, revenue: 0, monthRevenue: 0, outstanding: 0 })
   const [topCategories, setTopCategories] = useState<{ category: string; nameAr: string; count: number }[]>([])
 
   useEffect(() => {
@@ -36,6 +36,8 @@ export default function AdminStatsPage() {
       const now = new Date()
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
+      const outstandingStatuses = ['quoted', 'negotiation', 'approved', 'payment_review']
+
       setStats({
         total: requests.length,
         pending: requests.filter(r => r.status === 'pending').length,
@@ -43,6 +45,9 @@ export default function AdminStatsPage() {
         monthRevenue: requests
           .filter(r => r.status === 'completed' && r.created_at >= monthStart)
           .reduce((s, r) => s + (r.final_total ?? 0), 0),
+        outstanding: requests
+          .filter(r => outstandingStatuses.includes(r.status))
+          .reduce((s, r) => s + (r.final_total ?? r.admin_quoted_price ?? 0), 0),
       })
 
       // Top categories
@@ -69,12 +74,13 @@ export default function AdminStatsPage() {
     <div className="p-4 md:p-6">
       <h1 className="text-2xl font-black text-dark mb-6">الإحصائيات</h1>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
         {[
           { label: 'إجمالي الطلبات', value: stats.total, icon: '📋' },
           { label: 'الطلبات المعلقة', value: stats.pending, icon: '⏳' },
           { label: 'الإيرادات الإجمالية', value: `${formatNumber(stats.revenue)} ر.س`, icon: '💰' },
           { label: 'إيرادات هذا الشهر', value: `${formatNumber(stats.monthRevenue)} ر.س`, icon: '📅' },
+          { label: 'مبالغ غير مدفوعة', value: `${formatNumber(stats.outstanding)} ر.س`, icon: '🧾' },
         ].map(s => (
           <div key={s.label} className="bg-card rounded-2xl border border-border p-4 sm:p-5 text-center">
             <div className="text-2xl sm:text-3xl mb-2">{s.icon}</div>

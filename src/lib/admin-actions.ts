@@ -108,8 +108,8 @@ export function getAdminActions(status: RequestStatus): AdminActionConfig {
 
     case 'content_review':
       return {
-        showStatusUpdate: false,
-        showAdminNotes: false,
+        showStatusUpdate: true,
+        showAdminNotes: true,
         showQuickActions: false,
         allowedActions: [],
         message: {

@@ -781,7 +781,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                         )}
 
                         {/* No actions needed message for waiting states */}
-                        {waitingForClient(request.status as any) && (
+                        {waitingForClient(request.status as any) && !adminActions.showStatusUpdate && (
                           <div className="text-center py-6">
                             <div className="inline-flex items-center gap-2 text-muted">
                               <span className="text-lg">⏳</span>
