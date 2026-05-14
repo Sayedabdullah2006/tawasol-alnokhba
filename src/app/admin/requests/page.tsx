@@ -30,6 +30,9 @@ export default function AdminRequestsPage() {
   const [showBulkConfirm, setShowBulkConfirm] = useState(false)
   const [bulkApplyDiscount, setBulkApplyDiscount] = useState(false)
   const [bulkDiscountPct, setBulkDiscountPct] = useState<number>(10)
+  const [reminderTarget, setReminderTarget] = useState<any | null>(null)
+  const [singleApplyDiscount, setSingleApplyDiscount] = useState(false)
+  const [singleDiscountPct, setSingleDiscountPct] = useState<number>(10)
   const [showDebug, setShowDebug] = useState(false)
   // Removed drawer-related state since we now use full-page view
 
@@ -171,9 +174,21 @@ export default function AdminRequestsPage() {
     }
   }
 
-  const handleSendReminder = async (request: any, event: React.MouseEvent) => {
+  const handleSendReminder = (request: any, event: React.MouseEvent) => {
     event.stopPropagation() // منع فتح صفحة الطلب
-    console.log('🔔 Sending reminder for request:', request.id, request.client_email)
+    setSingleApplyDiscount(false)
+    setSingleDiscountPct(10)
+    setReminderTarget(request)
+  }
+
+  const handleConfirmSingleReminder = async () => {
+    if (!reminderTarget) return
+    const request = reminderTarget
+    const willApplyDiscount = singleApplyDiscount && request.status === 'quoted'
+    if (willApplyDiscount && (singleDiscountPct <= 0 || singleDiscountPct >= 100)) {
+      showToast('نسبة الخصم يجب أن تكون بين 1 و 99', 'error')
+      return
+    }
 
     setSendingReminderId(request.id)
     try {
@@ -182,14 +197,22 @@ export default function AdminRequestsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requestId: request.id,
-          reminderType: request.status // استخدام حالة الطلب كنوع التذكير
+          reminderType: request.status,
+          discountPct: willApplyDiscount ? singleDiscountPct : null,
         })
       })
 
       const data = await response.json()
 
       if (response.ok && data.success) {
-        showToast(`تم إرسال تذكير لطلب ${generateRequestNumber(request.request_number)} بنجاح`, 'success')
+        const requestNum = generateRequestNumber(request.request_number)
+        if (data.priceUpdated) {
+          showToast(`تم إرسال خصم ${singleDiscountPct}% لطلب ${requestNum} وتحديث السعر`, 'success')
+          loadData() // refresh prices
+        } else {
+          showToast(`تم إرسال تذكير لطلب ${requestNum} بنجاح`, 'success')
+        }
+        setReminderTarget(null)
       } else {
         showToast(data.error || 'فشل في إرسال التذكير', 'error')
       }
@@ -402,6 +425,114 @@ export default function AdminRequestsPage() {
           </div>
         )}
       </div>
+
+      {/* Single Reminder Dialog */}
+      {reminderTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="text-center mb-4">
+              <div className="text-5xl mb-2">📧</div>
+              <h3 className="text-lg font-bold text-blue-700 mb-1">إرسال تذكير للعميل</h3>
+              <p className="text-sm text-gray-600">
+                الطلب: <strong>{generateRequestNumber(reminderTarget.request_number)}</strong>
+              </p>
+              <p className="text-xs text-muted mt-1">
+                {reminderTarget.client_name || '—'} · {reminderTarget.client_email}
+              </p>
+              {(reminderTarget.final_total ?? reminderTarget.admin_quoted_price) && (
+                <p className="text-xs text-muted mt-1">
+                  السعر الحالي: <strong className="text-gold">{formatNumber(reminderTarget.final_total ?? reminderTarget.admin_quoted_price)} ر.س</strong>
+                </p>
+              )}
+            </div>
+
+            {reminderTarget.status === 'quoted' ? (
+              <>
+                <label className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all mb-3 ${
+                  singleApplyDiscount ? 'bg-orange-50 border-orange-400' : 'bg-white border-border hover:border-orange-300'
+                }`}>
+                  <input
+                    type="checkbox"
+                    checked={singleApplyDiscount}
+                    onChange={e => setSingleApplyDiscount(e.target.checked)}
+                    className="mt-1 w-5 h-5 accent-orange-500 cursor-pointer"
+                  />
+                  <div className="flex-1">
+                    <div className="font-bold text-dark text-sm">🎯 تقديم خصم خاص للعميل</div>
+                    <div className="text-xs text-muted mt-0.5">
+                      يُحدَّث سعر العرض في الطلب ويصل العميل بريد بالسعر الجديد
+                    </div>
+                  </div>
+                </label>
+
+                {singleApplyDiscount && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-4">
+                    <label className="block text-xs font-medium text-orange-800 mb-2">
+                      نسبة الخصم (%)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={99}
+                      value={singleDiscountPct}
+                      onChange={e => setSingleDiscountPct(parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 rounded-lg border border-orange-300 bg-white text-sm"
+                    />
+                    {(reminderTarget.admin_quoted_price ?? reminderTarget.final_total) > 0 && singleDiscountPct > 0 && singleDiscountPct < 100 && (
+                      <p className="text-xs text-orange-700 mt-2 leading-relaxed">
+                        السعر بعد الخصم:{' '}
+                        <strong>
+                          {formatNumber(
+                            Math.round(
+                              (reminderTarget.admin_quoted_price ?? reminderTarget.final_total) *
+                                (1 - singleDiscountPct / 100) * 100
+                            ) / 100
+                          )}{' '}
+                          ر.س
+                        </strong>
+                        {' '}(توفير{' '}
+                        {formatNumber(
+                          Math.round(
+                            (reminderTarget.admin_quoted_price ?? reminderTarget.final_total) *
+                              (singleDiscountPct / 100) * 100
+                          ) / 100
+                        )}
+                        {' '}ر.س)
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-xs text-muted text-center bg-blue-50 border border-blue-200 rounded-xl py-2 px-3 mb-4">
+                💡 خيار الخصم متاح فقط للطلبات بحالة "بانتظار موافقة العميل"
+              </p>
+            )}
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setReminderTarget(null)}
+                className="flex-1"
+                disabled={sendingReminderId === reminderTarget.id}
+              >
+                إلغاء
+              </Button>
+              <Button
+                onClick={handleConfirmSingleReminder}
+                loading={sendingReminderId === reminderTarget.id}
+                className={singleApplyDiscount && reminderTarget.status === 'quoted'
+                  ? 'flex-1 bg-orange-600 hover:bg-orange-700'
+                  : 'flex-1'}
+              >
+                {singleApplyDiscount && reminderTarget.status === 'quoted'
+                  ? `إرسال + خصم ${singleDiscountPct}%`
+                  : 'إرسال الآن'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bulk Reminder Confirmation Dialog */}
       {showBulkConfirm && (
