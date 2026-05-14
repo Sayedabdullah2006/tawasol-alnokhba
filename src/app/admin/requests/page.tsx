@@ -26,6 +26,8 @@ export default function AdminRequestsPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [requestToDelete, setRequestToDelete] = useState<any>(null)
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null)
+  const [sendingBulkReminder, setSendingBulkReminder] = useState(false)
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false)
   const [showDebug, setShowDebug] = useState(false)
   // Removed drawer-related state since we now use full-page view
 
@@ -125,6 +127,34 @@ export default function AdminRequestsPage() {
     setRequestToDelete(null)
   }
 
+  const quotedCount = requests.filter(r => r.status === 'quoted').length
+
+  const handleBulkReminder = async () => {
+    setSendingBulkReminder(true)
+    try {
+      const response = await fetch('/api/admin/bulk-reminder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'quoted' })
+      })
+      const data = await response.json()
+      if (response.ok && data.success) {
+        const parts = [`تم إرسال ${data.sent} تذكير`]
+        if (data.failed > 0) parts.push(`فشل ${data.failed}`)
+        if (data.skipped > 0) parts.push(`تخطي ${data.skipped} (بدون بريد)`)
+        showToast(parts.join(' • '), data.failed > 0 ? 'error' : 'success')
+      } else {
+        showToast(data.error || 'فشل الإرسال الجماعي', 'error')
+      }
+    } catch (error) {
+      console.error('Bulk reminder error:', error)
+      showToast('خطأ في الاتصال بالخادم', 'error')
+    } finally {
+      setSendingBulkReminder(false)
+      setShowBulkConfirm(false)
+    }
+  }
+
   const handleSendReminder = async (request: any, event: React.MouseEvent) => {
     event.stopPropagation() // منع فتح صفحة الطلب
     console.log('🔔 Sending reminder for request:', request.id, request.client_email)
@@ -179,6 +209,15 @@ export default function AdminRequestsPage() {
           ))}
         </select>
         <Button variant="outline" onClick={handleExport}>تصدير CSV</Button>
+
+        <Button
+          variant="outline"
+          onClick={() => setShowBulkConfirm(true)}
+          disabled={quotedCount === 0}
+          className="border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50"
+        >
+          🔔 تذكير جماعي للعروض ({quotedCount})
+        </Button>
 
         <button
           onClick={() => setShowDebug(!showDebug)}
@@ -347,6 +386,42 @@ export default function AdminRequestsPage() {
           </div>
         )}
       </div>
+
+      {/* Bulk Reminder Confirmation Dialog */}
+      {showBulkConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+            <div className="text-center mb-6">
+              <div className="text-6xl mb-4">🔔</div>
+              <h3 className="text-xl font-bold text-orange-700 mb-2">تأكيد الإرسال الجماعي</h3>
+              <p className="text-sm text-gray-600">
+                سيتم إرسال تذكير لـ <strong>{quotedCount}</strong> عميل لديهم عروض بانتظار موافقتهم.
+              </p>
+              <p className="text-xs text-gray-500 mt-3">
+                سيُرسل البريد لكل عميل لديه عرض في حالة "بانتظار موافقة العميل".
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowBulkConfirm(false)}
+                className="flex-1"
+                disabled={sendingBulkReminder}
+              >
+                إلغاء
+              </Button>
+              <Button
+                onClick={handleBulkReminder}
+                loading={sendingBulkReminder}
+                className="flex-1 bg-orange-600 hover:bg-orange-700"
+              >
+                إرسال الآن
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       {showDeleteDialog && requestToDelete && (
