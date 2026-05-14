@@ -5,9 +5,18 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
-import { sendEmail } from '@/lib/email'
+import { sendEmailWithRetry } from '@/lib/email-queue'
 import { generateRequestNumber } from '@/lib/utils'
-import { reminderTemplates, type ReminderType } from '@/lib/reminder-templates'
+import { reminderTemplates, quotedDiscountTemplate, type ReminderType } from '@/lib/reminder-templates'
+
+// Throttle between sends to avoid hitting Resend/Supabase Edge rate limits.
+// 600ms ≈ 1.6 sends/sec — comfortably below Resend's free tier (2 req/sec).
+const SEND_DELAY_MS = 600
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+// Allow this route to run longer than the default (some bulk batches are slow).
+export const maxDuration = 300 // seconds
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,11 +35,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
     }
 
-    const { status } = await request.json() as { status: ReminderType }
+    const { status, discountPct } = await request.json() as {
+      status: ReminderType
+      discountPct?: number | null
+    }
 
     if (!status || !(status in reminderTemplates)) {
       return NextResponse.json(
         { error: 'حالة غير صالحة للإرسال الجماعي' },
+        { status: 400 }
+      )
+    }
+
+    const applyDiscount = typeof discountPct === 'number' && discountPct > 0 && discountPct < 100
+    if (applyDiscount && status !== 'quoted') {
+      return NextResponse.json(
+        { error: 'تطبيق الخصم متاح فقط للعروض في حالة "بانتظار موافقة العميل"' },
         { status: 400 }
       )
     }
@@ -53,36 +73,84 @@ export async function POST(request: NextRequest) {
     let sent = 0
     let failed = 0
     let skipped = 0
+    let updated = 0
     const failedRequestNumbers: string[] = []
 
-    for (const r of matchingRequests) {
+    for (let i = 0; i < matchingRequests.length; i++) {
+      const r = matchingRequests[i]
       if (!r.client_email) {
         skipped++
         continue
       }
 
       const requestNumber = generateRequestNumber(r.request_number)
-      const subject = template.subject(requestNumber)
-      const amount = r.final_total ?? r.admin_quoted_price ?? undefined
-      const html = template.html(r.client_name ?? 'عزيزنا', requestNumber, amount)
+      let subject: string
+      let html: string
+      let newPrice: number | null = null
 
-      const ok = await sendEmail(r.client_email, subject, html)
-      if (ok) {
+      if (applyDiscount) {
+        const originalPrice = Number(r.admin_quoted_price ?? r.final_total ?? 0)
+        if (originalPrice <= 0) {
+          skipped++
+          continue
+        }
+        const computedNew = Math.round(originalPrice * (1 - (discountPct! / 100)) * 100) / 100
+        newPrice = computedNew
+        subject = quotedDiscountTemplate.subject(requestNumber, discountPct!)
+        html = quotedDiscountTemplate.html(
+          r.client_name ?? 'عزيزنا',
+          requestNumber,
+          originalPrice,
+          computedNew,
+          discountPct!,
+        )
+      } else {
+        const amount = r.final_total ?? r.admin_quoted_price ?? undefined
+        subject = template.subject(requestNumber)
+        html = template.html(r.client_name ?? 'عزيزنا', requestNumber, amount)
+      }
+
+      // Use retry-aware sender — handles transient Resend/Edge rate-limit blips
+      // by retrying with exponential backoff. Basic mode skips the spam-scoring
+      // pre-flight which would over-flag reminder content.
+      const result = await sendEmailWithRetry({
+        to: r.client_email,
+        subject,
+        html,
+        context: applyDiscount ? `bulk-discount-${requestNumber}` : `bulk-reminder-${requestNumber}`,
+        retries: 3,
+        enhanced: false,
+        category: 'notification',
+      })
+
+      if (result.success) {
         sent++
+        const updatePatch: Record<string, unknown> = {
+          last_reminder_sent: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+        if (applyDiscount && newPrice !== null) {
+          updatePatch.admin_quoted_price = newPrice
+          updatePatch.final_total = newPrice
+          updated++
+        }
         await supabase
           .from('publish_requests')
-          .update({
-            last_reminder_sent: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
+          .update(updatePatch)
           .eq('id', r.id)
       } else {
         failed++
         failedRequestNumbers.push(requestNumber)
+        console.warn(`[BULK_REMINDER] Failed for ${requestNumber}: ${result.error}`)
+      }
+
+      // Throttle between sends (skip after the last one)
+      if (i < matchingRequests.length - 1) {
+        await sleep(SEND_DELAY_MS)
       }
     }
 
-    console.log(`[BULK_REMINDER] status=${status} sent=${sent} failed=${failed} skipped=${skipped}`)
+    console.log(`[BULK_REMINDER] status=${status} sent=${sent} failed=${failed} skipped=${skipped} priceUpdated=${updated}`)
 
     return NextResponse.json({
       success: true,
@@ -90,6 +158,7 @@ export async function POST(request: NextRequest) {
       sent,
       failed,
       skipped,
+      priceUpdated: updated,
       failedRequestNumbers,
     })
   } catch (error) {

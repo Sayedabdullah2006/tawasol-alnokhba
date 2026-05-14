@@ -176,3 +176,63 @@ export const reminderTemplates = {
 }
 
 export type ReminderType = keyof typeof reminderTemplates
+
+// Discounted-quote reminder — used by bulk reminder when admin applies a discount
+export const quotedDiscountTemplate = {
+  subject: (requestNumber: string, discountPct: number) =>
+    `🎯 خصم ${discountPct}% خاص لك على عرضك · ${requestNumber}`,
+  html: (
+    clientName: string,
+    requestNumber: string,
+    originalPrice: number,
+    newPrice: number,
+    discountPct: number,
+  ) => `
+    <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f8f9fa; padding: 20px;">
+      <div style="background: white; border-radius: 12px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <div style="font-size: 56px; margin-bottom: 8px;">🎯</div>
+          <h2 style="color: #c2410c; margin: 0; font-size: 24px;">خصم خاص على عرضك!</h2>
+        </div>
+
+        <p style="font-size: 16px; color: #333; line-height: 1.7;">
+          مرحباً <strong>${clientName}</strong>،
+        </p>
+
+        <p style="font-size: 15px; color: #333; line-height: 1.7;">
+          خصصنا لك خصماً <strong style="color:#c2410c;">${discountPct}%</strong>
+          على عرض طلبك <strong>${requestNumber}</strong>. السعر تحدّث تلقائياً في حسابك.
+        </p>
+
+        <div style="background: linear-gradient(135deg, #fff7ed, #ffedd5); border: 2px solid #fb923c; border-radius: 12px; padding: 22px; margin: 22px 0; text-align: center;">
+          <p style="margin: 0 0 6px 0; font-size: 13px; color: #9a3412;">السعر القديم</p>
+          <p style="margin: 0 0 14px 0; font-size: 18px; color: #9a3412; text-decoration: line-through;">
+            ${originalPrice.toLocaleString('ar-SA')} ر.س
+          </p>
+          <p style="margin: 0 0 6px 0; font-size: 13px; color: #c2410c; font-weight: bold;">السعر بعد الخصم</p>
+          <p style="margin: 0; font-size: 32px; color: #c2410c; font-weight: 900;">
+            ${newPrice.toLocaleString('ar-SA')} ر.س
+          </p>
+          <p style="margin: 12px 0 0 0; font-size: 14px; color: #c2410c;">
+            توفير <strong>${(originalPrice - newPrice).toLocaleString('ar-SA')} ر.س</strong>
+          </p>
+        </div>
+
+        <p style="font-size: 14px; color: #555; line-height: 1.7; text-align: center;">
+          فرصة محدودة — راجع العرض المحدّث واعتمده الآن من لوحة التحكم.
+        </p>
+
+        <div style="text-align: center; margin: 26px 0;">
+          <a href="${process.env.NEXT_PUBLIC_SITE_URL}/dashboard"
+            style="background: #c2410c; color: white; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 15px;">
+            مراجعة العرض المحدّث
+          </a>
+        </div>
+
+        <p style="text-align: center; font-size: 12px; color: #999; margin: 20px 0 0 0;">
+          مع تحيات فريق تواصل النخبة
+        </p>
+      </div>
+    </div>
+  `,
+}

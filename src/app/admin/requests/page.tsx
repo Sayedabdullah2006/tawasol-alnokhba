@@ -28,6 +28,8 @@ export default function AdminRequestsPage() {
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null)
   const [sendingBulkReminder, setSendingBulkReminder] = useState(false)
   const [showBulkConfirm, setShowBulkConfirm] = useState(false)
+  const [bulkApplyDiscount, setBulkApplyDiscount] = useState(false)
+  const [bulkDiscountPct, setBulkDiscountPct] = useState<number>(10)
   const [showDebug, setShowDebug] = useState(false)
   // Removed drawer-related state since we now use full-page view
 
@@ -130,19 +132,32 @@ export default function AdminRequestsPage() {
   const quotedCount = requests.filter(r => r.status === 'quoted').length
 
   const handleBulkReminder = async () => {
+    if (bulkApplyDiscount && (bulkDiscountPct <= 0 || bulkDiscountPct >= 100)) {
+      showToast('نسبة الخصم يجب أن تكون بين 1 و 99', 'error')
+      return
+    }
     setSendingBulkReminder(true)
     try {
       const response = await fetch('/api/admin/bulk-reminder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'quoted' })
+        body: JSON.stringify({
+          status: 'quoted',
+          discountPct: bulkApplyDiscount ? bulkDiscountPct : null,
+        })
       })
       const data = await response.json()
       if (response.ok && data.success) {
         const parts = [`تم إرسال ${data.sent} تذكير`]
+        if (data.priceUpdated > 0) parts.push(`تحديث ${data.priceUpdated} سعر`)
         if (data.failed > 0) parts.push(`فشل ${data.failed}`)
-        if (data.skipped > 0) parts.push(`تخطي ${data.skipped} (بدون بريد)`)
-        showToast(parts.join(' • '), data.failed > 0 ? 'error' : 'success')
+        if (data.skipped > 0) parts.push(`تخطي ${data.skipped}`)
+        // success: all sent  /  info: partial  /  error: none sent
+        const toastType: 'success' | 'error' | 'info' =
+          data.sent === 0 ? 'error' : (data.failed > 0 ? 'info' : 'success')
+        showToast(parts.join(' • '), toastType)
+        // Refresh list if prices were updated
+        if (data.priceUpdated > 0) loadData()
       } else {
         showToast(data.error || 'فشل الإرسال الجماعي', 'error')
       }
@@ -152,6 +167,7 @@ export default function AdminRequestsPage() {
     } finally {
       setSendingBulkReminder(false)
       setShowBulkConfirm(false)
+      setBulkApplyDiscount(false)
     }
   }
 
@@ -390,22 +406,56 @@ export default function AdminRequestsPage() {
       {/* Bulk Reminder Confirmation Dialog */}
       {showBulkConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-            <div className="text-center mb-6">
-              <div className="text-6xl mb-4">🔔</div>
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="text-center mb-4">
+              <div className="text-6xl mb-3">🔔</div>
               <h3 className="text-xl font-bold text-orange-700 mb-2">تأكيد الإرسال الجماعي</h3>
               <p className="text-sm text-gray-600">
                 سيتم إرسال تذكير لـ <strong>{quotedCount}</strong> عميل لديهم عروض بانتظار موافقتهم.
               </p>
-              <p className="text-xs text-gray-500 mt-3">
-                سيُرسل البريد لكل عميل لديه عرض في حالة "بانتظار موافقة العميل".
-              </p>
             </div>
+
+            <label className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all mb-3 ${
+              bulkApplyDiscount ? 'bg-orange-50 border-orange-400' : 'bg-white border-border hover:border-orange-300'
+            }`}>
+              <input
+                type="checkbox"
+                checked={bulkApplyDiscount}
+                onChange={e => setBulkApplyDiscount(e.target.checked)}
+                className="mt-1 w-5 h-5 accent-orange-500 cursor-pointer"
+              />
+              <div className="flex-1">
+                <div className="font-bold text-dark text-sm">🎯 تطبيق خصم وتحديث الأسعار</div>
+                <div className="text-xs text-muted mt-0.5">
+                  يُحدَّث سعر كل عرض ويُرسَل البريد بالسعر الجديد
+                </div>
+              </div>
+            </label>
+
+            {bulkApplyDiscount && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-4">
+                <label className="block text-xs font-medium text-orange-800 mb-2">
+                  نسبة الخصم (%)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={99}
+                  value={bulkDiscountPct}
+                  onChange={e => setBulkDiscountPct(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 rounded-lg border border-orange-300 bg-white text-sm"
+                />
+                <p className="text-xs text-orange-700 mt-2 leading-relaxed">
+                  ⚠️ سيُعدَّل <strong>admin_quoted_price</strong> و <strong>final_total</strong> لكل عرض،
+                  ويصل العميل بريد بالسعر الجديد بدلاً من بريد التذكير العادي.
+                </p>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <Button
                 variant="outline"
-                onClick={() => setShowBulkConfirm(false)}
+                onClick={() => { setShowBulkConfirm(false); setBulkApplyDiscount(false) }}
                 className="flex-1"
                 disabled={sendingBulkReminder}
               >
@@ -416,7 +466,7 @@ export default function AdminRequestsPage() {
                 loading={sendingBulkReminder}
                 className="flex-1 bg-orange-600 hover:bg-orange-700"
               >
-                إرسال الآن
+                {bulkApplyDiscount ? `إرسال + خصم ${bulkDiscountPct}%` : 'إرسال الآن'}
               </Button>
             </div>
           </div>
