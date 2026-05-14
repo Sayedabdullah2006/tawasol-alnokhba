@@ -11,7 +11,7 @@ export default function AdminStatsPage() {
   const supabase = createClient()
   const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({ total: 0, pending: 0, revenue: 0, monthRevenue: 0, outstanding: 0 })
+  const [stats, setStats] = useState({ total: 0, pending: 0, revenue: 0, monthRevenue: 0, outstanding: 0, conversionRate: 0, paidCount: 0 })
   const [topCategories, setTopCategories] = useState<{ category: string; nameAr: string; count: number }[]>([])
 
   useEffect(() => {
@@ -28,18 +28,36 @@ export default function AdminStatsPage() {
 
       if (profile?.role !== 'admin') { router.push('/dashboard'); return }
 
-      const { data: reqs } = await supabase
+      // Get accurate total count (bypasses any row-fetch limit)
+      const { count: totalCount } = await supabase
         .from('publish_requests')
-        .select('*')
+        .select('id', { count: 'exact', head: true })
 
-      const requests = reqs ?? []
+      // Fetch all rows in pages to avoid PostgREST default row limit
+      const PAGE = 1000
+      const requests: any[] = []
+      const total = totalCount ?? 0
+      for (let from = 0; from < Math.max(total, 1); from += PAGE) {
+        const { data: chunk } = await supabase
+          .from('publish_requests')
+          .select('*')
+          .range(from, from + PAGE - 1)
+        if (!chunk || chunk.length === 0) break
+        requests.push(...chunk)
+        if (chunk.length < PAGE) break
+      }
+
       const now = new Date()
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
       const outstandingStatuses = ['quoted', 'negotiation', 'approved', 'payment_review']
+      const paidStatuses = ['paid', 'in_progress', 'content_review', 'completed']
+
+      const finalTotal = total || requests.length
+      const paidCount = requests.filter(r => paidStatuses.includes(r.status)).length
 
       setStats({
-        total: requests.length,
+        total: finalTotal,
         pending: requests.filter(r => r.status === 'pending').length,
         revenue: requests.filter(r => r.status === 'completed').reduce((s, r) => s + (r.final_total ?? 0), 0),
         monthRevenue: requests
@@ -48,6 +66,8 @@ export default function AdminStatsPage() {
         outstanding: requests
           .filter(r => outstandingStatuses.includes(r.status))
           .reduce((s, r) => s + (r.final_total ?? r.admin_quoted_price ?? 0), 0),
+        paidCount,
+        conversionRate: finalTotal > 0 ? (paidCount / finalTotal) * 100 : 0,
       })
 
       // Top categories
@@ -74,13 +94,18 @@ export default function AdminStatsPage() {
     <div className="p-4 md:p-6">
       <h1 className="text-2xl font-black text-dark mb-6">الإحصائيات</h1>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
         {[
           { label: 'إجمالي الطلبات', value: stats.total, icon: '📋' },
           { label: 'الطلبات المعلقة', value: stats.pending, icon: '⏳' },
           { label: 'الإيرادات الإجمالية', value: `${formatNumber(stats.revenue)} ر.س`, icon: '💰' },
           { label: 'إيرادات هذا الشهر', value: `${formatNumber(stats.monthRevenue)} ر.س`, icon: '📅' },
           { label: 'مبالغ غير مدفوعة', value: `${formatNumber(stats.outstanding)} ر.س`, icon: '🧾' },
+          {
+            label: `معدل التحويل (${stats.paidCount}/${stats.total})`,
+            value: `${stats.conversionRate.toFixed(1)}%`,
+            icon: '📈',
+          },
         ].map(s => (
           <div key={s.label} className="bg-card rounded-2xl border border-border p-4 sm:p-5 text-center">
             <div className="text-2xl sm:text-3xl mb-2">{s.icon}</div>
