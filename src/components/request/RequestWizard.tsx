@@ -19,7 +19,6 @@ import { validateEmail } from '@/lib/email-validation'
 import SuccessScreen from './SuccessScreen'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
-import HostBanner from './HostBanner'
 
 type StepId = 'influencer' | 'clientType' | 'category' | 'subOption' | 'details' | 'channels' | 'contact' | 'terms' | 'confirm'
 
@@ -165,8 +164,6 @@ export default function RequestWizard() {
       <div className="max-w-3xl mx-auto w-full px-4 pt-6 flex-1 flex flex-col">
         <WizardProgress current={stepIndex + 1} total={totalSteps} />
 
-        <HostBanner step={currentStep} />
-
         <div className="flex-1 py-4">
           {currentStep === 'influencer' && (
             <StepInfluencer influencers={influencers} selected={selectedInfluencer} onSelect={setSelectedInfluencer} />
@@ -218,7 +215,7 @@ export default function RequestWizard() {
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center">
                 <div className="text-2xl mb-2">📋</div>
-                <p className="font-bold text-blue-700 text-sm">محمد بيراجع طلبك شخصياً ويرسلك العرض المخصص قريباً</p>
+                <p className="font-bold text-blue-700 text-sm">فريقنا بيراجع طلبك ويرسلك العرض المخصص قريباً</p>
                 <p className="text-xs text-blue-600 mt-1">ومفيش أي التزام مالي قبل ما توافق على العرض</p>
               </div>
             </div>
