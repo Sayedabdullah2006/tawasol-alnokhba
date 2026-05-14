@@ -18,9 +18,9 @@ export default function Step1Category({ selected, onSelect, categories, clientTy
   return (
     <div className="wizard-enter">
       <h2 className="text-xl md:text-2xl font-black text-dark text-center mb-2">
-        ما الذي تريد نشره؟
+        حلو، ايش بنروّج اليوم؟ 🎯
       </h2>
-      <p className="text-sm text-muted text-center mb-6">اختر فئة المحتوى</p>
+      <p className="text-sm text-muted text-center mb-6">كل فئة لها أسلوب وجمهور مختلف — لا تتردد، نقدر نناقش التفاصيل لاحقاً</p>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-2xl mx-auto">
         {filtered.map(cat => (

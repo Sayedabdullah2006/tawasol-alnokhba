@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { calculateReach } from '@/lib/pricing-engine'
 import { useToast } from '@/components/ui/Toast'
@@ -29,10 +29,26 @@ interface Props {
   scope: 'single' | 'all'
   adminNotes?: string | null
   negotiationRejected?: boolean
+  quoteExpiresAt?: string | null
+  quickDiscountPct?: number | null
+  quickDiscountDeadline?: string | null
+}
+
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return 'انتهى'
+  const totalSeconds = Math.floor(ms / 1000)
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  if (days > 0) return `${days} يوم و ${hours} ساعة`
+  if (hours > 0) return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
 }
 
 export default function QuoteApproval({
-  requestId, quotedPrice, offeredExtras, influencer, scope, adminNotes, negotiationRejected
+  requestId, quotedPrice, offeredExtras, influencer, scope, adminNotes, negotiationRejected,
+  quoteExpiresAt, quickDiscountPct, quickDiscountDeadline,
 }: Props) {
   const router = useRouter()
   const { showToast } = useToast()
@@ -46,8 +62,23 @@ export default function QuoteApproval({
 
   const extrasMap = useMemo(() => new Map(offeredExtras.map(e => [e.id, e])), [offeredExtras])
 
+  // Live ticker for countdowns
+  const [now, setNow] = useState<number>(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  const quickDeadlineMs = quickDiscountDeadline ? new Date(quickDiscountDeadline).getTime() : 0
+  const expiryMs = quoteExpiresAt ? new Date(quoteExpiresAt).getTime() : 0
+  const quickDiscountActive = !!(quickDiscountPct && quickDeadlineMs > now)
+  const expired = expiryMs > 0 && expiryMs <= now
+
+  const discountAmount = quickDiscountActive ? quotedPrice * ((quickDiscountPct ?? 0) / 100) : 0
+  const discountedBase = Math.max(0, quotedPrice - discountAmount)
+
   const extrasTotal = selected.reduce((sum, id) => sum + (extrasMap.get(id)?.price ?? 0), 0)
-  const finalTotal = quotedPrice + extrasTotal
+  const finalTotal = discountedBase + extrasTotal
 
   const reach = useMemo(() => {
     if (!influencer) return 0
@@ -164,15 +195,53 @@ export default function QuoteApproval({
         </div>
       )}
 
+      {quickDiscountActive && !isFreeBase && (
+        <div className="bg-gradient-to-l from-orange-100 to-orange-50 border-2 border-orange-400 rounded-2xl p-4 text-center">
+          <p className="font-black text-orange-700 text-base mb-1">🎯 خصم {quickDiscountPct}% للقبول السريع</p>
+          <p className="text-xs text-orange-700 mb-2">
+            اعتمد العرض الآن ووفّر <strong>{formatNumber(discountAmount)} ر.س</strong>
+          </p>
+          <div className="inline-block bg-orange-600 text-white text-sm font-bold px-3 py-1 rounded-lg font-mono">
+            ⏳ {formatCountdown(quickDeadlineMs - now)}
+          </div>
+        </div>
+      )}
+
+      {expiryMs > 0 && !expired && !isFreeBase && (
+        <div className="bg-yellow-50 border border-yellow-300 rounded-xl p-3 text-center">
+          <p className="text-xs text-yellow-700">
+            ⏰ العرض ساري لمدة <strong>{formatCountdown(expiryMs - now)}</strong>
+          </p>
+        </div>
+      )}
+
+      {expired && (
+        <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 text-center">
+          <p className="font-bold text-red-700 mb-1">⛔ انتهت صلاحية هذا العرض</p>
+          <p className="text-xs text-red-600">تواصل مع الإدارة لطلب عرض محدّث</p>
+        </div>
+      )}
+
       <div className="bg-card rounded-2xl border border-border p-5 space-y-2">
         <div className="flex justify-between items-center">
           <span className="text-muted text-sm">السعر الرئيسي</span>
           {isFreeBase ? (
             <span className="font-black text-green">مجاني 🎁</span>
+          ) : quickDiscountActive ? (
+            <span className="font-bold text-dark">
+              <span className="line-through text-muted text-sm me-2">{formatNumber(quotedPrice)}</span>
+              <span className="text-orange-700">{formatNumber(discountedBase)} ر.س</span>
+            </span>
           ) : (
             <span className="font-bold text-dark">{formatNumber(quotedPrice)} ر.س</span>
           )}
         </div>
+        {quickDiscountActive && !isFreeBase && (
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-orange-700">خصم القبول السريع ({quickDiscountPct}%)</span>
+            <span className="text-orange-700 font-bold">−{formatNumber(discountAmount)} ر.س</span>
+          </div>
+        )}
         {extrasTotal > 0 && (
           <div className="flex justify-between items-center text-sm">
             <span className="text-muted">الخدمات الإضافية ({selected.length})</span>
@@ -333,7 +402,7 @@ export default function QuoteApproval({
         </div>
       ) : (
         <div className="space-y-3">
-          <Button onClick={handleApprove} loading={submitting} className="w-full" size="lg">
+          <Button onClick={handleApprove} loading={submitting} className="w-full" size="lg" disabled={expired}>
             {isFreeFinal
               ? 'اعتماد وبدء التنفيذ 🎁'
               : `اعتماد العرض والانتقال للدفع — ${formatNumber(finalTotal)} ر.س`}

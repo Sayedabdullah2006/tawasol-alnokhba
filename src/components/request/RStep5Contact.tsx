@@ -48,9 +48,12 @@ export default function RStep5Contact({ data, onChange }: Props) {
   return (
     <div className="wizard-enter max-w-lg mx-auto">
       <h2 className="text-xl md:text-2xl font-black text-dark text-center mb-2">
-        بيانات التواصل
+        آخر شي ونخلص — بياناتك للتواصل
       </h2>
-      <p className="text-sm text-muted text-center mb-6">أدخل بياناتك للتواصل</p>
+      <p className="text-sm text-muted text-center mb-2">سنستخدمها فقط لإرسال العرض والمتابعة معك</p>
+      <p className="text-xs text-muted text-center mb-6 bg-blue-50 border border-blue-200 rounded-xl py-2 px-3">
+        🔒 بياناتك آمنة ولن تُشارك مع أي طرف ثالث
+      </p>
 
       <div className="space-y-4">
         <Input

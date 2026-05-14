@@ -74,6 +74,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'لا يمكن تعديل هذا الطلب' }, { status: 400 })
     }
 
+    if (req.quote_expires_at && new Date(req.quote_expires_at).getTime() <= Date.now()) {
+      return NextResponse.json(
+        { error: 'انتهت صلاحية هذا العرض — تواصل مع الإدارة لطلب عرض محدّث' },
+        { status: 400 }
+      )
+    }
+
     // Service role for both reads (extras/pricing_config require it under admin RLS)
     // and the publish_requests update (users have no UPDATE policy).
     const serviceClient = await createServiceRoleClient()
@@ -82,7 +89,15 @@ export async function POST(request: Request) {
     const valid = (selectedExtras ?? []).filter(id => availableMap.has(id))
     const extrasSelected = valid.map(id => availableMap.get(id)!)
     const extrasTotal = extrasSelected.reduce((sum, e) => sum + (e.price ?? 0), 0)
-    const finalTotal = Number(req.admin_quoted_price ?? 0) + extrasTotal
+
+    // Apply quick-acceptance discount if still within the window
+    const basePrice = Number(req.admin_quoted_price ?? 0)
+    const quickDiscountPct = Number(req.quote_quick_discount_pct ?? 0)
+    const quickDeadline = req.quote_quick_discount_deadline ? new Date(req.quote_quick_discount_deadline).getTime() : 0
+    const withinQuickWindow = quickDiscountPct > 0 && quickDeadline > Date.now()
+    const discountAmount = withinQuickWindow ? basePrice * (quickDiscountPct / 100) : 0
+    const discountedBase = Math.max(0, basePrice - discountAmount)
+    const finalTotal = discountedBase + extrasTotal
 
     const reach = calculateReach({
       influencer: req.influencers ?? {},

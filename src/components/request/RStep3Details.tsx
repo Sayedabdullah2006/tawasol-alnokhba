@@ -26,9 +26,12 @@ export default function RStep3Details({ data, onChange }: Props) {
   return (
     <div className="wizard-enter max-w-lg mx-auto">
       <h2 className="text-xl md:text-2xl font-black text-dark text-center mb-2">
-        تفاصيل المحتوى
+        احكي لنا عن خبرك
       </h2>
-      <p className="text-sm text-muted text-center mb-6">أدخل تفاصيل الخبر أو المحتوى المراد نشره</p>
+      <p className="text-sm text-muted text-center mb-2">اكتب بحرية وكأنك تشرح لصديق — نقدر نهذّب الصياغة لاحقاً</p>
+      <p className="text-xs text-muted text-center mb-6 bg-green/5 border border-green/20 rounded-xl py-2 px-3">
+        💡 مفيش التزام مالي قبل ما توافق على العرض اللي نرسله لك
+      </p>
 
       <div className="space-y-4">
         <Input
@@ -82,6 +85,9 @@ export default function RStep3Details({ data, onChange }: Props) {
           value={data.preferredDate}
           onChange={e => update('preferredDate', e.target.value)}
         />
+        <p className="text-xs text-muted text-center">
+          💡 الثلاثاء والأربعاء عادةً أعلى تفاعل لدى جمهورنا
+        </p>
       </div>
     </div>
   )

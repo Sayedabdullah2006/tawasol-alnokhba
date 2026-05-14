@@ -5,11 +5,18 @@ import { cn } from '@/lib/utils'
 export type ClientType = 'individual' | 'business' | 'government' | 'charity'
 
 const CLIENT_TYPES: { id: ClientType; icon: string; title: string; desc: string }[] = [
-  { id: 'individual', icon: '👤', title: 'فرد', desc: 'شخص طبيعي' },
-  { id: 'business', icon: '🏢', title: 'شركة / مؤسسة', desc: 'كيان تجاري أو مؤسسي' },
-  { id: 'government', icon: '🏛️', title: 'جهة حكومية', desc: 'خدمة أو إعلان حكومي' },
-  { id: 'charity', icon: '❤️', title: 'جمعية خيرية', desc: 'مبادرة أو عمل خيري' },
+  { id: 'individual', icon: '👤', title: 'فرد', desc: 'سواء كنت رائد أعمال أو شخص يبغى يوصل رسالة' },
+  { id: 'business', icon: '🏢', title: 'شركة / مؤسسة', desc: 'كيان تجاري — عادةً نسوّي لكم عروض مخصصة' },
+  { id: 'government', icon: '🏛️', title: 'جهة حكومية', desc: 'خدمة أو إعلان حكومي — معتمدين رسمياً' },
+  { id: 'charity', icon: '❤️', title: 'جمعية خيرية', desc: 'مبادرة أو عمل خيري — قلوبنا معكم' },
 ]
+
+const FOLLOW_UP: Record<ClientType, string> = {
+  individual: 'تمام، خلّنا نضبط لك تجربة شخصية.',
+  business: 'الشركات نخصص لها عروضاً مرنة — نكمل؟',
+  government: 'بكل احترام — جهزنا لك مسار خاص.',
+  charity: 'يسرّنا دعم العمل الخيري — نكمل؟',
+}
 
 interface Props {
   selected: ClientType | null
@@ -19,8 +26,8 @@ interface Props {
 export default function RStep1ClientType({ selected, onSelect }: Props) {
   return (
     <div className="wizard-enter">
-      <h2 className="text-xl md:text-2xl font-black text-dark text-center mb-2">من أنت؟</h2>
-      <p className="text-sm text-muted text-center mb-6">حدد نوع الطالب</p>
+      <h2 className="text-xl md:text-2xl font-black text-dark text-center mb-2">نتشرف نعرفك — أيش يصفك أكثر؟</h2>
+      <p className="text-sm text-muted text-center mb-6">معرفة هويتك تساعدنا نقدّم لك التجربة الأنسب</p>
 
       <div className="grid grid-cols-2 gap-4 max-w-lg mx-auto">
         {CLIENT_TYPES.map(ct => (
@@ -39,6 +46,12 @@ export default function RStep1ClientType({ selected, onSelect }: Props) {
           </button>
         ))}
       </div>
+
+      {selected && (
+        <div className="max-w-md mx-auto mt-5 bg-green/5 border border-green/20 rounded-xl px-4 py-2 text-center text-sm text-green-700 wizard-enter">
+          <span className="text-base">✓</span> {FOLLOW_UP[selected]}
+        </div>
+      )}
     </div>
   )
 }

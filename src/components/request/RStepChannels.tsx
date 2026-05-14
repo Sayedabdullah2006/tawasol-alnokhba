@@ -35,10 +35,13 @@ export default function RStepChannels({ influencer, selected, onToggle }: Props)
   return (
     <div className="wizard-enter max-w-lg mx-auto">
       <h2 className="text-xl md:text-2xl font-black text-dark text-center mb-2">
-        على أي قنوات تريد النشر؟
+        وين تحب يطلع منشورك؟
       </h2>
-      <p className="text-sm text-muted text-center mb-6">
+      <p className="text-sm text-muted text-center mb-2">
         اختر قناة أو أكثر — كل قناة إضافية توسّع وصول الخبر
+      </p>
+      <p className="text-xs text-muted text-center mb-6">
+        💡 الجمع بين منصتين يزيد الوصول 2.3× في تجربتنا
       </p>
 
       <div className="space-y-3">

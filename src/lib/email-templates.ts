@@ -190,7 +190,33 @@ export function quoteReadyToClient(d: {
   clientName: string
   price: number
   reach: number
+  quoteExpiresAt?: string | null
+  quickDiscountPct?: number | null
+  quickDiscountDeadline?: string | null
 }) {
+  const expiryBlock = d.quoteExpiresAt
+    ? `
+      <div style="background:#FEF3C7; border:1px solid #F59E0B; border-radius:10px; padding:12px; margin-bottom:14px; text-align:center;">
+        <p style="margin:0; font-size:13px; color:#92400E;">
+          ⏰ <strong>العرض ساري حتى ${formatDateAr(d.quoteExpiresAt)}</strong>
+        </p>
+      </div>`
+    : ''
+
+  const discountBlock = d.quickDiscountPct && d.quickDiscountDeadline
+    ? `
+      <div style="background:#FFEDD5; border:2px solid #FB923C; border-radius:12px; padding:14px; margin-bottom:14px; text-align:center;">
+        <p style="margin:0 0 4px 0; font-size:14px; font-weight:bold; color:#C2410C;">
+          🎯 خصم ${d.quickDiscountPct}% للقبول السريع
+        </p>
+        <p style="margin:0 0 6px 0; font-size:12px; color:#9A3412;">
+          اعتمد العرض قبل <strong>${formatDateAr(d.quickDiscountDeadline)}</strong> ووفّر
+          <strong>${(d.price * (d.quickDiscountPct / 100)).toLocaleString('ar-SA')} ر.س</strong>
+        </p>
+        <p style="margin:0; font-size:11px; color:#9A3412;">السعر مع الخصم: ${(d.price * (1 - d.quickDiscountPct / 100)).toLocaleString('ar-SA')} ر.س</p>
+      </div>`
+    : ''
+
   return {
     subject: `💰 وصلك العرض المخصص · ${d.requestNumber}`,
     html: wrap(`
@@ -198,12 +224,14 @@ export function quoteReadyToClient(d: {
       <p style="margin:0 0 18px 0; font-size:14px; line-height:1.8;">
         فريقنا انتهى من مراجعة طلبك <strong>${escapeHtml(d.requestNumber)}</strong> وأعد العرض المخصص:
       </p>
-      <div style="background:#F7F4ED; border-radius:12px; padding:18px; text-align:center; margin-bottom:18px;">
+      <div style="background:#F7F4ED; border-radius:12px; padding:18px; text-align:center; margin-bottom:14px;">
         <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">السعر الرئيسي</p>
         <p style="margin:0 0 12px 0; font-size:28px; font-weight:900; color:${BRAND_GOLD};">${d.price.toLocaleString('ar-SA')} ر.س</p>
         <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">الوصول المتوقع</p>
         <p style="margin:0; font-size:18px; font-weight:bold; color:${BRAND_NAVY};">${formatReach(d.reach)} متابع</p>
       </div>
+      ${discountBlock}
+      ${expiryBlock}
       <p style="margin:0 0 18px 0; font-size:13px; line-height:1.8;">
         يمكنك أيضاً اختيار خدمات إضافية لتعزيز الحملة. السعر والوصول يتحدّثان فورياً مع كل اختيار.
       </p>
@@ -507,6 +535,18 @@ function formatReach(n: number): string {
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
   if (n >= 1000) return `${Math.round(n / 1000)}K`
   return n.toString()
+}
+
+function formatDateAr(iso: string): string {
+  try {
+    const d = new Date(iso)
+    return d.toLocaleString('ar-SA', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    })
+  } catch {
+    return iso
+  }
 }
 
 // ─── Content Review Templates ───

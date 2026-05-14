@@ -27,10 +27,10 @@ export default function StepInfluencer({ influencers, selected, onSelect }: Step
   return (
     <div className="wizard-enter">
       <h2 className="text-xl md:text-2xl font-black text-dark text-center mb-2">
-        اختر المؤثر
+        مع مين تحب تنشر اليوم؟
       </h2>
       <p className="text-sm text-muted text-center mb-6">
-        حدد الحساب الذي تريد النشر من خلاله
+        كل حساب له جمهور وأسلوب مختلف — اختر اللي يناسب رسالتك
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
@@ -92,6 +92,10 @@ export default function StepInfluencer({ influencers, selected, onSelect }: Step
           )
         })}
       </div>
+
+      <p className="text-xs text-muted text-center mt-5 max-w-md mx-auto leading-relaxed">
+        💡 لست متأكداً؟ لا تقلق — تقدر تغيّر اختيارك في أي خطوة قبل الإرسال.
+      </p>
     </div>
   )
 }

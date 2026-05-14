@@ -23,12 +23,18 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { requestId, quotedPrice, offeredExtras, adminNotes, baseReach } = body as {
+    const {
+      requestId, quotedPrice, offeredExtras, adminNotes, baseReach,
+      quoteExpiresAt, quickDiscountPct, quickDiscountDeadline,
+    } = body as {
       requestId: string
       quotedPrice: number
       offeredExtras: OfferedExtra[]
       adminNotes?: string
       baseReach: number
+      quoteExpiresAt?: string | null
+      quickDiscountPct?: number | null
+      quickDiscountDeadline?: string | null
     }
 
     if (typeof quotedPrice !== 'number' || quotedPrice < 0) {
@@ -47,6 +53,9 @@ export async function POST(request: Request) {
         status: 'quoted',
         quoted_at: new Date().toISOString(),
         admin_notes: adminNotes ?? null,
+        quote_expires_at: quoteExpiresAt ?? null,
+        quote_quick_discount_pct: quickDiscountPct ?? null,
+        quote_quick_discount_deadline: quickDiscountDeadline ?? null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', requestId)
@@ -68,7 +77,14 @@ export async function POST(request: Request) {
       }
       const promise = quotedPrice <= 0
         ? notifyFreeGiftToClient({ ...args, adminMessage: adminNotes ?? '' })
-        : notifyQuoteReadyToClient({ ...args, price: quotedPrice, reach: baseReach ?? 0 })
+        : notifyQuoteReadyToClient({
+            ...args,
+            price: quotedPrice,
+            reach: baseReach ?? 0,
+            quoteExpiresAt: quoteExpiresAt ?? null,
+            quickDiscountPct: quickDiscountPct ?? null,
+            quickDiscountDeadline: quickDiscountDeadline ?? null,
+          })
       promise.catch(e => console.error('Quote email failed:', e))
     }
 

@@ -46,9 +46,9 @@ export default function RStep6Terms({ termsAccepted, privacyAccepted, onTermsCha
   return (
     <div className="wizard-enter max-w-lg mx-auto">
       <h2 className="text-xl md:text-2xl font-black text-dark text-center mb-2">
-        اقرأ وافق للمتابعة
+        اتفاقية بسيطة بيننا
       </h2>
-      <p className="text-sm text-muted text-center mb-6">الشروط والأحكام</p>
+      <p className="text-sm text-muted text-center mb-6">اقرأها بسرعة (دقيقتين) وفعّل الموافقتين أدناه</p>
 
       <div className="bg-card rounded-2xl border border-border p-5 mb-6">
         <div className="terms-scroll max-h-[260px] overflow-y-auto text-sm text-dark/80 leading-relaxed whitespace-pre-line">

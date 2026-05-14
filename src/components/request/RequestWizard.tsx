@@ -19,6 +19,7 @@ import { validateEmail } from '@/lib/email-validation'
 import SuccessScreen from './SuccessScreen'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
+import HostBanner from './HostBanner'
 
 type StepId = 'influencer' | 'clientType' | 'category' | 'subOption' | 'details' | 'channels' | 'contact' | 'terms' | 'confirm'
 
@@ -164,6 +165,8 @@ export default function RequestWizard() {
       <div className="max-w-3xl mx-auto w-full px-4 pt-6 flex-1 flex flex-col">
         <WizardProgress current={stepIndex + 1} total={totalSteps} />
 
+        <HostBanner step={currentStep} />
+
         <div className="flex-1 py-4">
           {currentStep === 'influencer' && (
             <StepInfluencer influencers={influencers} selected={selectedInfluencer} onSelect={setSelectedInfluencer} />
@@ -201,8 +204,8 @@ export default function RequestWizard() {
           )}
           {currentStep === 'confirm' && (
             <div className="wizard-enter max-w-lg mx-auto space-y-6">
-              <h2 className="text-xl md:text-2xl font-black text-dark text-center mb-2">تأكيد وإرسال الطلب</h2>
-              <p className="text-sm text-muted text-center">راجع ملخص طلبك — سيُراجع من قبل فريق تواصل النخبة وسيصلك العرض لاحقاً</p>
+              <h2 className="text-xl md:text-2xl font-black text-dark text-center mb-2">كل شي تمام؟</h2>
+              <p className="text-sm text-muted text-center">خلّينا نراجع ملخصك سوا — متأكد إن كل شي زي ما تبغى؟</p>
               <div className="bg-card rounded-2xl border border-border overflow-hidden">
                 <div className="p-5 space-y-3 text-sm">
                   {selectedInf && <div className="flex justify-between"><span className="text-muted">المؤثر:</span><span className="font-medium">{selectedInf.name_ar}</span></div>}
@@ -215,7 +218,8 @@ export default function RequestWizard() {
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center">
                 <div className="text-2xl mb-2">📋</div>
-                <p className="font-bold text-blue-700 text-sm">سيتم مراجعة طلبك من قبل فريق تواصل النخبة</p>
+                <p className="font-bold text-blue-700 text-sm">محمد بيراجع طلبك شخصياً ويرسلك العرض المخصص قريباً</p>
+                <p className="text-xs text-blue-600 mt-1">ومفيش أي التزام مالي قبل ما توافق على العرض</p>
               </div>
             </div>
           )}

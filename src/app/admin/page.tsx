@@ -13,6 +13,7 @@ export default function AdminStatsPage() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ total: 0, pending: 0, revenue: 0, monthRevenue: 0, outstanding: 0, conversionRate: 0, paidCount: 0 })
   const [topCategories, setTopCategories] = useState<{ category: string; nameAr: string; count: number }[]>([])
+  const [funnel, setFunnel] = useState<{ label: string; count: number; pctOfPrev: number; pctOfTotal: number }[]>([])
 
   useEffect(() => {
     const load = async () => {
@@ -70,6 +71,28 @@ export default function AdminStatsPage() {
         conversionRate: finalTotal > 0 ? (paidCount / finalTotal) * 100 : 0,
       })
 
+      // Funnel — count requests that reached each stage based on timestamps + status
+      const paidLikeStatuses = ['paid', 'in_progress', 'content_review', 'completed']
+      const stages = [
+        { label: 'تم استقبال الطلب', count: requests.length },
+        { label: 'تم إرسال العرض', count: requests.filter(r => r.quoted_at).length },
+        { label: 'اعتمد العميل', count: requests.filter(r => r.approved_at).length },
+        { label: 'تم الدفع', count: requests.filter(r => paidLikeStatuses.includes(r.status)).length },
+        { label: 'اكتمل الطلب', count: requests.filter(r => r.status === 'completed').length },
+      ]
+      const totalForPct = stages[0].count || 1
+      setFunnel(
+        stages.map((s, i) => {
+          const prev = i === 0 ? s.count : stages[i - 1].count
+          return {
+            label: s.label,
+            count: s.count,
+            pctOfPrev: prev > 0 ? (s.count / prev) * 100 : 0,
+            pctOfTotal: (s.count / totalForPct) * 100,
+          }
+        })
+      )
+
       // Top categories
       const catMap: Record<string, number> = {}
       requests.forEach(r => { catMap[r.category] = (catMap[r.category] ?? 0) + 1 })
@@ -114,6 +137,36 @@ export default function AdminStatsPage() {
           </div>
         ))}
       </div>
+
+      {funnel.length > 0 && funnel[0].count > 0 && (
+        <div className="bg-card rounded-2xl border border-border p-5 mb-6">
+          <h2 className="font-bold text-dark mb-1">قمع التحويل</h2>
+          <p className="text-xs text-muted mb-4">نسبة الانتقال من كل مرحلة للتالية — اكتشف أين يتسرّب العملاء.</p>
+          <div className="space-y-3">
+            {funnel.map((f, i) => (
+              <div key={f.label}>
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span className="font-medium text-dark">{f.label}</span>
+                  <span className="text-muted text-xs">
+                    <strong className="text-dark">{f.count}</strong>
+                    {i > 0 && (
+                      <span className={`ms-2 ${f.pctOfPrev >= 80 ? 'text-green' : f.pctOfPrev >= 50 ? 'text-orange-600' : 'text-red-600'}`}>
+                        ({f.pctOfPrev.toFixed(1)}% من السابق)
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="h-3 bg-cream rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-l from-green to-gold rounded-full transition-all"
+                    style={{ width: `${Math.max(f.pctOfTotal, 2)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {topCategories.length > 0 && (
         <div className="bg-card rounded-2xl border border-border p-5">
