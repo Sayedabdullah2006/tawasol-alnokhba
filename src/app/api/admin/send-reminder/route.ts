@@ -128,23 +128,37 @@ export async function POST(request: NextRequest) {
 
     console.log(`[SEND_REMINDER] ✅ Reminder sent successfully to ${requestData.client_email}`);
 
-    // Update the request — apply price changes when discounting + always update reminder timestamp
-    const updatePatch: Record<string, unknown> = {
-      last_reminder_sent: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
+    // Critical update: price changes (separate so a missing nullable column won't drop it)
     if (applyDiscount && newPrice !== null) {
-      updatePatch.admin_quoted_price = newPrice
-      updatePatch.final_total = newPrice
+      const { error: priceUpdateError } = await supabase
+        .from('publish_requests')
+        .update({
+          admin_quoted_price: newPrice,
+          final_total: newPrice,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', requestId);
+
+      if (priceUpdateError) {
+        console.error('[SEND_REMINDER] Failed to update price:', priceUpdateError);
+        return NextResponse.json(
+          { error: 'تم إرسال البريد لكن فشل تحديث السعر في الطلب', details: priceUpdateError.message },
+          { status: 500 }
+        );
+      }
     }
 
-    const { error: updateError } = await supabase
+    // Non-critical: bump reminder timestamp. Tolerate missing column gracefully.
+    const { error: stampError } = await supabase
       .from('publish_requests')
-      .update(updatePatch)
+      .update({
+        last_reminder_sent: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', requestId);
 
-    if (updateError) {
-      console.error('[SEND_REMINDER] Failed to update request:', updateError);
+    if (stampError) {
+      console.warn('[SEND_REMINDER] Could not bump last_reminder_sent (column may be missing):', stampError.message);
     }
 
     return NextResponse.json({

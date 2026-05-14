@@ -125,19 +125,38 @@ export async function POST(request: NextRequest) {
 
       if (result.success) {
         sent++
-        const updatePatch: Record<string, unknown> = {
-          last_reminder_sent: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }
+
+        // Critical update: price changes — kept separate so a missing
+        // last_reminder_sent column won't roll back the price write.
         if (applyDiscount && newPrice !== null) {
-          updatePatch.admin_quoted_price = newPrice
-          updatePatch.final_total = newPrice
-          updated++
+          const { error: priceErr } = await supabase
+            .from('publish_requests')
+            .update({
+              admin_quoted_price: newPrice,
+              final_total: newPrice,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', r.id)
+
+          if (priceErr) {
+            console.error(`[BULK_REMINDER] Price update failed for ${requestNumber}:`, priceErr.message)
+          } else {
+            updated++
+          }
         }
-        await supabase
+
+        // Non-critical timestamp bump — tolerate missing column
+        const { error: stampErr } = await supabase
           .from('publish_requests')
-          .update(updatePatch)
+          .update({
+            last_reminder_sent: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', r.id)
+
+        if (stampErr) {
+          console.warn(`[BULK_REMINDER] last_reminder_sent update skipped for ${requestNumber}:`, stampErr.message)
+        }
       } else {
         failed++
         failedRequestNumbers.push(requestNumber)
