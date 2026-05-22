@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
     // Convert the shared function result to match expected API format
     return NextResponse.json({
       success: result.success,
+      reason: result.reason,
       payment: result.payment,
       error: result.success ? undefined : result.reason,
       alreadyProcessed: result.reason === 'already_processed'
@@ -72,6 +73,7 @@ export async function POST(request: NextRequest) {
     // Convert the shared function result to match expected API format
     return NextResponse.json({
       success: result.success,
+      reason: result.reason,
       payment: result.payment,
       error: result.success ? undefined : result.reason,
       alreadyProcessed: result.reason === 'already_processed'

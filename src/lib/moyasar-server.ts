@@ -5,6 +5,7 @@
 
 import { createServiceRoleClient } from '@/lib/supabase-server';
 import { buildAuthHeader, MOYASAR_API_URL, toSAR } from '@/lib/moyasar';
+import { notifyPaymentConfirmedToClient } from '@/lib/email';
 
 /**
  * Shared Payment Verification and Status Update Function
@@ -103,7 +104,7 @@ export async function verifyAndUpdatePayment(paymentId: string, requestId?: stri
     // Step 4: Get the original order to verify amount
     const { data: originalOrder, error: orderError } = await supabase
       .from('publish_requests')
-      .select('id, status, final_total, admin_quoted_price')
+      .select('id, status, final_total, admin_quoted_price, client_name, client_email, request_number')
       .eq('id', targetRequestId)
       .single();
 
@@ -192,6 +193,18 @@ export async function verifyAndUpdatePayment(paymentId: string, requestId?: stri
       console.log(`[MOYASAR_VERIFY] ✅ Rows affected: ${updateData.length}`);
     }
 
+    // Step 7: Send payment confirmation email to client (CC to admin is automatic)
+    if (originalOrder.client_email) {
+      notifyPaymentConfirmedToClient({
+        email: originalOrder.client_email,
+        requestNumber: String(originalOrder.request_number),
+        clientName: originalOrder.client_name ?? '',
+        total: toSAR(payment.amount),
+      }).catch((err: unknown) => {
+        console.error('[MOYASAR_VERIFY] ⚠️ Payment confirmation email failed (non-blocking):', err);
+      });
+    }
+
     return {
       success: true,
       reason: 'verified_and_updated',
@@ -205,7 +218,7 @@ export async function verifyAndUpdatePayment(paymentId: string, requestId?: stri
         source: {
           type: payment.source?.type,
           company: payment.source?.company,
-          last4: payment.source?.number?.slice(-4) ?? '****',  // ← renamed for clarity
+          last4: payment.source?.number?.slice(-4) ?? '****',
         },
         metadata: payment.metadata,
       },

@@ -18,7 +18,7 @@ const BANK_INFO = {
   iban: 'SA4678000000001258622215',
 }
 
-type Method = 'bank' | 'online'
+type Method = 'bank' | 'online' | 'tamara'
 
 export default function PaymentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -31,6 +31,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
   const [method, setMethod] = useState<Method>('bank')
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [tamaraLoading, setTamaraLoading] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -66,6 +67,27 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
       showToast(`تم نسخ ${label}`)
     } catch {
       showToast('تعذّر النسخ', 'error')
+    }
+  }
+
+  const handleTamaraCheckout = async () => {
+    setTamaraLoading(true)
+    try {
+      const res = await fetch('/api/payment/tamara/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: id }),
+      })
+      const data = await res.json()
+      if (res.ok && data.checkoutUrl) {
+        window.location.href = data.checkoutUrl
+      } else {
+        showToast(data.error ?? 'فشل الاتصال بتمارا، حاول مجدداً', 'error')
+        setTamaraLoading(false)
+      }
+    } catch {
+      showToast('فشل الاتصال بالخادم', 'error')
+      setTamaraLoading(false)
     }
   }
 
@@ -148,28 +170,44 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => setMethod('bank')}
-                  className={`p-4 rounded-xl border-2 text-center transition-all cursor-pointer ${
+                  className={`p-3 rounded-xl border-2 text-center transition-all cursor-pointer ${
                     method === 'bank' ? 'border-green bg-green/5' : 'border-border bg-white hover:border-green/40'
                   }`}
                 >
                   <div className="text-2xl mb-1">🏦</div>
-                  <div className="font-bold text-sm text-dark">تحويل بنكي</div>
-                  <div className="text-xs text-muted">للحساب البنكي للشركة</div>
+                  <div className="font-bold text-xs text-dark">تحويل بنكي</div>
+                  <div className="text-[10px] text-muted">للحساب البنكي</div>
                 </button>
                 <button
                   type="button"
                   onClick={() => setMethod('online')}
-                  className={`p-4 rounded-xl border-2 text-center transition-all cursor-pointer ${
+                  className={`p-3 rounded-xl border-2 text-center transition-all cursor-pointer ${
                     method === 'online' ? 'border-green bg-green/5' : 'border-border bg-white hover:border-green/40'
                   }`}
                 >
                   <div className="text-2xl mb-1">💳</div>
-                  <div className="font-bold text-sm text-dark">دفع إلكتروني</div>
-                  <div className="text-xs text-muted">مدى / فيزا / Apple Pay</div>
+                  <div className="font-bold text-xs text-dark">دفع إلكتروني</div>
+                  <div className="text-[10px] text-muted">مدى / فيزا</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMethod('tamara')}
+                  className={`p-3 rounded-xl border-2 text-center transition-all cursor-pointer ${
+                    method === 'tamara' ? 'border-[#3D1152] bg-[#3D1152]/5' : 'border-border bg-white hover:border-[#3D1152]/40'
+                  }`}
+                >
+                  <div
+                    className="mx-auto mb-1 w-10 h-7 rounded-lg flex items-center justify-center text-white font-black text-xs"
+                    style={{ background: 'linear-gradient(135deg, #f97316 0%, #ec4899 50%, #8b5cf6 100%)' }}
+                  >
+                    تمارا
+                  </div>
+                  <div className="font-bold text-xs text-dark">تمارا</div>
+                  <div className="text-[10px] text-muted">حتى 3 أقساط</div>
                 </button>
               </div>
 
@@ -230,6 +268,50 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                     category: cat?.nameAr,
                   }}
                 />
+              )}
+
+              {method === 'tamara' && (
+                <div className="bg-card rounded-xl border border-[#3D1152]/20 p-5 space-y-4">
+                  <div className="text-center">
+                    <div
+                      className="inline-flex items-center justify-center px-5 py-2 rounded-2xl text-white font-black text-lg mb-3"
+                      style={{ background: 'linear-gradient(135deg, #f97316 0%, #ec4899 50%, #8b5cf6 100%)' }}
+                    >
+                      تمارا
+                    </div>
+                    <p className="font-bold text-dark text-sm">ادفع على 3 أقساط بدون فوائد</p>
+                    <p className="text-xs text-muted mt-1">
+                      قسّم المبلغ على 3 دفعات شهرية · 100% متوافق مع الشريعة الإسلامية
+                    </p>
+                  </div>
+
+                  <div className="bg-[#3D1152]/5 border border-[#3D1152]/15 rounded-xl p-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-sm font-bold text-dark">توزيع الأقساط</span>
+                      <span className="text-xs text-muted">بدون رسوم إضافية</span>
+                    </div>
+                    {[1, 2, 3].map(n => (
+                      <div key={n} className="flex justify-between items-center py-2 border-b border-[#3D1152]/10 last:border-0">
+                        <span className="text-xs text-muted">القسط {n === 1 ? 'الأول (الآن)' : n === 2 ? 'الثاني' : 'الثالث'}</span>
+                        <span className="font-bold text-sm text-dark">
+                          {formatNumber(Math.ceil(totalDue / 3))} ر.س
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Button
+                    onClick={handleTamaraCheckout}
+                    loading={tamaraLoading}
+                    className="w-full !bg-[#3D1152] hover:!bg-[#2d0c3e]"
+                  >
+                    {tamaraLoading ? 'جارٍ التحويل لتمارا...' : `ادفع ${formatNumber(totalDue)} ر.س عبر تمارا`}
+                  </Button>
+
+                  <p className="text-[10px] text-muted text-center">
+                    ستُحوَّل لصفحة تمارا الآمنة لإتمام الدفع
+                  </p>
+                </div>
               )}
             </>
           )}

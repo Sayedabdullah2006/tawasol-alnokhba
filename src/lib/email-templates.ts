@@ -232,9 +232,13 @@ export function quoteReadyToClient(d: {
       </div>
       ${discountBlock}
       ${expiryBlock}
-      <p style="margin:0 0 18px 0; font-size:13px; line-height:1.8;">
+      <p style="margin:0 0 14px 0; font-size:13px; line-height:1.8;">
         يمكنك أيضاً اختيار خدمات إضافية لتعزيز الحملة. السعر والوصول يتحدّثان فورياً مع كل اختيار.
       </p>
+      <div style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:12px; padding:14px; margin-bottom:18px; text-align:center;">
+        <p style="margin:0 0 4px 0; font-size:13px; font-weight:bold; color:#6d28d9;">🛍️ يمكنك الدفع عبر تمارا على 3 أقساط بدون فوائد</p>
+        <p style="margin:0; font-size:11px; color:#7c3aed;">100% متوافق مع الشريعة الإسلامية · بدون رسوم إضافية · للعملاء في السعودية</p>
+      </div>
       <p style="margin:0; text-align:center;">${button('مراجعة العرض', `${SITE_URL}/dashboard`)}</p>
     `),
   }
@@ -286,9 +290,13 @@ export function quoteApprovedAwaitingPaymentToClient(d: {
         <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">المبلغ المستحق</p>
         <p style="margin:0; font-size:24px; font-weight:900; color:${BRAND_GOLD};">${d.total.toLocaleString('ar-SA')} ر.س</p>
       </div>
-      <p style="margin:0 0 18px 0; font-size:13px; line-height:1.8;">
-        من صفحة الدفع يمكنك التحويل البنكي ورفع الإيصال — وسنبدأ التنفيذ فور التحقق.
+      <p style="margin:0 0 14px 0; font-size:13px; line-height:1.8;">
+        من صفحة الدفع يمكنك التحويل البنكي أو الدفع الإلكتروني فوراً.
       </p>
+      <div style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:12px; padding:14px; margin-bottom:18px; text-align:center;">
+        <p style="margin:0 0 4px 0; font-size:13px; font-weight:bold; color:#6d28d9;">🛍️ هل تريد تقسيط المبلغ؟ ادفع عبر تمارا على 3 أقساط بدون فوائد</p>
+        <p style="margin:0; font-size:11px; color:#7c3aed;">القسط الأول الآن · الثاني بعد شهر · الثالث بعد شهرين · بدون رسوم</p>
+      </div>
       <p style="margin:0; text-align:center;">${button('الانتقال للدفع', `${SITE_URL}/dashboard`)}</p>
     `),
   }

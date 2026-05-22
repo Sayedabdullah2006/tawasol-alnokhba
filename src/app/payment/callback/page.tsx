@@ -85,17 +85,17 @@ export default function PaymentCallbackPage() {
               status: 'pending',
             });
           } else {
-            console.error('❌ [CALLBACK] Payment verification failed:', data.reason);
+            console.error('❌ [CALLBACK] Payment verification failed:', data.reason ?? data.error);
             setResult({
               success: false,
-              error: data.reason,
+              error: data.reason ?? data.error,
             });
           }
         } else {
           console.error('❌ [CALLBACK] Payment verification failed:', data);
           setResult({
             success: false,
-            error: data.reason ?? 'verification_failed',
+            error: data.error ?? data.reason ?? 'verification_failed',
           });
         }
       } catch (error) {
