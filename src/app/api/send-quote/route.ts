@@ -25,14 +25,13 @@ export async function POST(request: Request) {
     const body = await request.json()
     const {
       requestId, quotedPrice, offeredExtras, adminNotes, baseReach,
-      quoteExpiresAt, quickDiscountPct, quickDiscountDeadline,
+      quickDiscountPct, quickDiscountDeadline,
     } = body as {
       requestId: string
       quotedPrice: number
       offeredExtras: OfferedExtra[]
       adminNotes?: string
       baseReach: number
-      quoteExpiresAt?: string | null
       quickDiscountPct?: number | null
       quickDiscountDeadline?: string | null
     }
@@ -53,7 +52,7 @@ export async function POST(request: Request) {
         status: 'quoted',
         quoted_at: new Date().toISOString(),
         admin_notes: adminNotes ?? null,
-        quote_expires_at: quoteExpiresAt ?? null,
+        quote_expires_at: null,
         quote_quick_discount_pct: quickDiscountPct ?? null,
         quote_quick_discount_deadline: quickDiscountDeadline ?? null,
         updated_at: new Date().toISOString(),
@@ -81,7 +80,7 @@ export async function POST(request: Request) {
             ...args,
             price: quotedPrice,
             reach: baseReach ?? 0,
-            quoteExpiresAt: quoteExpiresAt ?? null,
+            quoteExpiresAt: null,
             quickDiscountPct: quickDiscountPct ?? null,
             quickDiscountDeadline: quickDiscountDeadline ?? null,
           })

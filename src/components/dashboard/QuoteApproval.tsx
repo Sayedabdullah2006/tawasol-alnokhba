@@ -29,7 +29,6 @@ interface Props {
   scope: 'single' | 'all'
   adminNotes?: string | null
   negotiationRejected?: boolean
-  quoteExpiresAt?: string | null
   quickDiscountPct?: number | null
   quickDiscountDeadline?: string | null
 }
@@ -48,7 +47,7 @@ function formatCountdown(ms: number): string {
 
 export default function QuoteApproval({
   requestId, quotedPrice, offeredExtras, influencer, scope, adminNotes, negotiationRejected,
-  quoteExpiresAt, quickDiscountPct, quickDiscountDeadline,
+  quickDiscountPct, quickDiscountDeadline,
 }: Props) {
   const router = useRouter()
   const { showToast } = useToast()
@@ -70,9 +69,7 @@ export default function QuoteApproval({
   }, [])
 
   const quickDeadlineMs = quickDiscountDeadline ? new Date(quickDiscountDeadline).getTime() : 0
-  const expiryMs = quoteExpiresAt ? new Date(quoteExpiresAt).getTime() : 0
   const quickDiscountActive = !!(quickDiscountPct && quickDeadlineMs > now)
-  const expired = expiryMs > 0 && expiryMs <= now
 
   const discountAmount = quickDiscountActive ? quotedPrice * ((quickDiscountPct ?? 0) / 100) : 0
   const discountedBase = Math.max(0, quotedPrice - discountAmount)
@@ -204,21 +201,6 @@ export default function QuoteApproval({
           <div className="inline-block bg-orange-600 text-white text-sm font-bold px-3 py-1 rounded-lg font-mono">
             ⏳ {formatCountdown(quickDeadlineMs - now)}
           </div>
-        </div>
-      )}
-
-      {expiryMs > 0 && !expired && !isFreeBase && (
-        <div className="bg-yellow-50 border border-yellow-300 rounded-xl p-3 text-center">
-          <p className="text-xs text-yellow-700">
-            ⏰ العرض ساري لمدة <strong>{formatCountdown(expiryMs - now)}</strong>
-          </p>
-        </div>
-      )}
-
-      {expired && (
-        <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 text-center">
-          <p className="font-bold text-red-700 mb-1">⛔ انتهت صلاحية هذا العرض</p>
-          <p className="text-xs text-red-600">تواصل مع الإدارة لطلب عرض محدّث</p>
         </div>
       )}
 
@@ -402,7 +384,7 @@ export default function QuoteApproval({
         </div>
       ) : (
         <div className="space-y-3">
-          <Button onClick={handleApprove} loading={submitting} className="w-full" size="lg" disabled={expired}>
+          <Button onClick={handleApprove} loading={submitting} className="w-full" size="lg">
             {isFreeFinal
               ? 'اعتماد وبدء التنفيذ 🎁'
               : `اعتماد العرض والانتقال للدفع — ${formatNumber(finalTotal)} ر.س`}

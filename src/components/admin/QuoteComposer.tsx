@@ -34,7 +34,6 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
   const [isFree, setIsFree] = useState(false)
   const [selectedExtrasToOffer, setSelectedExtrasToOffer] = useState<string[]>([])
   const [adminNotes, setAdminNotes] = useState(request.admin_notes ?? '')
-  const [validityDays, setValidityDays] = useState<number>(7)
   const [enableQuickDiscount, setEnableQuickDiscount] = useState(false)
   const [quickDiscountPct, setQuickDiscountPct] = useState<number>(5)
   const [quickDiscountHours, setQuickDiscountHours] = useState<number>(48)
@@ -124,11 +123,6 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
         reachBoost: e.reachBoost,
       }))
 
-    if (validityDays < 1) {
-      showToast('صلاحية العرض يجب أن تكون يوماً واحداً على الأقل', 'error')
-      setSaving(false)
-      return
-    }
     if (enableQuickDiscount && (quickDiscountPct <= 0 || quickDiscountPct >= 100 || quickDiscountHours < 1)) {
       showToast('قيم خصم القبول السريع غير صالحة', 'error')
       setSaving(false)
@@ -136,7 +130,6 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
     }
 
     const now = Date.now()
-    const quoteExpiresAt = new Date(now + validityDays * 24 * 60 * 60 * 1000).toISOString()
     const quickDiscountDeadline = enableQuickDiscount && !isFree
       ? new Date(now + quickDiscountHours * 60 * 60 * 1000).toISOString()
       : null
@@ -151,7 +144,6 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
         offeredExtras,
         adminNotes: adminNotes || null,
         baseReach,
-        quoteExpiresAt,
         quickDiscountPct: quickDiscountPctToSend,
         quickDiscountDeadline,
       }),
@@ -295,15 +287,6 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
 
       {!isFree && (
         <div className="bg-cream rounded-xl p-4 space-y-3">
-          <h3 className="font-bold text-dark text-sm">⏰ صلاحية العرض</h3>
-          <div>
-            <label className="text-muted block mb-1 text-sm">العرض ساري لمدة (يوم)</label>
-            <input type="number" min={1} max={60} value={validityDays}
-              onChange={e => setValidityDays(Math.max(1, parseInt(e.target.value) || 1))}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-white text-sm" />
-            <p className="text-xs text-muted mt-1">سيظهر للعميل عدّاد تنازلي ويتم تعليم العرض كمنتهٍ بعد هذه المدة.</p>
-          </div>
-
           <label className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
             enableQuickDiscount ? 'bg-orange-50 border-orange-400' : 'bg-white border-border hover:border-orange-300'
           }`}>

@@ -74,13 +74,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'لا يمكن تعديل هذا الطلب' }, { status: 400 })
     }
 
-    if (req.quote_expires_at && new Date(req.quote_expires_at).getTime() <= Date.now()) {
-      return NextResponse.json(
-        { error: 'انتهت صلاحية هذا العرض — تواصل مع الإدارة لطلب عرض محدّث' },
-        { status: 400 }
-      )
-    }
-
     // Service role for both reads (extras/pricing_config require it under admin RLS)
     // and the publish_requests update (users have no UPDATE policy).
     const serviceClient = await createServiceRoleClient()
