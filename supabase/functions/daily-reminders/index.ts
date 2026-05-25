@@ -93,6 +93,66 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
+    // 0. إغلاق الطلبات التي مضى عليها أكثر من 7 أيام في حالة pending
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+    const { data: staleRequests, error: staleError } = await supabase
+      .from('publish_requests')
+      .select('id, request_number, client_name, client_email')
+      .eq('status', 'pending')
+      .lt('created_at', sevenDaysAgo)
+      .not('client_email', 'is', null)
+
+    if (staleError) {
+      console.error('[AUTO-CLOSE] Error fetching stale requests:', staleError)
+    } else if (staleRequests && staleRequests.length > 0) {
+      console.log(`[AUTO-CLOSE] Found ${staleRequests.length} stale pending requests to close`)
+
+      for (const req of staleRequests) {
+        try {
+          // تحديث الحالة إلى auto_closed
+          const { error: updateError } = await supabase
+            .from('publish_requests')
+            .update({
+              status: 'auto_closed',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', req.id)
+            .eq('status', 'pending') // حماية من race condition
+
+          if (updateError) {
+            console.error(`[AUTO-CLOSE] Failed to close request ${req.id}:`, updateError)
+            continue
+          }
+
+          // إرسال إيميل الإغلاق للعميل
+          const requestNumber = generateRequestNumber(req.request_number)
+          const subject = `📋 تم إغلاق طلبك تلقائياً · ${requestNumber}`
+          const htmlContent = createAutoClosedHTML(req.client_name, requestNumber)
+
+          const emailResponse = await supabase.functions.invoke('send-enhanced-email', {
+            body: {
+              to: req.client_email,
+              subject,
+              html: htmlContent,
+              cc: 'first1saudi@gmail.com',
+              options: { category: 'notification', priority: 'normal' }
+            }
+          })
+
+          if (emailResponse.error || !emailResponse.data?.ok) {
+            console.error(`[AUTO-CLOSE] Email failed for ${req.client_email}:`, emailResponse.error)
+          } else {
+            console.log(`[AUTO-CLOSE] ✅ Closed & notified: ${requestNumber} → ${req.client_email}`)
+          }
+        } catch (err) {
+          console.error(`[AUTO-CLOSE] Error processing request ${req.id}:`, err)
+        }
+      }
+    } else {
+      console.log('[AUTO-CLOSE] No stale pending requests found')
+    }
+
     // 1. العثور على الطلبات التي تحتاج تذكيرات
     const { data: requests, error: requestsError } = await supabase
       .from('publish_requests')
@@ -372,6 +432,41 @@ function createPaymentReminderHTML(data: ReminderData, reminderNum: number, amou
           💳 إتمام الدفع
         </a>
       </div>
+    </div>
+  `
+}
+
+function createAutoClosedHTML(clientName: string, requestNumber: string): string {
+  return `
+    <div style="direction:rtl; font-family:Arial,sans-serif; max-width:600px; margin:0 auto; padding:20px; background:#fff;">
+      <div style="text-align:center; margin-bottom:24px;">
+        <div style="font-size:48px; margin-bottom:12px;">📋</div>
+        <h2 style="margin:0; color:#0E2855; font-size:20px;">تم إغلاق طلبك تلقائياً</h2>
+        <p style="margin:4px 0 0 0; color:#6B7C99; font-size:14px;">طلب ${requestNumber}</p>
+      </div>
+      <div style="background:#F8FAFC; border-radius:12px; padding:20px; margin:20px 0;">
+        <p style="margin:0 0 12px 0; color:#0E2855; font-size:15px; font-weight:bold;">مرحباً ${clientName} 👋</p>
+        <p style="font-size:14px; line-height:1.8; margin:0; color:#374151;">
+          طلبك <strong>${requestNumber}</strong> كان تحت المراجعة لأكثر من أسبوع دون معالجة،
+          لذلك أُغلق تلقائياً للحفاظ على تنظيم قائمة الطلبات.
+        </p>
+      </div>
+      <div style="background:#FEF3C7; border:1px solid #F59E0B; border-radius:12px; padding:16px; margin:16px 0;">
+        <p style="margin:0 0 8px 0; font-size:13px; font-weight:bold; color:#92400E;">📌 هل ترغب في المتابعة؟</p>
+        <p style="margin:0; font-size:13px; line-height:1.8; color:#78350F;">
+          يسعدنا استقبال طلبك مجدداً — ما عليك سوى الدخول للموقع ورفع طلب جديد وسيتم مراجعته بأولوية.
+        </p>
+      </div>
+      <div style="text-align:center; margin:32px 0;">
+        <a href="https://nukhba.media/request"
+           style="display:inline-block; background:#059669; color:#fff; padding:16px 36px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:15px;">
+          رفع طلب جديد
+        </a>
+      </div>
+      <p style="text-align:center; font-size:12px; color:#6B7C99; margin:0;">
+        إذا كان الإغلاق خطأً أو تحتاج مساعدة —
+        <a href="https://nukhba.media/contact" style="color:#C9A961;">تواصل معنا</a>
+      </p>
     </div>
   `
 }

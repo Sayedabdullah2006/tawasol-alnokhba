@@ -57,6 +57,11 @@ export const CLIENT_STATUS_LABELS: Record<RequestStatus, { label: string; color:
     label: 'مرفوض',
     color: 'red',
     description: 'تم رفض طلبك من قبل الإدارة'
+  },
+  auto_closed: {
+    label: 'أُغلق تلقائياً',
+    color: 'gray',
+    description: 'أُغلق الطلب تلقائياً بعد أسبوع دون معالجة — يمكنك رفع طلب جديد'
   }
 }
 
@@ -116,6 +121,11 @@ export const ADMIN_STATUS_LABELS: Record<RequestStatus, { label: string; color: 
     label: 'مرفوض من الإدارة',
     color: 'red',
     description: 'تم رفض الطلب من قبل الإدارة'
+  },
+  auto_closed: {
+    label: 'أُغلق تلقائياً',
+    color: 'gray',
+    description: 'أُغلق الطلب تلقائياً بعد أسبوع في المراجعة دون معالجة'
   }
 }
 
@@ -149,7 +159,7 @@ export function isWaitingStatus(status: RequestStatus): boolean {
 }
 
 export function isFinalStatus(status: RequestStatus): boolean {
-  return ['completed', 'rejected', 'client_rejected'].includes(status)
+  return ['completed', 'rejected', 'client_rejected', 'auto_closed'].includes(status)
 }
 
 // أولويات المهام للإدارة

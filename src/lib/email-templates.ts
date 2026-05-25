@@ -358,6 +358,41 @@ export function paymentConfirmedToClient(d: {
   }
 }
 
+// 5c. Auto-closed after 7 days pending — to client
+export function requestAutoClosedToClient(d: {
+  requestNumber: string
+  clientName: string
+}) {
+  return {
+    subject: `📋 تم إغلاق طلبك تلقائياً · ${d.requestNumber}`,
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <div style="text-align:center; margin-bottom:20px;">
+        <div style="font-size:48px;">📋</div>
+        <h2 style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${BRAND_NAVY};">تم إغلاق طلبك تلقائياً</h2>
+      </div>
+      <p style="margin:0 0 16px 0; font-size:14px; line-height:1.8;">
+        طلبك <strong>${escapeHtml(d.requestNumber)}</strong> كان تحت المراجعة لأكثر من أسبوع دون معالجة،
+        لذلك أُغلق تلقائياً للحفاظ على تنظيم قائمة الطلبات.
+      </p>
+      <div style="background:#F7F4ED; border-radius:12px; padding:16px; margin-bottom:18px;">
+        <p style="margin:0 0 8px 0; font-size:13px; font-weight:bold; color:${BRAND_NAVY};">📌 هل ترغب في المتابعة؟</p>
+        <p style="margin:0; font-size:13px; line-height:1.8; color:#4B5563;">
+          يسعدنا استقبال طلبك مجدداً — ما عليك سوى الدخول للموقع ورفع طلب جديد
+          وسيتم مراجعته بأولوية.
+        </p>
+      </div>
+      <p style="margin:0 0 20px 0; text-align:center;">
+        ${button('رفع طلب جديد', `${SITE_URL}/request`)}
+      </p>
+      <p style="margin:0; font-size:12px; color:#6B7C99; text-align:center;">
+        إذا كان الإغلاق خطأً أو تحتاج مساعدة، تواصل معنا عبر
+        <a href="${SITE_URL}/contact" style="color:${BRAND_GOLD};">صفحة التواصل</a>.
+      </p>
+    `),
+  }
+}
+
 // 6. In progress — to client
 export function inProgressToClient(d: {
   requestNumber: string

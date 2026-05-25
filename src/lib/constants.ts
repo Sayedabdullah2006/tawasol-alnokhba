@@ -153,6 +153,7 @@ export const REQUEST_STATUSES = {
   content_review: { label: 'مراجعة المحتوى', color: 'purple' },
   completed: { label: 'مكتمل', color: 'green' },
   rejected: { label: 'مرفوض', color: 'red' },
+  auto_closed: { label: 'أُغلق تلقائياً', color: 'gray' },
 } as const
 
 export type RequestStatus = keyof typeof REQUEST_STATUSES
