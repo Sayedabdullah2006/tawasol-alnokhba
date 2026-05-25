@@ -130,18 +130,19 @@ export const ADMIN_STATUS_LABELS: Record<RequestStatus, { label: string; color: 
 }
 
 // دالة للحصول على تسمية الحالة حسب دور المستخدم
+const FALLBACK_LABEL = { label: 'غير معروف', color: 'gray', description: '' }
+
 export function getStatusLabel(
   status: RequestStatus,
   userRole: 'client' | 'admin' | 'public' = 'public'
 ): { label: string; color: string; description: string } {
   switch (userRole) {
     case 'client':
-      return CLIENT_STATUS_LABELS[status]
+      return CLIENT_STATUS_LABELS[status] ?? FALLBACK_LABEL
     case 'admin':
-      return ADMIN_STATUS_LABELS[status]
+      return ADMIN_STATUS_LABELS[status] ?? FALLBACK_LABEL
     default:
-      // للمستخدمين العامين أو غير المحددين، استخدم تسميات محايدة
-      return CLIENT_STATUS_LABELS[status]
+      return CLIENT_STATUS_LABELS[status] ?? FALLBACK_LABEL
   }
 }
 
