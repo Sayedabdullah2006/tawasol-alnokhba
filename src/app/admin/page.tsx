@@ -51,7 +51,6 @@ export default function AdminStatsPage() {
       const now = new Date()
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-      const outstandingStatuses = ['quoted', 'negotiation', 'approved', 'payment_review']
       const paidStatuses = ['paid', 'in_progress', 'content_review', 'completed']
 
       const finalTotal = total || requests.length
@@ -64,8 +63,9 @@ export default function AdminStatsPage() {
         monthRevenue: requests
           .filter(r => r.status === 'completed' && r.created_at >= monthStart)
           .reduce((s, r) => s + (r.final_total ?? 0), 0),
+        // فقط الطلبات التي أُرسل لها عرض سعر وبانتظار موافقة العميل (لم تُغلق ولم تُدفع)
         outstanding: requests
-          .filter(r => outstandingStatuses.includes(r.status))
+          .filter(r => r.status === 'quoted')
           .reduce((s, r) => s + (r.final_total ?? r.admin_quoted_price ?? 0), 0),
         paidCount,
         conversionRate: finalTotal > 0 ? (paidCount / finalTotal) * 100 : 0,
@@ -123,7 +123,7 @@ export default function AdminStatsPage() {
           { label: 'الطلبات المعلقة', value: stats.pending, icon: '⏳' },
           { label: 'الإيرادات الإجمالية', value: `${formatNumber(stats.revenue)} ر.س`, icon: '💰' },
           { label: 'إيرادات هذا الشهر', value: `${formatNumber(stats.monthRevenue)} ر.س`, icon: '📅' },
-          { label: 'مبالغ غير مدفوعة', value: `${formatNumber(stats.outstanding)} ر.س`, icon: '🧾' },
+          { label: 'عروض بانتظار الموافقة', value: `${formatNumber(stats.outstanding)} ر.س`, icon: '🧾' },
           {
             label: `معدل التحويل (${stats.paidCount}/${stats.total})`,
             value: `${stats.conversionRate.toFixed(1)}%`,
