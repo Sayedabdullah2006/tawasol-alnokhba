@@ -1,26 +1,19 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // AUTO-QUOTE ENGINE — جدول الأسعار المعتمد
-// السعر = الأساسي + الإضافات + VAT 15%
+// السعر = الأساسي + الإضافات
 // لا حاجة لـ AI — التسعير مبني على الفئة + الفئة الفرعية + نوع العميل
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+import { EXTRAS } from '@/lib/constants'
 
 // لا يوجد ضريبة قيمة مضافة في هذا النظام
 export const AQ_VAT = 0
 
-// ─── أسعار الخدمات الإضافية (بدون VAT) ───
-export const AQ_EXTRAS_PRICES: Record<string, number> = {
-  bilingual:    300,
-  mention:      200,
-  story:        150,
-  encyclopedia: 500,
-  pin6:         100,
-  pin12:        200,
-  repost:       150,
-  campaign:    1000,
-  video:        400,
-  report:       800,
-  infographic:  300,
-}
+// ─── أسعار الخدمات الإضافية (مصدر الحقيقة: constants.ts → EXTRAS) ───
+// يُشتق تلقائياً من EXTRAS لضمان التزامن دائماً مع القائمة الرئيسية
+export const AQ_EXTRAS_PRICES: Record<string, number> = Object.fromEntries(
+  EXTRAS.map(e => [e.id, e.price])
+)
 
 export const AQ_EXTRAS_NAMES: Record<string, string> = {
   bilingual:    'صياغة المحتوى باللغتين',
@@ -126,6 +119,24 @@ export interface AQResult {
   subtotal: number
   vatAmount: number
   total: number
+}
+
+// ─── مساعد: تحليل sub_option من قاعدة البيانات ───
+// sub_option يُخزَّن كـ JSON string في DB للمسابقات — يجب تحويله قبل الإرسال لـ calculateAutoQuote
+export function parseSubOption(
+  raw: string | object | null | undefined
+): AQInput['subOption'] {
+  if (!raw) return null
+  if (typeof raw === 'object') return raw as { subcategory: string; position: string }
+  try {
+    const parsed = JSON.parse(raw)
+    if (typeof parsed === 'object' && parsed !== null) {
+      return parsed as { subcategory: string; position: string }
+    }
+    return parsed as string
+  } catch {
+    return raw  // إذا لم يكن JSON صالحاً → استخدمه كـ string عادي
+  }
 }
 
 // ─── الدالة الرئيسية للاحتساب ───

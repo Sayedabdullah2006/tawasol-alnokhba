@@ -43,19 +43,27 @@ export async function POST(request: Request) {
     const { data: updated, error } = await supabase
       .from('publish_requests')
       .update({
-        admin_quoted_price: quotedPrice,
-        admin_offered_extras: offeredExtras ?? [],
-        user_selected_extras: [],
-        extras_selected_total: 0,
-        final_total: quotedPrice,
-        estimated_reach: baseReach ?? 0,
-        status: 'quoted',
-        quoted_at: new Date().toISOString(),
-        admin_notes: adminNotes ?? null,
-        quote_expires_at: null,
-        quote_quick_discount_pct: quickDiscountPct ?? null,
+        admin_quoted_price:            quotedPrice,
+        admin_offered_extras:          offeredExtras ?? [],
+        user_selected_extras:          [],
+        extras_selected_total:         0,
+        final_total:                   quotedPrice,
+        estimated_reach:               baseReach ?? 0,
+        status:                        'quoted',
+        quoted_at:                     new Date().toISOString(),
+        last_status_change:            new Date().toISOString(),
+        admin_notes:                   adminNotes ?? null,
+        quote_expires_at:              null,
+        quote_quick_discount_pct:      quickDiscountPct ?? null,
         quote_quick_discount_deadline: quickDiscountDeadline ?? null,
-        updated_at: new Date().toISOString(),
+        updated_at:                    new Date().toISOString(),
+        // ── إعادة ضبط حقول التفاوض ─────────────────────────────────────
+        // عند إرسال عرض يدوي جديد يبدأ التفاوض من الصفر
+        original_quoted_price:         null,
+        negotiation_round:             0,
+        negotiation_rejected:          false,
+        negotiation_reason:            null,
+        client_proposed_price:         null,
       })
       .eq('id', requestId)
       .select('request_number, client_name, client_email')

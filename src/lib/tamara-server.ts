@@ -177,6 +177,29 @@ export async function createTamaraCheckoutSession(
   return { success: true, checkoutUrl: checkout_url, orderId: order_id, checkoutId: checkout_id }
 }
 
+// ─── Fetch Order Details ──────────────────────────────────────────────────────
+
+/**
+ * Fetch order details from Tamara API to verify amount before processing.
+ * Returns the total amount in SAR, or null if the request fails.
+ */
+async function fetchTamaraOrderAmount(tamaraOrderId: string): Promise<number | null> {
+  try {
+    const res = await fetch(`${TAMARA_API_URL}/orders/${tamaraOrderId}`, {
+      headers: { 'Authorization': authHeader() },
+    })
+    if (!res.ok) {
+      console.error('[TAMARA] Failed to fetch order details:', res.status)
+      return null
+    }
+    const data = await res.json() as { total_amount?: { amount?: number } }
+    return Number(data.total_amount?.amount ?? 0) || null
+  } catch (err) {
+    console.error('[TAMARA] Error fetching order:', err)
+    return null
+  }
+}
+
 // ─── Authorize Order ──────────────────────────────────────────────────────────
 
 export async function authorizeTamaraOrder(orderId: string): Promise<boolean> {
@@ -212,7 +235,7 @@ export async function handleTamaraOrderApproved(
   // Idempotency: skip if already processed
   const { data: existing } = await supabase
     .from('publish_requests')
-    .select('id, status, client_name, client_email, request_number')
+    .select('id, status, client_name, client_email, request_number, final_total, admin_quoted_price')
     .eq('tamara_order_id', tamaraOrderId)
     .maybeSingle()
 
@@ -225,6 +248,35 @@ export async function handleTamaraOrderApproved(
       return { success: true, reason: 'already_processed' }
     }
     requestId = target.id
+  }
+
+  // ── التحقق من مبلغ الدفع مع تمارا ────────────────────────────────
+  const tamaraAmount = await fetchTamaraOrderAmount(tamaraOrderId)
+  if (tamaraAmount !== null) {
+    // Fetch expected amount from DB (use existing row if available)
+    let expectedAmount: number | null = null
+    if (target) {
+      expectedAmount = Number(target.final_total ?? target.admin_quoted_price ?? 0) || null
+    } else {
+      const { data: dbReq } = await supabase
+        .from('publish_requests')
+        .select('final_total, admin_quoted_price')
+        .eq('id', requestId)
+        .single()
+      if (dbReq) {
+        expectedAmount = Number(dbReq.final_total ?? dbReq.admin_quoted_price ?? 0) || null
+      }
+    }
+    if (expectedAmount !== null && tamaraAmount !== expectedAmount) {
+      console.error(
+        `[TAMARA] ❌ Amount mismatch: Tamara=${tamaraAmount} SAR, DB=${expectedAmount} SAR`
+      )
+      return { success: false, reason: 'amount_mismatch' }
+    }
+    console.log(`[TAMARA] ✅ Amount verified: ${tamaraAmount} SAR`)
+  } else {
+    // إذا فشل جلب التفاصيل، نكمل بحذر ونسجّل تحذيراً
+    console.warn('[TAMARA] ⚠️ Could not verify amount from Tamara API — proceeding with caution')
   }
 
   // Authorize with Tamara first

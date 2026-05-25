@@ -5,10 +5,26 @@ import {
   notifyInProgressToClient,
   notifyCompletedToClient,
   notifyRejectedToClient,
-  notifyQuoteReadyToClient,
   notifyStatusUpdateToClient,
 } from '@/lib/email'
 import { REQUEST_STATUSES } from '@/lib/constants'
+
+// ── حماية انتقالات الحالة ──────────────────────────────────────────
+// يمنع الانتقال العشوائي بين الحالات ويحمي الحالات المالية النهائية
+const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+  pending:         ['quoted', 'rejected'],
+  quoted:          ['approved', 'rejected', 'pending'],
+  negotiation:     ['quoted', 'rejected', 'pending'],
+  client_rejected: ['quoted', 'rejected', 'pending'],
+  approved:        ['in_progress', 'paid', 'payment_review', 'rejected'],
+  payment_review:  ['approved', 'paid', 'rejected'],
+  paid:            ['in_progress'],
+  in_progress:     ['content_review', 'completed'],
+  content_review:  ['in_progress', 'completed'],
+  completed:       [],          // حالة نهائية — لا تراجع
+  rejected:        ['pending'], // يمكن إعادة فتح الطلب المرفوض
+  auto_closed:     ['pending'],
+}
 
 export async function POST(request: Request) {
   try {
@@ -28,14 +44,41 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { requestId, status, adminNotes } = body
+    const { requestId, status: newStatus, adminNotes } = body
 
+    if (!requestId || !newStatus) {
+      return NextResponse.json({ error: 'البيانات غير مكتملة' }, { status: 400 })
+    }
+
+    // ── جلب الحالة الحالية قبل التحديث ──────────────────────────────
+    const { data: current } = await supabase
+      .from('publish_requests')
+      .select('status')
+      .eq('id', requestId)
+      .single()
+
+    if (!current) {
+      return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 })
+    }
+
+    // ── التحقق من صحة الانتقال ────────────────────────────────────────
+    const allowed = ALLOWED_TRANSITIONS[current.status] ?? []
+    if (!allowed.includes(newStatus)) {
+      return NextResponse.json({
+        error: `لا يمكن الانتقال من "${current.status}" إلى "${newStatus}"`,
+        currentStatus: current.status,
+        allowedTransitions: allowed,
+      }, { status: 422 })
+    }
+
+    // ── تحديث قاعدة البيانات ──────────────────────────────────────────
     const { data: updated, error } = await supabase
       .from('publish_requests')
       .update({
-        status,
-        admin_notes: adminNotes,
-        updated_at: new Date().toISOString(),
+        status:            newStatus,
+        admin_notes:       adminNotes,
+        last_status_change: new Date().toISOString(),
+        updated_at:        new Date().toISOString(),
       })
       .eq('id', requestId)
       .select('request_number, client_name, client_email, final_total, admin_quoted_price, estimated_reach')
@@ -45,7 +88,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'فشل تحديث الحالة' }, { status: 500 })
     }
 
-    // Notify client of the status change — async, never blocks the response
+    // ── إخطار العميل بتغيير الحالة ───────────────────────────────────
+    // ملاحظة: حالة "quoted" لا تُرسل من هنا — send-quote يتولى ذلك
     if (updated?.client_email) {
       const requestNumber = `ATH-${String(updated.request_number).padStart(4, '0')}`
       const base = {
@@ -54,29 +98,15 @@ export async function POST(request: Request) {
         clientName: updated.client_name ?? 'عزيزنا',
       }
       let p: Promise<boolean> | null = null
-      switch (status) {
-        case 'quoted':
-          // When admin manually sets status to quoted (sends quote)
-          p = notifyQuoteReadyToClient({
-            ...base,
-            price: Number(updated.admin_quoted_price ?? 0),
-            reach: Number(updated.estimated_reach ?? 0) // Use stored reach estimate
-          })
-          break
+      switch (newStatus) {
         case 'paid':
-          p = notifyPaymentConfirmedToClient({ ...base, total: Number(updated.final_total ?? updated.admin_quoted_price ?? 0) })
+          p = notifyPaymentConfirmedToClient({
+            ...base,
+            total: Number(updated.final_total ?? updated.admin_quoted_price ?? 0),
+          })
           break
         case 'in_progress':
           p = notifyInProgressToClient(base)
-          break
-        case 'content_review':
-          // When admin manually changes status to content review
-          p = notifyStatusUpdateToClient({
-            ...base,
-            status,
-            statusLabel: REQUEST_STATUSES[status as keyof typeof REQUEST_STATUSES]?.label || status,
-            adminNotes
-          })
           break
         case 'completed':
           p = notifyCompletedToClient(base)
@@ -84,41 +114,25 @@ export async function POST(request: Request) {
         case 'rejected':
           p = notifyRejectedToClient({ ...base, reason: adminNotes ?? '' })
           break
+        case 'content_review':
         case 'payment_review':
-          // When admin manually changes status to payment review
-          p = notifyStatusUpdateToClient({
-            ...base,
-            status,
-            statusLabel: REQUEST_STATUSES[status as keyof typeof REQUEST_STATUSES]?.label || status,
-            adminNotes
-          })
-          break
         case 'approved':
-          // When admin manually approves (rare, usually done via approve-quote)
-          p = notifyStatusUpdateToClient({
-            ...base,
-            status,
-            statusLabel: REQUEST_STATUSES[status as keyof typeof REQUEST_STATUSES]?.label || status,
-            adminNotes
-          })
-          break
         case 'pending':
-          // When admin manually changes back to pending
           p = notifyStatusUpdateToClient({
             ...base,
-            status,
-            statusLabel: REQUEST_STATUSES[status as keyof typeof REQUEST_STATUSES]?.label || status,
-            adminNotes
+            status:      newStatus,
+            statusLabel: REQUEST_STATUSES[newStatus as keyof typeof REQUEST_STATUSES]?.label || newStatus,
+            adminNotes,
           })
           break
+        // "quoted" مقصود عدم إرسال إيميل هنا — send-quote يتولاه
         default:
-          // For any other status changes, send generic notification
-          if (REQUEST_STATUSES[status as keyof typeof REQUEST_STATUSES]) {
+          if (REQUEST_STATUSES[newStatus as keyof typeof REQUEST_STATUSES]) {
             p = notifyStatusUpdateToClient({
               ...base,
-              status,
-              statusLabel: REQUEST_STATUSES[status as keyof typeof REQUEST_STATUSES].label,
-              adminNotes
+              status:      newStatus,
+              statusLabel: REQUEST_STATUSES[newStatus as keyof typeof REQUEST_STATUSES].label,
+              adminNotes,
             })
           }
           break

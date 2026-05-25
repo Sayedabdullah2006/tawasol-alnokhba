@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { createServiceRoleClient } from '@/lib/supabase-server';
 
 export async function POST(request: NextRequest) {
@@ -18,7 +19,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'server misconfigured' }, { status: 500 });
     }
 
-    if (!signature || signature !== webhookSecret) {
+    // استخدام timingSafeEqual لمنع هجمات التوقيت (timing attacks)
+    const sigBuf = Buffer.from(signature ?? '')
+    const expBuf = Buffer.from(webhookSecret)
+    const signatureValid = sigBuf.length === expBuf.length &&
+      timingSafeEqual(sigBuf, expBuf)
+
+    if (!signature || !signatureValid) {
       console.error('[WEBHOOK] ❌ Invalid signature — rejected');
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
