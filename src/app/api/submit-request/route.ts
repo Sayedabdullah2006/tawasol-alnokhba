@@ -3,14 +3,14 @@ import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supab
 import { generateRequestNumber } from '@/lib/utils'
 import { notifyNewRequestToAdmin, notifyQuoteReadyToClient } from '@/lib/email'
 import { CATEGORIES } from '@/lib/constants'
-import { calculateAutoQuote } from '@/lib/auto-quote'
+import { calculateAutoQuote, calculateCampaignQuote, CAMPAIGN_DISCOUNT_PCT } from '@/lib/auto-quote'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
     const serviceClient = await createServiceRoleClient()
 
-    // ── تحديد المستخدم ──────────────────────────────────────────────────
+    // ── تحديد المستخدم ───────────────────────────────────────────
     let userId: string | null = null
     try {
       const userClient = await createServerSupabaseClient()
@@ -22,7 +22,6 @@ export async function POST(request: Request) {
       try {
         const { data: users } = await serviceClient.auth.admin.listUsers()
         const existing = users?.users?.find(u => u.email === body.client_email)
-
         if (existing) {
           userId = existing.id
         } else {
@@ -36,11 +35,11 @@ export async function POST(request: Request) {
           if (newUser?.user) {
             userId = newUser.user.id
             await serviceClient.from('profiles').upsert({
-              id:       newUser.user.id,
+              id:        newUser.user.id,
               full_name: body.client_name,
-              phone:    body.client_phone,
-              city:     body.client_city,
-              x_handle: body.x_handle,
+              phone:     body.client_phone,
+              city:      body.client_city,
+              x_handle:  body.x_handle,
             })
           }
         }
@@ -49,11 +48,144 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── احتساب السعر التلقائي ──────────────────────────────────────────
     const selectedExtras: string[] = Array.isArray(body.selected_extras) ? body.selected_extras : []
     const channels: string[]       = Array.isArray(body.channels) ? body.channels : []
     const scope = channels.length > 1 ? 'all' : 'single'
+    const now   = new Date().toISOString()
+    const isCampaign = body.request_type === 'campaign'
 
+    // ── مسار الحملة ──────────────────────────────────────────────
+    if (isCampaign) {
+      const campaignPostsRaw: Array<{
+        category: string
+        sub_option: string | null
+        title: string
+        content: string
+        preferred_date?: string | null
+        images?: string[]
+        link?: string | null
+        hashtags?: string | null
+      }> = Array.isArray(body.campaign_posts) ? body.campaign_posts : []
+
+      if (campaignPostsRaw.length < 2) {
+        return NextResponse.json({ error: 'الحملة تتطلب منشورين على الأقل' }, { status: 400 })
+      }
+
+      // احتساب سعر كل منشور
+      const campaignCalc = calculateCampaignQuote(
+        campaignPostsRaw.map(p => ({
+          category:   p.category ?? '',
+          subOption:  p.sub_option
+            ? (() => {
+                try {
+                  const parsed = JSON.parse(p.sub_option!)
+                  return typeof parsed === 'object' ? parsed : p.sub_option!
+                } catch { return p.sub_option! }
+              })()
+            : null,
+          clientType: body.client_type ?? 'individual',
+        })),
+        selectedExtras,
+      )
+
+      // استخدم بيانات أول منشور لحقول title/content/category الإلزامية في الجدول
+      const firstPost = campaignPostsRaw[0]
+
+      const { data, error } = await serviceClient
+        .from('publish_requests')
+        .insert({
+          user_id:          userId,
+          influencer_id:    body.influencer_id,
+          client_type:      body.client_type,
+
+          // حقول إلزامية في الجدول — نملؤها ببيانات أول منشور
+          category:         'campaign',
+          title:            firstPost.title,
+          content:          firstPost.content,
+          scope,
+          images:           'one',
+
+          // حقول الحملة
+          request_type:         'campaign',
+          campaign_post_count:  campaignPostsRaw.length,
+          campaign_duration:    body.campaign_duration ?? null,
+          campaign_posts:       campaignPostsRaw,
+          campaign_subtotal:    campaignCalc.postsSubtotal,
+          campaign_discount_pct: CAMPAIGN_DISCOUNT_PCT,
+
+          channels,
+          extras:           selectedExtras,
+          num_posts:        campaignPostsRaw.length,
+
+          link:             firstPost.link ?? null,
+          hashtags:         firstPost.hashtags ?? null,
+          preferred_date:   firstPost.preferred_date ?? null,
+          content_images:   Array.isArray(firstPost.images) ? firstPost.images : [],
+
+          client_name:      body.client_name,
+          client_phone:     body.client_phone,
+          client_email:     body.client_email,
+          client_city:      body.client_city,
+          x_handle:         body.x_handle,
+
+          // تسعير
+          base_price:            campaignCalc.afterDiscount,
+          extras_total:          campaignCalc.extrasTotal,
+          vat_amount:            0,
+          total_amount:          campaignCalc.total,
+          admin_quoted_price:    campaignCalc.total,
+          admin_offered_extras:  [],
+          user_selected_extras:  [],
+          extras_selected_total: 0,
+          final_total:           campaignCalc.total,
+          estimated_reach:       0,
+
+          status:            'quoted',
+          quoted_at:         now,
+          last_status_change: now,
+          auto_quote_tier:   null,
+          auto_quoted_at:    now,
+          auto_quote_note:   `حملة ${campaignPostsRaw.length} منشورات — خصم ${CAMPAIGN_DISCOUNT_PCT}%`,
+          updated_at:        now,
+        })
+        .select('request_number, id')
+        .single()
+
+      if (error) {
+        console.error('Campaign insert error:', error)
+        return NextResponse.json({ error: 'فشل حفظ الطلب' }, { status: 500 })
+      }
+
+      const requestNumber = generateRequestNumber(data.request_number)
+
+      notifyNewRequestToAdmin({
+        requestNumber,
+        clientName:  body.client_name,
+        clientEmail: body.client_email,
+        clientPhone: body.client_phone,
+        category:    `حملة (${campaignPostsRaw.length} منشورات)`,
+        title:       `حملة: ${firstPost.title}`,
+        content:     firstPost.content,
+        channels,
+      }).catch(e => console.error('Admin campaign email failed:', e))
+
+      if (body.client_email) {
+        notifyQuoteReadyToClient({
+          email:                 body.client_email,
+          requestNumber,
+          clientName:            body.client_name ?? 'عزيزنا',
+          price:                 campaignCalc.total,
+          reach:                 0,
+          quoteExpiresAt:        null,
+          quickDiscountPct:      null,
+          quickDiscountDeadline: null,
+        }).catch(e => console.error('Campaign quote email failed:', e))
+      }
+
+      return NextResponse.json({ requestNumber, quotedTotal: campaignCalc.total })
+    }
+
+    // ── مسار المنشور الواحد ───────────────────────────────────────
     const subOptionForCalc = body.sub_option &&
       typeof body.sub_option === 'object' &&
       'subcategory' in body.sub_option
@@ -67,9 +199,6 @@ export async function POST(request: Request) {
       selectedExtras,
     })
 
-    const now = new Date().toISOString()
-
-    // ── حفظ الطلب مع عرض السعر مباشرة ──────────────────────────────────
     const { data, error } = await serviceClient
       .from('publish_requests')
       .insert({
@@ -99,7 +228,8 @@ export async function POST(request: Request) {
         client_city:      body.client_city,
         x_handle:         body.x_handle,
 
-        // ── حقول التسعير التلقائي ──
+        request_type:     'single',
+
         base_price:            priceCalc.basePrice,
         extras_total:          priceCalc.extrasTotal,
         vat_amount:            priceCalc.vatAmount,
@@ -111,11 +241,10 @@ export async function POST(request: Request) {
         final_total:           priceCalc.total,
         estimated_reach:       0,
 
-        // ── حالة مباشرة إلى "مُسعَّر" ──
         status:            'quoted',
         quoted_at:         now,
         last_status_change: now,
-        auto_quote_tier:   body.category,
+        auto_quote_tier:   null,
         auto_quoted_at:    now,
         auto_quote_note:   `تسعير تلقائي — فئة: ${body.category}، إضافات: ${selectedExtras.length}`,
         updated_at:        now,
@@ -130,11 +259,9 @@ export async function POST(request: Request) {
 
     const requestNumber = generateRequestNumber(data.request_number)
 
-    // ── إرسال الإيميلات (لا تُوقف الاستجابة في حال الفشل) ─────────────
-    const cat      = CATEGORIES.find(c => c.id === body.category)
+    const cat       = CATEGORIES.find(c => c.id === body.category)
     const catNameAr = cat?.nameAr ?? body.category
 
-    // إيميل المدير (إشعار طلب جديد بالسعر)
     notifyNewRequestToAdmin({
       requestNumber,
       clientName:  body.client_name,
@@ -146,24 +273,21 @@ export async function POST(request: Request) {
       channels,
     }).catch(e => console.error('Admin email failed:', e))
 
-    // إيميل العميل (عرض السعر فوراً)
     if (body.client_email) {
       notifyQuoteReadyToClient({
-        email:         body.client_email,
+        email:                 body.client_email,
         requestNumber,
-        clientName:    body.client_name ?? 'عزيزنا',
-        price:         priceCalc.total,
-        reach:         0,
-        quoteExpiresAt: null,
-        quickDiscountPct: null,
+        clientName:            body.client_name ?? 'عزيزنا',
+        price:                 priceCalc.total,
+        reach:                 0,
+        quoteExpiresAt:        null,
+        quickDiscountPct:      null,
         quickDiscountDeadline: null,
       }).catch(e => console.error('Quote email failed:', e))
     }
 
-    return NextResponse.json({
-      requestNumber,
-      quotedTotal: priceCalc.total,
-    })
+    return NextResponse.json({ requestNumber, quotedTotal: priceCalc.total })
+
   } catch (err) {
     console.error('Submit error:', err)
     return NextResponse.json({ error: 'حدث خطأ في الخادم' }, { status: 500 })

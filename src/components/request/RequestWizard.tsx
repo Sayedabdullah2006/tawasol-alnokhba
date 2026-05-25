@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/Toast'
 import WizardProgress from '@/components/pricing/WizardProgress'
 import WizardFooter from '@/components/pricing/WizardFooter'
 import StepInfluencer, { type Influencer } from '@/components/pricing/StepInfluencer'
+import RStepRequestType, { type RequestType } from './RStepRequestType'
 import RStep1ClientType, { type ClientType } from './RStep1ClientType'
 import Step1Category from '@/components/pricing/Step1Category'
 import StepSubOption from '@/components/pricing/StepSubOption'
@@ -16,20 +17,46 @@ import RStepExtras from './RStepExtras'
 import RStep5Contact, { type ContactData } from './RStep5Contact'
 import RStep6Terms from './RStep6Terms'
 import StepCompetition from '@/components/pricing/StepCompetition'
+import RStepCampaignSetup, { type CampaignSetup } from './RStepCampaignSetup'
+import RStepCampaignPosts, { type CampaignPostData, makeEmptyPost, isPostComplete } from './RStepCampaignPosts'
 import { validateEmail } from '@/lib/email-validation'
 import SuccessScreen from './SuccessScreen'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
-import { calculateAutoQuote } from '@/lib/auto-quote'
+import { calculateAutoQuote, calculateCampaignQuote, CAMPAIGN_DISCOUNT_PCT } from '@/lib/auto-quote'
 import { formatNumber } from '@/lib/utils'
+import { CATEGORIES } from '@/lib/constants'
 
-type StepId = 'influencer' | 'clientType' | 'category' | 'subOption' | 'details' | 'channels' | 'extras' | 'contact' | 'terms' | 'confirm'
+type StepId =
+  | 'influencer'
+  | 'requestType'
+  | 'clientType'
+  | 'category'
+  | 'subOption'
+  | 'details'
+  | 'channels'
+  | 'extras'
+  | 'contact'
+  | 'terms'
+  | 'confirm'
+  | 'campaignSetup'
+  | 'campaignPosts'
 
 const CHANNEL_LABELS: Record<string, string> = {
   x: 'X',
   ig: 'Instagram',
   li: 'LinkedIn',
   tk: 'TikTok',
+}
+
+const DURATION_LABELS: Record<string, string> = {
+  week_1:  'أسبوع',
+  week_2:  'أسبوعان',
+  month_1: 'شهر',
+  month_2: 'شهران',
+  month_3: '3 أشهر',
+  month_6: '6 أشهر',
+  open:    'مفتوح',
 }
 
 export default function RequestWizard() {
@@ -43,53 +70,83 @@ export default function RequestWizard() {
   const [influencers, setInfluencers] = useState<Influencer[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Step data
+  // ── Step data ──────────────────────────────────────────────────
   const [selectedInfluencer, setSelectedInfluencer] = useState<string | null>(null)
-  const [clientType, setClientType] = useState<ClientType | null>(null)
-  const [category, setCategory] = useState<string | null>(null)
-  const [subOption, setSubOption] = useState<string | null>(null)
-  const [competitionSelection, setCompetitionSelection] = useState<{ subcategory: string; position: string } | null>(null)
-  const [details, setDetails] = useState({ title: '', content: '', link: '', hashtags: '', preferredDate: '', images: [] as string[] })
-  const [channels, setChannels] = useState<string[]>([])
+  const [requestType, setRequestType]   = useState<RequestType | null>(null)
+  const [clientType, setClientType]     = useState<ClientType | null>(null)
+  const [category, setCategory]         = useState<string | null>(null)
+  const [subOption, setSubOption]       = useState<string | null>(null)
+  const [competitionSelection, setCompetitionSelection] =
+    useState<{ subcategory: string; position: string } | null>(null)
+  const [details, setDetails] = useState({
+    title: '', content: '', link: '', hashtags: '', preferredDate: '', images: [] as string[],
+  })
+  const [channels, setChannels]         = useState<string[]>([])
   const [selectedExtras, setSelectedExtras] = useState<string[]>([])
-  const [contact, setContact] = useState<ContactData>({ fullName: '', phone: '', email: '', city: '', xHandle: '' })
-  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [contact, setContact]           = useState<ContactData>({ fullName: '', phone: '', email: '', city: '', xHandle: '' })
+  const [termsAccepted, setTermsAccepted]   = useState(false)
   const [privacyAccepted, setPrivacyAccepted] = useState(false)
+
+  // ── Campaign-specific state ────────────────────────────────────
+  const [campaignSetup, setCampaignSetup] = useState<CampaignSetup>({ postCount: 2, duration: '' })
+  const [campaignPosts, setCampaignPosts] = useState<CampaignPostData[]>([makeEmptyPost(), makeEmptyPost()])
+
+  // Sync post array length when postCount changes
+  useEffect(() => {
+    setCampaignPosts(prev => {
+      const n = campaignSetup.postCount
+      if (prev.length === n) return prev
+      if (prev.length < n) return [...prev, ...Array.from({ length: n - prev.length }, makeEmptyPost)]
+      return prev.slice(0, n)
+    })
+  }, [campaignSetup.postCount])
 
   const selectedCat: DBCategory | null = categories.find(c => c.id === category) ?? null
   const needsSubOption = selectedCat?.has_sub_option && selectedCat?.sub_options?.length
   const isCompetitionCategory = category === 'competitions'
 
-  // احتساب السعر في أي وقت
-  const priceCalc = useMemo(() => {
-    if (!category) return null
-    const subOpt = isCompetitionCategory ? competitionSelection : subOption
+  // ── Price calculation ──────────────────────────────────────────
+  const singlePriceCalc = useMemo(() => {
+    if (!category || requestType !== 'single') return null
     return calculateAutoQuote({
       category,
-      subOption: subOpt,
+      subOption: isCompetitionCategory ? competitionSelection : subOption,
       clientType,
       selectedExtras,
     })
-  }, [category, subOption, competitionSelection, clientType, selectedExtras, isCompetitionCategory])
+  }, [category, subOption, competitionSelection, clientType, selectedExtras, isCompetitionCategory, requestType])
 
+  const campaignPriceCalc = useMemo(() => {
+    if (requestType !== 'campaign') return null
+    return calculateCampaignQuote(
+      campaignPosts.map(p => ({ category: p.category, subOption: p.subOption, clientType })),
+      selectedExtras,
+    )
+  }, [campaignPosts, clientType, selectedExtras, requestType])
+
+  const priceCalc = requestType === 'campaign' ? null : singlePriceCalc
+
+  // ── Steps ──────────────────────────────────────────────────────
   const steps: StepId[] = useMemo(() => {
-    const base: StepId[] = ['influencer', 'clientType', 'category']
+    if (requestType === 'campaign') {
+      return ['influencer', 'requestType', 'clientType', 'campaignSetup', 'campaignPosts', 'channels', 'extras', 'contact', 'terms', 'confirm']
+    }
+    const base: StepId[] = ['influencer', 'requestType', 'clientType', 'category']
     if (isCompetitionCategory || needsSubOption) base.push('subOption')
     base.push('details', 'channels', 'extras', 'contact', 'terms', 'confirm')
     return base
-  }, [isCompetitionCategory, needsSubOption])
+  }, [requestType, isCompetitionCategory, needsSubOption])
 
-  const currentStep = steps[stepIndex]
-  const totalSteps = steps.length
+  const currentStep  = steps[stepIndex]
+  const totalSteps   = steps.length
 
+  // ── Load data ──────────────────────────────────────────────────
   useEffect(() => {
     const supabase = createClient()
-
     supabase.from('influencers').select('*').eq('is_active', true).then(({ data }) => {
       setInfluencers((data as Influencer[]) ?? [])
       setLoading(false)
     })
-
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data: profile }) => {
@@ -109,11 +166,13 @@ export default function RequestWizard() {
 
   const selectedInf = influencers.find(i => i.id === selectedInfluencer) ?? null
 
+  // ── Validation ─────────────────────────────────────────────────
   const canProceed = (): boolean => {
     switch (currentStep) {
-      case 'influencer':  return selectedInfluencer !== null
-      case 'clientType':  return clientType !== null
-      case 'category':    return category !== null
+      case 'influencer':    return selectedInfluencer !== null
+      case 'requestType':   return requestType !== null
+      case 'clientType':    return clientType !== null
+      case 'category':      return category !== null
       case 'subOption':
         if (isCompetitionCategory) {
           return competitionSelection !== null &&
@@ -121,31 +180,61 @@ export default function RequestWizard() {
                  competitionSelection.position !== ''
         }
         return subOption !== null
-      case 'details':  return details.title.trim() !== '' && details.content.trim() !== ''
-      case 'channels': return channels.length > 0
-      case 'extras':   return true // اختياري دائماً
+      case 'details':       return details.title.trim() !== '' && details.content.trim() !== ''
+      case 'channels':      return channels.length > 0
+      case 'extras':        return true
       case 'contact':
         return contact.fullName.trim() !== ''
           && contact.phone.trim() !== ''
           && validateEmail(contact.email).valid
-      case 'terms':   return termsAccepted && privacyAccepted
-      case 'confirm': return true
-      default:        return true
+      case 'terms':         return termsAccepted && privacyAccepted
+      case 'confirm':       return true
+      case 'campaignSetup': return campaignSetup.postCount >= 2
+      case 'campaignPosts': return campaignPosts.every(isPostComplete)
+      default:              return true
     }
   }
 
   const goNext = () => { if (stepIndex < totalSteps - 1) setStepIndex(stepIndex + 1) }
   const goBack = () => { if (stepIndex > 0) setStepIndex(stepIndex - 1) }
 
+  // ── Submit ─────────────────────────────────────────────────────
   const handleSubmit = async () => {
     setSubmitting(true)
     try {
-      const subOptionData = isCompetitionCategory ? competitionSelection : subOption
+      let body: Record<string, unknown>
 
-      const res = await fetch('/api/submit-request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      if (requestType === 'campaign') {
+        body = {
+          request_type:     'campaign',
+          influencer_id:    selectedInfluencer,
+          client_type:      clientType,
+          channels,
+          selected_extras:  selectedExtras,
+          client_name:      contact.fullName,
+          client_phone:     contact.phone,
+          client_email:     contact.email,
+          client_city:      contact.city   || null,
+          x_handle:         contact.xHandle || null,
+          campaign_post_count: campaignSetup.postCount,
+          campaign_duration:   campaignSetup.duration || null,
+          campaign_posts: campaignPosts.map(p => ({
+            category:       p.category,
+            sub_option:     p.subOption
+              ? (typeof p.subOption === 'object' ? JSON.stringify(p.subOption) : p.subOption)
+              : null,
+            title:          p.title,
+            content:        p.content,
+            preferred_date: p.preferredDate || null,
+            images:         p.images,
+            link:           p.link || null,
+            hashtags:       p.hashtags || null,
+          })),
+        }
+      } else {
+        const subOptionData = isCompetitionCategory ? competitionSelection : subOption
+        body = {
+          request_type:    'single',
           influencer_id:   selectedInfluencer,
           client_type:     clientType,
           category,
@@ -159,11 +248,17 @@ export default function RequestWizard() {
           client_name:     contact.fullName,
           client_phone:    contact.phone,
           client_email:    contact.email,
-          client_city:     contact.city || null,
+          client_city:     contact.city   || null,
           x_handle:        contact.xHandle || null,
           channels,
           selected_extras: selectedExtras,
-        }),
+        }
+      }
+
+      const res = await fetch('/api/submit-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
       })
 
       const data = await res.json()
@@ -184,15 +279,31 @@ export default function RequestWizard() {
   if (loading || catsLoading) return <LoadingSpinner size="lg" />
   if (success) return <SuccessScreen requestNumber={requestNumber} quotedTotal={quotedTotal} />
 
+  // ── Render ─────────────────────────────────────────────────────
   return (
     <div className="flex flex-col bg-cream">
       <div className="max-w-3xl mx-auto w-full px-4 pt-6 flex-1 flex flex-col">
         <WizardProgress current={stepIndex + 1} total={totalSteps} />
 
         <div className="flex-1 py-4">
+
           {currentStep === 'influencer' && (
             <StepInfluencer influencers={influencers} selected={selectedInfluencer} onSelect={setSelectedInfluencer} />
           )}
+
+          {currentStep === 'requestType' && (
+            <RStepRequestType
+              selected={requestType}
+              onSelect={(v) => {
+                setRequestType(v)
+                // reset single-post fields when switching type
+                if (v === 'campaign') {
+                  setCategory(null); setSubOption(null); setCompetitionSelection(null)
+                }
+              }}
+            />
+          )}
+
           {currentStep === 'clientType' && (
             <RStep1ClientType
               selected={clientType}
@@ -202,6 +313,7 @@ export default function RequestWizard() {
               }}
             />
           )}
+
           {currentStep === 'category' && (
             <Step1Category
               selected={category}
@@ -210,6 +322,7 @@ export default function RequestWizard() {
               clientType={clientType}
             />
           )}
+
           {currentStep === 'subOption' && (
             <>
               {isCompetitionCategory ? (
@@ -219,9 +332,23 @@ export default function RequestWizard() {
               ) : null}
             </>
           )}
+
           {currentStep === 'details' && (
             <RStep3Details data={details} onChange={setDetails} />
           )}
+
+          {currentStep === 'campaignSetup' && (
+            <RStepCampaignSetup data={campaignSetup} onChange={setCampaignSetup} />
+          )}
+
+          {currentStep === 'campaignPosts' && (
+            <RStepCampaignPosts
+              posts={campaignPosts}
+              onChange={setCampaignPosts}
+              clientType={clientType}
+            />
+          )}
+
           {currentStep === 'channels' && (
             <RStepChannels
               influencer={selectedInf}
@@ -231,16 +358,28 @@ export default function RequestWizard() {
               )}
             />
           )}
-          {currentStep === 'extras' && priceCalc && (
+
+          {currentStep === 'extras' && (
             <RStepExtras
               selected={selectedExtras}
               onChange={setSelectedExtras}
-              basePrice={priceCalc.basePrice}
+              basePrice={
+                requestType === 'campaign'
+                  ? (campaignPriceCalc?.afterDiscount ?? 0)
+                  : (priceCalc?.basePrice ?? 0)
+              }
+              baseLabel={
+                requestType === 'campaign'
+                  ? `إجمالي الحملة (بعد خصم ${CAMPAIGN_DISCOUNT_PCT}%)`
+                  : undefined
+              }
             />
           )}
+
           {currentStep === 'contact' && (
             <RStep5Contact data={contact} onChange={setContact} />
           )}
+
           {currentStep === 'terms' && (
             <RStep6Terms
               termsAccepted={termsAccepted}
@@ -249,7 +388,9 @@ export default function RequestWizard() {
               onPrivacyChange={setPrivacyAccepted}
             />
           )}
-          {currentStep === 'confirm' && priceCalc && (
+
+          {/* ── Confirm ─────────────────────────────────────────── */}
+          {currentStep === 'confirm' && (
             <div className="wizard-enter max-w-lg mx-auto space-y-5">
               <h2 className="text-xl md:text-2xl font-black text-dark text-center mb-1">
                 كل شي تمام؟
@@ -268,19 +409,47 @@ export default function RequestWizard() {
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-muted">الفئة</span>
-                    <span className="font-medium">{selectedCat?.name_ar}</span>
+                    <span className="text-muted">نوع الطلب</span>
+                    <span className="font-medium">
+                      {requestType === 'campaign' ? `🚀 حملة (${campaignSetup.postCount} منشورات)` : '📄 منشور واحد'}
+                    </span>
                   </div>
+                  {requestType === 'single' && category && (
+                    <div className="flex justify-between">
+                      <span className="text-muted">الفئة</span>
+                      <span className="font-medium">
+                        {CATEGORIES.find(c => c.id === category)?.nameAr ?? category}
+                      </span>
+                    </div>
+                  )}
+                  {requestType === 'campaign' && campaignSetup.duration && (
+                    <div className="flex justify-between">
+                      <span className="text-muted">مدة الحملة</span>
+                      <span className="font-medium">{DURATION_LABELS[campaignSetup.duration] ?? campaignSetup.duration}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-muted">القنوات</span>
                     <span className="font-medium">{channels.map(c => CHANNEL_LABELS[c] ?? c).join('، ')}</span>
                   </div>
-                  <div className="border-t border-border pt-3">
-                    <div className="flex justify-between">
-                      <span className="text-muted">عنوان الخبر</span>
-                      <span className="font-medium text-right max-w-[200px] truncate">{details.title}</span>
+                  {requestType === 'single' && (
+                    <div className="border-t border-border pt-3">
+                      <div className="flex justify-between">
+                        <span className="text-muted">عنوان الخبر</span>
+                        <span className="font-medium text-right max-w-[200px] truncate">{details.title}</span>
+                      </div>
                     </div>
-                  </div>
+                  )}
+                  {requestType === 'campaign' && (
+                    <div className="border-t border-border pt-3 space-y-1">
+                      {campaignPosts.map((p, i) => (
+                        <div key={i} className="flex justify-between text-xs">
+                          <span className="text-muted">منشور {i + 1}</span>
+                          <span className="font-medium truncate max-w-[180px]">{p.title || '—'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -290,19 +459,47 @@ export default function RequestWizard() {
                   <p className="font-bold text-dark text-sm">💰 تفاصيل العرض</p>
                 </div>
                 <div className="p-5 space-y-2 text-sm">
-                  <div className="flex justify-between text-muted">
-                    <span>السعر الأساسي</span>
-                    <span>{formatNumber(priceCalc.basePrice)} ر.س</span>
-                  </div>
-                  {priceCalc.extrasBreakdown.map(e => (
-                    <div key={e.id} className="flex justify-between text-muted">
-                      <span>{e.name}</span>
-                      <span>+{formatNumber(e.price)} ر.س</span>
-                    </div>
-                  ))}
+                  {requestType === 'campaign' && campaignPriceCalc ? (
+                    <>
+                      <div className="flex justify-between text-muted">
+                        <span>مجموع المنشورات ({campaignSetup.postCount})</span>
+                        <span>{formatNumber(campaignPriceCalc.postsSubtotal)} ر.س</span>
+                      </div>
+                      <div className="flex justify-between text-green font-semibold">
+                        <span>خصم الحملة ({CAMPAIGN_DISCOUNT_PCT}%)</span>
+                        <span>− {formatNumber(campaignPriceCalc.discountAmount)} ر.س</span>
+                      </div>
+                      {campaignPriceCalc.extrasBreakdown.map(e => (
+                        <div key={e.id} className="flex justify-between text-muted">
+                          <span>{e.name}</span>
+                          <span>+{formatNumber(e.price)} ر.س</span>
+                        </div>
+                      ))}
+                    </>
+                  ) : priceCalc ? (
+                    <>
+                      <div className="flex justify-between text-muted">
+                        <span>السعر الأساسي</span>
+                        <span>{formatNumber(priceCalc.basePrice)} ر.س</span>
+                      </div>
+                      {priceCalc.extrasBreakdown.map(e => (
+                        <div key={e.id} className="flex justify-between text-muted">
+                          <span>{e.name}</span>
+                          <span>+{formatNumber(e.price)} ر.س</span>
+                        </div>
+                      ))}
+                    </>
+                  ) : null}
+
                   <div className="flex justify-between font-black text-dark text-lg border-t border-border pt-3 mt-1">
                     <span>الإجمالي</span>
-                    <span className="text-green">{formatNumber(priceCalc.total)} ر.س</span>
+                    <span className="text-green">
+                      {formatNumber(
+                        requestType === 'campaign'
+                          ? (campaignPriceCalc?.total ?? 0)
+                          : (priceCalc?.total ?? 0)
+                      )} ر.س
+                    </span>
                   </div>
                 </div>
               </div>
@@ -320,6 +517,7 @@ export default function RequestWizard() {
           )}
         </div>
 
+        {/* Footer */}
         {currentStep !== 'confirm' ? (
           <WizardFooter
             onNext={goNext}

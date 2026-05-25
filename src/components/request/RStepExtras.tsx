@@ -7,9 +7,10 @@ interface Props {
   selected: string[]
   onChange: (extras: string[]) => void
   basePrice: number
+  baseLabel?: string
 }
 
-export default function RStepExtras({ selected, onChange, basePrice }: Props) {
+export default function RStepExtras({ selected, onChange, basePrice, baseLabel }: Props) {
   const toggle = (id: string) => {
     // pin6 و pin12 متعارضان
     if (id === 'pin6' && !selected.includes('pin6')) {
@@ -73,7 +74,7 @@ export default function RStepExtras({ selected, onChange, basePrice }: Props) {
       {/* ملخص السعر الحي */}
       <div className="bg-card border border-border rounded-2xl p-4 space-y-2 text-sm">
         <div className="flex justify-between text-muted">
-          <span>السعر الأساسي</span>
+          <span>{baseLabel ?? 'السعر الأساسي'}</span>
           <span>{formatNumber(basePrice)} ر.س</span>
         </div>
         {extrasTotal > 0 && (

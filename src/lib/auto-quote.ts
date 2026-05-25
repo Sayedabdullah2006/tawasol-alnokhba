@@ -139,6 +139,65 @@ export function parseSubOption(
   }
 }
 
+// ─── حملة: ثوابت وأنواع ─────────────────────────────────────────
+
+export const CAMPAIGN_DISCOUNT_PCT = 30
+
+export interface CampaignPostInput {
+  category: string
+  subOption?: AQInput['subOption']
+  clientType?: string | null
+}
+
+export interface CampaignQuoteResult {
+  posts: Array<{ index: number; category: string; basePrice: number }>
+  postsSubtotal: number
+  discountAmount: number
+  discountPct: number
+  afterDiscount: number
+  extrasBreakdown: { id: string; name: string; price: number }[]
+  extrasTotal: number
+  total: number
+}
+
+export function calculateCampaignQuote(
+  posts: CampaignPostInput[],
+  selectedExtras: string[],
+  discountPct: number = CAMPAIGN_DISCOUNT_PCT,
+): CampaignQuoteResult {
+  const postBreakdown = posts.map((p, i) => {
+    const result = calculateAutoQuote({
+      category: p.category,   // fallback 499 من calculateAutoQuote إذا كانت الفئة غير معروفة
+      subOption: p.subOption,
+      clientType: p.clientType,
+      selectedExtras: [],
+    })
+    return { index: i, category: p.category, basePrice: result.basePrice }
+  })
+
+  const postsSubtotal = postBreakdown.reduce((s, p) => s + p.basePrice, 0)
+  const discountAmount = Math.round(postsSubtotal * discountPct / 100)
+  const afterDiscount = postsSubtotal - discountAmount
+
+  const extrasBreakdown = selectedExtras
+    .filter(id => AQ_EXTRAS_PRICES[id] !== undefined)
+    .map(id => ({ id, name: AQ_EXTRAS_NAMES[id] ?? id, price: AQ_EXTRAS_PRICES[id] }))
+
+  const extrasTotal = extrasBreakdown.reduce((s, e) => s + e.price, 0)
+  const total = afterDiscount + extrasTotal
+
+  return {
+    posts: postBreakdown,
+    postsSubtotal,
+    discountAmount,
+    discountPct,
+    afterDiscount,
+    extrasBreakdown,
+    extrasTotal,
+    total,
+  }
+}
+
 // ─── الدالة الرئيسية للاحتساب ───
 
 export function calculateAutoQuote(input: AQInput): AQResult {

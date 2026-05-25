@@ -20,6 +20,16 @@ import { getAdminActions, requiresAdminAction, waitingForClient, isFinalStatus, 
 
 // ── مساعدات عرض البيانات ───────────────────────────────────────────
 
+const CAMPAIGN_DURATION_LABELS: Record<string, string> = {
+  week_1:  'أسبوع واحد',
+  week_2:  'أسبوعان',
+  month_1: 'شهر واحد',
+  month_2: 'شهران',
+  month_3: '3 أشهر',
+  month_6: '6 أشهر',
+  open:    'مفتوح (بدون تحديد)',
+}
+
 const CLIENT_TYPE_LABELS: Record<string, string> = {
   individual: '👤 فرد',
   business:   '🏢 شركة / مؤسسة تجارية',
@@ -466,6 +476,109 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
               </div>
             </div>
 
+            {/* ② ب — منشورات الحملة */}
+            {request.request_type === 'campaign' && Array.isArray(request.campaign_posts) && request.campaign_posts.length > 0 && (
+              <div className="bg-card rounded-2xl border border-border p-5">
+                <h2 className="font-bold text-dark mb-4 flex items-center gap-2">
+                  🚀 منشورات الحملة
+                  <span className="text-xs bg-green/10 text-green-700 font-bold px-2 py-0.5 rounded-full mr-1">
+                    {request.campaign_posts.length} منشور
+                  </span>
+                  {request.campaign_discount_pct && (
+                    <span className="text-xs bg-orange-100 text-orange-700 font-bold px-2 py-0.5 rounded-full">
+                      خصم {request.campaign_discount_pct}%
+                    </span>
+                  )}
+                </h2>
+
+                {/* تفاصيل التسعير */}
+                {request.campaign_subtotal != null && (
+                  <div className="mb-4 bg-green/5 rounded-xl p-3 text-sm flex justify-between">
+                    <div>
+                      <div className="text-muted line-through">{formatNumber(request.campaign_subtotal)} ر.س</div>
+                      <div className="font-black text-green text-lg">{formatNumber(request.base_price)} ر.س</div>
+                    </div>
+                    <div className="text-left text-xs text-muted self-center">
+                      <div>بعد خصم {request.campaign_discount_pct ?? 30}%</div>
+                      <div className="text-green font-bold">وفّر {formatNumber(request.campaign_subtotal - (request.base_price ?? 0))} ر.س</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* مدة الحملة */}
+                {request.campaign_duration && (
+                  <div className="mb-4">
+                    <InfoRow label="مدة الحملة">
+                      <span className="font-medium">
+                        {CAMPAIGN_DURATION_LABELS[request.campaign_duration] ?? request.campaign_duration}
+                      </span>
+                    </InfoRow>
+                  </div>
+                )}
+
+                {/* بطاقات المنشورات */}
+                <div className="space-y-3">
+                  {request.campaign_posts.map((post: Record<string, unknown>, idx: number) => {
+                    const pCat = CATEGORIES.find(c => c.id === post.category)
+                    let subLabel: string | null = null
+                    if (post.sub_option) {
+                      subLabel = renderSubOptionLabel(post.category as string, post.sub_option as string)
+                    }
+                    return (
+                      <div key={idx} className="rounded-xl border border-border bg-cream/50 overflow-hidden">
+                        <div className="flex items-center gap-3 px-4 py-3 bg-card border-b border-border/50">
+                          <div className="w-7 h-7 rounded-full bg-green/10 text-green text-sm font-black flex items-center justify-center flex-shrink-0">
+                            {idx + 1}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-bold text-dark text-sm truncate">{post.title as string || '—'}</div>
+                            {pCat && (
+                              <div className="text-xs text-muted">{pCat.icon} {pCat.nameAr}</div>
+                            )}
+                          </div>
+                          {!!post.preferred_date && (
+                            <div className="text-xs text-orange-600 flex-shrink-0">
+                              📅 {formatDate(post.preferred_date as string)}
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-4 space-y-2 text-sm">
+                          {subLabel && (
+                            <div className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-lg inline-block">
+                              {subLabel}
+                            </div>
+                          )}
+                          <div className="text-dark whitespace-pre-line bg-cream rounded-lg p-3 border border-border/50">
+                            {post.content as string}
+                          </div>
+                          {!!post.link && (
+                            <a href={post.link as string} target="_blank" rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline text-xs break-all" dir="ltr">
+                              {post.link as string}
+                            </a>
+                          )}
+                          {!!post.hashtags && (
+                            <div className="text-blue-600 text-xs font-medium" dir="ltr">{post.hashtags as string}</div>
+                          )}
+                          {Array.isArray(post.images) && (post.images as string[]).length > 0 && (
+                            <div className="grid grid-cols-4 gap-1 mt-1">
+                              {(post.images as string[]).map((url, i) => (
+                                <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                                  className="aspect-square rounded-lg overflow-hidden border border-border block">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={url} alt={`صورة ${i + 1}`} className="w-full h-full object-cover" />
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* ③ الخدمات الإضافية */}
             {selectedExtras.length > 0 && (
               <div className="bg-card rounded-2xl border border-border p-5">
@@ -509,12 +622,23 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                 </div>
 
                 <div className="space-y-2 text-sm">
-                  {request.base_price != null && (
+                  {request.request_type === 'campaign' && request.campaign_subtotal != null ? (
+                    <>
+                      <div className="flex justify-between text-muted">
+                        <span>مجموع المنشورات ({request.campaign_post_count})</span>
+                        <span>{formatNumber(request.campaign_subtotal)} ر.س</span>
+                      </div>
+                      <div className="flex justify-between text-green font-semibold">
+                        <span>خصم الحملة ({request.campaign_discount_pct ?? 30}%)</span>
+                        <span>− {formatNumber(request.campaign_subtotal - (request.base_price ?? 0))} ر.س</span>
+                      </div>
+                    </>
+                  ) : request.base_price != null ? (
                     <div className="flex justify-between text-muted">
                       <span>السعر الأساسي</span>
                       <span>{formatNumber(request.base_price)} ر.س</span>
                     </div>
-                  )}
+                  ) : null}
                   {selectedExtras.length > 0 && request.extras_total != null && (
                     <div className="flex justify-between text-muted">
                       <span>الخدمات الإضافية ({selectedExtras.length})</span>
