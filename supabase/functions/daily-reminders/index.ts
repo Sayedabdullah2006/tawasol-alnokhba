@@ -93,20 +93,30 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // 0. إغلاق الطلبات التي مضى عليها أكثر من 7 أيام في حالة pending
+    // 0. إغلاق الطلبات المتوقفة لأكثر من 7 أيام
+    // pending  → يُحسب من created_at (الطلب منتظر منذ الإنشاء)
+    // quoted   → يُحسب من last_status_change (العميل منتظر منذ وصول العرض)
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-    const { data: staleRequests, error: staleError } = await supabase
+    const { data: stalePending } = await supabase
       .from('publish_requests')
       .select('id, request_number, client_name, client_email')
-      .in('status', ['pending', 'quoted'])
+      .eq('status', 'pending')
       .lt('created_at', sevenDaysAgo)
       .not('client_email', 'is', null)
 
-    if (staleError) {
-      console.error('[AUTO-CLOSE] Error fetching stale requests:', staleError)
-    } else if (staleRequests && staleRequests.length > 0) {
-      console.log(`[AUTO-CLOSE] Found ${staleRequests.length} stale pending requests to close`)
+    const { data: staleQuoted } = await supabase
+      .from('publish_requests')
+      .select('id, request_number, client_name, client_email')
+      .eq('status', 'quoted')
+      .lt('last_status_change', sevenDaysAgo)
+      .not('client_email', 'is', null)
+
+    const staleRequests = [...(stalePending ?? []), ...(staleQuoted ?? [])]
+    const staleError = null // errors logged individually above
+
+    if (staleRequests.length > 0) {
+      console.log(`[AUTO-CLOSE] Found ${staleRequests.length} stale requests to close (pending: ${stalePending?.length ?? 0}, quoted: ${staleQuoted?.length ?? 0})`)
 
       for (const req of staleRequests) {
         try {
@@ -150,7 +160,7 @@ Deno.serve(async (req) => {
         }
       }
     } else {
-      console.log('[AUTO-CLOSE] No stale pending requests found')
+      console.log('[AUTO-CLOSE] No stale requests found')
     }
 
     // 1. العثور على الطلبات التي تحتاج تذكيرات
