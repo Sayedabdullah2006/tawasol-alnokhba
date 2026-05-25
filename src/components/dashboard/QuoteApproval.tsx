@@ -164,6 +164,7 @@ export default function QuoteApproval({
 
   const isFreeBase = quotedPrice <= 0
   const isFreeFinal = finalTotal <= 0
+  const actualValue = Math.round(quotedPrice * 5)
 
   return (
     <div className="space-y-4">
@@ -174,15 +175,16 @@ export default function QuoteApproval({
           <p className="text-xs text-muted">قدّمت لك الإدارة هذه الخدمة بدون مقابل</p>
         </div>
       ) : (
-        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-          <p className="font-bold text-blue-700 text-sm mb-1">💰 وصلك العرض</p>
-          <p className="text-xs text-blue-600">
-            {offeredExtras.length > 0
-              ? "راجع السعر واختر الخدمات الإضافية التي تريدها — السعر يتحدث تلقائياً."
-              : "راجع السعر المقترح واعتمد العرض للانتقال للدفع."
-            }
-          </p>
-        </div>
+        <>
+          <div className="bg-gradient-to-l from-amber-50 to-yellow-50 border border-amber-200 rounded-2xl p-4">
+            <p className="font-bold text-amber-800 text-sm mb-1">✨ وصلك العرض</p>
+            <p className="text-xs text-amber-700 leading-relaxed">
+              فريقنا من الصياغة والتصميم والنشر سيعمل على هذه الحملة.
+              القيمة الفعلية لهذا الجهد تُقدَّر بـ <strong>{formatNumber(actualValue)} ر.س</strong> —
+              مساهمتك الرمزية لدعم استمرارنا هي فقط ما ترى أدناه.
+            </p>
+          </div>
+        </>
       )}
 
       {adminNotes && (
@@ -205,8 +207,14 @@ export default function QuoteApproval({
       )}
 
       <div className="bg-card rounded-2xl border border-border p-5 space-y-2">
+        {!isFreeBase && (
+          <div className="flex justify-between items-center text-xs pb-2 border-b border-dashed border-border">
+            <span className="text-muted">القيمة الفعلية للخدمة</span>
+            <span className="line-through text-muted">{formatNumber(actualValue)} ر.س</span>
+          </div>
+        )}
         <div className="flex justify-between items-center">
-          <span className="text-muted text-sm">السعر الرئيسي</span>
+          <span className="text-muted text-sm">{isFreeBase ? 'السعر' : 'مساهمتك الرمزية'}</span>
           {isFreeBase ? (
             <span className="font-black text-green">مجاني 🎁</span>
           ) : quickDiscountActive ? (
@@ -232,7 +240,7 @@ export default function QuoteApproval({
         )}
         <div className="border-t border-border pt-3 mt-2">
           <div className="flex justify-between items-center">
-            <span className="font-bold text-dark">الإجمالي</span>
+            <span className="font-bold text-dark">{isFreeBase ? 'الإجمالي' : 'إجمالي مساهمتك'}</span>
             {isFreeFinal ? (
               <span className="font-black text-2xl text-green">مجاني</span>
             ) : (
@@ -387,7 +395,7 @@ export default function QuoteApproval({
           <Button onClick={handleApprove} loading={submitting} className="w-full" size="lg">
             {isFreeFinal
               ? 'اعتماد وبدء التنفيذ 🎁'
-              : `اعتماد العرض والانتقال للدفع — ${formatNumber(finalTotal)} ر.س`}
+              : `تأكيد المساهمة والانتقال للدفع — ${formatNumber(finalTotal)} ر.س`}
           </Button>
 
           {negotiationRejected ? (

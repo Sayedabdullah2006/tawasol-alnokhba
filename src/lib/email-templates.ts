@@ -217,15 +217,18 @@ export function quoteReadyToClient(d: {
       </div>`
     : ''
 
+  const actualValue = Math.round(d.price * 5)
+
   return {
-    subject: `💰 وصلك العرض المخصص · ${d.requestNumber}`,
+    subject: `✨ وصلك العرض المخصص · ${d.requestNumber}`,
     html: wrap(`
       ${greeting(d.clientName)}
       <p style="margin:0 0 18px 0; font-size:14px; line-height:1.8;">
-        فريقنا انتهى من مراجعة طلبك <strong>${escapeHtml(d.requestNumber)}</strong> وأعد العرض المخصص:
+        فريقنا من الصياغة والتصميم والنشر انتهى من مراجعة طلبك <strong>${escapeHtml(d.requestNumber)}</strong> وأعد العرض المخصص:
       </p>
       <div style="background:#F7F4ED; border-radius:12px; padding:18px; text-align:center; margin-bottom:14px;">
-        <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">السعر الرئيسي</p>
+        <p style="margin:0 0 2px 0; font-size:11px; color:#9CA3AF; text-decoration:line-through;">القيمة الفعلية للخدمة: ${actualValue.toLocaleString('ar-SA')} ر.س</p>
+        <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">مساهمتك الرمزية</p>
         <p style="margin:0 0 12px 0; font-size:28px; font-weight:900; color:${BRAND_GOLD};">${d.price.toLocaleString('ar-SA')} ر.س</p>
         <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">الوصول المتوقع</p>
         <p style="margin:0; font-size:18px; font-weight:bold; color:${BRAND_NAVY};">${formatReach(d.reach)} متابع</p>
@@ -277,6 +280,7 @@ export function quoteApprovedAwaitingPaymentToClient(d: {
   clientName: string
   total: number
 }) {
+  const actualValue = Math.round(d.total * 5)
   return {
     subject: `📋 اعتمدت عرض طلبك · ${d.requestNumber} · بانتظار الدفع`,
     html: wrap(`
@@ -284,10 +288,11 @@ export function quoteApprovedAwaitingPaymentToClient(d: {
       <p style="margin:0 0 16px 0; font-size:15px;">📋 <strong>تم اعتماد العرض</strong></p>
       <p style="margin:0 0 16px 0; font-size:13px; line-height:1.8;">
         شكراً لاعتمادك عرض طلب <strong>${escapeHtml(d.requestNumber)}</strong>.
-        لإطلاق التنفيذ نحتاج تأكيد الدفع.
+        لإطلاق التنفيذ نحتاج تأكيد مساهمتك الرمزية.
       </p>
       <div style="background:#F7F4ED; border-radius:10px; padding:14px; margin-bottom:16px; text-align:center;">
-        <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">المبلغ المستحق</p>
+        <p style="margin:0 0 2px 0; font-size:11px; color:#9CA3AF; text-decoration:line-through;">القيمة الفعلية للخدمة: ${actualValue.toLocaleString('ar-SA')} ر.س</p>
+        <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">مساهمتك الرمزية</p>
         <p style="margin:0; font-size:24px; font-weight:900; color:${BRAND_GOLD};">${d.total.toLocaleString('ar-SA')} ر.س</p>
       </div>
       <p style="margin:0 0 14px 0; font-size:13px; line-height:1.8;">

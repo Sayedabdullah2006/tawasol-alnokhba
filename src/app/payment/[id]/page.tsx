@@ -137,6 +137,12 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
         <div className="p-5 space-y-5">
           {/* Order summary (read-only) */}
           <div className="bg-cream rounded-xl p-4 text-sm space-y-2">
+            {totalDue > 0 && (
+              <div className="flex justify-between items-center text-xs pb-2 border-b border-dashed border-border/60">
+                <span className="text-muted">القيمة الفعلية للخدمة</span>
+                <span className="line-through text-muted">{formatNumber(Math.round(totalDue * 5))} ر.س</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-muted">{cat?.icon} {cat?.nameAr}</span>
               <span className="font-medium">{formatNumber(request.admin_quoted_price ?? 0)} ر.س</span>
@@ -148,7 +154,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
               </div>
             ))}
             <div className="flex justify-between border-t border-border pt-2 mt-2">
-              <span className="font-bold">الإجمالي المستحق</span>
+              <span className="font-bold">مساهمتك الرمزية</span>
               <span className="font-black text-2xl text-gold">{formatNumber(totalDue)} ر.س</span>
             </div>
             {request.estimated_reach > 0 && (
@@ -237,7 +243,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                     </div>
                     <div className="flex items-center justify-between bg-gold/10 border border-gold/20 rounded-lg p-3">
                       <div className="flex-1">
-                        <div className="text-xs text-muted">المبلغ المستحق</div>
+                        <div className="text-xs text-muted">مساهمتك الرمزية</div>
                         <div className="font-bold text-gold text-lg">{formatNumber(totalDue)} ر.س</div>
                       </div>
                       <button onClick={() => copy(String(totalDue), 'المبلغ')}
