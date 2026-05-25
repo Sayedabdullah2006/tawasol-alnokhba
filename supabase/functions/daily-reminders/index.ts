@@ -110,11 +110,11 @@ Deno.serve(async (req) => {
 
       for (const req of staleRequests) {
         try {
-          // تحديث الحالة إلى completed
+          // تحديث الحالة إلى auto_closed (منفصلة عن completed لعدم احتسابها إيراداً)
           const { error: updateError } = await supabase
             .from('publish_requests')
             .update({
-              status: 'completed',
+              status: 'auto_closed',
               updated_at: new Date().toISOString(),
             })
             .eq('id', req.id)
