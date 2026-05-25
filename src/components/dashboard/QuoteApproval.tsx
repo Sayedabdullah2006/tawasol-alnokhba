@@ -23,6 +23,13 @@ interface Influencer {
 
 const MAX_ROUNDS = 3
 const ROUND_DISCOUNTS = [5, 10, 15] // نسبة الخصم لكل جولة
+const MONTHLY_LIMIT = 3            // الحد الشهري لكل حساب
+
+interface MonthlyQuota {
+  used:      number
+  limit:     number
+  remaining: number
+}
 
 interface Props {
   requestId: string
@@ -62,6 +69,7 @@ export default function QuoteApproval({
   const [rejectionReason, setRejectionReason] = useState('')
   const [negotiationReason, setNegotiationReason] = useState('')
   const [proposedPrice, setProposedPrice] = useState('')
+  const [monthlyQuota, setMonthlyQuota] = useState<MonthlyQuota | null>(null)
 
   const extrasMap = useMemo(() => new Map(offeredExtras.map(e => [e.id, e])), [offeredExtras])
 
@@ -70,6 +78,18 @@ export default function QuoteApproval({
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(id)
+  }, [])
+
+  // جلب الحصة الشهرية
+  useEffect(() => {
+    fetch('/api/request-negotiation')
+      .then(r => r.json())
+      .then(d => {
+        if (d.monthlyLimit !== undefined) {
+          setMonthlyQuota({ used: d.monthlyUsed, limit: d.monthlyLimit, remaining: d.monthlyRemaining })
+        }
+      })
+      .catch(() => {/* تجاهل أخطاء الشبكة */})
   }, [])
 
   const quickDeadlineMs = quickDiscountDeadline ? new Date(quickDiscountDeadline).getTime() : 0
@@ -158,16 +178,27 @@ export default function QuoteApproval({
 
     const data = await res.json().catch(() => ({}))
     if (res.ok) {
+      // تحديث الحصة الشهرية في الحالة المحلية
+      if (data.monthlyRemaining !== undefined) {
+        setMonthlyQuota({ used: data.monthlyUsed, limit: data.monthlyLimit, remaining: data.monthlyRemaining })
+      }
       const msg = data.isFinal
         ? `✅ عرضنا النهائي: ${formatNumber(data.counterPrice)} ر.س — تحقق من طلبك`
         : `✅ عرض جديد بخصم ${data.discountPct}% — تحقق من طلبك`
       showToast(msg)
       router.push(`/dashboard/${requestId}`)
+    } else if (data.monthlyLimitReached) {
+      showToast(data.error ?? 'استنفدت حصتك الشهرية من التفاوض', 'error')
+      if (monthlyQuota) setMonthlyQuota({ ...monthlyQuota, remaining: 0 })
+      setNegotiating(false)
+      setSubmitting(false)
     } else {
       showToast(data.error ?? 'فشل إرسال طلب التفاوض', 'error')
       setSubmitting(false)
     }
   }
+
+  const monthlyBlocked = monthlyQuota !== null && monthlyQuota.remaining <= 0
 
   const isFreeBase = quotedPrice <= 0
   const isFreeFinal = finalTotal <= 0
@@ -420,12 +451,21 @@ export default function QuoteApproval({
               </p>
               <p className="text-xs text-amber-600 mt-1">يمكنك اعتماد العرض أو رفضه</p>
             </div>
+          ) : monthlyBlocked ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center space-y-1">
+              <p className="text-sm font-bold text-amber-700">
+                🗓️ استنفدت حصتك الشهرية من التفاوض
+              </p>
+              <p className="text-xs text-amber-600">
+                الحد الشهري: {MONTHLY_LIMIT} جولات لكل حساب — تجدد كل 30 يوماً
+              </p>
+            </div>
           ) : (
             <div className="space-y-2">
-              {/* شريط جولات التفاوض */}
+              {/* شريط جولات الطلب */}
               <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-orange-700">جولات التفاوض</span>
+                  <span className="text-xs font-bold text-orange-700">جولات هذا الطلب</span>
                   <span className="text-xs text-orange-600">
                     {negotiationRound}/{MAX_ROUNDS} مستخدمة
                   </span>
@@ -458,6 +498,27 @@ export default function QuoteApproval({
                     الجولة القادمة: خصم <strong>{ROUND_DISCOUNTS[negotiationRound]}%</strong> تلقائياً
                   </p>
                 )}
+                {/* الحصة الشهرية */}
+                {monthlyQuota && (
+                  <div className="mt-2 pt-2 border-t border-orange-200 flex items-center justify-between">
+                    <span className="text-[11px] text-orange-600">رصيدك الشهري</span>
+                    <div className="flex gap-1">
+                      {Array.from({ length: MONTHLY_LIMIT }).map((_, i) => (
+                        <div
+                          key={i}
+                          className={`w-4 h-4 rounded-full border transition-all ${
+                            i < monthlyQuota.used
+                              ? 'bg-orange-400 border-orange-500'
+                              : 'bg-white border-orange-300'
+                          }`}
+                        />
+                      ))}
+                      <span className="text-[11px] text-orange-600 mr-1">
+                        ({monthlyQuota.remaining} متبقية / 30 يوم)
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
               <Button
                 variant="outline"
@@ -465,7 +526,7 @@ export default function QuoteApproval({
                 className="w-full border-orange-300 text-orange-700 hover:bg-orange-50"
                 disabled={submitting}
               >
-                💬 طلب التفاوض ({MAX_ROUNDS - negotiationRound} جولة متبقية)
+                💬 طلب التفاوض ({MAX_ROUNDS - negotiationRound} جولة متبقية بهذا الطلب)
               </Button>
             </div>
           )}
