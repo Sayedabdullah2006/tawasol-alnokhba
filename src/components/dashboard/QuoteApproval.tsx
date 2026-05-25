@@ -207,14 +207,8 @@ export default function QuoteApproval({
       )}
 
       <div className="bg-card rounded-2xl border border-border p-5 space-y-2">
-        {!isFreeBase && (
-          <div className="flex justify-between items-center text-xs pb-2 border-b border-dashed border-border">
-            <span className="text-muted">القيمة الفعلية للخدمة</span>
-            <span className="line-through text-muted">{formatNumber(actualValue)} ر.س</span>
-          </div>
-        )}
         <div className="flex justify-between items-center">
-          <span className="text-muted text-sm">{isFreeBase ? 'السعر' : 'مساهمتك الرمزية'}</span>
+          <span className="text-muted text-sm">{isFreeBase ? 'السعر' : 'الخدمة الأساسية'}</span>
           {isFreeBase ? (
             <span className="font-black text-green">مجاني 🎁</span>
           ) : quickDiscountActive ? (
@@ -240,13 +234,16 @@ export default function QuoteApproval({
         )}
         <div className="border-t border-border pt-3 mt-2">
           <div className="flex justify-between items-center">
-            <span className="font-bold text-dark">{isFreeBase ? 'الإجمالي' : 'إجمالي مساهمتك'}</span>
+            <span className="font-bold text-dark">المطلوب دفعه</span>
             {isFreeFinal ? (
               <span className="font-black text-2xl text-green">مجاني</span>
             ) : (
               <span className="font-black text-2xl text-gold">{formatNumber(finalTotal)} ر.س</span>
             )}
           </div>
+          {!isFreeFinal && (
+            <p className="text-xs text-muted mt-1 text-left">هذا هو المبلغ الكامل — لا رسوم إضافية</p>
+          )}
           <div className="flex justify-between items-center text-sm mt-2">
             <span className="text-muted">الوصول المتوقع</span>
             <span className="font-bold text-green">{formatNumberShort(reach)} متابع</span>

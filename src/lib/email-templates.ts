@@ -227,9 +227,9 @@ export function quoteReadyToClient(d: {
         فريقنا من الصياغة والتصميم والنشر انتهى من مراجعة طلبك <strong>${escapeHtml(d.requestNumber)}</strong> وأعد العرض المخصص:
       </p>
       <div style="background:#F7F4ED; border-radius:12px; padding:18px; text-align:center; margin-bottom:14px;">
-        <p style="margin:0 0 2px 0; font-size:11px; color:#9CA3AF; text-decoration:line-through;">القيمة الفعلية للخدمة: ${actualValue.toLocaleString('ar-SA')} ر.س</p>
-        <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">مساهمتك الرمزية</p>
-        <p style="margin:0 0 12px 0; font-size:28px; font-weight:900; color:${BRAND_GOLD};">${d.price.toLocaleString('ar-SA')} ر.س</p>
+        <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">المطلوب دفعه</p>
+        <p style="margin:0 0 6px 0; font-size:28px; font-weight:900; color:${BRAND_GOLD};">${d.price.toLocaleString('ar-SA')} ر.س</p>
+        <p style="margin:0 0 12px 0; font-size:11px; color:#9CA3AF;">هذا كل ما تدفعه — لا رسوم إضافية</p>
         <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">الوصول المتوقع</p>
         <p style="margin:0; font-size:18px; font-weight:bold; color:${BRAND_NAVY};">${formatReach(d.reach)} متابع</p>
       </div>
@@ -291,9 +291,9 @@ export function quoteApprovedAwaitingPaymentToClient(d: {
         لإطلاق التنفيذ نحتاج تأكيد مساهمتك الرمزية.
       </p>
       <div style="background:#F7F4ED; border-radius:10px; padding:14px; margin-bottom:16px; text-align:center;">
-        <p style="margin:0 0 2px 0; font-size:11px; color:#9CA3AF; text-decoration:line-through;">القيمة الفعلية للخدمة: ${actualValue.toLocaleString('ar-SA')} ر.س</p>
-        <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">مساهمتك الرمزية</p>
-        <p style="margin:0; font-size:24px; font-weight:900; color:${BRAND_GOLD};">${d.total.toLocaleString('ar-SA')} ر.س</p>
+        <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">المطلوب دفعه</p>
+        <p style="margin:0 0 6px 0; font-size:24px; font-weight:900; color:${BRAND_GOLD};">${d.total.toLocaleString('ar-SA')} ر.س</p>
+        <p style="margin:0; font-size:11px; color:#9CA3AF;">هذا كل ما تدفعه — لا رسوم إضافية</p>
       </div>
       <p style="margin:0 0 14px 0; font-size:13px; line-height:1.8;">
         من صفحة الدفع يمكنك التحويل البنكي أو الدفع الإلكتروني فوراً.
