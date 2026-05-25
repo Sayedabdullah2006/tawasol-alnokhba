@@ -389,22 +389,48 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
             {/* Pricing Info */}
             {request.status !== 'pending' && request.admin_quoted_price != null && (
               <div className="bg-card rounded-2xl border border-border p-5">
-                <h2 className="font-bold text-dark mb-4">معلومات العرض</h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-bold text-dark">معلومات العرض</h2>
+                  {request.auto_quoted_at && (
+                    <span className="text-xs bg-blue-100 text-blue-700 font-bold px-2 py-1 rounded-full">
+                      🤖 تسعير تلقائي
+                    </span>
+                  )}
+                </div>
+
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted">السعر المعتمد:</span>
-                    <span className="font-bold text-gold">{formatNumber(request.admin_quoted_price)} ر.س</span>
-                  </div>
-                  {request.extras_selected_total > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted">خدمات إضافية:</span>
-                      <span>+{formatNumber(request.extras_selected_total)} ر.س</span>
+                  {request.base_price != null && (
+                    <div className="flex justify-between text-muted">
+                      <span>السعر الأساسي</span>
+                      <span>{formatNumber(request.base_price)} ر.س</span>
+                    </div>
+                  )}
+                  {Array.isArray(request.extras) && request.extras.length > 0 && (
+                    <div className="flex justify-between text-muted">
+                      <span>الخدمات الإضافية المختارة</span>
+                      <span>+{formatNumber(request.extras_total ?? 0)} ر.س</span>
                     </div>
                   )}
                   <div className="flex justify-between font-bold border-t border-border pt-2 mt-2">
-                    <span>الإجمالي:</span>
+                    <span>الإجمالي</span>
                     <span className="text-gold text-lg">{formatNumber(request.final_total ?? request.admin_quoted_price)} ر.س</span>
                   </div>
+
+                  {Array.isArray(request.extras) && request.extras.length > 0 && (
+                    <div className="pt-2 border-t border-border mt-1">
+                      <p className="text-muted text-xs mb-1">الإضافات المختارة:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {request.extras.map((e: string) => (
+                          <span key={e} className="text-xs bg-green/10 text-green px-2 py-0.5 rounded-full">{e}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {request.auto_quote_note && (
+                    <p className="text-xs text-muted bg-cream rounded-lg p-2 mt-2">
+                      📝 {request.auto_quote_note}
+                    </p>
+                  )}
                 </div>
               </div>
             )}

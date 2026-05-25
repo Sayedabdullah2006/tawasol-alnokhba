@@ -21,6 +21,9 @@ interface Influencer {
   tk_followers?: number | null
 }
 
+const MAX_ROUNDS = 3
+const ROUND_DISCOUNTS = [5, 10, 15] // نسبة الخصم لكل جولة
+
 interface Props {
   requestId: string
   quotedPrice: number
@@ -29,6 +32,7 @@ interface Props {
   scope: 'single' | 'all'
   adminNotes?: string | null
   negotiationRejected?: boolean
+  negotiationRound?: number
   quickDiscountPct?: number | null
   quickDiscountDeadline?: string | null
 }
@@ -47,7 +51,7 @@ function formatCountdown(ms: number): string {
 
 export default function QuoteApproval({
   requestId, quotedPrice, offeredExtras, influencer, scope, adminNotes, negotiationRejected,
-  quickDiscountPct, quickDiscountDeadline,
+  negotiationRound = 0, quickDiscountPct, quickDiscountDeadline,
 }: Props) {
   const router = useRouter()
   const { showToast } = useToast()
@@ -130,14 +134,14 @@ export default function QuoteApproval({
   }
 
   const handleNegotiate = async () => {
-    if (!negotiationReason.trim() || !proposedPrice.trim()) {
-      showToast('يرجى كتابة سبب التفاوض والسعر المقترح', 'error')
+    if (!negotiationReason.trim()) {
+      showToast('يرجى كتابة سبب طلب التفاوض', 'error')
       return
     }
 
-    const proposedAmount = parseFloat(proposedPrice)
-    if (isNaN(proposedAmount) || proposedAmount < 0) {
-      showToast('يرجى إدخال سعر صالح', 'error')
+    const proposedAmount = proposedPrice.trim() ? parseFloat(proposedPrice) : undefined
+    if (proposedAmount !== undefined && (isNaN(proposedAmount) || proposedAmount <= 0)) {
+      showToast('يرجى إدخال سعر مقترح صالح', 'error')
       return
     }
 
@@ -148,15 +152,18 @@ export default function QuoteApproval({
       body: JSON.stringify({
         requestId,
         negotiationReason: negotiationReason.trim(),
-        proposedPrice: proposedAmount
+        proposedPrice: proposedAmount ?? null,
       }),
     })
 
+    const data = await res.json().catch(() => ({}))
     if (res.ok) {
-      showToast('تم إرسال طلب التفاوض')
-      router.push('/dashboard')
+      const msg = data.isFinal
+        ? `✅ عرضنا النهائي: ${formatNumber(data.counterPrice)} ر.س — تحقق من طلبك`
+        : `✅ عرض جديد بخصم ${data.discountPct}% — تحقق من طلبك`
+      showToast(msg)
+      router.push(`/dashboard/${requestId}`)
     } else {
-      const data = await res.json().catch(() => ({}))
       showToast(data.error ?? 'فشل إرسال طلب التفاوض', 'error')
       setSubmitting(false)
     }
@@ -329,23 +336,38 @@ export default function QuoteApproval({
         </div>
       ) : negotiating ? (
         <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 space-y-4">
-          <h3 className="font-bold text-orange-700">طلب التفاوض</h3>
-          <p className="text-sm text-orange-600">
-            اقترح السعر الذي يناسبك وسبب طلب التفاوض.
-          </p>
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-orange-700">طلب التفاوض</h3>
+            <span className="text-xs bg-orange-200 text-orange-800 font-bold px-2 py-1 rounded-full">
+              الجولة {negotiationRound + 1} من {MAX_ROUNDS}
+            </span>
+          </div>
+
+          {/* توقع الرد الآلي */}
+          <div className="bg-white border border-orange-200 rounded-xl p-3 text-center">
+            <p className="text-xs text-orange-700">
+              ⚡ سيصلك رد فوري بخصم{' '}
+              <strong>{ROUND_DISCOUNTS[negotiationRound]}%</strong>
+              {' '}= <strong>{formatNumber(Math.round(quotedPrice * (1 - ROUND_DISCOUNTS[negotiationRound] / 100)))} ر.س</strong>
+              {negotiationRound + 1 === MAX_ROUNDS && ' (عرض نهائي)'}
+            </p>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-orange-700 mb-2">
-              السعر المقترح (ر.س) <span className="text-red-500">*</span>
+              سعر مقترح (اختياري)
             </label>
             <input
               type="number"
               value={proposedPrice}
               onChange={e => setProposedPrice(e.target.value)}
-              placeholder={String(Math.round(quotedPrice * 0.8))}
+              placeholder={`مثلاً: ${Math.round(quotedPrice * (1 - ROUND_DISCOUNTS[negotiationRound] / 100))}`}
               className="w-full px-4 py-3 rounded-xl border border-orange-200 text-sm"
               min="0"
             />
+            <p className="text-xs text-orange-500 mt-1">
+              إذا كان اقتراحك أفضل لنا من خصم {ROUND_DISCOUNTS[negotiationRound]}% سيُقبل تلقائياً
+            </p>
           </div>
 
           <div>
@@ -355,8 +377,8 @@ export default function QuoteApproval({
             <textarea
               value={negotiationReason}
               onChange={e => setNegotiationReason(e.target.value)}
-              placeholder="مثلاً: السعر يتجاوز الميزانية، أو أرى أن القيمة المقترحة مناسبة أكثر..."
-              className="w-full px-4 py-3 rounded-xl border border-orange-200 text-sm min-h-[100px] resize-y"
+              placeholder="مثلاً: السعر يتجاوز الميزانية المتاحة..."
+              className="w-full px-4 py-3 rounded-xl border border-orange-200 text-sm min-h-[80px] resize-y"
               maxLength={500}
             />
             <div className="flex justify-between text-xs text-orange-600 mt-1">
@@ -368,11 +390,7 @@ export default function QuoteApproval({
           <div className="flex gap-3">
             <Button
               variant="ghost"
-              onClick={() => {
-                setNegotiating(false)
-                setNegotiationReason('')
-                setProposedPrice('')
-              }}
+              onClick={() => { setNegotiating(false); setNegotiationReason(''); setProposedPrice('') }}
               className="flex-1"
             >
               إلغاء
@@ -380,10 +398,10 @@ export default function QuoteApproval({
             <Button
               onClick={handleNegotiate}
               loading={submitting}
-              disabled={!negotiationReason.trim() || !proposedPrice.trim()}
+              disabled={!negotiationReason.trim()}
               className="flex-1 bg-orange-600 hover:bg-orange-700"
             >
-              إرسال طلب التفاوض
+              إرسال — الرد فوري ⚡
             </Button>
           </div>
         </div>
@@ -397,18 +415,59 @@ export default function QuoteApproval({
 
           {negotiationRejected ? (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
-              <p className="text-sm font-medium text-amber-700">📋 السعر المعروض نهائي ولا يقبل التفاوض</p>
+              <p className="text-sm font-medium text-amber-700">
+                🔒 وصلت للحد الأقصى ({MAX_ROUNDS} جولات) — السعر نهائي
+              </p>
               <p className="text-xs text-amber-600 mt-1">يمكنك اعتماد العرض أو رفضه</p>
             </div>
           ) : (
-            <Button
-              variant="outline"
-              onClick={() => setNegotiating(true)}
-              className="w-full border-orange-300 text-orange-700 hover:bg-orange-50"
-              disabled={submitting}
-            >
-              💬 طلب التفاوض
-            </Button>
+            <div className="space-y-2">
+              {/* شريط جولات التفاوض */}
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-orange-700">جولات التفاوض</span>
+                  <span className="text-xs text-orange-600">
+                    {negotiationRound}/{MAX_ROUNDS} مستخدمة
+                  </span>
+                </div>
+                <div className="flex gap-1.5">
+                  {ROUND_DISCOUNTS.map((disc, i) => {
+                    const done = i < negotiationRound
+                    const next = i === negotiationRound
+                    return (
+                      <div
+                        key={i}
+                        className={`flex-1 rounded-lg p-1.5 text-center text-xs font-bold border transition-all
+                          ${done
+                            ? 'bg-orange-200 border-orange-300 text-orange-700 opacity-60'
+                            : next
+                            ? 'bg-orange-500 border-orange-600 text-white shadow-sm'
+                            : 'bg-white border-orange-200 text-orange-400'
+                          }`}
+                      >
+                        {done ? '✓' : `${disc}%`}
+                        <div className="text-[10px] mt-0.5 font-normal">
+                          {done ? 'مكتملة' : next ? 'التالية' : `جولة ${i + 1}`}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {negotiationRound < MAX_ROUNDS && (
+                  <p className="text-xs text-orange-600 mt-2 text-center">
+                    الجولة القادمة: خصم <strong>{ROUND_DISCOUNTS[negotiationRound]}%</strong> تلقائياً
+                  </p>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setNegotiating(true)}
+                className="w-full border-orange-300 text-orange-700 hover:bg-orange-50"
+                disabled={submitting}
+              >
+                💬 طلب التفاوض ({MAX_ROUNDS - negotiationRound} جولة متبقية)
+              </Button>
+            </div>
           )}
 
           <Button

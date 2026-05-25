@@ -12,6 +12,7 @@ import Step1Category from '@/components/pricing/Step1Category'
 import StepSubOption from '@/components/pricing/StepSubOption'
 import RStep3Details from './RStep3Details'
 import RStepChannels from './RStepChannels'
+import RStepExtras from './RStepExtras'
 import RStep5Contact, { type ContactData } from './RStep5Contact'
 import RStep6Terms from './RStep6Terms'
 import StepCompetition from '@/components/pricing/StepCompetition'
@@ -19,8 +20,10 @@ import { validateEmail } from '@/lib/email-validation'
 import SuccessScreen from './SuccessScreen'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
+import { calculateAutoQuote } from '@/lib/auto-quote'
+import { formatNumber } from '@/lib/utils'
 
-type StepId = 'influencer' | 'clientType' | 'category' | 'subOption' | 'details' | 'channels' | 'contact' | 'terms' | 'confirm'
+type StepId = 'influencer' | 'clientType' | 'category' | 'subOption' | 'details' | 'channels' | 'extras' | 'contact' | 'terms' | 'confirm'
 
 const CHANNEL_LABELS: Record<string, string> = {
   x: 'X',
@@ -36,6 +39,7 @@ export default function RequestWizard() {
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [requestNumber, setRequestNumber] = useState('')
+  const [quotedTotal, setQuotedTotal] = useState(0)
   const [influencers, setInfluencers] = useState<Influencer[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -47,6 +51,7 @@ export default function RequestWizard() {
   const [competitionSelection, setCompetitionSelection] = useState<{ subcategory: string; position: string } | null>(null)
   const [details, setDetails] = useState({ title: '', content: '', link: '', hashtags: '', preferredDate: '', images: [] as string[] })
   const [channels, setChannels] = useState<string[]>([])
+  const [selectedExtras, setSelectedExtras] = useState<string[]>([])
   const [contact, setContact] = useState<ContactData>({ fullName: '', phone: '', email: '', city: '', xHandle: '' })
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [privacyAccepted, setPrivacyAccepted] = useState(false)
@@ -55,10 +60,22 @@ export default function RequestWizard() {
   const needsSubOption = selectedCat?.has_sub_option && selectedCat?.sub_options?.length
   const isCompetitionCategory = category === 'competitions'
 
+  // احتساب السعر في أي وقت
+  const priceCalc = useMemo(() => {
+    if (!category) return null
+    const subOpt = isCompetitionCategory ? competitionSelection : subOption
+    return calculateAutoQuote({
+      category,
+      subOption: subOpt,
+      clientType,
+      selectedExtras,
+    })
+  }, [category, subOption, competitionSelection, clientType, selectedExtras, isCompetitionCategory])
+
   const steps: StepId[] = useMemo(() => {
     const base: StepId[] = ['influencer', 'clientType', 'category']
     if (isCompetitionCategory || needsSubOption) base.push('subOption')
-    base.push('details', 'channels', 'contact', 'terms', 'confirm')
+    base.push('details', 'channels', 'extras', 'contact', 'terms', 'confirm')
     return base
   }, [isCompetitionCategory, needsSubOption])
 
@@ -79,10 +96,10 @@ export default function RequestWizard() {
           if (profile) {
             setContact(prev => ({
               fullName: profile.full_name || prev.fullName,
-              phone: profile.phone || prev.phone,
-              email: user.email || prev.email,
-              city: profile.city || prev.city,
-              xHandle: profile.x_handle || prev.xHandle,
+              phone:    profile.phone    || prev.phone,
+              email:    user.email       || prev.email,
+              city:     profile.city     || prev.city,
+              xHandle:  profile.x_handle || prev.xHandle,
             }))
           }
         })
@@ -94,9 +111,9 @@ export default function RequestWizard() {
 
   const canProceed = (): boolean => {
     switch (currentStep) {
-      case 'influencer': return selectedInfluencer !== null
-      case 'clientType': return clientType !== null
-      case 'category': return category !== null
+      case 'influencer':  return selectedInfluencer !== null
+      case 'clientType':  return clientType !== null
+      case 'category':    return category !== null
       case 'subOption':
         if (isCompetitionCategory) {
           return competitionSelection !== null &&
@@ -104,14 +121,16 @@ export default function RequestWizard() {
                  competitionSelection.position !== ''
         }
         return subOption !== null
-      case 'details': return details.title.trim() !== '' && details.content.trim() !== ''
+      case 'details':  return details.title.trim() !== '' && details.content.trim() !== ''
       case 'channels': return channels.length > 0
-      case 'contact': return contact.fullName.trim() !== ''
-        && contact.phone.trim() !== ''
-        && validateEmail(contact.email).valid
-      case 'terms': return termsAccepted && privacyAccepted
+      case 'extras':   return true // اختياري دائماً
+      case 'contact':
+        return contact.fullName.trim() !== ''
+          && contact.phone.trim() !== ''
+          && validateEmail(contact.email).valid
+      case 'terms':   return termsAccepted && privacyAccepted
       case 'confirm': return true
-      default: return true
+      default:        return true
     }
   }
 
@@ -121,26 +140,29 @@ export default function RequestWizard() {
   const handleSubmit = async () => {
     setSubmitting(true)
     try {
-      // Prepare sub_option data - for competitions, send the selection object
-      const subOptionData = isCompetitionCategory
-        ? competitionSelection
-        : subOption
+      const subOptionData = isCompetitionCategory ? competitionSelection : subOption
 
       const res = await fetch('/api/submit-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          influencer_id: selectedInfluencer,
-          client_type: clientType,
-          category, sub_option: subOptionData,
-          title: details.title, content: details.content,
-          link: details.link || null, hashtags: details.hashtags || null,
-          preferred_date: details.preferredDate || null,
-          content_images: details.images,
-          client_name: contact.fullName, client_phone: contact.phone,
-          client_email: contact.email, client_city: contact.city || null,
-          x_handle: contact.xHandle || null,
+          influencer_id:   selectedInfluencer,
+          client_type:     clientType,
+          category,
+          sub_option:      subOptionData,
+          title:           details.title,
+          content:         details.content,
+          link:            details.link || null,
+          hashtags:        details.hashtags || null,
+          preferred_date:  details.preferredDate || null,
+          content_images:  details.images,
+          client_name:     contact.fullName,
+          client_phone:    contact.phone,
+          client_email:    contact.email,
+          client_city:     contact.city || null,
+          x_handle:        contact.xHandle || null,
           channels,
+          selected_extras: selectedExtras,
         }),
       })
 
@@ -148,16 +170,19 @@ export default function RequestWizard() {
       if (!res.ok) throw new Error(data.error ?? 'حدث خطأ')
 
       setRequestNumber(data.requestNumber)
+      setQuotedTotal(data.quotedTotal ?? 0)
       setSuccess(true)
-      showToast('تم إرسال طلبك بنجاح!')
+      showToast('تم إرسال طلبك وعرض السعر بنجاح!')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'حدث خطأ أثناء إرسال الطلب'
       showToast(msg, 'error')
-    } finally { setSubmitting(false) }
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (loading || catsLoading) return <LoadingSpinner size="lg" />
-  if (success) return <SuccessScreen requestNumber={requestNumber} />
+  if (success) return <SuccessScreen requestNumber={requestNumber} quotedTotal={quotedTotal} />
 
   return (
     <div className="flex flex-col bg-cream">
@@ -169,10 +194,21 @@ export default function RequestWizard() {
             <StepInfluencer influencers={influencers} selected={selectedInfluencer} onSelect={setSelectedInfluencer} />
           )}
           {currentStep === 'clientType' && (
-            <RStep1ClientType selected={clientType} onSelect={(v) => { if (clientType !== v) { setCategory(null); setSubOption(null) }; setClientType(v) }} />
+            <RStep1ClientType
+              selected={clientType}
+              onSelect={(v) => {
+                if (clientType !== v) { setCategory(null); setSubOption(null) }
+                setClientType(v)
+              }}
+            />
           )}
           {currentStep === 'category' && (
-            <Step1Category selected={category} onSelect={(id) => { setCategory(id); setSubOption(null); setCompetitionSelection(null) }} categories={categories} clientType={clientType} />
+            <Step1Category
+              selected={category}
+              onSelect={(id) => { setCategory(id); setSubOption(null); setCompetitionSelection(null) }}
+              categories={categories}
+              clientType={clientType}
+            />
           )}
           {currentStep === 'subOption' && (
             <>
@@ -190,47 +226,113 @@ export default function RequestWizard() {
             <RStepChannels
               influencer={selectedInf}
               selected={channels}
-              onToggle={(id) => setChannels(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+              onToggle={(id) => setChannels(prev =>
+                prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+              )}
+            />
+          )}
+          {currentStep === 'extras' && priceCalc && (
+            <RStepExtras
+              selected={selectedExtras}
+              onChange={setSelectedExtras}
+              basePrice={priceCalc.basePrice}
             />
           )}
           {currentStep === 'contact' && (
             <RStep5Contact data={contact} onChange={setContact} />
           )}
           {currentStep === 'terms' && (
-            <RStep6Terms termsAccepted={termsAccepted} privacyAccepted={privacyAccepted} onTermsChange={setTermsAccepted} onPrivacyChange={setPrivacyAccepted} />
+            <RStep6Terms
+              termsAccepted={termsAccepted}
+              privacyAccepted={privacyAccepted}
+              onTermsChange={setTermsAccepted}
+              onPrivacyChange={setPrivacyAccepted}
+            />
           )}
-          {currentStep === 'confirm' && (
-            <div className="wizard-enter max-w-lg mx-auto space-y-6">
-              <h2 className="text-xl md:text-2xl font-black text-dark text-center mb-2">كل شي تمام؟</h2>
-              <p className="text-sm text-muted text-center">خلّينا نراجع ملخصك سوا — متأكد إن كل شي زي ما تبغى؟</p>
+          {currentStep === 'confirm' && priceCalc && (
+            <div className="wizard-enter max-w-lg mx-auto space-y-5">
+              <h2 className="text-xl md:text-2xl font-black text-dark text-center mb-1">
+                كل شي تمام؟
+              </h2>
+              <p className="text-sm text-muted text-center">
+                راجع ملخص طلبك — وبمجرد الإرسال يصلك عرض السعر فوراً
+              </p>
+
+              {/* ملخص الطلب */}
               <div className="bg-card rounded-2xl border border-border overflow-hidden">
                 <div className="p-5 space-y-3 text-sm">
-                  {selectedInf && <div className="flex justify-between"><span className="text-muted">المؤثر:</span><span className="font-medium">{selectedInf.name_ar}</span></div>}
-                  <div className="flex justify-between"><span className="text-muted">الفئة:</span><span className="font-medium">{selectedCat?.name_ar}</span></div>
-                  <div className="flex justify-between"><span className="text-muted">القنوات:</span><span className="font-medium">{channels.map(c => CHANNEL_LABELS[c] ?? c).join('، ')}</span></div>
-                  <div className="border-t border-border pt-3 mt-3">
-                    <div className="flex justify-between"><span className="text-muted">عنوان الخبر:</span><span className="font-medium">{details.title}</span></div>
+                  {selectedInf && (
+                    <div className="flex justify-between">
+                      <span className="text-muted">المؤثر</span>
+                      <span className="font-medium">{selectedInf.name_ar}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-muted">الفئة</span>
+                    <span className="font-medium">{selectedCat?.name_ar}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted">القنوات</span>
+                    <span className="font-medium">{channels.map(c => CHANNEL_LABELS[c] ?? c).join('، ')}</span>
+                  </div>
+                  <div className="border-t border-border pt-3">
+                    <div className="flex justify-between">
+                      <span className="text-muted">عنوان الخبر</span>
+                      <span className="font-medium text-right max-w-[200px] truncate">{details.title}</span>
+                    </div>
                   </div>
                 </div>
               </div>
+
+              {/* تفاصيل السعر */}
+              <div className="bg-card rounded-2xl border border-border overflow-hidden">
+                <div className="bg-green/5 border-b border-border px-5 py-3">
+                  <p className="font-bold text-dark text-sm">💰 تفاصيل العرض</p>
+                </div>
+                <div className="p-5 space-y-2 text-sm">
+                  <div className="flex justify-between text-muted">
+                    <span>السعر الأساسي</span>
+                    <span>{formatNumber(priceCalc.basePrice)} ر.س</span>
+                  </div>
+                  {priceCalc.extrasBreakdown.map(e => (
+                    <div key={e.id} className="flex justify-between text-muted">
+                      <span>{e.name}</span>
+                      <span>+{formatNumber(e.price)} ر.س</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between font-black text-dark text-lg border-t border-border pt-3 mt-1">
+                    <span>الإجمالي</span>
+                    <span className="text-green">{formatNumber(priceCalc.total)} ر.س</span>
+                  </div>
+                </div>
+              </div>
+
               <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center">
-                <div className="text-2xl mb-2">📋</div>
-                <p className="font-bold text-blue-700 text-sm">فريقنا بيراجع طلبك ويرسلك العرض المخصص قريباً</p>
-                <p className="text-xs text-blue-600 mt-1">ومفيش أي التزام مالي قبل ما توافق على العرض</p>
+                <div className="text-2xl mb-2">📧</div>
+                <p className="font-bold text-blue-700 text-sm">
+                  سيُرسل هذا العرض فوراً لبريدك الإلكتروني
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  ومفيش أي التزام مالي قبل ما توافق على العرض
+                </p>
               </div>
             </div>
           )}
         </div>
 
         {currentStep !== 'confirm' ? (
-          <WizardFooter onNext={goNext} onBack={stepIndex > 0 ? goBack : undefined}
-            showBack={stepIndex > 0} nextDisabled={!canProceed()} />
+          <WizardFooter
+            onNext={goNext}
+            onBack={stepIndex > 0 ? goBack : undefined}
+            showBack={stepIndex > 0}
+            nextDisabled={!canProceed()}
+          />
         ) : (
           <div className="sticky bottom-0 bg-card/95 backdrop-blur-md border-t border-border px-4 py-3 flex items-center gap-3">
             <Button variant="ghost" onClick={goBack}>→ رجوع</Button>
             <div className="flex-1" />
             <Button onClick={handleSubmit} disabled={submitting} loading={submitting}>
-              {submitting ? 'جارٍ إرسال طلبك...' : 'إرسال الطلب نهائياً'}
+              {submitting ? 'جارٍ إرسال طلبك...' : 'إرسال الطلب والحصول على العرض'}
             </Button>
           </div>
         )}
