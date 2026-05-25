@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
     const { data: staleRequests, error: staleError } = await supabase
       .from('publish_requests')
       .select('id, request_number, client_name, client_email')
-      .eq('status', 'pending')
+      .in('status', ['pending', 'quoted'])
       .lt('created_at', sevenDaysAgo)
       .not('client_email', 'is', null)
 
@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
               updated_at: new Date().toISOString(),
             })
             .eq('id', req.id)
-            .eq('status', 'pending') // حماية من race condition
+            .in('status', ['pending', 'quoted']) // حماية من race condition
 
           if (updateError) {
             console.error(`[AUTO-CLOSE] Failed to close request ${req.id}:`, updateError)
