@@ -224,7 +224,9 @@ export function quoteReadyToClient(d: {
     html: wrap(`
       ${greeting(d.clientName)}
       <p style="margin:0 0 18px 0; font-size:14px; line-height:1.8;">
-        فريقنا من الصياغة والتصميم والنشر انتهى من مراجعة طلبك <strong>${escapeHtml(d.requestNumber)}</strong> وأعد العرض المخصص:
+        فريقنا من الصياغة والتصميم والنشر انتهى من مراجعة طلبك <strong>${escapeHtml(d.requestNumber)}</strong> وأعد العرض المخصص.
+        القيمة الفعلية لهذا الجهد تُقدَّر بـ <strong style="color:${BRAND_NAVY};">${actualValue.toLocaleString('ar-SA')} ر.س</strong> —
+        لكن مساهمتك الرمزية لدعم استمرارنا هي فقط:
       </p>
       <div style="background:#F7F4ED; border-radius:12px; padding:18px; text-align:center; margin-bottom:14px;">
         <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">المطلوب دفعه</p>
@@ -288,7 +290,8 @@ export function quoteApprovedAwaitingPaymentToClient(d: {
       <p style="margin:0 0 16px 0; font-size:15px;">📋 <strong>تم اعتماد العرض</strong></p>
       <p style="margin:0 0 16px 0; font-size:13px; line-height:1.8;">
         شكراً لاعتمادك عرض طلب <strong>${escapeHtml(d.requestNumber)}</strong>.
-        لإطلاق التنفيذ نحتاج تأكيد مساهمتك الرمزية.
+        فريقنا سيبدأ العمل فور تأكيد مساهمتك الرمزية — وهي رمزية فعلاً
+        مقارنةً بالقيمة الفعلية للخدمة التي تُقدَّر بـ <strong style="color:${BRAND_NAVY};">${actualValue.toLocaleString('ar-SA')} ر.س</strong>.
       </p>
       <div style="background:#F7F4ED; border-radius:10px; padding:14px; margin-bottom:16px; text-align:center;">
         <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">المطلوب دفعه</p>
