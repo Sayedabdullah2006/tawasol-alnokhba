@@ -13,6 +13,24 @@ interface ReminderStats {
   generatedAt: string
 }
 
+interface StaleRequest {
+  id: string
+  requestNumber: string
+  clientName: string
+  clientEmail: string
+  status: string
+  daysWaiting: number
+}
+
+interface CloseResult {
+  success: boolean
+  closed?: number
+  emailed?: number
+  failed?: number
+  results?: { requestNumber: string; clientEmail: string; closed: boolean; emailed: boolean }[]
+  error?: string
+}
+
 interface JobResult {
   success: boolean
   processed?: number
@@ -30,6 +48,12 @@ export default function AdminRemindersPage() {
   const [jobResult, setJobResult] = useState<JobResult | null>(null)
   const [testRequestId, setTestRequestId] = useState('')
   const [testResult, setTestResult] = useState<any>(null)
+
+  // حالة قسم الطلبات المتوقفة
+  const [staleLoading, setStaleLoading] = useState(false)
+  const [staleRequests, setStaleRequests] = useState<StaleRequest[] | null>(null)
+  const [closeResult, setCloseResult] = useState<CloseResult | null>(null)
+  const [confirmClose, setConfirmClose] = useState(false)
 
   const supabase = createClient()
 
@@ -134,6 +158,36 @@ export default function AdminRemindersPage() {
     }
   }
 
+  // ── جلب معاينة الطلبات المتوقفة ──────────────────────────────────────────
+  const handlePreviewStale = async () => {
+    setStaleLoading(true)
+    setStaleRequests(null)
+    setCloseResult(null)
+    setConfirmClose(false)
+    try {
+      const result = await callRemindersAPI('preview-stale')
+      setStaleRequests(result.requests ?? [])
+    } catch (error) {
+      setStaleRequests([])
+    } finally {
+      setStaleLoading(false)
+    }
+  }
+
+  const handleCloseStale = async () => {
+    setStaleLoading(true)
+    setConfirmClose(false)
+    try {
+      const result = await callRemindersAPI('close-stale')
+      setCloseResult(result)
+      setStaleRequests(null) // أعد التحميل في المرة القادمة
+    } catch (error) {
+      setCloseResult({ success: false, error: error instanceof Error ? error.message : 'خطأ' })
+    } finally {
+      setStaleLoading(false)
+    }
+  }
+
   useEffect(() => {
     loadStats()
   }, [])
@@ -146,6 +200,122 @@ export default function AdminRemindersPage() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-black text-dark mb-6">📧 إدارة التذكيرات اليومية</h1>
+
+      {/* ── قسم الطلبات المتوقفة ─────────────────────────────────────── */}
+      <div className="bg-card rounded-2xl border-2 border-amber-300 p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-dark">🔒 مراجعة وإغلاق الطلبات المتوقفة</h2>
+            <p className="text-sm text-muted mt-1">
+              الطلبات التي مضى عليها أكثر من 7 أيام دون استجابة من العميل
+            </p>
+          </div>
+          <Button onClick={handlePreviewStale} disabled={staleLoading} variant="outline" size="sm">
+            {staleLoading ? '⏳ جاري الفحص...' : '🔍 فحص الطلبات المتوقفة'}
+          </Button>
+        </div>
+
+        {/* نتيجة الإغلاق */}
+        {closeResult && (
+          <div className={`p-4 rounded-xl mb-4 ${closeResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+            {closeResult.success ? (
+              <div className="text-green-800">
+                <p className="font-bold mb-2">✅ تم الإغلاق بنجاح</p>
+                <p className="text-sm">أُغلق: <strong>{closeResult.closed}</strong> طلب · أُرسل إيميل لـ <strong>{closeResult.emailed}</strong> عميل</p>
+                {closeResult.results && (
+                  <div className="mt-2 space-y-1">
+                    {closeResult.results.map((r, i) => (
+                      <p key={i} className="text-xs text-green-700">
+                        {r.closed ? '✅' : '❌'} {r.requestNumber} — {r.clientEmail} {r.emailed ? '📧' : ''}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-red-800 text-sm">❌ خطأ: {closeResult.error}</p>
+            )}
+          </div>
+        )}
+
+        {/* قائمة الطلبات المتوقفة */}
+        {staleRequests !== null && (
+          staleRequests.length === 0 ? (
+            <div className="text-center py-6 text-muted">
+              <div className="text-3xl mb-2">✅</div>
+              <p>لا توجد طلبات متوقفة — كل شيء نظيف!</p>
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium text-amber-700">
+                  ⚠️ يوجد <strong>{staleRequests.length}</strong> طلب متوقف سيتم إغلاقه وإشعار أصحابه
+                </p>
+              </div>
+
+              {/* جدول الطلبات */}
+              <div className="overflow-x-auto rounded-xl border border-amber-200 mb-4">
+                <table className="w-full text-sm">
+                  <thead className="bg-amber-50">
+                    <tr>
+                      <th className="text-right p-3 font-bold text-amber-800">رقم الطلب</th>
+                      <th className="text-right p-3 font-bold text-amber-800">العميل</th>
+                      <th className="text-right p-3 font-bold text-amber-800">البريد</th>
+                      <th className="text-right p-3 font-bold text-amber-800">الحالة</th>
+                      <th className="text-right p-3 font-bold text-amber-800">أيام الانتظار</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {staleRequests.map((r, i) => (
+                      <tr key={r.id} className={i % 2 === 0 ? 'bg-white' : 'bg-amber-50/30'}>
+                        <td className="p-3 font-mono font-bold text-dark">{r.requestNumber}</td>
+                        <td className="p-3 text-dark">{r.clientName}</td>
+                        <td className="p-3 text-muted text-xs">{r.clientEmail}</td>
+                        <td className="p-3">
+                          <span className="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full">
+                            {r.status === 'pending' ? 'تحت المراجعة' : 'بانتظار الموافقة'}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <span className={`font-bold ${r.daysWaiting >= 14 ? 'text-red-600' : 'text-amber-600'}`}>
+                            {r.daysWaiting} يوم
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* زر التأكيد */}
+              {!confirmClose ? (
+                <Button
+                  onClick={() => setConfirmClose(true)}
+                  disabled={staleLoading}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white"
+                >
+                  🔒 إغلاق {staleRequests.length} طلب وإشعار العملاء
+                </Button>
+              ) : (
+                <div className="bg-red-50 border border-red-300 rounded-xl p-4">
+                  <p className="text-red-800 font-bold text-center mb-3">
+                    ⚠️ هل أنت متأكد؟ سيتم إغلاق {staleRequests.length} طلب وإرسال إيميل لكل عميل
+                  </p>
+                  <div className="flex gap-3">
+                    <Button onClick={handleCloseStale} disabled={staleLoading} className="flex-1 bg-red-600 hover:bg-red-700 text-white">
+                      {staleLoading ? '⏳ جاري الإغلاق...' : '✅ نعم، أغلق الكل'}
+                    </Button>
+                    <Button onClick={() => setConfirmClose(false)} variant="outline" className="flex-1">
+                      إلغاء
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        )}
+      </div>
+      {/* ───────────────────────────────────────────────────────────────── */}
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* تشغيل Job يدوي */}

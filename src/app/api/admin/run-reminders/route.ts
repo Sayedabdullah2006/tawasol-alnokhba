@@ -43,6 +43,12 @@ export async function POST(request: NextRequest) {
       case 'run-daily-job':
         return await handleRunDailyJob()
 
+      case 'preview-stale':
+        return await handlePreviewStale()
+
+      case 'close-stale':
+        return await handleCloseStale()
+
       case 'test-single-reminder':
         return await handleTestSingleReminder(params.requestId)
 
@@ -66,6 +72,145 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+// ─── مساعد: جلب الطلبات المتوقفة ───────────────────────────────────────────
+async function getStaleRequests() {
+  const supabase = await createServiceRoleClient()
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+  const { data: stalePending } = await supabase
+    .from('publish_requests')
+    .select('id, request_number, client_name, client_email, status, created_at, last_status_change')
+    .eq('status', 'pending')
+    .lt('created_at', sevenDaysAgo)
+    .not('client_email', 'is', null)
+
+  const { data: staleQuoted } = await supabase
+    .from('publish_requests')
+    .select('id, request_number, client_name, client_email, status, created_at, last_status_change')
+    .eq('status', 'quoted')
+    .lt('last_status_change', sevenDaysAgo)
+    .not('client_email', 'is', null)
+
+  const all = [...(stalePending ?? []), ...(staleQuoted ?? [])]
+  return all.map(r => {
+    const refDate = r.status === 'quoted' ? r.last_status_change : r.created_at
+    const days = Math.floor((Date.now() - new Date(refDate).getTime()) / (1000 * 60 * 60 * 24))
+    return {
+      id: r.id,
+      requestNumber: `ATH-${r.request_number.toString().padStart(4, '0')}`,
+      clientName: r.client_name,
+      clientEmail: r.client_email,
+      status: r.status,
+      daysWaiting: days,
+    }
+  })
+}
+
+async function handlePreviewStale() {
+  try {
+    const stale = await getStaleRequests()
+    return NextResponse.json({ success: true, count: stale.length, requests: stale })
+  } catch (error) {
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 })
+  }
+}
+
+async function handleCloseStale() {
+  try {
+    const supabase = await createServiceRoleClient()
+    const stale = await getStaleRequests()
+
+    if (stale.length === 0) {
+      return NextResponse.json({ success: true, closed: 0, failed: 0, results: [] })
+    }
+
+    const results: { requestNumber: string; clientEmail: string; closed: boolean; emailed: boolean }[] = []
+
+    for (const req of stale) {
+      let closed = false
+      let emailed = false
+
+      // تغيير الحالة
+      const { error: updateErr } = await supabase
+        .from('publish_requests')
+        .update({ status: 'auto_closed', updated_at: new Date().toISOString() })
+        .eq('id', req.id)
+        .in('status', ['pending', 'quoted'])
+
+      if (!updateErr) {
+        closed = true
+
+        // إرسال إيميل الإغلاق
+        const html = buildAutoClosedHTML(req.clientName, req.requestNumber)
+        const emailRes = await supabase.functions.invoke('send-enhanced-email', {
+          body: {
+            to: req.clientEmail,
+            subject: `📋 تم إغلاق طلبك تلقائياً · ${req.requestNumber}`,
+            html,
+            cc: 'first1saudi@gmail.com',
+            options: { category: 'notification', priority: 'normal' }
+          }
+        })
+        emailed = !emailRes.error && !!emailRes.data?.ok
+      }
+
+      results.push({ requestNumber: req.requestNumber, clientEmail: req.clientEmail, closed, emailed })
+    }
+
+    const closedCount = results.filter(r => r.closed).length
+    const emailedCount = results.filter(r => r.emailed).length
+
+    return NextResponse.json({ success: true, closed: closedCount, emailed: emailedCount, failed: stale.length - closedCount, results })
+  } catch (error) {
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 })
+  }
+}
+
+function buildAutoClosedHTML(clientName: string, requestNumber: string): string {
+  return `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F7F4ED;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F7F4ED;padding:24px 12px;">
+<tr><td align="center">
+<table width="560" style="max-width:560px;background:#fff;border-radius:16px;overflow:hidden;">
+  <tr><td style="background:#0E2855;padding:24px;text-align:center;">
+    <h1 style="margin:0;color:#fff;font-size:22px;font-weight:900;">تواصل النخبة</h1>
+    <p style="margin:4px 0 0;color:#C9A961;font-size:11px;letter-spacing:2px;">TAWASOL ALNOKHBA</p>
+  </td></tr>
+  <tr><td style="padding:32px 28px;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:48px;margin-bottom:12px;">📋</div>
+      <h2 style="margin:0;color:#0E2855;font-size:20px;font-weight:900;">تم إغلاق طلبك تلقائياً</h2>
+      <p style="margin:6px 0 0;color:#6B7C99;font-size:14px;">طلب ${requestNumber}</p>
+    </div>
+    <div style="background:#F8FAFC;border-radius:12px;padding:20px;margin:0 0 16px;">
+      <p style="margin:0 0 12px;color:#0E2855;font-size:15px;font-weight:bold;">مرحباً ${clientName} 👋</p>
+      <p style="font-size:14px;line-height:1.8;margin:0;color:#374151;">
+        طلبك <strong>${requestNumber}</strong> كان بانتظار موافقتك لأكثر من أسبوع،
+        لذلك أُغلق تلقائياً للحفاظ على تنظيم قائمة الطلبات.
+      </p>
+    </div>
+    <div style="background:#FEF3C7;border:1px solid #F59E0B;border-radius:12px;padding:16px;margin:0 0 24px;">
+      <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#92400E;">📌 هل ترغب في المتابعة؟</p>
+      <p style="margin:0;font-size:13px;line-height:1.8;color:#78350F;">
+        يسعدنا استقبال طلبك مجدداً — ما عليك سوى الدخول للموقع ورفع طلب جديد.
+      </p>
+    </div>
+    <div style="text-align:center;margin:0 0 20px;">
+      <a href="https://nukhba.media/request"
+         style="display:inline-block;background:#059669;color:#fff;padding:14px 32px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:15px;">
+        رفع طلب جديد
+      </a>
+    </div>
+  </td></tr>
+  <tr><td style="background:#F7F4ED;padding:18px;text-align:center;border-top:1px solid #E3DCC9;">
+    <p style="margin:0;color:#6B7C99;font-size:11px;">تواصل النخبة · منصة متخصصة في التسويق الرقمي</p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`
 }
 
 async function handleRunDailyJob() {
