@@ -21,10 +21,6 @@ interface Influencer {
   tk_followers?: number | null
 }
 
-const MAX_ROUNDS = 3
-const ROUND_DISCOUNTS = [5, 10, 15] // نسبة الخصم لكل جولة
-const MONTHLY_LIMIT = 3            // الحد الشهري لكل حساب
-
 interface MonthlyQuota {
   used:      number
   limit:     number
@@ -182,13 +178,10 @@ export default function QuoteApproval({
       if (data.monthlyRemaining !== undefined) {
         setMonthlyQuota({ used: data.monthlyUsed, limit: data.monthlyLimit, remaining: data.monthlyRemaining })
       }
-      const msg = data.isFinal
-        ? `✅ عرضنا النهائي: ${formatNumber(data.counterPrice)} ر.س — تحقق من طلبك`
-        : `✅ عرض جديد بخصم ${data.discountPct}% — تحقق من طلبك`
-      showToast(msg)
+      showToast('✅ تم إرسال طلبك — تحقق من العرض الجديد')
       router.push(`/dashboard/${requestId}`)
     } else if (data.monthlyLimitReached) {
-      showToast(data.error ?? 'استنفدت حصتك الشهرية من التفاوض', 'error')
+      showToast('غير متاح حالياً — حاول لاحقاً', 'error')
       if (monthlyQuota) setMonthlyQuota({ ...monthlyQuota, remaining: 0 })
       setNegotiating(false)
       setSubmitting(false)
@@ -367,22 +360,7 @@ export default function QuoteApproval({
         </div>
       ) : negotiating ? (
         <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-orange-700">طلب التفاوض</h3>
-            <span className="text-xs bg-orange-200 text-orange-800 font-bold px-2 py-1 rounded-full">
-              الجولة {negotiationRound + 1} من {MAX_ROUNDS}
-            </span>
-          </div>
-
-          {/* توقع الرد الآلي */}
-          <div className="bg-white border border-orange-200 rounded-xl p-3 text-center">
-            <p className="text-xs text-orange-700">
-              ⚡ سيصلك رد فوري بخصم{' '}
-              <strong>{ROUND_DISCOUNTS[negotiationRound]}%</strong>
-              {' '}= <strong>{formatNumber(Math.round(quotedPrice * (1 - ROUND_DISCOUNTS[negotiationRound] / 100)))} ر.س</strong>
-              {negotiationRound + 1 === MAX_ROUNDS && ' (عرض نهائي)'}
-            </p>
-          </div>
+          <h3 className="font-bold text-orange-700">طلب التفاوض</h3>
 
           <div>
             <label className="block text-sm font-medium text-orange-700 mb-2">
@@ -392,13 +370,10 @@ export default function QuoteApproval({
               type="number"
               value={proposedPrice}
               onChange={e => setProposedPrice(e.target.value)}
-              placeholder={`مثلاً: ${Math.round(quotedPrice * (1 - ROUND_DISCOUNTS[negotiationRound] / 100))}`}
+              placeholder="السعر الذي تقترحه..."
               className="w-full px-4 py-3 rounded-xl border border-orange-200 text-sm"
               min="0"
             />
-            <p className="text-xs text-orange-500 mt-1">
-              إذا كان اقتراحك أفضل لنا من خصم {ROUND_DISCOUNTS[negotiationRound]}% سيُقبل تلقائياً
-            </p>
           </div>
 
           <div>
@@ -432,7 +407,7 @@ export default function QuoteApproval({
               disabled={!negotiationReason.trim()}
               className="flex-1 bg-orange-600 hover:bg-orange-700"
             >
-              إرسال — الرد فوري ⚡
+              إرسال طلب التفاوض
             </Button>
           </div>
         </div>
@@ -446,89 +421,18 @@ export default function QuoteApproval({
 
           {negotiationRejected ? (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
-              <p className="text-sm font-medium text-amber-700">
-                🔒 وصلت للحد الأقصى ({MAX_ROUNDS} جولات) — السعر نهائي
-              </p>
+              <p className="text-sm font-medium text-amber-700">🔒 السعر نهائي</p>
               <p className="text-xs text-amber-600 mt-1">يمكنك اعتماد العرض أو رفضه</p>
             </div>
-          ) : monthlyBlocked ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center space-y-1">
-              <p className="text-sm font-bold text-amber-700">
-                🗓️ استنفدت حصتك الشهرية من التفاوض
-              </p>
-              <p className="text-xs text-amber-600">
-                الحد الشهري: {MONTHLY_LIMIT} جولات لكل حساب — تجدد كل 30 يوماً
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {/* شريط جولات الطلب */}
-              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-orange-700">جولات هذا الطلب</span>
-                  <span className="text-xs text-orange-600">
-                    {negotiationRound}/{MAX_ROUNDS} مستخدمة
-                  </span>
-                </div>
-                <div className="flex gap-1.5">
-                  {ROUND_DISCOUNTS.map((disc, i) => {
-                    const done = i < negotiationRound
-                    const next = i === negotiationRound
-                    return (
-                      <div
-                        key={i}
-                        className={`flex-1 rounded-lg p-1.5 text-center text-xs font-bold border transition-all
-                          ${done
-                            ? 'bg-orange-200 border-orange-300 text-orange-700 opacity-60'
-                            : next
-                            ? 'bg-orange-500 border-orange-600 text-white shadow-sm'
-                            : 'bg-white border-orange-200 text-orange-400'
-                          }`}
-                      >
-                        {done ? '✓' : `${disc}%`}
-                        <div className="text-[10px] mt-0.5 font-normal">
-                          {done ? 'مكتملة' : next ? 'التالية' : `جولة ${i + 1}`}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-                {negotiationRound < MAX_ROUNDS && (
-                  <p className="text-xs text-orange-600 mt-2 text-center">
-                    الجولة القادمة: خصم <strong>{ROUND_DISCOUNTS[negotiationRound]}%</strong> تلقائياً
-                  </p>
-                )}
-                {/* الحصة الشهرية */}
-                {monthlyQuota && (
-                  <div className="mt-2 pt-2 border-t border-orange-200 flex items-center justify-between">
-                    <span className="text-[11px] text-orange-600">رصيدك الشهري</span>
-                    <div className="flex gap-1">
-                      {Array.from({ length: MONTHLY_LIMIT }).map((_, i) => (
-                        <div
-                          key={i}
-                          className={`w-4 h-4 rounded-full border transition-all ${
-                            i < monthlyQuota.used
-                              ? 'bg-orange-400 border-orange-500'
-                              : 'bg-white border-orange-300'
-                          }`}
-                        />
-                      ))}
-                      <span className="text-[11px] text-orange-600 mr-1">
-                        ({monthlyQuota.remaining} متبقية / 30 يوم)
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <Button
-                variant="outline"
-                onClick={() => setNegotiating(true)}
-                className="w-full border-orange-300 text-orange-700 hover:bg-orange-50"
-                disabled={submitting}
-              >
-                💬 طلب التفاوض ({MAX_ROUNDS - negotiationRound} جولة متبقية بهذا الطلب)
-              </Button>
-            </div>
+          ) : monthlyBlocked ? null : (
+            <Button
+              variant="outline"
+              onClick={() => setNegotiating(true)}
+              className="w-full border-orange-300 text-orange-700 hover:bg-orange-50"
+              disabled={submitting}
+            >
+              💬 طلب التفاوض
+            </Button>
           )}
 
           <Button
