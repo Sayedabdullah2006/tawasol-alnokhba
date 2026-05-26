@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
-import { getCategoriesForClientType } from '@/lib/constants'
+import type { DBCategory } from '@/lib/hooks'
 import { calculateAutoQuote, CAMPAIGN_DISCOUNT_PCT } from '@/lib/auto-quote'
 import { formatNumber } from '@/lib/utils'
 import ContentImagesUploader from './ContentImagesUploader'
@@ -98,14 +98,17 @@ interface PostCardProps {
   post: CampaignPostData
   onChange: (p: CampaignPostData) => void
   clientType: string | null
+  categories: DBCategory[]
   isOpen: boolean
   onToggle: () => void
 }
 
-function PostCard({ index, post, onChange, clientType, isOpen, onToggle }: PostCardProps) {
+function PostCard({ index, post, onChange, clientType, categories, isOpen, onToggle }: PostCardProps) {
   const complete          = isPostComplete(post)
   const basePrice         = getPostBasePrice(post, clientType)
-  const availableCategories = getCategoriesForClientType(clientType ?? 'individual')
+  const availableCategories = clientType
+    ? categories.filter(c => !c.client_types || c.client_types.includes(clientType))
+    : categories
   const catInfo           = availableCategories.find(c => c.id === post.category)
   const compSub   = (
     post.category === 'competitions' &&
@@ -141,7 +144,7 @@ function PostCard({ index, post, onChange, clientType, isOpen, onToggle }: PostC
           </div>
           {catInfo && (
             <div className="text-xs text-muted">
-              {catInfo.icon} {catInfo.nameAr}
+              {catInfo.icon} {catInfo.name_ar}
             </div>
           )}
         </div>
@@ -171,7 +174,7 @@ function PostCard({ index, post, onChange, clientType, isOpen, onToggle }: PostC
             >
               <option value="">— اختر الفئة —</option>
               {availableCategories.map(c => (
-                <option key={c.id} value={c.id}>{c.icon} {c.nameAr}</option>
+                <option key={c.id} value={c.id}>{c.icon} {c.name_ar}</option>
               ))}
             </select>
           </div>
@@ -322,9 +325,10 @@ interface Props {
   posts: CampaignPostData[]
   onChange: (posts: CampaignPostData[]) => void
   clientType: string | null
+  categories: DBCategory[]
 }
 
-export default function RStepCampaignPosts({ posts, onChange, clientType }: Props) {
+export default function RStepCampaignPosts({ posts, onChange, clientType, categories }: Props) {
   const [openIndex, setOpenIndex] = useState(0)
 
   const updatePost = (i: number, p: CampaignPostData) => {
@@ -380,6 +384,7 @@ export default function RStepCampaignPosts({ posts, onChange, clientType }: Prop
             post={post}
             onChange={p => updatePost(i, p)}
             clientType={clientType}
+            categories={categories}
             isOpen={openIndex === i}
             onToggle={() => setOpenIndex(openIndex === i ? -1 : i)}
           />

@@ -308,7 +308,12 @@ export default function RequestWizard() {
             <RStep1ClientType
               selected={clientType}
               onSelect={(v) => {
-                if (clientType !== v) { setCategory(null); setSubOption(null) }
+                if (clientType !== v) {
+                  setCategory(null)
+                  setSubOption(null)
+                  // إعادة تعيين تصنيفات منشورات الحملة عند تغيير نوع العميل
+                  setCampaignPosts(prev => prev.map(p => ({ ...p, category: '', subOption: null })))
+                }
                 setClientType(v)
               }}
             />
@@ -346,6 +351,7 @@ export default function RequestWizard() {
               posts={campaignPosts}
               onChange={setCampaignPosts}
               clientType={clientType}
+              categories={categories}
             />
           )}
 
