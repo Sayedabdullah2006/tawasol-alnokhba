@@ -507,10 +507,10 @@ export default function RequestWizard() {
               <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center">
                 <div className="text-2xl mb-2">📧</div>
                 <p className="font-bold text-blue-700 text-sm">
-                  سيُرسل هذا العرض فوراً لبريدك الإلكتروني
+                  بمجرد إرسالك سيصلك عرضك خلال دقائق
                 </p>
                 <p className="text-xs text-blue-600 mt-1">
-                  ومفيش أي التزام مالي قبل ما توافق على العرض
+                  مُحتسَب خصيصاً بحسب طبيعة خبرك — ولا يوجد أي التزام مالي قبل موافقتك
                 </p>
               </div>
             </div>
