@@ -17,14 +17,14 @@ export const AQ_EXTRAS_PRICES: Record<string, number> = Object.fromEntries(
 
 export const AQ_EXTRAS_NAMES: Record<string, string> = {
   bilingual:    'صياغة المحتوى باللغتين',
-  mention:      'منشن في القناة',
-  story:        'ستوري في القناة',
-  encyclopedia: 'إضافة للموسوعة الرقمية',
+  mention:      'منشن لحساب المستخدم',
+  story:        'ستوري انستغرام وتيك توك',
+  encyclopedia: 'إضافة لقاعدة بيانات أول سعودي First1saudi.net',
   pin6:         'تثبيت 6 ساعات في X و LinkedIn',
   pin12:        'تثبيت 12 ساعة في X و LinkedIn',
-  repost:       'إعادة نشر',
+  repost:       'رتويت للمنشور بعد يوم أو يومين',
   campaign:     'حملة ترويجية متكاملة',
-  video:        'فيديو جاهز',
+  video:        'تصميم مقطع فيديو شخصي موشن جرافيك',
   report:       'تقرير الأداء',
   infographic:  'تصميم إنفوجرافيك',
 }
