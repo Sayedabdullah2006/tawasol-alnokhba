@@ -65,7 +65,7 @@ const SIMPLE_BASE: Record<string, ClientPrices> = {
   appointment: { individual: 899,  business: 2500, government: 5000 },
   award:       { individual: 599,  business: 2000 },
   cv:          { individual: 799  },
-  product:     { individual: 799,  business: 2500 },
+  product:     { business: 2500 },
   charity:     { charity: 999 },
   government:  { government: 4500 },
 }
