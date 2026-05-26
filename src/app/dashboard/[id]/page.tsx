@@ -246,6 +246,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
               negotiationRound={request.negotiation_round ?? 0}
               quickDiscountPct={request.quote_quick_discount_pct}
               quickDiscountDeadline={request.quote_quick_discount_deadline}
+              quoteExpiresAt={request.quote_expires_at}
             />
           </div>
         )}

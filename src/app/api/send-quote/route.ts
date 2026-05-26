@@ -40,6 +40,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'السعر غير صالح' }, { status: 400 })
     }
 
+    // مهلة الموافقة على العرض — 24 ساعة من إرسال التسعيرة
+    const quoteExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+
     const { data: updated, error } = await supabase
       .from('publish_requests')
       .update({
@@ -53,7 +56,7 @@ export async function POST(request: Request) {
         quoted_at:                     new Date().toISOString(),
         last_status_change:            new Date().toISOString(),
         admin_notes:                   adminNotes ?? null,
-        quote_expires_at:              null,
+        quote_expires_at:              quoteExpiresAt,
         quote_quick_discount_pct:      quickDiscountPct ?? null,
         quote_quick_discount_deadline: quickDiscountDeadline ?? null,
         updated_at:                    new Date().toISOString(),
@@ -88,7 +91,7 @@ export async function POST(request: Request) {
             ...args,
             price: quotedPrice,
             reach: baseReach ?? 0,
-            quoteExpiresAt: null,
+            quoteExpiresAt,
             quickDiscountPct: quickDiscountPct ?? null,
             quickDiscountDeadline: quickDiscountDeadline ?? null,
           })

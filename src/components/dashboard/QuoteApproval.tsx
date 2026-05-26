@@ -38,6 +38,7 @@ interface Props {
   negotiationRound?: number
   quickDiscountPct?: number | null
   quickDiscountDeadline?: string | null
+  quoteExpiresAt?: string | null
 }
 
 function formatCountdown(ms: number): string {
@@ -54,7 +55,7 @@ function formatCountdown(ms: number): string {
 
 export default function QuoteApproval({
   requestId, quotedPrice, offeredExtras, influencer, scope, adminNotes, negotiationRejected,
-  negotiationRound = 0, quickDiscountPct, quickDiscountDeadline,
+  negotiationRound = 0, quickDiscountPct, quickDiscountDeadline, quoteExpiresAt,
 }: Props) {
   const router = useRouter()
   const { showToast } = useToast()
@@ -90,6 +91,11 @@ export default function QuoteApproval({
 
   const quickDeadlineMs = quickDiscountDeadline ? new Date(quickDiscountDeadline).getTime() : 0
   const quickDiscountActive = !!(quickDiscountPct && quickDeadlineMs > now)
+
+  // مهلة الموافقة على العرض — 24 ساعة
+  const quoteDeadlineMs = quoteExpiresAt ? new Date(quoteExpiresAt).getTime() : 0
+  const quoteExpired = !!(quoteExpiresAt && quoteDeadlineMs <= now)
+  const quoteCountdownActive = !!(quoteExpiresAt && !quoteExpired)
 
   const discountAmount = quickDiscountActive ? quotedPrice * ((quickDiscountPct ?? 0) / 100) : 0
   const discountedBase = Math.max(0, quotedPrice - discountAmount)
@@ -222,6 +228,28 @@ export default function QuoteApproval({
         <div className="bg-cream rounded-xl p-3 text-sm">
           <span className="text-muted block text-xs mb-1">ملاحظة من الإدارة</span>
           <p className="text-dark">{adminNotes}</p>
+        </div>
+      )}
+
+      {quoteExpired && (
+        <div className="bg-gradient-to-l from-red-50 to-red-100 border-2 border-red-300 rounded-2xl p-5 text-center">
+          <div className="text-3xl mb-2">⌛</div>
+          <p className="font-black text-red-700 text-base mb-1">انتهى وقت الموافقة على العرض</p>
+          <p className="text-xs text-red-600 leading-relaxed">
+            للأسف انقضت مهلة الـ 24 ساعة. تواصل مع الإدارة لتجديد العرض.
+          </p>
+        </div>
+      )}
+
+      {quoteCountdownActive && (
+        <div className="bg-gradient-to-l from-blue-50 to-blue-100 border-2 border-blue-300 rounded-2xl p-4 text-center">
+          <p className="font-bold text-blue-800 text-sm mb-1">⏳ يتبقّى للموافقة على العرض</p>
+          <div className="inline-block bg-blue-600 text-white text-base font-bold px-4 py-1.5 rounded-lg font-mono">
+            {formatCountdown(quoteDeadlineMs - now)}
+          </div>
+          <p className="text-[11px] text-blue-700 mt-2">
+            اعتمد العرض أو اطلب تفاوضاً قبل انتهاء المهلة
+          </p>
         </div>
       )}
 
@@ -413,26 +441,30 @@ export default function QuoteApproval({
         </div>
       ) : (
         <div className="space-y-3">
-          <Button onClick={handleApprove} loading={submitting} className="w-full" size="lg">
-            {isFreeFinal
-              ? 'اعتماد وبدء التنفيذ 🎁'
-              : `تأكيد المساهمة والانتقال للدفع — ${formatNumber(finalTotal)} ر.س`}
-          </Button>
-
-          {negotiationRejected ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
-              <p className="text-sm font-medium text-amber-700">🔒 السعر نهائي</p>
-              <p className="text-xs text-amber-600 mt-1">يمكنك اعتماد العرض أو رفضه</p>
-            </div>
-          ) : monthlyBlocked ? null : (
-            <Button
-              variant="outline"
-              onClick={() => setNegotiating(true)}
-              className="w-full border-orange-300 text-orange-700 hover:bg-orange-50"
-              disabled={submitting}
-            >
-              💬 طلب التفاوض
+          {!quoteExpired && (
+            <Button onClick={handleApprove} loading={submitting} className="w-full" size="lg">
+              {isFreeFinal
+                ? 'اعتماد وبدء التنفيذ 🎁'
+                : `تأكيد المساهمة والانتقال للدفع — ${formatNumber(finalTotal)} ر.س`}
             </Button>
+          )}
+
+          {!quoteExpired && (
+            negotiationRejected ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+                <p className="text-sm font-medium text-amber-700">🔒 السعر نهائي</p>
+                <p className="text-xs text-amber-600 mt-1">يمكنك اعتماد العرض أو رفضه</p>
+              </div>
+            ) : monthlyBlocked ? null : (
+              <Button
+                variant="outline"
+                onClick={() => setNegotiating(true)}
+                className="w-full border-orange-300 text-orange-700 hover:bg-orange-50"
+                disabled={submitting}
+              >
+                💬 طلب التفاوض
+              </Button>
+            )
           )}
 
           <Button

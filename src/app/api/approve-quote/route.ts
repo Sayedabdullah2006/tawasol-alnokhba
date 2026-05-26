@@ -73,6 +73,13 @@ export async function POST(request: Request) {
     if (req.status !== 'quoted' && req.status !== 'approved') {
       return NextResponse.json({ error: 'لا يمكن تعديل هذا الطلب' }, { status: 400 })
     }
+    // التحقق من مهلة الموافقة (24 ساعة)
+    if (req.status === 'quoted' && req.quote_expires_at && new Date(req.quote_expires_at).getTime() < Date.now()) {
+      return NextResponse.json({
+        error: 'انتهى وقت الموافقة على العرض — تواصل مع الإدارة لتجديده',
+        expired: true,
+      }, { status: 400 })
+    }
 
     // Service role for both reads (extras/pricing_config require it under admin RLS)
     // and the publish_requests update (users have no UPDATE policy).
