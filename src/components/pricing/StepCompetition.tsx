@@ -106,14 +106,6 @@ export default function StepCompetition({ selected, onSelect }: StepCompetitionP
                    position.id === 'top_50' ? '🏅' : '⭐'}
                 </div>
                 <h3 className="font-bold text-dark text-sm mb-1">{position.nameAr}</h3>
-                {position.multiplier > 1.0 && (
-                  <div className="text-xs text-green font-medium">
-                    +{Math.round((position.multiplier - 1) * 100)}% على السعر
-                  </div>
-                )}
-                {position.multiplier === 1.0 && (
-                  <div className="text-xs text-muted">السعر الأساسي</div>
-                )}
               </button>
             ))}
           </div>
