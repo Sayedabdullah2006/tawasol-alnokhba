@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
-import { CATEGORIES } from '@/lib/constants'
+import { getCategoriesForClientType } from '@/lib/constants'
 import { calculateAutoQuote, CAMPAIGN_DISCOUNT_PCT } from '@/lib/auto-quote'
 import { formatNumber } from '@/lib/utils'
 import ContentImagesUploader from './ContentImagesUploader'
@@ -103,9 +103,10 @@ interface PostCardProps {
 }
 
 function PostCard({ index, post, onChange, clientType, isOpen, onToggle }: PostCardProps) {
-  const complete  = isPostComplete(post)
-  const basePrice = getPostBasePrice(post, clientType)
-  const catInfo   = CATEGORIES.find(c => c.id === post.category)
+  const complete          = isPostComplete(post)
+  const basePrice         = getPostBasePrice(post, clientType)
+  const availableCategories = getCategoriesForClientType(clientType ?? 'individual')
+  const catInfo           = availableCategories.find(c => c.id === post.category)
   const compSub   = (
     post.category === 'competitions' &&
     post.subOption !== null &&
@@ -169,7 +170,7 @@ function PostCard({ index, post, onChange, clientType, isOpen, onToggle }: PostC
               className={select}
             >
               <option value="">— اختر الفئة —</option>
-              {CATEGORIES.map(c => (
+              {availableCategories.map(c => (
                 <option key={c.id} value={c.id}>{c.icon} {c.nameAr}</option>
               ))}
             </select>
