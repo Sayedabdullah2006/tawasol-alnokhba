@@ -34,9 +34,6 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
   const [isFree, setIsFree] = useState(false)
   const [selectedExtrasToOffer, setSelectedExtrasToOffer] = useState<string[]>([])
   const [adminNotes, setAdminNotes] = useState(request.admin_notes ?? '')
-  const [enableQuickDiscount, setEnableQuickDiscount] = useState(false)
-  const [quickDiscountPct, setQuickDiscountPct] = useState<number>(5)
-  const [quickDiscountHours, setQuickDiscountHours] = useState<number>(48)
 
   useEffect(() => {
     const load = async () => {
@@ -123,18 +120,6 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
         reachBoost: e.reachBoost,
       }))
 
-    if (enableQuickDiscount && (quickDiscountPct <= 0 || quickDiscountPct >= 100 || quickDiscountHours < 1)) {
-      showToast('قيم خصم القبول السريع غير صالحة', 'error')
-      setSaving(false)
-      return
-    }
-
-    const now = Date.now()
-    const quickDiscountDeadline = enableQuickDiscount && !isFree
-      ? new Date(now + quickDiscountHours * 60 * 60 * 1000).toISOString()
-      : null
-    const quickDiscountPctToSend = enableQuickDiscount && !isFree ? quickDiscountPct : null
-
     const res = await fetch('/api/send-quote', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -144,8 +129,6 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
         offeredExtras,
         adminNotes: adminNotes || null,
         baseReach,
-        quickDiscountPct: quickDiscountPctToSend,
-        quickDiscountDeadline,
       }),
     })
 
@@ -284,43 +267,6 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
           className="w-full px-4 py-3 rounded-xl border border-border bg-white text-sm min-h-[80px] resize-y"
           placeholder={isFree ? 'مثلاً: تم منحك خدمة مجانية كهدية ترحيبية...' : 'مثلاً: تم تعديل السعر بسبب...'} />
       </div>
-
-      {!isFree && (
-        <div className="bg-cream rounded-xl p-4 space-y-3">
-          <label className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-            enableQuickDiscount ? 'bg-orange-50 border-orange-400' : 'bg-white border-border hover:border-orange-300'
-          }`}>
-            <input type="checkbox" checked={enableQuickDiscount}
-              onChange={e => setEnableQuickDiscount(e.target.checked)}
-              className="w-5 h-5 accent-orange-500 cursor-pointer" />
-            <div className="flex-1">
-              <div className="font-bold text-dark text-sm">🎯 خصم للقبول السريع</div>
-              <div className="text-xs text-muted mt-0.5">يُطبَّق تلقائياً إذا اعتمد العميل العرض خلال المدة المحددة</div>
-            </div>
-          </label>
-
-          {enableQuickDiscount && (
-            <div className="grid grid-cols-2 gap-3 pl-2 border-r-2 border-orange-300 pr-3">
-              <div>
-                <label className="text-muted block mb-1 text-xs">نسبة الخصم %</label>
-                <input type="number" min={1} max={99} value={quickDiscountPct}
-                  onChange={e => setQuickDiscountPct(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-white text-sm" />
-              </div>
-              <div>
-                <label className="text-muted block mb-1 text-xs">خلال (ساعة)</label>
-                <input type="number" min={1} max={720} value={quickDiscountHours}
-                  onChange={e => setQuickDiscountHours(parseInt(e.target.value) || 1)}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-white text-sm" />
-              </div>
-              <div className="col-span-2 text-xs bg-orange-100 rounded-lg p-2 text-orange-700">
-                السعر مع الخصم: <strong>{formatNumber(effectivePrice * (1 - quickDiscountPct / 100))} ر.س</strong>
-                {' '}(توفير {formatNumber(effectivePrice * (quickDiscountPct / 100))} ر.س)
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       <div className="flex gap-3">
         <Button variant="ghost" onClick={onCancel} className="flex-1">إلغاء</Button>

@@ -25,20 +25,20 @@ export async function POST(request: Request) {
     const body = await request.json()
     const {
       requestId, quotedPrice, offeredExtras, adminNotes, baseReach,
-      quickDiscountPct, quickDiscountDeadline,
     } = body as {
       requestId: string
       quotedPrice: number
       offeredExtras: OfferedExtra[]
       adminNotes?: string
       baseReach: number
-      quickDiscountPct?: number | null
-      quickDiscountDeadline?: string | null
     }
 
     if (typeof quotedPrice !== 'number' || quotedPrice < 0) {
       return NextResponse.json({ error: 'السعر غير صالح' }, { status: 400 })
     }
+
+    // مهلة الموافقة على العرض — 24 ساعة من إرسال التسعيرة
+    const quoteExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
 
     const { data: updated, error } = await supabase
       .from('publish_requests')
@@ -53,9 +53,7 @@ export async function POST(request: Request) {
         quoted_at:                     new Date().toISOString(),
         last_status_change:            new Date().toISOString(),
         admin_notes:                   adminNotes ?? null,
-        quote_expires_at:              null,
-        quote_quick_discount_pct:      quickDiscountPct ?? null,
-        quote_quick_discount_deadline: quickDiscountDeadline ?? null,
+        quote_expires_at:              quoteExpiresAt,
         updated_at:                    new Date().toISOString(),
         // ── إعادة ضبط حقول التفاوض ─────────────────────────────────────
         // عند إرسال عرض يدوي جديد يبدأ التفاوض من الصفر
@@ -88,9 +86,7 @@ export async function POST(request: Request) {
             ...args,
             price: quotedPrice,
             reach: baseReach ?? 0,
-            quoteExpiresAt: null,
-            quickDiscountPct: quickDiscountPct ?? null,
-            quickDiscountDeadline: quickDiscountDeadline ?? null,
+            quoteExpiresAt,
           })
       promise.catch(e => console.error('Quote email failed:', e))
     }

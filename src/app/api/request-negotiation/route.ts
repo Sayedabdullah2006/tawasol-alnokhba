@@ -70,6 +70,13 @@ export async function POST(request: Request) {
     if (req.status !== 'quoted') {
       return NextResponse.json({ error: 'لا يمكن التفاوض في هذه المرحلة' }, { status: 400 })
     }
+    // التحقق من مهلة الموافقة (24 ساعة) — لا تفاوض بعد انتهاء العرض
+    if (req.quote_expires_at && new Date(req.quote_expires_at).getTime() < Date.now()) {
+      return NextResponse.json({
+        error: 'انتهى وقت العرض — تواصل مع الإدارة لتجديده',
+        expired: true,
+      }, { status: 400 })
+    }
 
     // ── فحص حد الطلب الواحد (3 جولات/طلب) ────────────────────────
     if (req.negotiation_rejected || req.negotiation_round >= MAX_ROUNDS) {
@@ -128,6 +135,8 @@ export async function POST(request: Request) {
 
     const requestNumber = `ATH-${String(req.request_number).padStart(4, '0')}`
     const now = new Date().toISOString()
+    // مهلة الموافقة على العرض المعدّل — 24 ساعة من إصداره
+    const quoteExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
 
     // ── تحديث قاعدة البيانات ───────────────────────────────────────
     const { error: updateError } = await supabase
@@ -148,6 +157,7 @@ export async function POST(request: Request) {
                                        ? 'client_accepted'
                                        : 'admin_discount',
         last_status_change:          now,
+        quote_expires_at:            quoteExpiresAt,
         updated_at:                  now,
         user_selected_extras:        [],
         extras_selected_total:       0,

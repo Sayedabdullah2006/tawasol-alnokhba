@@ -52,6 +52,8 @@ export async function POST(request: Request) {
     const channels: string[]       = Array.isArray(body.channels) ? body.channels : []
     const scope = channels.length > 1 ? 'all' : 'single'
     const now   = new Date().toISOString()
+    // مهلة الموافقة على العرض — 24 ساعة من إنشاء العرض التلقائي
+    const quoteExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
     const isCampaign = body.request_type === 'campaign'
 
     // ── مسار الحملة ──────────────────────────────────────────────
@@ -143,6 +145,7 @@ export async function POST(request: Request) {
           status:            'quoted',
           quoted_at:         now,
           last_status_change: now,
+          quote_expires_at:  quoteExpiresAt,
           auto_quote_tier:   null,
           auto_quoted_at:    now,
           auto_quote_note:   `حملة ${campaignPostsRaw.length} منشورات — خصم ${CAMPAIGN_DISCOUNT_PCT}%`,
@@ -176,9 +179,7 @@ export async function POST(request: Request) {
           clientName:            body.client_name ?? 'عزيزنا',
           price:                 campaignCalc.total,
           reach:                 0,
-          quoteExpiresAt:        null,
-          quickDiscountPct:      null,
-          quickDiscountDeadline: null,
+          quoteExpiresAt,
         }).catch(e => console.error('Campaign quote email failed:', e))
       }
 
@@ -244,6 +245,7 @@ export async function POST(request: Request) {
         status:            'quoted',
         quoted_at:         now,
         last_status_change: now,
+        quote_expires_at:  quoteExpiresAt,
         auto_quote_tier:   null,
         auto_quoted_at:    now,
         auto_quote_note:   `تسعير تلقائي — فئة: ${body.category}، إضافات: ${selectedExtras.length}`,
@@ -280,9 +282,7 @@ export async function POST(request: Request) {
         clientName:            body.client_name ?? 'عزيزنا',
         price:                 priceCalc.total,
         reach:                 0,
-        quoteExpiresAt:        null,
-        quickDiscountPct:      null,
-        quickDiscountDeadline: null,
+        quoteExpiresAt,
       }).catch(e => console.error('Quote email failed:', e))
     }
 
