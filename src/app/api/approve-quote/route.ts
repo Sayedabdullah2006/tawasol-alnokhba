@@ -90,14 +90,8 @@ export async function POST(request: Request) {
     const extrasSelected = valid.map(id => availableMap.get(id)!)
     const extrasTotal = extrasSelected.reduce((sum, e) => sum + (e.price ?? 0), 0)
 
-    // Apply quick-acceptance discount if still within the window
     const basePrice = Number(req.admin_quoted_price ?? 0)
-    const quickDiscountPct = Number(req.quote_quick_discount_pct ?? 0)
-    const quickDeadline = req.quote_quick_discount_deadline ? new Date(req.quote_quick_discount_deadline).getTime() : 0
-    const withinQuickWindow = quickDiscountPct > 0 && quickDeadline > Date.now()
-    const discountAmount = withinQuickWindow ? basePrice * (quickDiscountPct / 100) : 0
-    const discountedBase = Math.max(0, basePrice - discountAmount)
-    const finalTotal = discountedBase + extrasTotal
+    const finalTotal = basePrice + extrasTotal
 
     const reach = calculateReach({
       influencer: req.influencers ?? {},

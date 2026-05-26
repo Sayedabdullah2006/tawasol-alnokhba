@@ -244,8 +244,6 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
               adminNotes={request.admin_notes}
               negotiationRejected={!!request.negotiation_rejected}
               negotiationRound={request.negotiation_round ?? 0}
-              quickDiscountPct={request.quote_quick_discount_pct}
-              quickDiscountDeadline={request.quote_quick_discount_deadline}
               quoteExpiresAt={request.quote_expires_at}
             />
           </div>

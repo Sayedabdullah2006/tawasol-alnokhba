@@ -191,8 +191,6 @@ export function quoteReadyToClient(d: {
   price: number
   reach: number
   quoteExpiresAt?: string | null
-  quickDiscountPct?: number | null
-  quickDiscountDeadline?: string | null
 }) {
   const expiryBlock = d.quoteExpiresAt
     ? `
@@ -200,20 +198,6 @@ export function quoteReadyToClient(d: {
         <p style="margin:0; font-size:13px; color:#92400E;">
           ⏰ <strong>العرض ساري حتى ${formatDateAr(d.quoteExpiresAt)}</strong>
         </p>
-      </div>`
-    : ''
-
-  const discountBlock = d.quickDiscountPct && d.quickDiscountDeadline
-    ? `
-      <div style="background:#FFEDD5; border:2px solid #FB923C; border-radius:12px; padding:14px; margin-bottom:14px; text-align:center;">
-        <p style="margin:0 0 4px 0; font-size:14px; font-weight:bold; color:#C2410C;">
-          🎯 خصم ${d.quickDiscountPct}% للقبول السريع
-        </p>
-        <p style="margin:0 0 6px 0; font-size:12px; color:#9A3412;">
-          اعتمد العرض قبل <strong>${formatDateAr(d.quickDiscountDeadline)}</strong> ووفّر
-          <strong>${(d.price * (d.quickDiscountPct / 100)).toLocaleString('ar-SA')} ر.س</strong>
-        </p>
-        <p style="margin:0; font-size:11px; color:#9A3412;">السعر مع الخصم: ${(d.price * (1 - d.quickDiscountPct / 100)).toLocaleString('ar-SA')} ر.س</p>
       </div>`
     : ''
 
@@ -231,7 +215,6 @@ export function quoteReadyToClient(d: {
         <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">الوصول المتوقع</p>
         <p style="margin:0; font-size:18px; font-weight:bold; color:${BRAND_NAVY};">${formatReach(d.reach)} متابع</p>
       </div>
-      ${discountBlock}
       ${expiryBlock}
       <p style="margin:0 0 14px 0; font-size:13px; line-height:1.8;">
         يمكنك أيضاً اختيار خدمات إضافية لتعزيز الحملة. السعر والوصول يتحدّثان فورياً مع كل اختيار.

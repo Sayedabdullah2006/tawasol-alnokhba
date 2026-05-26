@@ -180,8 +180,6 @@ export async function POST(request: Request) {
           price:                 campaignCalc.total,
           reach:                 0,
           quoteExpiresAt,
-          quickDiscountPct:      null,
-          quickDiscountDeadline: null,
         }).catch(e => console.error('Campaign quote email failed:', e))
       }
 
@@ -285,8 +283,6 @@ export async function POST(request: Request) {
         price:                 priceCalc.total,
         reach:                 0,
         quoteExpiresAt,
-        quickDiscountPct:      null,
-        quickDiscountDeadline: null,
       }).catch(e => console.error('Quote email failed:', e))
     }
 
