@@ -169,11 +169,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'فشل معالجة طلب التفاوض' }, { status: 500 })
     }
 
-    // ── رسالة الجولة للعميل ────────────────────────────────────────
-    const roundLabel = isFinalRound
-      ? `الجولة ${currentRound} من ${MAX_ROUNDS} — هذا عرضنا النهائي ولا يمكن التفاوض أكثر`
-      : `الجولة ${currentRound} من ${MAX_ROUNDS} — تبقّت ${MAX_ROUNDS - currentRound} جولة في هذا الطلب`
-
     if (req.client_email) {
       notifyNegotiatedQuoteToClient({
         email:              req.client_email,
@@ -182,7 +177,7 @@ export async function POST(request: Request) {
         originalPrice,
         newPrice:           counterPrice,
         discountPercentage: actualDiscountPct,
-        adminMessage:       roundLabel,
+        adminMessage:       '',
         priceSource:        'admin_discount',
       }).catch(e => console.error('Auto-negotiation client email failed:', e))
     }
