@@ -72,13 +72,16 @@ export async function POST(request: Request) {
     }
 
     // ── تحديث قاعدة البيانات ──────────────────────────────────────────
+    const now = new Date().toISOString()
     const { data: updated, error } = await supabase
       .from('publish_requests')
       .update({
-        status:            newStatus,
-        admin_notes:       adminNotes,
-        last_status_change: new Date().toISOString(),
-        updated_at:        new Date().toISOString(),
+        status:             newStatus,
+        admin_notes:        adminNotes,
+        last_status_change: now,
+        updated_at:         now,
+        // سجّل وقت تأكيد الدفع عند انتقال الطلب إلى "مدفوع" (تحويل بنكي)
+        ...(newStatus === 'paid' ? { paid_at: now } : {}),
       })
       .eq('id', requestId)
       .select('request_number, client_name, client_email, final_total, admin_quoted_price, estimated_reach')

@@ -20,6 +20,7 @@ export default function AdminStatsPage() {
     monthRevenue: 0,
     prevMonthRevenue: 0,
     revenue: 0,
+    totalPaidRevenue: 0,
     outstanding: 0,
     conversionRate: 0,
   })
@@ -70,17 +71,26 @@ export default function AdminStatsPage() {
         paidStatuses.includes(r.status) && r.created_at >= monthStart
       ).length
 
-      // الإيرادات: كل الطلبات المدفوعة (ليس فقط completed) لعكس المبالغ المحصّلة فعلاً
+      // الإيرادات: الطلبات التي تأكّد دفعها فعلاً
+      // paid_at يُسجَّل عند تأكيد Moyasar/Tamara أو عند تأكيد الأدمن للتحويل البنكي
+      // الفلتر الاحتياطي بالحالة يغطي السجلات القديمة قبل إضافة paid_at
+      const isConfirmedPaid = (r: any) =>
+        (r.paid_at != null || paidStatuses.includes(r.status)) && (r.final_total ?? 0) > 0
+
       const monthRevenue = requests
-        .filter(r => paidStatuses.includes(r.status) && r.created_at >= monthStart)
+        .filter(r => isConfirmedPaid(r) && r.created_at >= monthStart)
         .reduce((s, r) => s + (r.final_total ?? 0), 0)
 
       const prevMonthRevenue = requests
         .filter(r =>
-          paidStatuses.includes(r.status) &&
+          isConfirmedPaid(r) &&
           r.created_at >= prevMonthStart &&
           r.created_at < prevMonthEnd
         )
+        .reduce((s, r) => s + (r.final_total ?? 0), 0)
+
+      const totalPaidRevenue = requests
+        .filter(isConfirmedPaid)
         .reduce((s, r) => s + (r.final_total ?? 0), 0)
 
       setStats({
@@ -91,7 +101,8 @@ export default function AdminStatsPage() {
         monthPaidCount,
         monthRevenue,
         prevMonthRevenue,
-        revenue: requests.filter(r => r.status === 'completed').reduce((s, r) => s + (r.final_total ?? 0), 0),
+        revenue: requests.filter(r => r.status === 'completed' && (r.final_total ?? 0) > 0).reduce((s, r) => s + (r.final_total ?? 0), 0),
+        totalPaidRevenue,
         outstanding: requests
           .filter(r => r.status === 'quoted')
           .reduce((s, r) => s + (r.final_total ?? r.admin_quoted_price ?? 0), 0),
@@ -148,6 +159,11 @@ export default function AdminStatsPage() {
   const goalAchieved = stats.prevMonthRevenue > 0
     ? Math.min((stats.monthRevenue / stats.prevMonthRevenue) * 100, 100)
     : stats.monthRevenue > 0 ? 100 : 0
+
+  const avgOrderRevenue = stats.paidCount > 0 ? stats.totalPaidRevenue / stats.paidCount : 0
+  const remainingRevenue = Math.max(0, stats.prevMonthRevenue - stats.monthRevenue)
+  const ordersNeeded = avgOrderRevenue > 0 ? Math.ceil(remainingRevenue / avgOrderRevenue) : null
+  const goalMet = stats.prevMonthRevenue > 0 && stats.monthRevenue >= stats.prevMonthRevenue
 
   const currentMonthName = new Date().toLocaleString('ar-SA', { month: 'long' })
   const prevMonthName = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)
@@ -303,6 +319,32 @@ export default function AdminStatsPage() {
               <p className="text-xs text-muted">ر.س</p>
             </div>
           </div>
+
+          {/* المتبقي لتحقيق الهدف */}
+          {stats.prevMonthRevenue > 0 && (
+            <div className={`mt-3 rounded-xl p-3 text-center text-xs ${goalMet ? 'bg-green/10' : 'bg-amber-50'}`}>
+              {goalMet ? (
+                <p className="font-bold text-green">تحقق الهدف هذا الشهر!</p>
+              ) : (
+                <>
+                  <p className="text-muted mb-0.5">المتبقي لتحقيق الهدف</p>
+                  <p className="font-black text-dark text-sm">
+                    {formatNumber(remainingRevenue)} ر.س
+                    {ordersNeeded !== null && (
+                      <span className="font-normal text-muted">
+                        {' '}· ~{ordersNeeded} طلب
+                      </span>
+                    )}
+                  </p>
+                  {avgOrderRevenue > 0 && (
+                    <p className="text-muted mt-0.5">
+                      بمعدل {formatNumber(Math.round(avgOrderRevenue))} ر.س / طلب
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
