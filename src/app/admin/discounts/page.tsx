@@ -30,6 +30,12 @@ export default function AdminDiscountsPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
 
+  // حالة الإرسال بالبريد
+  const [sendingFor, setSendingFor]     = useState<string | null>(null)   // id الكود الذي يُرسل
+  const [sendMessage, setSendMessage]   = useState('')
+  const [quotedCount, setQuotedCount]   = useState<number | null>(null)
+  const [sendingEmail, setSendingEmail] = useState(false)
+
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -37,6 +43,7 @@ export default function AdminDiscountsPage() {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       if (profile?.role !== 'admin') { router.push('/dashboard'); return }
       fetchCodes()
+      fetchQuotedCount()
     })
   }, [router])
 
@@ -46,6 +53,12 @@ export default function AdminDiscountsPage() {
     const json = await res.json()
     setCodes(json.data ?? [])
     setLoading(false)
+  }
+
+  const fetchQuotedCount = async () => {
+    const res = await fetch('/api/admin/send-discount-email')
+    const json = await res.json()
+    setQuotedCount(json.count ?? 0)
   }
 
   const handleCreate = async () => {
@@ -99,10 +112,38 @@ export default function AdminDiscountsPage() {
     })
     if (res.ok) {
       setCodes(prev => prev.filter(c => c.id !== id))
+      if (sendingFor === id) setSendingFor(null)
       showToast('تم الحذف')
     } else {
       showToast('فشل الحذف', 'error')
     }
+  }
+
+  const openSendPanel = (id: string) => {
+    setSendingFor(id)
+    setSendMessage('')
+  }
+
+  const handleSendEmail = async () => {
+    if (!sendMessage.trim()) { showToast('اكتب رسالة للعملاء', 'error'); return }
+    if (!sendingFor) return
+    if (!confirm(`سيتم إرسال الكود لـ ${quotedCount} عميل لديهم عروض منتظرة. متأكد؟`)) return
+
+    setSendingEmail(true)
+    const res = await fetch('/api/admin/send-discount-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ codeId: sendingFor, adminMessage: sendMessage.trim() }),
+    })
+    const json = await res.json()
+    if (res.ok) {
+      showToast(`✅ تم الإرسال — ${json.sent} نجح · ${json.failed} فشل`)
+      setSendingFor(null)
+      setSendMessage('')
+    } else {
+      showToast(json.error ?? 'فشل الإرسال', 'error')
+    }
+    setSendingEmail(false)
   }
 
   if (loading) return <LoadingSpinner size="lg" />
@@ -117,6 +158,9 @@ export default function AdminDiscountsPage() {
           <h1 className="text-2xl font-black text-dark">أكواد الخصم</h1>
           <p className="text-sm text-muted mt-0.5">
             {active} سارية · {codes.length} إجمالي
+            {quotedCount !== null && (
+              <span className="ms-2 text-amber-600 font-medium">· {quotedCount} عميل بعروض منتظرة</span>
+            )}
           </p>
         </div>
         <Button onClick={() => setShowForm(v => !v)}>
@@ -143,7 +187,6 @@ export default function AdminDiscountsPage() {
               />
               <p className="text-xs text-muted mt-1">حروف إنجليزية كبيرة وأرقام فقط</p>
             </div>
-
             <div>
               <label className="block text-xs text-muted mb-1">المناسبة</label>
               <input
@@ -154,7 +197,6 @@ export default function AdminDiscountsPage() {
                 className="w-full px-4 py-2.5 rounded-xl border border-border text-sm bg-white"
               />
             </div>
-
             <div>
               <label className="block text-xs text-muted mb-1">
                 نسبة الخصم % <span className="text-red-500">*</span>
@@ -168,7 +210,6 @@ export default function AdminDiscountsPage() {
                 className="w-full px-4 py-2.5 rounded-xl border border-border text-sm bg-white"
               />
             </div>
-
             <div>
               <label className="block text-xs text-muted mb-1">
                 تاريخ الانتهاء <span className="text-red-500">*</span>
@@ -180,7 +221,6 @@ export default function AdminDiscountsPage() {
                 className="w-full px-4 py-2.5 rounded-xl border border-border text-sm bg-white"
               />
             </div>
-
             <div>
               <label className="block text-xs text-muted mb-1">الحد الأقصى للاستخدام</label>
               <input
@@ -193,7 +233,6 @@ export default function AdminDiscountsPage() {
               />
             </div>
           </div>
-
           <div className="mt-5 flex justify-end gap-3">
             <Button variant="ghost" onClick={() => { setShowForm(false); setForm(emptyForm) }}>إلغاء</Button>
             <Button onClick={handleCreate} loading={saving}>إنشاء الكود</Button>
@@ -210,69 +249,144 @@ export default function AdminDiscountsPage() {
       ) : (
         <div className="space-y-3">
           {codes.map(dc => {
-            const expired    = new Date(dc.expires_at) < now
-            const exhausted  = dc.max_uses !== null && dc.used_count >= dc.max_uses
-            const isValid    = dc.is_active && !expired && !exhausted
+            const expired   = new Date(dc.expires_at) < now
+            const exhausted = dc.max_uses !== null && dc.used_count >= dc.max_uses
+            const isValid   = dc.is_active && !expired && !exhausted
+            const isSending = sendingFor === dc.id
 
             return (
-              <div
-                key={dc.id}
-                className={`bg-card rounded-2xl border p-4 md:p-5 transition-opacity ${isValid ? 'border-border' : 'border-border opacity-60'}`}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <span className="font-black text-dark text-lg font-mono tracking-widest">{dc.code}</span>
-                      <span className="bg-green/10 text-green text-xs font-bold px-2 py-0.5 rounded-full">
-                        -{dc.discount_pct}%
-                      </span>
-                      {isValid ? (
-                        <span className="bg-green/10 text-green text-xs px-2 py-0.5 rounded-full">✓ ساري</span>
-                      ) : expired ? (
-                        <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full">منتهي</span>
-                      ) : exhausted ? (
-                        <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full">نفدت الاستخدامات</span>
-                      ) : (
-                        <span className="bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded-full">موقوف</span>
+              <div key={dc.id} className={`bg-card rounded-2xl border transition-opacity ${isValid ? 'border-border' : 'border-border opacity-60'}`}>
+                {/* ── الكارت الرئيسية ── */}
+                <div className="p-4 md:p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="font-black text-dark text-lg font-mono tracking-widest">{dc.code}</span>
+                        <span className="bg-green/10 text-green text-xs font-bold px-2 py-0.5 rounded-full">
+                          -{dc.discount_pct}%
+                        </span>
+                        {isValid ? (
+                          <span className="bg-green/10 text-green text-xs px-2 py-0.5 rounded-full">✓ ساري</span>
+                        ) : expired ? (
+                          <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full">منتهي</span>
+                        ) : exhausted ? (
+                          <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full">نفدت الاستخدامات</span>
+                        ) : (
+                          <span className="bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded-full">موقوف</span>
+                        )}
+                      </div>
+
+                      {dc.occasion && <p className="text-sm text-muted">{dc.occasion}</p>}
+
+                      <div className="flex flex-wrap gap-4 mt-2 text-xs text-muted">
+                        <span>
+                          الاستخدام: <strong className="text-dark">{dc.used_count}</strong>
+                          {dc.max_uses !== null && ` / ${dc.max_uses}`}
+                        </span>
+                        <span>
+                          ينتهي: <strong className="text-dark">
+                            {new Date(dc.expires_at).toLocaleString('ar-SA', {
+                              year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                            })}
+                          </strong>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      {isValid && (
+                        <button
+                          onClick={() => isSending ? setSendingFor(null) : openSendPanel(dc.id)}
+                          className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
+                            isSending
+                              ? 'border-blue-300 text-blue-700 bg-blue-50'
+                              : 'border-blue-200 text-blue-600 hover:bg-blue-50'
+                          }`}
+                        >
+                          {isSending ? '✕ إلغاء الإرسال' : '📧 إرسال لعملاء انتظار'}
+                        </button>
                       )}
+                      <button
+                        onClick={() => handleToggle(dc.id, !dc.is_active)}
+                        className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
+                          dc.is_active
+                            ? 'border-amber-300 text-amber-700 hover:bg-amber-50'
+                            : 'border-green/40 text-green hover:bg-green/5'
+                        }`}
+                      >
+                        {dc.is_active ? 'إيقاف' : 'تفعيل'}
+                      </button>
+                      <button
+                        onClick={() => handleDelete(dc.id)}
+                        className="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-all"
+                      >
+                        حذف
+                      </button>
                     </div>
-
-                    {dc.occasion && <p className="text-sm text-muted">{dc.occasion}</p>}
-
-                    <div className="flex flex-wrap gap-4 mt-2 text-xs text-muted">
-                      <span>
-                        الاستخدام: <strong className="text-dark">{dc.used_count}</strong>
-                        {dc.max_uses !== null && ` / ${dc.max_uses}`}
-                      </span>
-                      <span>
-                        ينتهي: <strong className="text-dark">
-                          {new Date(dc.expires_at).toLocaleString('ar-SA', {
-                            year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-                          })}
-                        </strong>
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => handleToggle(dc.id, !dc.is_active)}
-                      className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
-                        dc.is_active
-                          ? 'border-amber-300 text-amber-700 hover:bg-amber-50'
-                          : 'border-green/40 text-green hover:bg-green/5'
-                      }`}
-                    >
-                      {dc.is_active ? 'إيقاف' : 'تفعيل'}
-                    </button>
-                    <button
-                      onClick={() => handleDelete(dc.id)}
-                      className="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-all"
-                    >
-                      حذف
-                    </button>
                   </div>
                 </div>
+
+                {/* ── لوحة الإرسال ── */}
+                {isSending && (
+                  <div className="border-t border-border bg-blue-50/50 p-4 md:p-5 rounded-b-2xl">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-blue-600 text-lg">📧</span>
+                      <div>
+                        <p className="text-sm font-bold text-dark">إرسال كود الخصم بالبريد الإلكتروني</p>
+                        <p className="text-xs text-muted">
+                          {quotedCount !== null
+                            ? `سيُرسَل لـ ${quotedCount} عميل لديهم عروض بانتظار الموافقة`
+                            : 'جارٍ جلب عدد العملاء...'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* معاينة الكود في الرسالة */}
+                    <div className="bg-white rounded-xl border border-blue-200 p-3 mb-3">
+                      <p className="text-xs text-muted mb-2">معاينة بطاقة الكود في الإيميل:</p>
+                      <div className="bg-[#0E2855] rounded-xl p-4 text-center">
+                        <p className="text-[#C9A961] text-xs font-bold mb-2">كود الخصم الخاص بك</p>
+                        <div className="bg-white rounded-lg px-4 py-2 inline-block mb-2 border-2 border-[#C9A961]">
+                          <span className="font-black text-[#0E2855] text-xl font-mono tracking-widest">{dc.code}</span>
+                        </div>
+                        <p className="text-white font-black text-xl">{dc.discount_pct}% خصم</p>
+                        {dc.occasion && (
+                          <p className="text-[#C9A961] text-xs mt-1">بمناسبة {dc.occasion}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mb-3">
+                      <label className="block text-xs font-medium text-dark mb-1">
+                        رسالتك للعملاء <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        value={sendMessage}
+                        onChange={e => setSendMessage(e.target.value)}
+                        placeholder={`مثال: بمناسبة ${dc.occasion ?? 'العيد'}، نهديكم كود خصم خاص — يمكنكم تطبيقه على عرضكم الحالي قبل الاعتماد`}
+                        className="w-full px-4 py-3 rounded-xl border border-blue-200 text-sm bg-white min-h-[90px] resize-y"
+                        maxLength={500}
+                      />
+                      <div className="flex justify-between text-xs text-muted mt-1">
+                        <span>ستظهر هذه الرسالة في مقدمة الإيميل</span>
+                        <span>{sendMessage.length}/500</span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 justify-end">
+                      <Button variant="ghost" onClick={() => setSendingFor(null)}>إلغاء</Button>
+                      <Button
+                        onClick={handleSendEmail}
+                        loading={sendingEmail}
+                        disabled={!sendMessage.trim() || quotedCount === 0}
+                      >
+                        {quotedCount === 0
+                          ? 'لا يوجد عملاء مؤهلون'
+                          : `📨 إرسال لـ ${quotedCount ?? '...'} عميل`}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}

@@ -1105,6 +1105,67 @@ export function negotiatedQuoteToClient(d: {
   }
 }
 
+// ── كود الخصم — إلى العميل ──────────────────────────────────────────────
+export function discountCodeToClient(d: {
+  clientName: string
+  code: string
+  discountPct: number
+  occasion: string | null
+  expiresAt: string
+  adminMessage: string
+  requestId: string
+}) {
+  const expiryFormatted = new Date(d.expiresAt).toLocaleDateString('ar-SA', {
+    year: 'numeric', month: 'long', day: 'numeric',
+  })
+
+  return {
+    subject: `🎁 هدية خاصة لك — خصم ${d.discountPct}% على طلبك · تواصل النخبة`,
+    html: wrap(`
+      ${greeting(d.clientName)}
+
+      <p style="margin:0 0 20px 0; font-size:15px; line-height:1.8;">
+        ${escapeHtml(d.adminMessage)}
+      </p>
+
+      <!-- بطاقة كود الخصم -->
+      <div style="background:${BRAND_NAVY}; border-radius:16px; padding:32px 24px; text-align:center; margin:28px 0;">
+        <p style="margin:0 0 14px 0; color:${BRAND_GOLD}; font-size:13px; font-weight:bold; letter-spacing:1.5px; text-transform:uppercase;">كود الخصم الخاص بك</p>
+
+        <div style="background:#FFFFFF; border-radius:12px; padding:16px 32px; display:inline-block; margin:0 0 18px 0; border:2px solid ${BRAND_GOLD};">
+          <span style="font-size:30px; font-weight:900; color:${BRAND_NAVY}; letter-spacing:6px; font-family:'Courier New',Courier,monospace;">${escapeHtml(d.code)}</span>
+        </div>
+
+        <p style="margin:0; color:#FFFFFF; font-size:26px; font-weight:900;">${d.discountPct}%&nbsp;خصم</p>
+
+        ${d.occasion ? `<p style="margin:10px 0 0 0; color:${BRAND_GOLD}; font-size:14px; font-weight:bold;">بمناسبة ${escapeHtml(d.occasion)}</p>` : ''}
+
+        <p style="margin:14px 0 0 0; color:rgba(255,255,255,0.65); font-size:12px;">
+          صالح حتى: ${escapeHtml(expiryFormatted)}
+        </p>
+      </div>
+
+      <!-- كيفية الاستخدام -->
+      <div style="background:#F7F4ED; border-radius:12px; padding:20px; margin:0 0 24px 0; border-right:4px solid ${BRAND_GOLD};">
+        <p style="margin:0 0 10px 0; color:${BRAND_NAVY}; font-size:14px; font-weight:bold;">🛈 كيف تستخدم الكود؟</p>
+        <ol style="margin:0; padding-right:20px; font-size:13px; color:#4A5568; line-height:2;">
+          <li>افتح طلبك من لوحة التحكم</li>
+          <li>ادخل الكود في خانة «لديك كود خصم؟» ثم اضغط <strong>تطبيق</strong></li>
+          <li>سيُخصم المبلغ تلقائياً قبل اعتماد العرض</li>
+        </ol>
+      </div>
+
+      <div style="text-align:center; margin:28px 0 8px 0;">
+        ${button('عرض طلبك الآن', `${SITE_URL}/dashboard/${d.requestId}`)}
+      </div>
+
+      <p style="margin:20px 0 0 0; font-size:12px; color:#9CA3AF; text-align:center;">
+        الكود للاستخدام الشخصي فقط — لا يمكن نقله أو مشاركته
+      </p>
+    `),
+  }
+}
+
 export function negotiationRejectedToClient(d: {
   email: string; requestNumber: string; clientName: string; originalPrice: number; adminMessage?: string
 }) {

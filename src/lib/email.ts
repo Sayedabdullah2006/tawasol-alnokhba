@@ -219,6 +219,20 @@ export async function notifyNegotiationRejectedToClient(args: {
   return sendEmail(args.email, t.subject, t.html)
 }
 
+export async function notifyDiscountCodeToClient(args: {
+  email: string
+  clientName: string
+  code: string
+  discountPct: number
+  occasion: string | null
+  expiresAt: string
+  adminMessage: string
+  requestId: string
+}) {
+  const t = templates.discountCodeToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
 // Old name kept for compatibility with the existing submit-request route.
 export async function sendNewRequestEmail(args: {
   requestNumber: string; clientName: string; clientEmail: string; clientPhone: string
