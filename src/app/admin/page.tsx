@@ -18,7 +18,6 @@ export default function AdminStatsPage() {
     paidCount: 0,
     monthPaidCount: 0,
     monthRevenue: 0,
-    prevMonthRevenue: 0,
     revenue: 0,
     totalPaidRevenue: 0,
     outstanding: 0,
@@ -26,6 +25,15 @@ export default function AdminStatsPage() {
   })
   const [topCategories, setTopCategories] = useState<{ category: string; nameAr: string; count: number }[]>([])
   const [funnel, setFunnel] = useState<{ label: string; count: number; pctOfPrev: number; pctOfTotal: number }[]>([])
+
+  // فلتر الشهر في بطاقة الهدف
+  const initialMonthKey = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })()
+  const [monthlyRevenueByKey, setMonthlyRevenueByKey] = useState<Record<string, number>>({})
+  const [availableMonths, setAvailableMonths] = useState<string[]>([initialMonthKey])
+  const [selectedMonthKey, setSelectedMonthKey] = useState<string>(initialMonthKey)
 
   useEffect(() => {
     const load = async () => {
@@ -59,8 +67,6 @@ export default function AdminStatsPage() {
 
       const now = new Date()
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-      const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
-      const prevMonthEnd = monthStart
 
       const paidStatuses = ['paid', 'in_progress', 'content_review', 'completed']
       const finalTotal = total || requests.length
@@ -81,17 +87,26 @@ export default function AdminStatsPage() {
         .filter(r => isConfirmedPaid(r) && r.created_at >= monthStart)
         .reduce((s, r) => s + (r.final_total ?? 0), 0)
 
-      const prevMonthRevenue = requests
-        .filter(r =>
-          isConfirmedPaid(r) &&
-          r.created_at >= prevMonthStart &&
-          r.created_at < prevMonthEnd
-        )
-        .reduce((s, r) => s + (r.final_total ?? 0), 0)
-
       const totalPaidRevenue = requests
         .filter(isConfirmedPaid)
         .reduce((s, r) => s + (r.final_total ?? 0), 0)
+
+      // إيرادات لكل شهر (YYYY-MM) لاستخدامها في فلتر بطاقة الهدف
+      const revenueByMonth: Record<string, number> = {}
+      const monthsWithData = new Set<string>()
+      for (const r of requests) {
+        if (!r.created_at) continue
+        const d = new Date(r.created_at)
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        monthsWithData.add(key)
+        if (isConfirmedPaid(r)) {
+          revenueByMonth[key] = (revenueByMonth[key] ?? 0) + (r.final_total ?? 0)
+        }
+      }
+      const nowKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      monthsWithData.add(nowKey)
+      setMonthlyRevenueByKey(revenueByMonth)
+      setAvailableMonths(Array.from(monthsWithData).sort().reverse())
 
       setStats({
         total: finalTotal,
@@ -100,7 +115,6 @@ export default function AdminStatsPage() {
         paidCount,
         monthPaidCount,
         monthRevenue,
-        prevMonthRevenue,
         revenue: requests.filter(isConfirmedPaid).reduce((s, r) => s + (r.final_total ?? 0), 0),
         totalPaidRevenue,
         outstanding: requests
@@ -149,34 +163,46 @@ export default function AdminStatsPage() {
 
   if (loading) return <LoadingSpinner size="lg" />
 
-  // مقارنة الإيرادات: هذا الشهر vs الشهر الماضي
-  const revenueGrowth = stats.prevMonthRevenue > 0
-    ? ((stats.monthRevenue - stats.prevMonthRevenue) / stats.prevMonthRevenue) * 100
-    : stats.monthRevenue > 0 ? 100 : 0
-  const isRevenueUp = revenueGrowth >= 0
-
-  // الهدف الشهري: 15,000 ر.س في مايو 2026 ويزيد 5% كل شهر
+  // قاعدة الهدف الشهري: 15,000 ر.س في مايو 2026 ويزيد 5% كل شهر
   const TARGET_BASE = 15000
   const TARGET_MONTHLY_GROWTH = 0.05
   const TARGET_BASELINE_YEAR = 2026
   const TARGET_BASELINE_MONTH = 4 // مايو (0-indexed)
-  const today = new Date()
+
+  // الشهر المختار في الفلتر — تتحدث كل أرقام بطاقة الهدف بناءً عليه
+  const [selYear, selMonth] = selectedMonthKey.split('-').map(Number)
+  const selectedDate = new Date(selYear, selMonth - 1, 1)
+  const selectedMonthName = selectedDate.toLocaleString('ar', { month: 'long', calendar: 'gregory' })
+  const selectedRevenue = monthlyRevenueByKey[selectedMonthKey] ?? 0
+
+  const prevDate = new Date(selYear, selMonth - 2, 1)
+  const prevKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`
+  const prevRevenue = monthlyRevenueByKey[prevKey] ?? 0
+
   const monthsFromBaseline =
-    (today.getFullYear() - TARGET_BASELINE_YEAR) * 12 + (today.getMonth() - TARGET_BASELINE_MONTH)
+    (selYear - TARGET_BASELINE_YEAR) * 12 + ((selMonth - 1) - TARGET_BASELINE_MONTH)
   const monthlyTarget = Math.round(
     TARGET_BASE * Math.pow(1 + TARGET_MONTHLY_GROWTH, monthsFromBaseline)
   )
 
+  // مقارنة الإيرادات: الشهر المختار vs الشهر الذي قبله
+  const revenueGrowth = prevRevenue > 0
+    ? ((selectedRevenue - prevRevenue) / prevRevenue) * 100
+    : selectedRevenue > 0 ? 100 : 0
+  const isRevenueUp = revenueGrowth >= 0
+
   // نسبة تحقيق الهدف
   const goalAchieved = monthlyTarget > 0
-    ? Math.min((stats.monthRevenue / monthlyTarget) * 100, 100)
+    ? Math.min((selectedRevenue / monthlyTarget) * 100, 100)
     : 0
 
   const avgOrderRevenue = stats.paidCount > 0 ? stats.totalPaidRevenue / stats.paidCount : 0
-  const remainingRevenue = Math.max(0, monthlyTarget - stats.monthRevenue)
+  const remainingRevenue = Math.max(0, monthlyTarget - selectedRevenue)
   const ordersNeeded = avgOrderRevenue > 0 ? Math.ceil(remainingRevenue / avgOrderRevenue) : null
-  const goalMet = stats.monthRevenue >= monthlyTarget
+  const goalMet = selectedRevenue >= monthlyTarget
 
+  const today = new Date()
+  const isCurrentMonth = selectedMonthKey === initialMonthKey
   const currentMonthName = today.toLocaleString('ar', { month: 'long', calendar: 'gregory' })
 
   const freePercent = stats.total > 0 ? (stats.freeCount / stats.total) * 100 : 0
@@ -278,19 +304,35 @@ export default function AdminStatsPage() {
             <div className="text-2xl">🎯</div>
           </div>
 
+          {/* فلتر اختيار الشهر */}
+          <select
+            value={selectedMonthKey}
+            onChange={e => setSelectedMonthKey(e.target.value)}
+            className="w-full mb-3 bg-cream border border-border rounded-lg px-3 py-2 text-sm font-medium text-dark"
+          >
+            {availableMonths.map(key => {
+              const [y, m] = key.split('-').map(Number)
+              const label = new Date(y, m - 1, 1)
+                .toLocaleString('ar', { month: 'long', year: 'numeric', calendar: 'gregory' })
+              return <option key={key} value={key}>{label}{key === initialMonthKey ? ' (الحالي)' : ''}</option>
+            })}
+          </select>
+
           {/* الإيراد الحالي مع مؤشر النمو */}
           <div className="flex items-end gap-2 mb-0.5">
             <p className="text-2xl font-black text-dark leading-none">
-              {formatNumber(stats.monthRevenue)}
+              {formatNumber(selectedRevenue)}
             </p>
             <span className="text-sm text-muted mb-0.5">ر.س</span>
-            {(stats.prevMonthRevenue > 0 || stats.monthRevenue > 0) && (
+            {(prevRevenue > 0 || selectedRevenue > 0) && (
               <span className={`text-sm font-bold mb-0.5 ${isRevenueUp ? 'text-green' : 'text-red-500'}`}>
                 {isRevenueUp ? '▲' : '▼'} {Math.abs(revenueGrowth).toFixed(1)}%
               </span>
             )}
           </div>
-          <p className="text-xs text-muted mb-4">{currentMonthName} (هذا الشهر)</p>
+          <p className="text-xs text-muted mb-4">
+            {selectedMonthName} {selYear}{isCurrentMonth ? ' (هذا الشهر)' : ''}
+          </p>
 
           {/* شريط تحقيق الهدف */}
           <div className="mb-3">
@@ -313,9 +355,9 @@ export default function AdminStatsPage() {
           {/* مقارنة الإيراد بالهدف */}
           <div className="grid grid-cols-2 gap-2 mt-3">
             <div className="bg-green/10 rounded-xl p-3 text-center">
-              <p className="text-xs text-muted mb-1">{currentMonthName}</p>
+              <p className="text-xs text-muted mb-1">{selectedMonthName}</p>
               <p className="text-base font-black text-green leading-tight">
-                {formatNumber(stats.monthRevenue)}
+                {formatNumber(selectedRevenue)}
               </p>
               <p className="text-xs text-muted">ر.س</p>
             </div>
@@ -332,7 +374,7 @@ export default function AdminStatsPage() {
           {monthlyTarget > 0 && (
             <div className={`mt-3 rounded-xl p-3 text-center text-xs ${goalMet ? 'bg-green/10' : 'bg-amber-50'}`}>
               {goalMet ? (
-                <p className="font-bold text-green">تحقق الهدف هذا الشهر!</p>
+                <p className="font-bold text-green">تحقق الهدف في {selectedMonthName}!</p>
               ) : (
                 <>
                   <p className="text-muted mb-0.5">المتبقي لتحقيق الهدف</p>
