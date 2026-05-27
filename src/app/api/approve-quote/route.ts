@@ -53,9 +53,10 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: 'يجب تسجيل الدخول' }, { status: 401 })
 
     const body = await request.json()
-    const { requestId, selectedExtras } = body as {
+    const { requestId, selectedExtras, discountCode } = body as {
       requestId: string
       selectedExtras: string[]
+      discountCode?: string | null
     }
 
     const { data: req, error: loadErr } = await supabase
@@ -91,7 +92,31 @@ export async function POST(request: Request) {
     const extrasTotal = extrasSelected.reduce((sum, e) => sum + (e.price ?? 0), 0)
 
     const basePrice = Number(req.admin_quoted_price ?? 0)
-    const finalTotal = basePrice + extrasTotal
+    const rawTotal  = basePrice + extrasTotal
+
+    // تطبيق كود الخصم على الاعتماد (فقط إذا لم يُطبَّق مسبقاً عند الإرسال)
+    let finalTotal = rawTotal
+    let discountRow: any = null
+    if (discountCode && !req.discount_code) {
+      const { data: dc } = await serviceClient
+        .from('discount_codes')
+        .select('*')
+        .eq('code', discountCode.trim().toUpperCase())
+        .single()
+      if (
+        dc && dc.is_active &&
+        new Date(dc.expires_at) > new Date() &&
+        (dc.max_uses === null || dc.used_count < dc.max_uses)
+      ) {
+        discountRow = dc
+        const discAmt = Math.round(rawTotal * Number(dc.discount_pct) / 100)
+        finalTotal = rawTotal - discAmt
+        await serviceClient
+          .from('discount_codes')
+          .update({ used_count: dc.used_count + 1 })
+          .eq('id', dc.id)
+      }
+    }
 
     const reach = calculateReach({
       influencer: req.influencers ?? {},
@@ -114,6 +139,13 @@ export async function POST(request: Request) {
     // fulfilment team can start scheduling immediately.
     const newStatus = finalTotal <= 0 ? 'in_progress' : 'approved'
 
+    const discountUpdateFields = discountRow ? {
+      discount_code:    discountRow.code,
+      discount_code_id: discountRow.id,
+      discount_pct:     Number(discountRow.discount_pct),
+      discount_amount:  Math.round(rawTotal * Number(discountRow.discount_pct) / 100),
+    } : {}
+
     const { error: updErr } = await serviceClient
       .from('publish_requests')
       .update({
@@ -125,6 +157,7 @@ export async function POST(request: Request) {
         status: newStatus,
         approved_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        ...discountUpdateFields,
       })
       .eq('id', requestId)
 

@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic'
 const adminNav = [
   { href: '/admin', label: 'الإحصائيات', icon: '📊' },
   { href: '/admin/requests', label: 'الطلبات', icon: '📋' },
+  { href: '/admin/discounts', label: 'أكواد الخصم', icon: '🏷️' },
   { href: '/admin/influencers', label: 'المؤثرون', icon: '👥' },
   { href: '/admin/categories', label: 'الفئات والمزايا', icon: '⚙️' },
   { href: '/admin/users', label: 'المستخدمون', icon: '👤' },

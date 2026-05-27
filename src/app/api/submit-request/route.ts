@@ -52,9 +52,29 @@ export async function POST(request: Request) {
     const channels: string[]       = Array.isArray(body.channels) ? body.channels : []
     const scope = channels.length > 1 ? 'all' : 'single'
     const now   = new Date().toISOString()
-    // مهلة الموافقة على العرض — 24 ساعة من إنشاء العرض التلقائي
     const quoteExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
     const isCampaign = body.request_type === 'campaign'
+
+    // ── تحقق من كود الخصم (إن وُجد) ─────────────────────────────
+    let discountRow: any = null
+    if (body.discount_code) {
+      const { data: dc } = await serviceClient
+        .from('discount_codes')
+        .select('*')
+        .eq('code', String(body.discount_code).trim().toUpperCase())
+        .single()
+      if (
+        dc && dc.is_active &&
+        new Date(dc.expires_at) > new Date() &&
+        (dc.max_uses === null || dc.used_count < dc.max_uses)
+      ) {
+        discountRow = dc
+        await serviceClient
+          .from('discount_codes')
+          .update({ used_count: dc.used_count + 1 })
+          .eq('id', dc.id)
+      }
+    }
 
     // ── مسار الحملة ──────────────────────────────────────────────
     if (isCampaign) {
@@ -89,6 +109,12 @@ export async function POST(request: Request) {
         })),
         selectedExtras,
       )
+
+      // تطبيق كود الخصم على إجمالي الحملة
+      const campaignDiscountAmt = discountRow
+        ? Math.round(campaignCalc.total * Number(discountRow.discount_pct) / 100)
+        : 0
+      const campaignFinalPrice = campaignCalc.total - campaignDiscountAmt
 
       // استخدم بيانات أول منشور لحقول title/content/category الإلزامية في الجدول
       const firstPost = campaignPostsRaw[0]
@@ -135,12 +161,18 @@ export async function POST(request: Request) {
           extras_total:          campaignCalc.extrasTotal,
           vat_amount:            0,
           total_amount:          campaignCalc.total,
-          admin_quoted_price:    campaignCalc.total,
+          admin_quoted_price:    campaignFinalPrice,
           admin_offered_extras:  [],
           user_selected_extras:  [],
           extras_selected_total: 0,
-          final_total:           campaignCalc.total,
+          final_total:           campaignFinalPrice,
           estimated_reach:       0,
+
+          // كود الخصم
+          discount_code:         discountRow ? discountRow.code : null,
+          discount_code_id:      discountRow ? discountRow.id   : null,
+          discount_pct:          discountRow ? Number(discountRow.discount_pct) : null,
+          discount_amount:       campaignDiscountAmt > 0 ? campaignDiscountAmt : null,
 
           status:            'quoted',
           quoted_at:         now,
@@ -183,7 +215,7 @@ export async function POST(request: Request) {
         }).catch(e => console.error('Campaign quote email failed:', e))
       }
 
-      return NextResponse.json({ requestNumber, quotedTotal: campaignCalc.total })
+      return NextResponse.json({ requestNumber, quotedTotal: campaignFinalPrice })
     }
 
     // ── مسار المنشور الواحد ───────────────────────────────────────
@@ -199,6 +231,12 @@ export async function POST(request: Request) {
       clientType:     body.client_type ?? 'individual',
       selectedExtras,
     })
+
+    // تطبيق كود الخصم على المنشور الواحد
+    const singleDiscountAmt = discountRow
+      ? Math.round(priceCalc.total * Number(discountRow.discount_pct) / 100)
+      : 0
+    const singleFinalPrice = priceCalc.total - singleDiscountAmt
 
     const { data, error } = await serviceClient
       .from('publish_requests')
@@ -235,12 +273,18 @@ export async function POST(request: Request) {
         extras_total:          priceCalc.extrasTotal,
         vat_amount:            priceCalc.vatAmount,
         total_amount:          priceCalc.total,
-        admin_quoted_price:    priceCalc.total,
+        admin_quoted_price:    singleFinalPrice,
         admin_offered_extras:  [],
         user_selected_extras:  [],
         extras_selected_total: 0,
-        final_total:           priceCalc.total,
+        final_total:           singleFinalPrice,
         estimated_reach:       0,
+
+        // كود الخصم
+        discount_code:    discountRow ? discountRow.code : null,
+        discount_code_id: discountRow ? discountRow.id   : null,
+        discount_pct:     discountRow ? Number(discountRow.discount_pct) : null,
+        discount_amount:  singleDiscountAmt > 0 ? singleDiscountAmt : null,
 
         status:            'quoted',
         quoted_at:         now,
@@ -286,7 +330,7 @@ export async function POST(request: Request) {
       }).catch(e => console.error('Quote email failed:', e))
     }
 
-    return NextResponse.json({ requestNumber, quotedTotal: priceCalc.total })
+    return NextResponse.json({ requestNumber, quotedTotal: singleFinalPrice })
 
   } catch (err) {
     console.error('Submit error:', err)

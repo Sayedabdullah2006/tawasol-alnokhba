@@ -87,6 +87,34 @@ export default function RequestWizard() {
   const [termsAccepted, setTermsAccepted]   = useState(false)
   const [privacyAccepted, setPrivacyAccepted] = useState(false)
 
+  // ── Discount code state ────────────────────────────────────────
+  const [discountInput, setDiscountInput]   = useState('')
+  const [validatingCode, setValidatingCode] = useState(false)
+  const [discountError, setDiscountError]   = useState('')
+  const [appliedDiscount, setAppliedDiscount] = useState<{
+    code: string; pct: number; occasion: string | null
+  } | null>(null)
+
+  const handleApplyDiscount = async () => {
+    if (!discountInput.trim()) return
+    setValidatingCode(true)
+    setDiscountError('')
+    setAppliedDiscount(null)
+    const res = await fetch('/api/validate-discount', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: discountInput.trim() }),
+    })
+    const data = await res.json()
+    if (data.valid) {
+      setAppliedDiscount({ code: data.code, pct: data.discount_pct, occasion: data.occasion })
+      setDiscountError('')
+    } else {
+      setDiscountError(data.error ?? 'الكود غير صحيح')
+    }
+    setValidatingCode(false)
+  }
+
   // ── Campaign-specific state ────────────────────────────────────
   const [campaignSetup, setCampaignSetup] = useState<CampaignSetup>({ postCount: 2, duration: '' })
   const [campaignPosts, setCampaignPosts] = useState<CampaignPostData[]>([makeEmptyPost(), makeEmptyPost()])
@@ -218,6 +246,7 @@ export default function RequestWizard() {
           x_handle:         contact.xHandle || null,
           campaign_post_count: campaignSetup.postCount,
           campaign_duration:   campaignSetup.duration || null,
+          discount_code:    appliedDiscount?.code ?? null,
           campaign_posts: campaignPosts.map(p => ({
             category:       p.category,
             sub_option:     p.subOption
@@ -252,6 +281,7 @@ export default function RequestWizard() {
           x_handle:        contact.xHandle || null,
           channels,
           selected_extras: selectedExtras,
+          discount_code:   appliedDiscount?.code ?? null,
         }
       }
 
@@ -396,7 +426,13 @@ export default function RequestWizard() {
           )}
 
           {/* ── Confirm ─────────────────────────────────────────── */}
-          {currentStep === 'confirm' && (
+          {currentStep === 'confirm' && (() => {
+            const rawTotal = requestType === 'campaign'
+              ? (campaignPriceCalc?.total ?? 0)
+              : (priceCalc?.total ?? 0)
+            const discountAmount = appliedDiscount ? Math.round(rawTotal * appliedDiscount.pct / 100) : 0
+            const discountedTotal = rawTotal - discountAmount
+            return (
             <div className="wizard-enter max-w-lg mx-auto space-y-5">
               <h2 className="text-xl md:text-2xl font-black text-dark text-center mb-1">
                 كل شي تمام؟
@@ -497,17 +533,68 @@ export default function RequestWizard() {
                     </>
                   ) : null}
 
+                  {appliedDiscount && (
+                    <div className="flex justify-between text-green font-semibold">
+                      <span>كود خصم {appliedDiscount.occasion ? `(${appliedDiscount.occasion})` : ''} − {appliedDiscount.pct}%</span>
+                      <span>− {formatNumber(discountAmount)} ر.س</span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between font-black text-dark text-lg border-t border-border pt-3 mt-1">
                     <span>الإجمالي</span>
-                    <span className="text-green">
-                      {formatNumber(
-                        requestType === 'campaign'
-                          ? (campaignPriceCalc?.total ?? 0)
-                          : (priceCalc?.total ?? 0)
-                      )} ر.س
-                    </span>
+                    <span className="text-green">{formatNumber(discountedTotal)} ر.س</span>
                   </div>
                 </div>
+              </div>
+
+              {/* كود الخصم */}
+              <div className="bg-card rounded-2xl border border-border p-4">
+                {appliedDiscount ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-green text-lg">✅</span>
+                      <div>
+                        <p className="text-sm font-bold text-dark">
+                          كود <span className="font-mono">{appliedDiscount.code}</span> — خصم {appliedDiscount.pct}%
+                        </p>
+                        {appliedDiscount.occasion && (
+                          <p className="text-xs text-muted">{appliedDiscount.occasion}</p>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => { setAppliedDiscount(null); setDiscountInput(''); setDiscountError('') }}
+                      className="text-xs text-red-500 hover:underline"
+                    >
+                      إزالة
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-sm font-medium text-dark mb-2">🏷️ لديك كود خصم؟</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={discountInput}
+                        onChange={e => { setDiscountInput(e.target.value.toUpperCase()); setDiscountError('') }}
+                        onKeyDown={e => e.key === 'Enter' && handleApplyDiscount()}
+                        placeholder="أدخل الكود هنا"
+                        className="flex-1 px-3 py-2 rounded-xl border border-border text-sm font-mono bg-white"
+                        maxLength={20}
+                      />
+                      <button
+                        onClick={handleApplyDiscount}
+                        disabled={validatingCode || !discountInput.trim()}
+                        className="px-4 py-2 rounded-xl bg-green text-white text-sm font-bold disabled:opacity-50 transition-opacity"
+                      >
+                        {validatingCode ? '...' : 'تطبيق'}
+                      </button>
+                    </div>
+                    {discountError && (
+                      <p className="text-xs text-red-500 mt-1.5">{discountError}</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center">
@@ -520,7 +607,8 @@ export default function RequestWizard() {
                 </p>
               </div>
             </div>
-          )}
+            )
+          })()}
         </div>
 
         {/* Footer */}

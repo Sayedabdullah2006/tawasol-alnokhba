@@ -66,6 +66,34 @@ export default function QuoteApproval({
   const [proposedPrice, setProposedPrice] = useState('')
   const [monthlyQuota, setMonthlyQuota] = useState<MonthlyQuota | null>(null)
 
+  // كود الخصم
+  const [discountInput, setDiscountInput]     = useState('')
+  const [validatingCode, setValidatingCode]   = useState(false)
+  const [discountError, setDiscountError]     = useState('')
+  const [appliedDiscount, setAppliedDiscount] = useState<{
+    code: string; pct: number; occasion: string | null
+  } | null>(null)
+
+  const handleApplyDiscount = async () => {
+    if (!discountInput.trim()) return
+    setValidatingCode(true)
+    setDiscountError('')
+    setAppliedDiscount(null)
+    const res = await fetch('/api/validate-discount', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: discountInput.trim() }),
+    })
+    const data = await res.json()
+    if (data.valid) {
+      setAppliedDiscount({ code: data.code, pct: data.discount_pct, occasion: data.occasion })
+      setDiscountError('')
+    } else {
+      setDiscountError(data.error ?? 'الكود غير صحيح')
+    }
+    setValidatingCode(false)
+  }
+
   const extrasMap = useMemo(() => new Map(offeredExtras.map(e => [e.id, e])), [offeredExtras])
 
   // Live ticker for countdowns
@@ -93,7 +121,9 @@ export default function QuoteApproval({
   const quoteCountdownActive = !!(quoteExpiresAt && !quoteExpired)
 
   const extrasTotal = selected.reduce((sum, id) => sum + (extrasMap.get(id)?.price ?? 0), 0)
-  const finalTotal = quotedPrice + extrasTotal
+  const rawTotal = quotedPrice + extrasTotal
+  const discountAmount = appliedDiscount ? Math.round(rawTotal * appliedDiscount.pct / 100) : 0
+  const finalTotal = rawTotal - discountAmount
 
   const reach = useMemo(() => {
     if (!influencer) return 0
@@ -109,7 +139,11 @@ export default function QuoteApproval({
     const res = await fetch('/api/approve-quote', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestId, selectedExtras: selected }),
+      body: JSON.stringify({
+        requestId,
+        selectedExtras: selected,
+        discountCode: appliedDiscount?.code ?? null,
+      }),
     })
 
     const data = await res.json().catch(() => ({}))
@@ -260,6 +294,14 @@ export default function QuoteApproval({
             <span className="text-green">+{formatNumber(extrasTotal)} ر.س</span>
           </div>
         )}
+        {appliedDiscount && discountAmount > 0 && (
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-green font-medium">
+              كود {appliedDiscount.occasion ? `(${appliedDiscount.occasion})` : ''} − {appliedDiscount.pct}%
+            </span>
+            <span className="text-green font-bold">− {formatNumber(discountAmount)} ر.س</span>
+          </div>
+        )}
         <div className="border-t border-border pt-3 mt-2">
           <div className="flex justify-between items-center">
             <span className="font-bold text-dark">المطلوب دفعه</span>
@@ -278,6 +320,58 @@ export default function QuoteApproval({
           </div>
         </div>
       </div>
+
+      {/* ── كود الخصم ── */}
+      {!isFreeBase && !quoteExpired && (
+        <div className="bg-card rounded-2xl border border-border p-4">
+          {appliedDiscount ? (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-green text-lg">✅</span>
+                <div>
+                  <p className="text-sm font-bold text-dark">
+                    كود <span className="font-mono">{appliedDiscount.code}</span> — خصم {appliedDiscount.pct}%
+                  </p>
+                  {appliedDiscount.occasion && (
+                    <p className="text-xs text-muted">{appliedDiscount.occasion}</p>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => { setAppliedDiscount(null); setDiscountInput(''); setDiscountError('') }}
+                className="text-xs text-red-500 hover:underline"
+              >
+                إزالة
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-sm font-medium text-dark mb-2">🏷️ لديك كود خصم؟</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={discountInput}
+                  onChange={e => { setDiscountInput(e.target.value.toUpperCase()); setDiscountError('') }}
+                  onKeyDown={e => e.key === 'Enter' && handleApplyDiscount()}
+                  placeholder="أدخل الكود هنا"
+                  className="flex-1 px-3 py-2 rounded-xl border border-border text-sm font-mono bg-white"
+                  maxLength={20}
+                />
+                <button
+                  onClick={handleApplyDiscount}
+                  disabled={validatingCode || !discountInput.trim()}
+                  className="px-4 py-2 rounded-xl bg-green text-white text-sm font-bold disabled:opacity-50 transition-opacity"
+                >
+                  {validatingCode ? '...' : 'تطبيق'}
+                </button>
+              </div>
+              {discountError && (
+                <p className="text-xs text-red-500 mt-1.5">{discountError}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {!isFreeBase && offeredExtras.length > 0 && (
         <div className="bg-card rounded-2xl border border-border p-5">
