@@ -57,13 +57,9 @@ export default function AdminStatsPage() {
         if (chunk.length < PAGE) break
       }
 
-      // الشهر المالي يبدأ من اليوم 20 وينتهي في اليوم 19 من الشهر التالي
       const now = new Date()
-      const cycleStartMonthOffset = now.getDate() >= 20 ? 0 : -1
-      const monthStartDate = new Date(now.getFullYear(), now.getMonth() + cycleStartMonthOffset, 20)
-      const prevMonthStartDate = new Date(now.getFullYear(), now.getMonth() + cycleStartMonthOffset - 1, 20)
-      const monthStart = monthStartDate.toISOString()
-      const prevMonthStart = prevMonthStartDate.toISOString()
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+      const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
       const prevMonthEnd = monthStart
 
       const paidStatuses = ['paid', 'in_progress', 'content_review', 'completed']
@@ -169,13 +165,9 @@ export default function AdminStatsPage() {
   const ordersNeeded = avgOrderRevenue > 0 ? Math.ceil(remainingRevenue / avgOrderRevenue) : null
   const goalMet = stats.prevMonthRevenue > 0 && stats.monthRevenue >= stats.prevMonthRevenue
 
-  // الشهر المالي يبدأ من 20 — اسم الشهر مأخوذ من شهر بدء الدورة الحالية
-  const today = new Date()
-  const cycleOffset = today.getDate() >= 20 ? 0 : -1
-  const cycleStart = new Date(today.getFullYear(), today.getMonth() + cycleOffset, 20)
-  const prevCycleStart = new Date(today.getFullYear(), today.getMonth() + cycleOffset - 1, 20)
-  const currentMonthName = cycleStart.toLocaleString('ar', { month: 'long', calendar: 'gregory' })
-  const prevMonthName = prevCycleStart.toLocaleString('ar', { month: 'long', calendar: 'gregory' })
+  const currentMonthName = new Date().toLocaleString('ar', { month: 'long', calendar: 'gregory' })
+  const prevMonthName = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)
+    .toLocaleString('ar', { month: 'long', calendar: 'gregory' })
 
   const freePercent = stats.total > 0 ? (stats.freeCount / stats.total) * 100 : 0
   const paidPercent = stats.total > 0 ? (stats.paidCount / stats.total) * 100 : 0
