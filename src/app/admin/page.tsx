@@ -165,9 +165,9 @@ export default function AdminStatsPage() {
   const ordersNeeded = avgOrderRevenue > 0 ? Math.ceil(remainingRevenue / avgOrderRevenue) : null
   const goalMet = stats.prevMonthRevenue > 0 && stats.monthRevenue >= stats.prevMonthRevenue
 
-  const currentMonthName = new Date().toLocaleString('ar-SA', { month: 'long' })
+  const currentMonthName = new Date().toLocaleString('ar', { month: 'long', calendar: 'gregory' })
   const prevMonthName = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)
-    .toLocaleString('ar-SA', { month: 'long' })
+    .toLocaleString('ar', { month: 'long', calendar: 'gregory' })
 
   const freePercent = stats.total > 0 ? (stats.freeCount / stats.total) * 100 : 0
   const paidPercent = stats.total > 0 ? (stats.paidCount / stats.total) * 100 : 0
