@@ -101,7 +101,7 @@ export default function AdminStatsPage() {
         monthPaidCount,
         monthRevenue,
         prevMonthRevenue,
-        revenue: requests.filter(r => r.status === 'completed' && (r.final_total ?? 0) > 0).reduce((s, r) => s + (r.final_total ?? 0), 0),
+        revenue: requests.filter(isConfirmedPaid).reduce((s, r) => s + (r.final_total ?? 0), 0),
         totalPaidRevenue,
         outstanding: requests
           .filter(r => r.status === 'quoted')
