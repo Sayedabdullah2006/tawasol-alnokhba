@@ -17,9 +17,9 @@ export default function AdminStatsPage() {
     freeCount: 0,
     paidCount: 0,
     monthPaidCount: 0,
-    prevMonthPaidCount: 0,
-    revenue: 0,
     monthRevenue: 0,
+    prevMonthRevenue: 0,
+    revenue: 0,
     outstanding: 0,
     conversionRate: 0,
   })
@@ -70,11 +70,18 @@ export default function AdminStatsPage() {
         paidStatuses.includes(r.status) && r.created_at >= monthStart
       ).length
 
-      const prevMonthPaidCount = requests.filter(r =>
-        paidStatuses.includes(r.status) &&
-        r.created_at >= prevMonthStart &&
-        r.created_at < prevMonthEnd
-      ).length
+      // الإيرادات: كل الطلبات المدفوعة (ليس فقط completed) لعكس المبالغ المحصّلة فعلاً
+      const monthRevenue = requests
+        .filter(r => paidStatuses.includes(r.status) && r.created_at >= monthStart)
+        .reduce((s, r) => s + (r.final_total ?? 0), 0)
+
+      const prevMonthRevenue = requests
+        .filter(r =>
+          paidStatuses.includes(r.status) &&
+          r.created_at >= prevMonthStart &&
+          r.created_at < prevMonthEnd
+        )
+        .reduce((s, r) => s + (r.final_total ?? 0), 0)
 
       setStats({
         total: finalTotal,
@@ -82,11 +89,9 @@ export default function AdminStatsPage() {
         freeCount,
         paidCount,
         monthPaidCount,
-        prevMonthPaidCount,
+        monthRevenue,
+        prevMonthRevenue,
         revenue: requests.filter(r => r.status === 'completed').reduce((s, r) => s + (r.final_total ?? 0), 0),
-        monthRevenue: requests
-          .filter(r => r.status === 'completed' && r.created_at >= monthStart)
-          .reduce((s, r) => s + (r.final_total ?? 0), 0),
         outstanding: requests
           .filter(r => r.status === 'quoted')
           .reduce((s, r) => s + (r.final_total ?? r.admin_quoted_price ?? 0), 0),
@@ -133,11 +138,17 @@ export default function AdminStatsPage() {
 
   if (loading) return <LoadingSpinner size="lg" />
 
-  const monthGrowth = stats.prevMonthPaidCount > 0
-    ? ((stats.monthPaidCount - stats.prevMonthPaidCount) / stats.prevMonthPaidCount) * 100
-    : stats.monthPaidCount > 0 ? 100 : 0
+  // مقارنة الإيرادات: هذا الشهر vs الشهر الماضي (الهدف)
+  const revenueGrowth = stats.prevMonthRevenue > 0
+    ? ((stats.monthRevenue - stats.prevMonthRevenue) / stats.prevMonthRevenue) * 100
+    : stats.monthRevenue > 0 ? 100 : 0
+  const isRevenueUp = revenueGrowth >= 0
 
-  const isGrowthPositive = monthGrowth >= 0
+  // نسبة تحقيق الهدف (هذا الشهر / الشهر الماضي)
+  const goalAchieved = stats.prevMonthRevenue > 0
+    ? Math.min((stats.monthRevenue / stats.prevMonthRevenue) * 100, 100)
+    : stats.monthRevenue > 0 ? 100 : 0
+
   const currentMonthName = new Date().toLocaleString('ar-SA', { month: 'long' })
   const prevMonthName = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)
     .toLocaleString('ar-SA', { month: 'long' })
@@ -231,51 +242,66 @@ export default function AdminStatsPage() {
           )}
         </div>
 
-        {/* الهدف الشهري مقارنة بالشهر السابق */}
+        {/* الهدف الشهري المالي مقارنة بالشهر السابق */}
         <div className="bg-card rounded-2xl border border-border p-5">
-          <div className="flex items-start justify-between mb-4">
-            <p className="text-sm text-muted leading-tight">الهدف الشهري<br />مقارنة بالشهر السابق</p>
-            <div className="text-2xl">📊</div>
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <p className="text-sm text-muted leading-tight">الهدف الشهري</p>
+              <p className="text-xs text-muted opacity-70 mt-0.5">إيرادات {prevMonthName} هي الهدف</p>
+            </div>
+            <div className="text-2xl">🎯</div>
           </div>
 
-          <div className="flex items-end gap-2 mb-1">
-            <p className="text-4xl font-black text-dark">{stats.monthPaidCount}</p>
-            {stats.prevMonthPaidCount > 0 || stats.monthPaidCount > 0 ? (
-              <span className={`text-sm font-bold mb-1 ${isGrowthPositive ? 'text-green' : 'text-red-500'}`}>
-                {isGrowthPositive ? '▲' : '▼'} {Math.abs(monthGrowth).toFixed(1)}%
+          {/* الإيراد الحالي مع مؤشر النمو */}
+          <div className="flex items-end gap-2 mb-0.5">
+            <p className="text-2xl font-black text-dark leading-none">
+              {formatNumber(stats.monthRevenue)}
+            </p>
+            <span className="text-sm text-muted mb-0.5">ر.س</span>
+            {(stats.prevMonthRevenue > 0 || stats.monthRevenue > 0) && (
+              <span className={`text-sm font-bold mb-0.5 ${isRevenueUp ? 'text-green' : 'text-red-500'}`}>
+                {isRevenueUp ? '▲' : '▼'} {Math.abs(revenueGrowth).toFixed(1)}%
               </span>
-            ) : null}
+            )}
           </div>
-          <p className="text-xs text-muted">{currentMonthName} (هذا الشهر)</p>
+          <p className="text-xs text-muted mb-4">{currentMonthName} (هذا الشهر)</p>
 
-          <div className="mt-4 space-y-2">
-            <div className="flex justify-between text-xs text-muted">
-              <span>{currentMonthName}</span>
-              <span>{prevMonthName}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-green/10 rounded-lg p-2 text-center">
-                <p className="text-lg font-black text-green">{stats.monthPaidCount}</p>
-                <p className="text-xs text-muted">{currentMonthName}</p>
+          {/* شريط تحقيق الهدف */}
+          {stats.prevMonthRevenue > 0 && (
+            <div className="mb-3">
+              <div className="flex justify-between text-xs text-muted mb-1.5">
+                <span>تحقيق الهدف</span>
+                <span className={`font-bold ${goalAchieved >= 100 ? 'text-green' : 'text-dark'}`}>
+                  {goalAchieved.toFixed(0)}%
+                </span>
               </div>
-              <div className="bg-cream rounded-lg p-2 text-center">
-                <p className="text-lg font-black text-dark">{stats.prevMonthPaidCount}</p>
-                <p className="text-xs text-muted">{prevMonthName}</p>
-              </div>
-            </div>
-            {stats.prevMonthPaidCount > 0 && (
-              <div className="h-1.5 bg-cream rounded-full overflow-hidden mt-2">
+              <div className="h-2.5 bg-cream rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all ${isGrowthPositive ? 'bg-green' : 'bg-red-400'}`}
-                  style={{
-                    width: `${Math.min(
-                      (stats.monthPaidCount / Math.max(stats.monthPaidCount, stats.prevMonthPaidCount)) * 100,
-                      100
-                    )}%`,
-                  }}
+                  className={`h-full rounded-full transition-all ${
+                    goalAchieved >= 100 ? 'bg-green' : goalAchieved >= 70 ? 'bg-gold' : 'bg-red-400'
+                  }`}
+                  style={{ width: `${goalAchieved}%` }}
                 />
               </div>
-            )}
+            </div>
+          )}
+
+          {/* مقارنة الشهرين */}
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <div className="bg-green/10 rounded-xl p-3 text-center">
+              <p className="text-xs text-muted mb-1">{currentMonthName}</p>
+              <p className="text-base font-black text-green leading-tight">
+                {formatNumber(stats.monthRevenue)}
+              </p>
+              <p className="text-xs text-muted">ر.س</p>
+            </div>
+            <div className="bg-cream rounded-xl p-3 text-center">
+              <p className="text-xs text-muted mb-1">الهدف ({prevMonthName})</p>
+              <p className="text-base font-black text-dark leading-tight">
+                {formatNumber(stats.prevMonthRevenue)}
+              </p>
+              <p className="text-xs text-muted">ر.س</p>
+            </div>
           </div>
         </div>
       </div>
