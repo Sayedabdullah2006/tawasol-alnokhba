@@ -149,25 +149,35 @@ export default function AdminStatsPage() {
 
   if (loading) return <LoadingSpinner size="lg" />
 
-  // مقارنة الإيرادات: هذا الشهر vs الشهر الماضي (الهدف)
+  // مقارنة الإيرادات: هذا الشهر vs الشهر الماضي
   const revenueGrowth = stats.prevMonthRevenue > 0
     ? ((stats.monthRevenue - stats.prevMonthRevenue) / stats.prevMonthRevenue) * 100
     : stats.monthRevenue > 0 ? 100 : 0
   const isRevenueUp = revenueGrowth >= 0
 
-  // نسبة تحقيق الهدف (هذا الشهر / الشهر الماضي)
-  const goalAchieved = stats.prevMonthRevenue > 0
-    ? Math.min((stats.monthRevenue / stats.prevMonthRevenue) * 100, 100)
-    : stats.monthRevenue > 0 ? 100 : 0
+  // الهدف الشهري: 15,000 ر.س في مايو 2026 ويزيد 5% كل شهر
+  const TARGET_BASE = 15000
+  const TARGET_MONTHLY_GROWTH = 0.05
+  const TARGET_BASELINE_YEAR = 2026
+  const TARGET_BASELINE_MONTH = 4 // مايو (0-indexed)
+  const today = new Date()
+  const monthsFromBaseline =
+    (today.getFullYear() - TARGET_BASELINE_YEAR) * 12 + (today.getMonth() - TARGET_BASELINE_MONTH)
+  const monthlyTarget = Math.round(
+    TARGET_BASE * Math.pow(1 + TARGET_MONTHLY_GROWTH, monthsFromBaseline)
+  )
+
+  // نسبة تحقيق الهدف
+  const goalAchieved = monthlyTarget > 0
+    ? Math.min((stats.monthRevenue / monthlyTarget) * 100, 100)
+    : 0
 
   const avgOrderRevenue = stats.paidCount > 0 ? stats.totalPaidRevenue / stats.paidCount : 0
-  const remainingRevenue = Math.max(0, stats.prevMonthRevenue - stats.monthRevenue)
+  const remainingRevenue = Math.max(0, monthlyTarget - stats.monthRevenue)
   const ordersNeeded = avgOrderRevenue > 0 ? Math.ceil(remainingRevenue / avgOrderRevenue) : null
-  const goalMet = stats.prevMonthRevenue > 0 && stats.monthRevenue >= stats.prevMonthRevenue
+  const goalMet = stats.monthRevenue >= monthlyTarget
 
-  const currentMonthName = new Date().toLocaleString('ar', { month: 'long', calendar: 'gregory' })
-  const prevMonthName = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)
-    .toLocaleString('ar', { month: 'long', calendar: 'gregory' })
+  const currentMonthName = today.toLocaleString('ar', { month: 'long', calendar: 'gregory' })
 
   const freePercent = stats.total > 0 ? (stats.freeCount / stats.total) * 100 : 0
   const paidPercent = stats.total > 0 ? (stats.paidCount / stats.total) * 100 : 0
@@ -258,12 +268,12 @@ export default function AdminStatsPage() {
           )}
         </div>
 
-        {/* الهدف الشهري المالي مقارنة بالشهر السابق */}
+        {/* الهدف الشهري — قاعدة 15,000 ر.س + 5% شهرياً */}
         <div className="bg-card rounded-2xl border border-border p-5">
           <div className="flex items-start justify-between mb-3">
             <div>
               <p className="text-sm text-muted leading-tight">الهدف الشهري</p>
-              <p className="text-xs text-muted opacity-70 mt-0.5">إيرادات {prevMonthName} هي الهدف</p>
+              <p className="text-xs text-muted opacity-70 mt-0.5">{formatNumber(monthlyTarget)} ر.س · يزيد 5% كل شهر</p>
             </div>
             <div className="text-2xl">🎯</div>
           </div>
@@ -283,26 +293,24 @@ export default function AdminStatsPage() {
           <p className="text-xs text-muted mb-4">{currentMonthName} (هذا الشهر)</p>
 
           {/* شريط تحقيق الهدف */}
-          {stats.prevMonthRevenue > 0 && (
-            <div className="mb-3">
-              <div className="flex justify-between text-xs text-muted mb-1.5">
-                <span>تحقيق الهدف</span>
-                <span className={`font-bold ${goalAchieved >= 100 ? 'text-green' : 'text-dark'}`}>
-                  {goalAchieved.toFixed(0)}%
-                </span>
-              </div>
-              <div className="h-2.5 bg-cream rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    goalAchieved >= 100 ? 'bg-green' : goalAchieved >= 70 ? 'bg-gold' : 'bg-red-400'
-                  }`}
-                  style={{ width: `${goalAchieved}%` }}
-                />
-              </div>
+          <div className="mb-3">
+            <div className="flex justify-between text-xs text-muted mb-1.5">
+              <span>تحقيق الهدف</span>
+              <span className={`font-bold ${goalAchieved >= 100 ? 'text-green' : 'text-dark'}`}>
+                {goalAchieved.toFixed(0)}%
+              </span>
             </div>
-          )}
+            <div className="h-2.5 bg-cream rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  goalAchieved >= 100 ? 'bg-green' : goalAchieved >= 70 ? 'bg-gold' : 'bg-red-400'
+                }`}
+                style={{ width: `${goalAchieved}%` }}
+              />
+            </div>
+          </div>
 
-          {/* مقارنة الشهرين */}
+          {/* مقارنة الإيراد بالهدف */}
           <div className="grid grid-cols-2 gap-2 mt-3">
             <div className="bg-green/10 rounded-xl p-3 text-center">
               <p className="text-xs text-muted mb-1">{currentMonthName}</p>
@@ -312,16 +320,16 @@ export default function AdminStatsPage() {
               <p className="text-xs text-muted">ر.س</p>
             </div>
             <div className="bg-cream rounded-xl p-3 text-center">
-              <p className="text-xs text-muted mb-1">الهدف ({prevMonthName})</p>
+              <p className="text-xs text-muted mb-1">الهدف الشهري</p>
               <p className="text-base font-black text-dark leading-tight">
-                {formatNumber(stats.prevMonthRevenue)}
+                {formatNumber(monthlyTarget)}
               </p>
               <p className="text-xs text-muted">ر.س</p>
             </div>
           </div>
 
           {/* المتبقي لتحقيق الهدف */}
-          {stats.prevMonthRevenue > 0 && (
+          {monthlyTarget > 0 && (
             <div className={`mt-3 rounded-xl p-3 text-center text-xs ${goalMet ? 'bg-green/10' : 'bg-amber-50'}`}>
               {goalMet ? (
                 <p className="font-bold text-green">تحقق الهدف هذا الشهر!</p>
