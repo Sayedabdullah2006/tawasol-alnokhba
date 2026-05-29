@@ -161,16 +161,19 @@ export default function RequestWizard() {
       subOption: isCompetitionCategory ? competitionSelection : subOption,
       clientType,
       selectedExtras,
+      channelCount: channels.length,
     })
-  }, [category, subOption, competitionSelection, clientType, selectedExtras, isCompetitionCategory, requestType])
+  }, [category, subOption, competitionSelection, clientType, selectedExtras, isCompetitionCategory, requestType, channels])
 
   const campaignPriceCalc = useMemo(() => {
     if (requestType !== 'campaign') return null
     return calculateCampaignQuote(
       campaignPosts.map(p => ({ category: p.category, subOption: p.subOption, clientType })),
       selectedExtras,
+      CAMPAIGN_DISCOUNT_PCT,
+      channels.length,
     )
-  }, [campaignPosts, clientType, selectedExtras, requestType])
+  }, [campaignPosts, clientType, selectedExtras, requestType, channels])
 
   const priceCalc = requestType === 'campaign' ? null : singlePriceCalc
 
@@ -591,8 +594,14 @@ export default function RequestWizard() {
                     <>
                       <div className="flex justify-between text-muted">
                         <span>مجموع المنشورات ({campaignSetup.postCount})</span>
-                        <span>{formatNumber(campaignPriceCalc.postsSubtotal)} ر.س</span>
+                        <span>{formatNumber(campaignPriceCalc.singleChannelSubtotal)} ر.س</span>
                       </div>
+                      {campaignPriceCalc.channelSurcharge > 0 && (
+                        <div className="flex justify-between text-muted">
+                          <span>قنوات إضافية ({campaignPriceCalc.channelCount} قنوات)</span>
+                          <span>+{formatNumber(campaignPriceCalc.channelSurcharge)} ر.س</span>
+                        </div>
+                      )}
                       <div className="flex justify-between text-green font-semibold">
                         <span>خصم الحملة ({CAMPAIGN_DISCOUNT_PCT}%)</span>
                         <span>− {formatNumber(campaignPriceCalc.discountAmount)} ر.س</span>
@@ -608,8 +617,14 @@ export default function RequestWizard() {
                     <>
                       <div className="flex justify-between text-muted">
                         <span>السعر الأساسي</span>
-                        <span>{formatNumber(priceCalc.basePrice)} ر.س</span>
+                        <span>{formatNumber(priceCalc.singleChannelBase)} ر.س</span>
                       </div>
+                      {priceCalc.channelSurcharge > 0 && (
+                        <div className="flex justify-between text-muted">
+                          <span>قنوات إضافية ({priceCalc.channelCount} قنوات)</span>
+                          <span>+{formatNumber(priceCalc.channelSurcharge)} ر.س</span>
+                        </div>
+                      )}
                       {priceCalc.extrasBreakdown.map(e => (
                         <div key={e.id} className="flex justify-between text-muted">
                           <span>{e.name}</span>

@@ -9,6 +9,16 @@ import { EXTRAS } from '@/lib/constants'
 // لا يوجد ضريبة قيمة مضافة في هذا النظام
 export const AQ_VAT = 0
 
+// ─── معامل القنوات ───
+// الأسعار الأساسية محسوبة لقناة واحدة. كل قناة إضافية تضيف CHANNEL_RATE من الأساس.
+// المعامل = 1 + r × (عدد القنوات − 1)   مثال (r=30%): 1→×1.0 | 2→×1.3 | 3→×1.6 | 4→×1.9
+export const CHANNEL_RATE = 0.30
+
+export function channelMultiplier(channelCount: number | null | undefined): number {
+  const n = Math.max(1, Math.floor(channelCount || 1))
+  return 1 + CHANNEL_RATE * (n - 1)
+}
+
 // ─── أسعار الخدمات الإضافية (مصدر الحقيقة: constants.ts → EXTRAS) ───
 // يُشتق تلقائياً من EXTRAS لضمان التزامن دائماً مع القائمة الرئيسية
 export const AQ_EXTRAS_PRICES: Record<string, number> = Object.fromEntries(
@@ -110,10 +120,15 @@ export interface AQInput {
   subOption?: string | { subcategory: string; position: string } | null
   clientType?: string | null
   selectedExtras: string[]
+  channelCount?: number      // عدد القنوات المختارة (افتراضي 1)
 }
 
 export interface AQResult {
-  basePrice: number
+  singleChannelBase: number  // السعر الأساسي لقناة واحدة (قبل معامل القنوات)
+  channelCount: number
+  channelMultiplier: number
+  channelSurcharge: number   // الزيادة الناتجة عن القنوات الإضافية
+  basePrice: number          // الأساسي بعد معامل القنوات (= singleChannelBase + channelSurcharge)
   extrasBreakdown: { id: string; name: string; price: number }[]
   extrasTotal: number
   subtotal: number
@@ -150,8 +165,12 @@ export interface CampaignPostInput {
 }
 
 export interface CampaignQuoteResult {
-  posts: Array<{ index: number; category: string; basePrice: number }>
-  postsSubtotal: number
+  posts: Array<{ index: number; category: string; basePrice: number; singleChannelBase: number }>
+  channelCount: number
+  channelMultiplier: number
+  channelSurcharge: number       // إجمالي زيادة القنوات عبر كل المنشورات
+  singleChannelSubtotal: number  // مجموع المنشورات لقناة واحدة (قبل معامل القنوات)
+  postsSubtotal: number          // مجموع المنشورات بعد معامل القنوات
   discountAmount: number
   discountPct: number
   afterDiscount: number
@@ -164,6 +183,7 @@ export function calculateCampaignQuote(
   posts: CampaignPostInput[],
   selectedExtras: string[],
   discountPct: number = CAMPAIGN_DISCOUNT_PCT,
+  channelCount: number = 1,
 ): CampaignQuoteResult {
   const postBreakdown = posts.map((p, i) => {
     const result = calculateAutoQuote({
@@ -171,11 +191,19 @@ export function calculateCampaignQuote(
       subOption: p.subOption,
       clientType: p.clientType,
       selectedExtras: [],
+      channelCount,
     })
-    return { index: i, category: p.category, basePrice: result.basePrice }
+    return {
+      index: i,
+      category: p.category,
+      basePrice: result.basePrice,
+      singleChannelBase: result.singleChannelBase,
+    }
   })
 
+  const singleChannelSubtotal = postBreakdown.reduce((s, p) => s + p.singleChannelBase, 0)
   const postsSubtotal = postBreakdown.reduce((s, p) => s + p.basePrice, 0)
+  const channelSurcharge = postsSubtotal - singleChannelSubtotal
   const discountAmount = Math.round(postsSubtotal * discountPct / 100)
   const afterDiscount = postsSubtotal - discountAmount
 
@@ -188,6 +216,10 @@ export function calculateCampaignQuote(
 
   return {
     posts: postBreakdown,
+    channelCount: Math.max(1, Math.floor(channelCount || 1)),
+    channelMultiplier: channelMultiplier(channelCount),
+    channelSurcharge,
+    singleChannelSubtotal,
     postsSubtotal,
     discountAmount,
     discountPct,
@@ -202,7 +234,7 @@ export function calculateCampaignQuote(
 
 export function calculateAutoQuote(input: AQInput): AQResult {
   const ct = (input.clientType ?? 'individual') as ClientType
-  let basePrice = 0
+  let singleChannelBase = 0
 
   if (input.category === 'competitions') {
     if (
@@ -211,18 +243,24 @@ export function calculateAutoQuote(input: AQInput): AQResult {
       'subcategory' in input.subOption &&
       'position' in input.subOption
     ) {
-      basePrice =
+      singleChannelBase =
         COMPETITION_BASE[input.subOption.subcategory]?.[input.subOption.position] ?? 499
     } else {
-      basePrice = 499
+      singleChannelBase = 499
     }
   } else if (input.category === 'inventions') {
     const so = typeof input.subOption === 'string' ? input.subOption : ''
-    basePrice = INVENTION_BASE[so] ?? 699
+    singleChannelBase = INVENTION_BASE[so] ?? 699
   } else {
     const prices = SIMPLE_BASE[input.category]
-    basePrice = prices?.[ct] ?? prices?.individual ?? 499
+    singleChannelBase = prices?.[ct] ?? prices?.individual ?? 499
   }
+
+  // تطبيق معامل القنوات على السعر الأساسي فقط (الإضافات لا تتأثر)
+  const channelCount = Math.max(1, Math.floor(input.channelCount || 1))
+  const channelMult = channelMultiplier(channelCount)
+  const basePrice = Math.round(singleChannelBase * channelMult)
+  const channelSurcharge = basePrice - singleChannelBase
 
   const extrasBreakdown = input.selectedExtras
     .filter(id => AQ_EXTRAS_PRICES[id] !== undefined)
@@ -233,5 +271,16 @@ export function calculateAutoQuote(input: AQInput): AQResult {
   const vatAmount = Math.round(subtotal * AQ_VAT)
   const total = subtotal + vatAmount
 
-  return { basePrice, extrasBreakdown, extrasTotal, subtotal, vatAmount, total }
+  return {
+    singleChannelBase,
+    channelCount,
+    channelMultiplier: channelMult,
+    channelSurcharge,
+    basePrice,
+    extrasBreakdown,
+    extrasTotal,
+    subtotal,
+    vatAmount,
+    total,
+  }
 }

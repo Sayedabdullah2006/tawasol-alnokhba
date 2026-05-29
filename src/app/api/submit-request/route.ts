@@ -108,6 +108,8 @@ export async function POST(request: Request) {
           clientType: body.client_type ?? 'individual',
         })),
         selectedExtras,
+        CAMPAIGN_DISCOUNT_PCT,
+        channels.length,
       )
 
       // تطبيق كود الخصم على إجمالي الحملة
@@ -230,6 +232,7 @@ export async function POST(request: Request) {
       subOption:      subOptionForCalc,
       clientType:     body.client_type ?? 'individual',
       selectedExtras,
+      channelCount:   channels.length,
     })
 
     // تطبيق كود الخصم على المنشور الواحد
