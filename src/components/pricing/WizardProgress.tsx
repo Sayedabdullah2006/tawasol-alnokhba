@@ -7,6 +7,12 @@ interface WizardProgressProps {
 
 export default function WizardProgress({ current, total }: WizardProgressProps) {
   const pct = (current / total) * 100
+  const remaining = total - current
+
+  const encouragement =
+    remaining === 1 ? '🎉 بقيت خطوة أخيرة فقط!' :
+    remaining === 2 ? '💪 بقيت خطوتان فقط' :
+    null
 
   return (
     <div className="mb-6">
@@ -20,6 +26,11 @@ export default function WizardProgress({ current, total }: WizardProgressProps) 
           style={{ width: `${pct}%` }}
         />
       </div>
+      {encouragement && (
+        <p className="text-xs font-bold text-green text-center mt-2 wizard-enter">
+          {encouragement}
+        </p>
+      )}
     </div>
   )
 }

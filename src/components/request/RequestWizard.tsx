@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useCategories, type DBCategory } from '@/lib/hooks'
 import { useToast } from '@/components/ui/Toast'
@@ -20,6 +20,7 @@ import StepCompetition from '@/components/pricing/StepCompetition'
 import RStepCampaignSetup, { type CampaignSetup } from './RStepCampaignSetup'
 import RStepCampaignPosts, { type CampaignPostData, makeEmptyPost, isPostComplete } from './RStepCampaignPosts'
 import { validateEmail } from '@/lib/email-validation'
+import MicroAffirmation from './MicroAffirmation'
 import SuccessScreen from './SuccessScreen'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
@@ -59,6 +60,23 @@ const DURATION_LABELS: Record<string, string> = {
   open:    'مفتوح',
 }
 
+// رسائل تشجيع قصيرة تظهر بمجرد اكتمال الخطوة بشكل صحيح
+const STEP_AFFIRMATIONS: Partial<Record<StepId, string>> = {
+  influencer:    'اختيار موفّق 👌',
+  requestType:   'تمام، نكمل 🚀',
+  clientType:    'وضحت لنا الصورة ✨',
+  category:      'فئة واضحة 🎯',
+  subOption:     'اختيار دقيق 👍',
+  details:       'محتوى جاهز للنشر ✍️',
+  channels:      'قنوات موفّقة 📡',
+  campaignSetup: 'حملة قوية 🚀',
+  campaignPosts: 'منشورات مكتملة ✅',
+}
+
+// مفتاح حفظ المسودة محلياً + مدة صلاحيتها (7 أيام)
+const DRAFT_KEY = 'tn_request_draft_v1'
+const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
 export default function RequestWizard() {
   const { showToast } = useToast()
   const { categories, loading: catsLoading } = useCategories()
@@ -69,6 +87,8 @@ export default function RequestWizard() {
   const [quotedTotal, setQuotedTotal] = useState(0)
   const [influencers, setInfluencers] = useState<Influencer[]>([])
   const [loading, setLoading] = useState(true)
+  const [hydrated, setHydrated] = useState(false)
+  const draftRestored = useRef(false)
 
   // ── Step data ──────────────────────────────────────────────────
   const [selectedInfluencer, setSelectedInfluencer] = useState<string | null>(null)
@@ -154,6 +174,11 @@ export default function RequestWizard() {
 
   const priceCalc = requestType === 'campaign' ? null : singlePriceCalc
 
+  // تقدير حيّ يظهر مبكراً بمجرد توفّر معطيات كافية لاحتساب السعر
+  const liveEstimate = requestType === 'campaign'
+    ? (campaignPriceCalc?.total ?? 0)
+    : (priceCalc?.total ?? 0)
+
   // ── Steps ──────────────────────────────────────────────────────
   const steps: StepId[] = useMemo(() => {
     if (requestType === 'campaign') {
@@ -165,8 +190,14 @@ export default function RequestWizard() {
     return base
   }, [requestType, isCompetitionCategory, needsSubOption])
 
-  const currentStep  = steps[stepIndex]
   const totalSteps   = steps.length
+
+  // ضمان بقاء المؤشر ضمن النطاق إذا تغيّر مسار الخطوات (مثلاً بعد استرجاع مسودة)
+  useEffect(() => {
+    if (stepIndex > totalSteps - 1) setStepIndex(totalSteps - 1)
+  }, [totalSteps, stepIndex])
+
+  const currentStep  = steps[stepIndex]
 
   // ── Load data ──────────────────────────────────────────────────
   useEffect(() => {
@@ -191,6 +222,52 @@ export default function RequestWizard() {
       }
     })
   }, [])
+
+  // ── استرجاع مسودة غير مكتملة (مرة واحدة عند الفتح) ──────────────
+  useEffect(() => {
+    if (draftRestored.current) return
+    draftRestored.current = true
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY)
+      if (raw) {
+        const d = JSON.parse(raw)
+        if (d && typeof d.savedAt === 'number' && Date.now() - d.savedAt < DRAFT_TTL_MS) {
+          if (d.selectedInfluencer)   setSelectedInfluencer(d.selectedInfluencer)
+          if (d.requestType)          setRequestType(d.requestType)
+          if (d.clientType)           setClientType(d.clientType)
+          if (d.category)             setCategory(d.category)
+          if (d.subOption)            setSubOption(d.subOption)
+          if (d.competitionSelection) setCompetitionSelection(d.competitionSelection)
+          if (d.details)              setDetails(d.details)
+          if (Array.isArray(d.channels))        setChannels(d.channels)
+          if (Array.isArray(d.selectedExtras))  setSelectedExtras(d.selectedExtras)
+          if (d.contact)              setContact(d.contact)
+          if (d.campaignSetup)        setCampaignSetup(d.campaignSetup)
+          if (Array.isArray(d.campaignPosts) && d.campaignPosts.length) setCampaignPosts(d.campaignPosts)
+          if (typeof d.stepIndex === 'number') setStepIndex(d.stepIndex)
+          showToast('تم استرجاع طلبك غير المكتمل ✨', 'info')
+        }
+      }
+    } catch { /* مسودة تالفة — نتجاهلها */ }
+    setHydrated(true)
+  }, [showToast])
+
+  // ── حفظ المسودة تلقائياً بعد أي تغيير ───────────────────────────
+  useEffect(() => {
+    if (!hydrated) return
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        savedAt: Date.now(),
+        selectedInfluencer, requestType, clientType, category, subOption,
+        competitionSelection, details, channels, selectedExtras, contact,
+        campaignSetup, campaignPosts, stepIndex,
+      }))
+    } catch { /* تجاوز سعة التخزين — نتجاهل بهدوء */ }
+  }, [
+    hydrated, selectedInfluencer, requestType, clientType, category, subOption,
+    competitionSelection, details, channels, selectedExtras, contact,
+    campaignSetup, campaignPosts, stepIndex,
+  ])
 
   const selectedInf = influencers.find(i => i.id === selectedInfluencer) ?? null
 
@@ -296,6 +373,7 @@ export default function RequestWizard() {
 
       setRequestNumber(data.requestNumber)
       setQuotedTotal(data.quotedTotal ?? 0)
+      try { localStorage.removeItem(DRAFT_KEY) } catch { /* تجاهل */ }
       setSuccess(true)
       showToast('تم إرسال طلبك وعرض السعر بنجاح!')
     } catch (err: unknown) {
@@ -314,6 +392,14 @@ export default function RequestWizard() {
     <div className="flex flex-col bg-cream">
       <div className="max-w-3xl mx-auto w-full px-4 pt-6 flex-1 flex flex-col">
         <WizardProgress current={stepIndex + 1} total={totalSteps} />
+
+        {liveEstimate > 0 && currentStep !== 'confirm' && (
+          <div className="flex justify-center -mt-3 mb-1">
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-green bg-green/5 border border-green/20 rounded-full px-3 py-1 wizard-enter">
+              💰 تقدير حالي: {formatNumber(liveEstimate)} ر.س
+            </span>
+          </div>
+        )}
 
         <div className="flex-1 py-4">
 
@@ -609,6 +695,10 @@ export default function RequestWizard() {
             </div>
             )
           })()}
+
+          {STEP_AFFIRMATIONS[currentStep] && (
+            <MicroAffirmation show={canProceed()} text={STEP_AFFIRMATIONS[currentStep]!} />
+          )}
         </div>
 
         {/* Footer */}
