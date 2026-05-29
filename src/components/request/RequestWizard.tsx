@@ -88,6 +88,7 @@ export default function RequestWizard() {
   const [influencers, setInfluencers] = useState<Influencer[]>([])
   const [loading, setLoading] = useState(true)
   const [hydrated, setHydrated] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const draftRestored = useRef(false)
 
   // ── Step data ──────────────────────────────────────────────────
@@ -182,16 +183,30 @@ export default function RequestWizard() {
     ? (campaignPriceCalc?.total ?? 0)
     : (priceCalc?.total ?? 0)
 
+  // ── اكتمال بيانات التواصل ───────────────────────────────────────
+  // المستخدم مسجّل دخول دائماً (محمي عبر proxy.ts). إن كان بروفايله مكتملاً
+  // نتخطّى خطوة التواصل تلقائياً؛ وإلا نعرضها لاستكمال الناقص.
+  const contactComplete =
+    isLoggedIn &&
+    contact.fullName.trim() !== '' &&
+    contact.phone.trim() !== '' &&
+    validateEmail(contact.email).valid
+
   // ── Steps ──────────────────────────────────────────────────────
   const steps: StepId[] = useMemo(() => {
     if (requestType === 'campaign') {
-      return ['influencer', 'requestType', 'clientType', 'campaignSetup', 'campaignPosts', 'channels', 'extras', 'contact', 'terms', 'confirm']
+      return [
+        'influencer', 'requestType', 'clientType', 'campaignSetup', 'campaignPosts',
+        'channels', 'extras', ...(contactComplete ? [] : ['contact'] as StepId[]), 'terms', 'confirm',
+      ]
     }
     const base: StepId[] = ['influencer', 'requestType', 'clientType', 'category']
     if (isCompetitionCategory || needsSubOption) base.push('subOption')
-    base.push('details', 'channels', 'extras', 'contact', 'terms', 'confirm')
+    base.push('details', 'channels', 'extras')
+    if (!contactComplete) base.push('contact')
+    base.push('terms', 'confirm')
     return base
-  }, [requestType, isCompetitionCategory, needsSubOption])
+  }, [requestType, isCompetitionCategory, needsSubOption, contactComplete])
 
   const totalSteps   = steps.length
 
@@ -211,6 +226,7 @@ export default function RequestWizard() {
     })
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
+        setIsLoggedIn(true)
         supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data: profile }) => {
           if (profile) {
             setContact(prev => ({
@@ -563,6 +579,12 @@ export default function RequestWizard() {
                     <span className="text-muted">القنوات</span>
                     <span className="font-medium">{channels.map(c => CHANNEL_LABELS[c] ?? c).join('، ')}</span>
                   </div>
+                  {contact.email.trim() && (
+                    <div className="flex justify-between">
+                      <span className="text-muted">يصلك العرض على</span>
+                      <span className="font-medium" dir="ltr">{contact.email}</span>
+                    </div>
+                  )}
                   {requestType === 'single' && (
                     <div className="border-t border-border pt-3">
                       <div className="flex justify-between">
