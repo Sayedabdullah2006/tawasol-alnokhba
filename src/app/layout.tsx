@@ -4,6 +4,7 @@ import './globals.css'
 import { ToastProvider } from '@/components/ui/Toast'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
+import DiscountPopup from '@/components/ui/DiscountPopup'
 
 const cairo = Cairo({
   subsets: ['arabic', 'latin'],
@@ -31,6 +32,7 @@ export default function RootLayout({
           <Header />
           <main className="flex-1 flex flex-col min-w-0">{children}</main>
           <Footer />
+          <DiscountPopup />
         </ToastProvider>
       </body>
     </html>
