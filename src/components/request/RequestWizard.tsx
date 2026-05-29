@@ -88,6 +88,7 @@ export default function RequestWizard() {
   const [influencers, setInfluencers] = useState<Influencer[]>([])
   const [loading, setLoading] = useState(true)
   const [hydrated, setHydrated] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const draftRestored = useRef(false)
 
   // ── Step data ──────────────────────────────────────────────────
@@ -211,6 +212,7 @@ export default function RequestWizard() {
     })
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
+        setIsLoggedIn(true)
         supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data: profile }) => {
           if (profile) {
             setContact(prev => ({
@@ -502,7 +504,7 @@ export default function RequestWizard() {
           )}
 
           {currentStep === 'contact' && (
-            <RStep5Contact data={contact} onChange={setContact} />
+            <RStep5Contact data={contact} onChange={setContact} canConfirm={isLoggedIn} />
           )}
 
           {currentStep === 'terms' && (

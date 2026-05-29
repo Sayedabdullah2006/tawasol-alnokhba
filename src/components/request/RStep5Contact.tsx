@@ -15,12 +15,20 @@ export interface ContactData {
 interface Props {
   data: ContactData
   onChange: (data: ContactData) => void
+  canConfirm?: boolean   // مسجّل دخول → نعرض بطاقة تأكيد مختصرة بدل النموذج الكامل
 }
 
-export default function RStep5Contact({ data, onChange }: Props) {
+function isContactComplete(d: ContactData): boolean {
+  return d.fullName.trim() !== '' && d.phone.trim() !== '' && validateEmail(d.email).valid
+}
+
+export default function RStep5Contact({ data, onChange, canConfirm = false }: Props) {
   const update = (field: keyof ContactData, value: string) => {
     onChange({ ...data, [field]: value })
   }
+
+  // للمسجّل المكتمل بياناته نبدأ ببطاقة تأكيد؛ غير ذلك نعرض النموذج كاملاً
+  const [editing, setEditing] = useState(() => !(canConfirm && isContactComplete(data)))
 
   const [emailError, setEmailError] = useState<string | null>(null)
   const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null)
@@ -44,6 +52,52 @@ export default function RStep5Contact({ data, onChange }: Props) {
     }, 500)
     return () => clearTimeout(t)
   }, [data.email])
+
+  // ── بطاقة التأكيد المختصرة (للمسجّل المكتمل بياناته) ─────────────
+  if (!editing) {
+    return (
+      <div className="wizard-enter max-w-lg mx-auto">
+        <h2 className="text-xl md:text-2xl font-black text-dark text-center mb-2">
+          آخر شي ونخلص — نأكّد بيانات تواصلك
+        </h2>
+        <p className="text-sm text-muted text-center mb-6">سنرسل العرض والمتابعة على هذه البيانات</p>
+
+        <div className="bg-card rounded-2xl border border-border overflow-hidden">
+          <div className="p-5 space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted">الاسم</span>
+              <span className="font-medium">{data.fullName}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">الجوال</span>
+              <span className="font-medium" dir="ltr">{data.phone}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">البريد</span>
+              <span className="font-medium" dir="ltr">{data.email}</span>
+            </div>
+            {data.city.trim() && (
+              <div className="flex justify-between">
+                <span className="text-muted">المدينة</span>
+                <span className="font-medium">{data.city}</span>
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="w-full border-t border-border py-3 text-sm font-bold text-green hover:bg-green/5 transition-colors cursor-pointer"
+          >
+            ✏️ تعديل البيانات
+          </button>
+        </div>
+
+        <p className="text-xs text-muted text-center mt-4 bg-blue-50 border border-blue-200 rounded-xl py-2 px-3">
+          🔒 بياناتك آمنة ولن تُشارك مع أي طرف ثالث
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="wizard-enter max-w-lg mx-auto">
