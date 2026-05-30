@@ -451,6 +451,64 @@ export function registrationCodeToClient(d: {
   }
 }
 
+// 9b. Welcome — to new user (after instant registration)
+export function welcomeToClient(d: {
+  clientName: string
+}) {
+  return {
+    subject: `🎉 مرحباً بك في تواصل النخبة`,
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <div style="text-align:center; margin-bottom:20px;">
+        <div style="font-size:48px;">🎉</div>
+        <p style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${BRAND_GOLD};">تم إنشاء حسابك بنجاح</p>
+      </div>
+      <p style="margin:0 0 16px 0; font-size:14px; line-height:1.8;">
+        يسعدنا انضمامك إلى <strong>تواصل النخبة</strong> — منصتك المتخصصة في التسويق والإعلان الرقمي.
+        حسابك جاهز الآن ويمكنك البدء فوراً.
+      </p>
+      <div style="background:#F7F4ED; border-radius:12px; padding:18px; margin-bottom:18px;">
+        <p style="margin:0 0 10px 0; font-size:14px; font-weight:bold; color:${BRAND_NAVY};">🚀 ابدأ من هنا</p>
+        <ul style="margin:0; padding-right:20px; font-size:13px; line-height:1.9; color:#4A5568;">
+          <li>قدّم طلب نشر جديد بكل سهولة</li>
+          <li>تابع حالة طلباتك من لوحة التحكم</li>
+          <li>استلم عروضاً مخصصة من فريقنا</li>
+        </ul>
+      </div>
+      <p style="margin:0; text-align:center;">${button('انتقل إلى لوحة التحكم', `${SITE_URL}/dashboard`)}</p>
+      <p style="margin:20px 0 0 0; font-size:13px; color:#6B7C99; line-height:1.8; text-align:center;">
+        لأي استفسار، فريق الدعم في خدمتك عبر
+        <a href="mailto:support@nukhba.media" style="color:${BRAND_GOLD};">support@nukhba.media</a>.
+      </p>
+    `),
+  }
+}
+
+// 9c. New account registered — to admin
+export function newAccountToAdmin(d: {
+  clientName: string
+  clientEmail: string
+}) {
+  return {
+    subject: `🆕 تسجيل حساب جديد · ${d.clientName}`,
+    html: wrap(`
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:48px; margin-bottom:16px;">🆕</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">تسجيل حساب جديد</h2>
+      </div>
+      <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
+        تم إنشاء حساب جديد على المنصة.
+      </p>
+      <div style="background:#F7F4ED; border-radius:10px; padding:14px; margin-bottom:18px;">
+        <p style="margin:4px 0; font-size:13px;"><strong>الاسم:</strong> ${escapeHtml(d.clientName)}</p>
+        <p style="margin:4px 0; font-size:13px;"><strong>البريد:</strong> <span dir="ltr">${escapeHtml(d.clientEmail)}</span></p>
+        <p style="margin:4px 0; font-size:13px;"><strong>التاريخ:</strong> ${formatDateAr(new Date().toISOString())}</p>
+      </div>
+      <p style="margin:0; text-align:center;">${button('عرض المستخدمين', `${SITE_URL}/admin/users`)}</p>
+    `),
+  }
+}
+
 // 10. Password reset code — to user
 export function resetPasswordCodeToClient(d: {
   code: string

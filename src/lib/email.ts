@@ -117,6 +117,20 @@ export async function sendRegistrationCode(args: {
   return sendEmail(args.email, t.subject, t.html)
 }
 
+export async function sendWelcomeEmail(args: {
+  email: string; clientName: string
+}) {
+  const t = templates.welcomeToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
+export async function notifyNewAccountToAdmin(args: {
+  clientName: string; clientEmail: string
+}) {
+  const t = templates.newAccountToAdmin(args)
+  return sendEmail(ADMIN_EMAIL, t.subject, t.html)
+}
+
 export async function sendResetPasswordCode(args: {
   email: string; code: string; ttlMinutes: number
 }) {
