@@ -6,10 +6,15 @@ import { verifyTurnstileToken } from '@/lib/turnstile'
 
 export async function POST(request: Request) {
   try {
-    const { email, password, fullName, captchaToken } = await request.json()
+    const { email, password, fullName, phone, captchaToken } = await request.json()
 
-    if (!email || !password || !fullName) {
+    if (!email || !password || !fullName || !phone) {
       return NextResponse.json({ error: 'جميع الحقول مطلوبة' }, { status: 400 })
+    }
+
+    const normalizedPhone = String(phone).replace(/\s+/g, '')
+    if (!/^05\d{8}$/.test(normalizedPhone)) {
+      return NextResponse.json({ error: 'رقم الجوال يجب أن يكون بصيغة 05XXXXXXXX' }, { status: 400 })
     }
 
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? undefined
@@ -49,6 +54,7 @@ export async function POST(request: Request) {
     await supabase.from('profiles').upsert({
       id: data.user.id,
       full_name: fullName,
+      phone: normalizedPhone,
       role: 'client',
     })
 
