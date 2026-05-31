@@ -48,7 +48,7 @@ export default function PricingPage() {
           <div className="max-w-4xl mx-auto px-4 text-center">
             <h1 className="text-3xl md:text-5xl font-black mb-4">الأسعار</h1>
             <p className="text-cream/70 text-base md:text-lg max-w-2xl mx-auto">
-              خدماتنا تبدأ من <span className="font-black text-cream">400 ر.س</span> — يُحدَّد السعر النهائي حسب طبيعة المحتوى، عدد القنوات، والخدمات الإضافية المطلوبة
+              خدماتنا تبدأ من <span className="font-black text-cream">400 ر.س</span> — يُحدَّد السعر النهائي حسب طبيعة المحتوى والخدمات الإضافية المطلوبة
             </p>
           </div>
         </section>
