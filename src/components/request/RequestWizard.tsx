@@ -252,7 +252,7 @@ export default function RequestWizard() {
         ? details.title.trim() !== '' && details.content.trim() !== ''
         : false
 
-  const publishComplete = channels.length > 0
+  const publishComplete = true   // القسم أصبح للخدمات الإضافية الاختيارية فقط
 
   const finishComplete = termsAccepted && privacyAccepted
 
@@ -590,28 +590,16 @@ export default function RequestWizard() {
             </div>
           </FormSection>
 
-          {/* ③ النشر والإضافات ──────────────────────────────────── */}
+          {/* ③ الخدمات الإضافية ──────────────────────────────────── */}
           <FormSection
             index={3}
-            title="النشر والإضافات"
-            subtitle="القنوات والخدمات الإضافية"
+            title="الخدمات الإضافية"
+            subtitle="خدمات اختيارية لوصول أكبر"
             complete={publishComplete}
             open={openSection === 2}
             onToggle={() => setOpenSection(openSection === 2 ? -1 : 2)}
           >
             <div className="space-y-6">
-              {selectedInf ? (
-                <RStepChannels
-                  influencer={selectedInf}
-                  selected={channels}
-                  onToggle={(id) => setChannels(prev =>
-                    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-                  )}
-                />
-              ) : (
-                <p className="text-sm text-muted text-center py-4">اختر الحساب في القسم الأول أولاً</p>
-              )}
-
               <div>
                 <h3 className="font-bold text-dark text-sm mb-1">خدمات إضافية (اختياري بمقابل اضافي لوصول اكبر)</h3>
                 <p className="text-xs text-muted mb-3">اختر ما يناسبك — يمكنك تجاوز هذا القسم</p>
