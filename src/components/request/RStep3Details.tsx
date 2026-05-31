@@ -41,7 +41,7 @@ export default function RStep3Details({ data, onChange }: Props) {
         />
         <Textarea
           id="content"
-          label="النص الكامل *"
+          label="تفاصيل الخبر *"
           placeholder="اكتب تفاصيل الخبر أو المحتوى كاملاً..."
           value={data.content}
           onChange={e => update('content', e.target.value)}
@@ -58,33 +58,6 @@ export default function RStep3Details({ data, onChange }: Props) {
           />
         </div>
 
-        <Input
-          id="link"
-          label="رابط إضافي (اختياري)"
-          dir="ltr"
-          type="url"
-          placeholder="https://example.com"
-          value={data.link}
-          onChange={e => update('link', e.target.value)}
-        />
-        <Input
-          id="hashtags"
-          label="الهاشتاقات المقترحة (اختياري)"
-          placeholder="#هاشتاق1 #هاشتاق2"
-          value={data.hashtags}
-          onChange={e => update('hashtags', e.target.value)}
-        />
-        <Input
-          id="preferredDate"
-          label="التاريخ المفضل للنشر (اختياري)"
-          type="date"
-          dir="ltr"
-          value={data.preferredDate}
-          onChange={e => update('preferredDate', e.target.value)}
-        />
-        <p className="text-xs text-muted text-center">
-          💡 الثلاثاء والأربعاء عادةً أعلى تفاعل لدى جمهورنا
-        </p>
       </div>
     </div>
   )
