@@ -10,7 +10,6 @@ import type { RequestType } from './RStepRequestType'
 import type { ClientType } from './RStep1ClientType'
 import type { CampaignSetup } from './RStepCampaignSetup'
 import RStep3Details from './RStep3Details'
-import RStepChannels from './RStepChannels'
 import { type ContactData } from './RStep5Contact'
 import RStep6Terms from './RStep6Terms'
 import RStepCampaignPosts, { type CampaignPostData, makeEmptyPost, isPostComplete } from './RStepCampaignPosts'
@@ -199,6 +198,19 @@ export default function RequestWizard() {
     setHydrated(true)
   }, [showToast])
 
+  // ── عند اختيار الحساب: النشر تلقائياً على كل قنواته المتاحة ───
+  // السعر موحّد لكل القنوات، فلا حاجة لاختيار القناة يدوياً
+  useEffect(() => {
+    if (!selectedInf) return
+    const available = [
+      selectedInf.x_followers  ? 'x'  : null,
+      selectedInf.ig_followers ? 'ig' : null,
+      selectedInf.li_followers ? 'li' : null,
+      selectedInf.tk_followers ? 'tk' : null,
+    ].filter(Boolean) as string[]
+    setChannels(available)
+  }, [selectedInf])
+
   // ── حفظ المسودة تلقائياً بعد أي تغيير ───────────────────────────
   useEffect(() => {
     if (!hydrated) return
@@ -273,7 +285,6 @@ export default function RequestWizard() {
       if (campaignSetup.postCount < 2) return 'حدّد عدد المنشورات'
       if (!campaignPosts.every(isPostComplete)) return 'أكمل تفاصيل جميع منشورات الحملة'
     }
-    if (channels.length === 0) return 'اختر قناة نشر واحدة على الأقل'
     if (!termsAccepted || !privacyAccepted) return 'فعّل الموافقة على الشروط والخصوصية'
     return null
   }
