@@ -11,10 +11,9 @@ import type { ClientType } from './RStep1ClientType'
 import type { CampaignSetup } from './RStepCampaignSetup'
 import RStep3Details from './RStep3Details'
 import RStepChannels from './RStepChannels'
-import RStep5Contact, { type ContactData } from './RStep5Contact'
+import { type ContactData } from './RStep5Contact'
 import RStep6Terms from './RStep6Terms'
 import RStepCampaignPosts, { type CampaignPostData, makeEmptyPost, isPostComplete } from './RStepCampaignPosts'
-import { validateEmail } from '@/lib/email-validation'
 import SuccessScreen from './SuccessScreen'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
@@ -104,7 +103,6 @@ export default function RequestWizard() {
   const [influencers, setInfluencers] = useState<Influencer[]>([])
   const [loading, setLoading] = useState(true)
   const [hydrated, setHydrated] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const draftRestored = useRef(false)
 
   // القسم المفتوح حالياً (أكورديون أحادي الفتح)
@@ -126,34 +124,6 @@ export default function RequestWizard() {
   const [contact, setContact]           = useState<ContactData>({ fullName: '', phone: '', email: '', city: '', xHandle: '' })
   const [termsAccepted, setTermsAccepted]   = useState(false)
   const [privacyAccepted, setPrivacyAccepted] = useState(false)
-
-  // ── كود الخصم ──────────────────────────────────────────────────
-  const [discountInput, setDiscountInput]   = useState('')
-  const [validatingCode, setValidatingCode] = useState(false)
-  const [discountError, setDiscountError]   = useState('')
-  const [appliedDiscount, setAppliedDiscount] = useState<{
-    code: string; pct: number; occasion: string | null
-  } | null>(null)
-
-  const handleApplyDiscount = async () => {
-    if (!discountInput.trim()) return
-    setValidatingCode(true)
-    setDiscountError('')
-    setAppliedDiscount(null)
-    const res = await fetch('/api/validate-discount', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: discountInput.trim() }),
-    })
-    const data = await res.json()
-    if (data.valid) {
-      setAppliedDiscount({ code: data.code, pct: data.discount_pct, occasion: data.occasion })
-      setDiscountError('')
-    } else {
-      setDiscountError(data.error ?? 'الكود غير صحيح')
-    }
-    setValidatingCode(false)
-  }
 
   // ── بيانات الحملة ──────────────────────────────────────────────
   const [campaignSetup, setCampaignSetup] = useState<CampaignSetup>({ postCount: 2, duration: '' })
@@ -186,7 +156,6 @@ export default function RequestWizard() {
     })
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
-        setIsLoggedIn(true)
         supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data: profile }) => {
           if (profile) {
             setContact(prev => ({
@@ -247,13 +216,8 @@ export default function RequestWizard() {
     campaignSetup, campaignPosts,
   ])
 
-  // ── اكتمال بيانات التواصل ───────────────────────────────────────
-  // إن كان المستخدم مسجّلاً وبروفايله مكتمل، نخفي حقول التواصل تلقائياً
-  const contactComplete =
-    isLoggedIn &&
-    contact.fullName.trim() !== '' &&
-    contact.phone.trim() !== '' &&
-    validateEmail(contact.email).valid
+  // ملاحظة: بيانات التواصل تُحمَّل تلقائياً من بروفايل الحساب وتُرسَل مع الطلب،
+  // دون عرض حقول إدخال — لأنها مُسجّلة مسبقاً عند إنشاء الحساب.
 
   // ── تبديل الخدمات الإضافية (مع تعارض pin6/pin12) ────────────────
   const toggleExtra = (id: string) => {
@@ -290,12 +254,7 @@ export default function RequestWizard() {
 
   const publishComplete = channels.length > 0
 
-  const contactReady = contactComplete || (
-    contact.fullName.trim() !== '' &&
-    contact.phone.trim() !== '' &&
-    validateEmail(contact.email).valid
-  )
-  const finishComplete = contactReady && termsAccepted && privacyAccepted
+  const finishComplete = termsAccepted && privacyAccepted
 
   const sectionComplete = [aboutComplete, contentComplete, publishComplete, finishComplete]
   const canSubmit = sectionComplete.every(Boolean)
@@ -315,7 +274,6 @@ export default function RequestWizard() {
       if (!campaignPosts.every(isPostComplete)) return 'أكمل تفاصيل جميع منشورات الحملة'
     }
     if (channels.length === 0) return 'اختر قناة نشر واحدة على الأقل'
-    if (!contactReady) return 'أكمل بيانات التواصل'
     if (!termsAccepted || !privacyAccepted) return 'فعّل الموافقة على الشروط والخصوصية'
     return null
   }
@@ -340,7 +298,6 @@ export default function RequestWizard() {
           x_handle:         contact.xHandle || null,
           campaign_post_count: campaignSetup.postCount,
           campaign_duration:   campaignSetup.duration || null,
-          discount_code:    appliedDiscount?.code ?? null,
           campaign_posts: campaignPosts.map(p => ({
             category:       p.category,
             sub_option:     p.subOption
@@ -375,7 +332,6 @@ export default function RequestWizard() {
           x_handle:        contact.xHandle || null,
           channels,
           selected_extras: selectedExtras,
-          discount_code:   appliedDiscount?.code ?? null,
         }
       }
 
@@ -696,80 +652,22 @@ export default function RequestWizard() {
             </div>
           </FormSection>
 
-          {/* ④ بياناتك والموافقة ────────────────────────────────── */}
+          {/* ④ الموافقة على الشروط ──────────────────────────────── */}
           <FormSection
             index={4}
-            title="بياناتك والموافقة"
-            subtitle="بيانات التواصل والشروط"
+            title="الموافقة على الشروط"
+            subtitle="اقرأ الشروط والأحكام ووافق عليها"
             complete={finishComplete}
             open={openSection === 3}
             onToggle={() => setOpenSection(openSection === 3 ? -1 : 3)}
           >
             <div className="space-y-6">
-              {contactComplete ? (
-                <div className="bg-green/5 border border-green/20 rounded-xl px-4 py-3 text-center text-sm text-green-700">
-                  ✓ بياناتك جاهزة من حسابك — يمكنك المتابعة مباشرة
-                </div>
-              ) : (
-                <RStep5Contact data={contact} onChange={setContact} />
-              )}
-
               <RStep6Terms
                 termsAccepted={termsAccepted}
                 privacyAccepted={privacyAccepted}
                 onTermsChange={setTermsAccepted}
                 onPrivacyChange={setPrivacyAccepted}
               />
-
-              {/* كود الخصم */}
-              <div className="bg-card rounded-2xl border border-border p-4">
-                {appliedDiscount ? (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-green text-lg">✅</span>
-                      <div>
-                        <p className="text-sm font-bold text-dark">
-                          تم تطبيق الكود <span className="font-mono">{appliedDiscount.code}</span>
-                        </p>
-                        {appliedDiscount.occasion && (
-                          <p className="text-xs text-muted">{appliedDiscount.occasion}</p>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => { setAppliedDiscount(null); setDiscountInput(''); setDiscountError('') }}
-                      className="text-xs text-red-500 hover:underline"
-                    >
-                      إزالة
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    <p className="text-sm font-medium text-dark mb-2">🏷️ لديك كود خصم؟ (اختياري)</p>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={discountInput}
-                        onChange={e => { setDiscountInput(e.target.value.toUpperCase()); setDiscountError('') }}
-                        onKeyDown={e => e.key === 'Enter' && handleApplyDiscount()}
-                        placeholder="أدخل الكود هنا"
-                        className="flex-1 px-3 py-2 rounded-xl border border-border text-sm font-mono bg-white"
-                        maxLength={20}
-                      />
-                      <button
-                        onClick={handleApplyDiscount}
-                        disabled={validatingCode || !discountInput.trim()}
-                        className="px-4 py-2 rounded-xl bg-green text-white text-sm font-bold disabled:opacity-50 transition-opacity"
-                      >
-                        {validatingCode ? '...' : 'تطبيق'}
-                      </button>
-                    </div>
-                    {discountError && (
-                      <p className="text-xs text-red-500 mt-1.5">{discountError}</p>
-                    )}
-                  </div>
-                )}
-              </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center">
                 <div className="text-2xl mb-2">📧</div>

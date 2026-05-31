@@ -16,6 +16,7 @@ export default function RegisterPage() {
 
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null)
@@ -36,6 +37,8 @@ export default function RegisterPage() {
       if (emailCheck.suggestion) setEmailSuggestion(emailCheck.suggestion)
       return
     }
+    const phoneNorm = phone.replace(/\s+/g, '')
+    if (!/^05\d{8}$/.test(phoneNorm)) { setError('رقم الجوال يجب أن يكون بصيغة 05XXXXXXXX'); return }
     if (password.length < 6) { setError('كلمة المرور يجب أن تكون 6 أحرف على الأقل'); return }
     if (password !== confirmPassword) { setError('كلمة المرور وتأكيدها غير متطابقتين'); return }
     if (captchaOn && !captchaToken) { setError('يرجى إكمال التحقق الأمني أولاً'); return }
@@ -45,7 +48,7 @@ export default function RegisterPage() {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, fullName, captchaToken }),
+        body: JSON.stringify({ email, password, fullName, phone: phoneNorm, captchaToken }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'تعذّر إنشاء الحساب'); setLoading(false); return }
@@ -76,6 +79,9 @@ export default function RegisterPage() {
           <Input id="email" label="البريد الإلكتروني" type="email" dir="ltr"
             placeholder="email@example.com" value={email}
             onChange={e => setEmail(e.target.value)} required />
+          <Input id="phone" label="رقم الجوال" type="tel" dir="ltr"
+            placeholder="05XXXXXXXX" value={phone}
+            onChange={e => setPhone(e.target.value)} required />
           <Input id="password" label="كلمة المرور" type="password" dir="ltr"
             placeholder="6 أحرف على الأقل" value={password}
             onChange={e => setPassword(e.target.value)} required />
