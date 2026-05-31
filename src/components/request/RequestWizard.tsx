@@ -30,6 +30,7 @@ const CLIENT_TYPE_OPTIONS: { id: ClientType; label: string }[] = [
   { id: 'business',   label: '🏢 شركة / مؤسسة' },
   { id: 'government', label: '🏛️ جهة حكومية' },
   { id: 'charity',    label: '❤️ جمعية خيرية' },
+  { id: 'agency',     label: '📣 وكالة دعاية وإعلان' },
 ]
 
 const DURATION_OPTIONS = [
@@ -121,6 +122,7 @@ export default function RequestWizard() {
   const [channels, setChannels]         = useState<string[]>([])
   const [selectedExtras, setSelectedExtras] = useState<string[]>([])
   const [contact, setContact]           = useState<ContactData>({ fullName: '', phone: '', email: '', city: '', xHandle: '' })
+  const [orgInfo, setOrgInfo]           = useState({ name: '', representative: '', license: '' })
   const [termsAccepted, setTermsAccepted]   = useState(false)
   const [privacyAccepted, setPrivacyAccepted] = useState(false)
 
@@ -141,8 +143,10 @@ export default function RequestWizard() {
   const selectedCat: DBCategory | null = categories.find(c => c.id === category) ?? null
   const needsSubOption = !!(selectedCat?.has_sub_option && selectedCat?.sub_options?.length)
   const isCompetitionCategory = category === 'competitions'
-  const availableCategories = clientType
-    ? categories.filter(c => !c.client_types || c.client_types.includes(clientType))
+  // الوكالة ترى نفس فئات الأفراد (كل أنواع الأخبار)
+  const effectiveClientType = clientType === 'agency' ? 'individual' : clientType
+  const availableCategories = effectiveClientType
+    ? categories.filter(c => !c.client_types || c.client_types.includes(effectiveClientType))
     : categories
   const selectedInf = influencers.find(i => i.id === selectedInfluencer) ?? null
 
@@ -189,6 +193,7 @@ export default function RequestWizard() {
           if (Array.isArray(d.channels))        setChannels(d.channels)
           if (Array.isArray(d.selectedExtras))  setSelectedExtras(d.selectedExtras)
           if (d.contact)              setContact(d.contact)
+          if (d.orgInfo)              setOrgInfo(d.orgInfo)
           if (d.campaignSetup)        setCampaignSetup(d.campaignSetup)
           if (Array.isArray(d.campaignPosts) && d.campaignPosts.length) setCampaignPosts(d.campaignPosts)
           showToast('تم استرجاع طلبك غير المكتمل ✨', 'info')
@@ -218,13 +223,13 @@ export default function RequestWizard() {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({
         savedAt: Date.now(),
         selectedInfluencer, requestType, clientType, category, subOption,
-        competitionSelection, details, channels, selectedExtras, contact,
+        competitionSelection, details, channels, selectedExtras, contact, orgInfo,
         campaignSetup, campaignPosts,
       }))
     } catch { /* تجاوز سعة التخزين — نتجاهل بهدوء */ }
   }, [
     hydrated, selectedInfluencer, requestType, clientType, category, subOption,
-    competitionSelection, details, channels, selectedExtras, contact,
+    competitionSelection, details, channels, selectedExtras, contact, orgInfo,
     campaignSetup, campaignPosts,
   ])
 
@@ -276,6 +281,7 @@ export default function RequestWizard() {
     if (!selectedInfluencer) return 'اختر الحساب الذي تريد النشر معه'
     if (!requestType) return 'اختر نوع الطلب'
     if (!clientType) return 'اختر صفة مقدّم الطلب'
+    if (clientType !== 'individual' && orgInfo.name.trim() === '') return 'أدخل اسم الجهة'
     if (requestType === 'single') {
       if (!category) return 'اختر فئة المحتوى'
       if (!subOptionSatisfied) return 'أكمل الخيار الفرعي للفئة'
@@ -300,6 +306,9 @@ export default function RequestWizard() {
           request_type:     'campaign',
           influencer_id:    selectedInfluencer,
           client_type:      clientType,
+          org_name:           clientType !== 'individual' ? (orgInfo.name.trim() || null) : null,
+          org_representative: clientType !== 'individual' ? (orgInfo.representative.trim() || null) : null,
+          org_license:        clientType !== 'individual' ? (orgInfo.license.trim() || null) : null,
           channels,
           selected_extras:  selectedExtras,
           client_name:      contact.fullName,
@@ -328,6 +337,9 @@ export default function RequestWizard() {
           request_type:    'single',
           influencer_id:   selectedInfluencer,
           client_type:     clientType,
+          org_name:           clientType !== 'individual' ? (orgInfo.name.trim() || null) : null,
+          org_representative: clientType !== 'individual' ? (orgInfo.representative.trim() || null) : null,
+          org_license:        clientType !== 'individual' ? (orgInfo.license.trim() || null) : null,
           category,
           sub_option:      subOptionData,
           title:           details.title,
@@ -453,7 +465,44 @@ export default function RequestWizard() {
                     <option key={o.id} value={o.id}>{o.label}</option>
                   ))}
                 </select>
+                <p className="text-xs text-amber-600 mt-1.5">⚠️ يجب اختيار الصفة الصحيحة تجنباً لإلغاء الطلب</p>
               </div>
+
+              {/* بيانات الجهة — لغير الأفراد (شركة / حكومة / جمعية / وكالة) */}
+              {clientType && clientType !== 'individual' && (
+                <div className="space-y-3 bg-muted/5 rounded-xl p-3 border border-border">
+                  <div>
+                    <label className={fieldLabel}>اسم الجهة *</label>
+                    <input
+                      type="text"
+                      value={orgInfo.name}
+                      onChange={e => setOrgInfo({ ...orgInfo, name: e.target.value })}
+                      placeholder="الاسم الرسمي للجهة"
+                      className={selectCls}
+                    />
+                  </div>
+                  <div>
+                    <label className={fieldLabel}>اسم ممثل الجهة (اختياري)</label>
+                    <input
+                      type="text"
+                      value={orgInfo.representative}
+                      onChange={e => setOrgInfo({ ...orgInfo, representative: e.target.value })}
+                      placeholder="اسم الشخص المسؤول"
+                      className={selectCls}
+                    />
+                  </div>
+                  <div>
+                    <label className={fieldLabel}>السجل أو الترخيص (اختياري)</label>
+                    <input
+                      type="text"
+                      value={orgInfo.license}
+                      onChange={e => setOrgInfo({ ...orgInfo, license: e.target.value })}
+                      placeholder="رقم السجل التجاري أو الترخيص"
+                      className={selectCls}
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* منشور واحد: الفئة + الخيار الفرعي */}
               {requestType === 'single' && (
@@ -587,7 +636,7 @@ export default function RequestWizard() {
               <RStepCampaignPosts
                 posts={campaignPosts}
                 onChange={setCampaignPosts}
-                clientType={clientType}
+                clientType={effectiveClientType}
                 categories={categories}
               />
             ) : (

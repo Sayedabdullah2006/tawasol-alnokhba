@@ -63,8 +63,11 @@ export const AQ_EXTRAS_LIST = [
 // ─── جدول الأسعار الأساسية (بدون VAT) ───
 // individual = فرد | business = شركة | government = حكومة | charity = خيرية
 
-type ClientType = 'individual' | 'business' | 'government' | 'charity'
+type ClientType = 'individual' | 'business' | 'government' | 'charity' | 'agency'
 type ClientPrices = Partial<Record<ClientType, number>>
+
+// وكالة الدعاية والإعلان: السعر = سعر الفرد × 3
+export const AGENCY_MULTIPLIER = 3
 
 // الفئات البسيطة (بدون فئات فرعية تؤثر على السعر)
 const SIMPLE_BASE: Record<string, ClientPrices> = {
@@ -253,8 +256,13 @@ export function calculateAutoQuote(input: AQInput): AQResult {
     singleChannelBase = INVENTION_BASE[so] ?? 699
   } else {
     const prices = SIMPLE_BASE[input.category]
-    singleChannelBase = prices?.[ct] ?? prices?.individual ?? 499
+    // الوكالة تستخدم سعر الفرد كأساس (ثم يُضرب ×3 بالأسفل)
+    const baseCt = ct === 'agency' ? 'individual' : ct
+    singleChannelBase = prices?.[baseCt] ?? prices?.individual ?? 499
   }
+
+  // وكالة الدعاية والإعلان: السعر = سعر الفرد × 3
+  if (ct === 'agency') singleChannelBase = singleChannelBase * AGENCY_MULTIPLIER
 
   // تطبيق معامل القنوات على السعر الأساسي فقط (الإضافات لا تتأثر)
   const channelCount = Math.max(1, Math.floor(input.channelCount || 1))

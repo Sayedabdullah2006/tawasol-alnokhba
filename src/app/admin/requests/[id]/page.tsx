@@ -35,6 +35,7 @@ const CLIENT_TYPE_LABELS: Record<string, string> = {
   business:   '🏢 شركة / مؤسسة تجارية',
   government: '🏛️ جهة حكومية',
   charity:    '❤️ مؤسسة خيرية',
+  agency:     '📣 وكالة دعاية وإعلان',
 }
 
 const CHANNEL_LABELS: Record<string, string> = {

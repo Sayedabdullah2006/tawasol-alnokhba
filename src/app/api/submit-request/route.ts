@@ -127,6 +127,9 @@ export async function POST(request: Request) {
           user_id:          userId,
           influencer_id:    body.influencer_id,
           client_type:      body.client_type,
+          org_name:           body.org_name ?? null,
+          org_representative: body.org_representative ?? null,
+          org_license:        body.org_license ?? null,
 
           // حقول إلزامية في الجدول — نملؤها ببيانات أول منشور
           category:         'campaign',
@@ -247,6 +250,9 @@ export async function POST(request: Request) {
         user_id:          userId,
         influencer_id:    body.influencer_id,
         client_type:      body.client_type,
+        org_name:           body.org_name ?? null,
+        org_representative: body.org_representative ?? null,
+        org_license:        body.org_license ?? null,
         category:         body.category,
         sub_option:       body.sub_option
           ? (typeof body.sub_option === 'object'

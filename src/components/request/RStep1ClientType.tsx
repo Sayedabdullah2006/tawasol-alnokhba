@@ -2,13 +2,14 @@
 
 import { cn } from '@/lib/utils'
 
-export type ClientType = 'individual' | 'business' | 'government' | 'charity'
+export type ClientType = 'individual' | 'business' | 'government' | 'charity' | 'agency'
 
 const CLIENT_TYPES: { id: ClientType; icon: string; title: string; desc: string }[] = [
   { id: 'individual', icon: '👤', title: 'فرد', desc: 'سواء كنت رائد أعمال أو شخص يبغى يوصل رسالة' },
   { id: 'business', icon: '🏢', title: 'شركة / مؤسسة', desc: 'كيان تجاري — عادةً نسوّي لكم عروض مخصصة' },
   { id: 'government', icon: '🏛️', title: 'جهة حكومية', desc: 'خدمة أو إعلان حكومي — معتمدين رسمياً' },
   { id: 'charity', icon: '❤️', title: 'جمعية خيرية', desc: 'مبادرة أو عمل خيري — قلوبنا معكم' },
+  { id: 'agency', icon: '📣', title: 'وكالة دعاية وإعلان', desc: 'وكالة تسويق أو دعاية — نخدمكم باحترافية' },
 ]
 
 const FOLLOW_UP: Record<ClientType, string> = {
@@ -16,6 +17,7 @@ const FOLLOW_UP: Record<ClientType, string> = {
   business: 'الشركات نخصص لها عروضاً مرنة — نكمل؟',
   government: 'بكل احترام — جهزنا لك مسار خاص.',
   charity: 'يسرّنا دعم العمل الخيري — نكمل؟',
+  agency: 'أهلاً بوكالات الدعاية — جهزنا لكم مساراً احترافياً.',
 }
 
 interface Props {
