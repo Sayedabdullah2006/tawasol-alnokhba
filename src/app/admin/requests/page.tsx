@@ -182,11 +182,7 @@ export default function AdminRequestsPage() {
   }
 
   // هل طُبِّق خصم على هذا الطلب؟ (نُظهر زر واتساب فقط في هذه الحالة)
-  const hasDiscount = (request: any) => {
-    const quoted = Number(request.admin_quoted_price ?? 0)
-    const final = Number(request.final_total ?? 0)
-    return quoted > 0 && final > 0 && final < quoted
-  }
+  const hasDiscount = (request: any) => Boolean(request.offer_discount_sent_at)
 
   // تطبيع رقم الجوال إلى صيغة دولية بدون رمز '+' (افتراضي السعودية 966)
   const normalizePhone = (raw: string) => {
@@ -205,11 +201,11 @@ export default function AdminRequestsPage() {
   const buildDiscountWhatsAppMessage = (request: any) => {
     const clientName = request.client_name || 'عزيزنا'
     const requestNumber = generateRequestNumber(request.request_number)
+    const oldPrice = Number(request.offer_original_price ?? request.admin_quoted_price ?? 0)
     const newPrice = Number(request.final_total ?? request.admin_quoted_price ?? 0)
-    const oldPrice = Number(request.admin_quoted_price ?? request.final_total ?? 0)
-    const discountPct = oldPrice > 0
-      ? Math.round((1 - newPrice / oldPrice) * 100)
-      : 0
+    const discountPct = request.offer_discount_pct != null
+      ? Number(request.offer_discount_pct)
+      : (oldPrice > 0 ? Math.round((1 - newPrice / oldPrice) * 100) : 0)
     const savings = Math.max(oldPrice - newPrice, 0)
 
     return [

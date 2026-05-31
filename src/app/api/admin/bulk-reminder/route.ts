@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
       let subject: string
       let html: string
       let newPrice: number | null = null
+      let discountOriginalPrice: number | null = null
 
       if (applyDiscount) {
         const originalPrice = Number(r.admin_quoted_price ?? r.final_total ?? 0)
@@ -94,6 +95,7 @@ export async function POST(request: NextRequest) {
           skipped++
           continue
         }
+        discountOriginalPrice = originalPrice
         const computedNew = Math.round(originalPrice * (1 - (discountPct! / 100)) * 100) / 100
         newPrice = computedNew
         subject = quotedDiscountTemplate.subject(requestNumber, discountPct!)
@@ -134,6 +136,9 @@ export async function POST(request: NextRequest) {
             .update({
               admin_quoted_price: newPrice,
               final_total: newPrice,
+              offer_discount_pct: discountPct,
+              offer_original_price: discountOriginalPrice,
+              offer_discount_sent_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             })
             .eq('id', r.id)
