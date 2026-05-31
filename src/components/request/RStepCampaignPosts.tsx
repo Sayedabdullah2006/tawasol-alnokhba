@@ -3,8 +3,6 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { DBCategory } from '@/lib/hooks'
-import { calculateAutoQuote, CAMPAIGN_DISCOUNT_PCT } from '@/lib/auto-quote'
-import { formatNumber } from '@/lib/utils'
 import ContentImagesUploader from './ContentImagesUploader'
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -78,19 +76,6 @@ export function isPostComplete(post: CampaignPostData): boolean {
   return post.title.trim() !== '' && post.content.trim() !== ''
 }
 
-function getPostBasePrice(
-  post: CampaignPostData,
-  clientType: string | null,
-): number {
-  if (!post.category) return 0
-  return calculateAutoQuote({
-    category: post.category,
-    subOption: post.subOption,
-    clientType,
-    selectedExtras: [],
-  }).basePrice
-}
-
 // ─── Single post card ─────────────────────────────────────────────
 
 interface PostCardProps {
@@ -105,7 +90,6 @@ interface PostCardProps {
 
 function PostCard({ index, post, onChange, clientType, categories, isOpen, onToggle }: PostCardProps) {
   const complete          = isPostComplete(post)
-  const basePrice         = getPostBasePrice(post, clientType)
   const availableCategories = clientType
     ? categories.filter(c => !c.client_types || c.client_types.includes(clientType))
     : categories
@@ -148,12 +132,6 @@ function PostCard({ index, post, onChange, clientType, categories, isOpen, onTog
             </div>
           )}
         </div>
-
-        {basePrice > 0 && (
-          <div className="text-sm font-bold text-green flex-shrink-0">
-            {formatNumber(basePrice)} ر.س
-          </div>
-        )}
 
         <span className="text-muted text-xs flex-shrink-0">
           {isOpen ? '▲' : '▼'}
@@ -338,9 +316,6 @@ export default function RStepCampaignPosts({ posts, onChange, clientType, catego
   }
 
   const completedCount  = posts.filter(isPostComplete).length
-  const postsSubtotal   = posts.reduce((s, p) => s + getPostBasePrice(p, clientType), 0)
-  const afterDiscount   = Math.round(postsSubtotal * (1 - CAMPAIGN_DISCOUNT_PCT / 100))
-  const discountAmount  = postsSubtotal - afterDiscount
 
   return (
     <div className="wizard-enter space-y-4 max-w-2xl mx-auto">
@@ -353,27 +328,6 @@ export default function RStepCampaignPosts({ posts, onChange, clientType, catego
           <span className="font-bold text-dark">{posts.length}</span> منشور
         </p>
       </div>
-
-      {/* ملخص السعر الحي */}
-      {postsSubtotal > 0 && (
-        <div className="bg-green/5 border border-green/20 rounded-2xl px-5 py-4 flex items-center justify-between wizard-enter">
-          <div>
-            <div className="text-muted line-through text-sm">
-              {formatNumber(postsSubtotal)} ر.س
-            </div>
-            <div className="font-black text-green text-xl">
-              {formatNumber(afterDiscount)} ر.س
-            </div>
-          </div>
-          <div className="text-left">
-            <div className="text-xs text-muted">وفّرت</div>
-            <div className="font-black text-green text-lg">
-              {formatNumber(discountAmount)} ر.س
-            </div>
-            <div className="text-xs text-muted">({CAMPAIGN_DISCOUNT_PCT}% خصم)</div>
-          </div>
-        </div>
-      )}
 
       {/* بطاقات المنشورات */}
       <div className="space-y-3">
