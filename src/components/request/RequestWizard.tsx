@@ -1,97 +1,116 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useCategories, type DBCategory } from '@/lib/hooks'
 import { useToast } from '@/components/ui/Toast'
-import WizardProgress from '@/components/pricing/WizardProgress'
-import WizardFooter from '@/components/pricing/WizardFooter'
-import StepInfluencer, { type Influencer } from '@/components/pricing/StepInfluencer'
-import RStepRequestType, { type RequestType } from './RStepRequestType'
-import RStep1ClientType, { type ClientType } from './RStep1ClientType'
-import Step1Category from '@/components/pricing/Step1Category'
-import StepSubOption from '@/components/pricing/StepSubOption'
+import { cn } from '@/lib/utils'
+import type { Influencer } from '@/components/pricing/StepInfluencer'
+import type { RequestType } from './RStepRequestType'
+import type { ClientType } from './RStep1ClientType'
+import type { CampaignSetup } from './RStepCampaignSetup'
 import RStep3Details from './RStep3Details'
 import RStepChannels from './RStepChannels'
-import RStepExtras from './RStepExtras'
 import RStep5Contact, { type ContactData } from './RStep5Contact'
 import RStep6Terms from './RStep6Terms'
-import StepCompetition from '@/components/pricing/StepCompetition'
-import RStepCampaignSetup, { type CampaignSetup } from './RStepCampaignSetup'
 import RStepCampaignPosts, { type CampaignPostData, makeEmptyPost, isPostComplete } from './RStepCampaignPosts'
 import { validateEmail } from '@/lib/email-validation'
-import MicroAffirmation from './MicroAffirmation'
 import SuccessScreen from './SuccessScreen'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
-import { calculateAutoQuote, calculateCampaignQuote, CAMPAIGN_DISCOUNT_PCT } from '@/lib/auto-quote'
-import { formatNumber } from '@/lib/utils'
-import { CATEGORIES } from '@/lib/constants'
+import { COMPETITION_SUBCATEGORIES, getCompetitionPositions } from '@/lib/constants'
+import { AQ_EXTRAS_LIST, AQ_EXTRAS_NAMES, AQ_EXTRAS_ICONS } from '@/lib/auto-quote'
 
-type StepId =
-  | 'influencer'
-  | 'requestType'
-  | 'clientType'
-  | 'category'
-  | 'subOption'
-  | 'details'
-  | 'channels'
-  | 'extras'
-  | 'contact'
-  | 'terms'
-  | 'confirm'
-  | 'campaignSetup'
-  | 'campaignPosts'
+// ─── خيارات القوائم المنسدلة ───────────────────────────────────────
+const REQUEST_TYPE_OPTIONS: { id: RequestType; label: string }[] = [
+  { id: 'single',   label: '📄 منشور واحد' },
+  { id: 'campaign', label: '🚀 حملة متعددة المنشورات' },
+]
 
-const CHANNEL_LABELS: Record<string, string> = {
-  x: 'X',
-  ig: 'Instagram',
-  li: 'LinkedIn',
-  tk: 'TikTok',
-}
+const CLIENT_TYPE_OPTIONS: { id: ClientType; label: string }[] = [
+  { id: 'individual', label: '👤 فرد' },
+  { id: 'business',   label: '🏢 شركة / مؤسسة' },
+  { id: 'government', label: '🏛️ جهة حكومية' },
+  { id: 'charity',    label: '❤️ جمعية خيرية' },
+]
 
-const DURATION_LABELS: Record<string, string> = {
-  week_1:  'أسبوع',
-  week_2:  'أسبوعان',
-  month_1: 'شهر',
-  month_2: 'شهران',
-  month_3: '3 أشهر',
-  month_6: '6 أشهر',
-  open:    'مفتوح',
-}
-
-// رسائل تشجيع قصيرة تظهر بمجرد اكتمال الخطوة بشكل صحيح
-const STEP_AFFIRMATIONS: Partial<Record<StepId, string>> = {
-  influencer:    'اختيار موفّق 👌',
-  requestType:   'تمام، نكمل 🚀',
-  clientType:    'وضحت لنا الصورة ✨',
-  category:      'فئة واضحة 🎯',
-  subOption:     'اختيار دقيق 👍',
-  details:       'محتوى جاهز للنشر ✍️',
-  channels:      'قنوات موفّقة 📡',
-  campaignSetup: 'حملة قوية 🚀',
-  campaignPosts: 'منشورات مكتملة ✅',
-}
+const DURATION_OPTIONS = [
+  { id: 'week_1',  label: 'أسبوع' },
+  { id: 'week_2',  label: 'أسبوعان' },
+  { id: 'month_1', label: 'شهر' },
+  { id: 'month_2', label: 'شهران' },
+  { id: 'month_3', label: '3 أشهر' },
+  { id: 'month_6', label: '6 أشهر' },
+  { id: 'open',    label: 'مفتوح' },
+]
 
 // مفتاح حفظ المسودة محلياً + مدة صلاحيتها (7 أيام)
 const DRAFT_KEY = 'tn_request_draft_v1'
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
+// أنماط مشتركة للحقول
+const selectCls = 'w-full rounded-xl border-2 border-border bg-white px-3 py-3 text-sm text-dark focus:outline-none focus:border-green transition-colors'
+const fieldLabel = 'block text-sm font-bold text-dark mb-1.5'
+
+// ─── مكوّن قسم قابل للطي ─────────────────────────────────────────
+function FormSection({
+  index, title, subtitle, complete, open, onToggle, children,
+}: {
+  index: number
+  title: string
+  subtitle?: string
+  complete: boolean
+  open: boolean
+  onToggle: () => void
+  children: ReactNode
+}) {
+  return (
+    <div className={cn(
+      'bg-card rounded-2xl border-2 overflow-hidden transition-all',
+      complete ? 'border-green/40' : 'border-border',
+    )}>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center gap-3 px-5 py-4 text-right hover:bg-muted/5 transition-colors"
+      >
+        <div className={cn(
+          'w-8 h-8 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0',
+          complete ? 'bg-green text-white' : 'bg-muted/15 text-muted',
+        )}>
+          {complete ? '✓' : index}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-bold text-dark text-sm">{title}</div>
+          {subtitle && <div className="text-xs text-muted mt-0.5">{subtitle}</div>}
+        </div>
+        <span className="text-muted text-xs flex-shrink-0">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="px-5 pb-5 pt-2 border-t border-border wizard-enter">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function RequestWizard() {
   const { showToast } = useToast()
   const { categories, loading: catsLoading } = useCategories()
-  const [stepIndex, setStepIndex] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [requestNumber, setRequestNumber] = useState('')
-  const [quotedTotal, setQuotedTotal] = useState(0)
   const [influencers, setInfluencers] = useState<Influencer[]>([])
   const [loading, setLoading] = useState(true)
   const [hydrated, setHydrated] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const draftRestored = useRef(false)
 
-  // ── Step data ──────────────────────────────────────────────────
+  // القسم المفتوح حالياً (أكورديون أحادي الفتح)
+  const [openSection, setOpenSection] = useState(0)
+
+  // ── بيانات الطلب ───────────────────────────────────────────────
   const [selectedInfluencer, setSelectedInfluencer] = useState<string | null>(null)
   const [requestType, setRequestType]   = useState<RequestType | null>(null)
   const [clientType, setClientType]     = useState<ClientType | null>(null)
@@ -108,7 +127,7 @@ export default function RequestWizard() {
   const [termsAccepted, setTermsAccepted]   = useState(false)
   const [privacyAccepted, setPrivacyAccepted] = useState(false)
 
-  // ── Discount code state ────────────────────────────────────────
+  // ── كود الخصم ──────────────────────────────────────────────────
   const [discountInput, setDiscountInput]   = useState('')
   const [validatingCode, setValidatingCode] = useState(false)
   const [discountError, setDiscountError]   = useState('')
@@ -136,11 +155,11 @@ export default function RequestWizard() {
     setValidatingCode(false)
   }
 
-  // ── Campaign-specific state ────────────────────────────────────
+  // ── بيانات الحملة ──────────────────────────────────────────────
   const [campaignSetup, setCampaignSetup] = useState<CampaignSetup>({ postCount: 2, duration: '' })
   const [campaignPosts, setCampaignPosts] = useState<CampaignPostData[]>([makeEmptyPost(), makeEmptyPost()])
 
-  // Sync post array length when postCount changes
+  // مزامنة طول مصفوفة المنشورات مع عدد المنشورات
   useEffect(() => {
     setCampaignPosts(prev => {
       const n = campaignSetup.postCount
@@ -151,73 +170,14 @@ export default function RequestWizard() {
   }, [campaignSetup.postCount])
 
   const selectedCat: DBCategory | null = categories.find(c => c.id === category) ?? null
-  const needsSubOption = selectedCat?.has_sub_option && selectedCat?.sub_options?.length
+  const needsSubOption = !!(selectedCat?.has_sub_option && selectedCat?.sub_options?.length)
   const isCompetitionCategory = category === 'competitions'
+  const availableCategories = clientType
+    ? categories.filter(c => !c.client_types || c.client_types.includes(clientType))
+    : categories
+  const selectedInf = influencers.find(i => i.id === selectedInfluencer) ?? null
 
-  // ── Price calculation ──────────────────────────────────────────
-  const singlePriceCalc = useMemo(() => {
-    if (!category || requestType !== 'single') return null
-    return calculateAutoQuote({
-      category,
-      subOption: isCompetitionCategory ? competitionSelection : subOption,
-      clientType,
-      selectedExtras,
-      channelCount: channels.length,
-    })
-  }, [category, subOption, competitionSelection, clientType, selectedExtras, isCompetitionCategory, requestType, channels])
-
-  const campaignPriceCalc = useMemo(() => {
-    if (requestType !== 'campaign') return null
-    return calculateCampaignQuote(
-      campaignPosts.map(p => ({ category: p.category, subOption: p.subOption, clientType })),
-      selectedExtras,
-      CAMPAIGN_DISCOUNT_PCT,
-      channels.length,
-    )
-  }, [campaignPosts, clientType, selectedExtras, requestType, channels])
-
-  const priceCalc = requestType === 'campaign' ? null : singlePriceCalc
-
-  // تقدير حيّ يظهر مبكراً بمجرد توفّر معطيات كافية لاحتساب السعر
-  const liveEstimate = requestType === 'campaign'
-    ? (campaignPriceCalc?.total ?? 0)
-    : (priceCalc?.total ?? 0)
-
-  // ── اكتمال بيانات التواصل ───────────────────────────────────────
-  // المستخدم مسجّل دخول دائماً (محمي عبر proxy.ts). إن كان بروفايله مكتملاً
-  // نتخطّى خطوة التواصل تلقائياً؛ وإلا نعرضها لاستكمال الناقص.
-  const contactComplete =
-    isLoggedIn &&
-    contact.fullName.trim() !== '' &&
-    contact.phone.trim() !== '' &&
-    validateEmail(contact.email).valid
-
-  // ── Steps ──────────────────────────────────────────────────────
-  const steps: StepId[] = useMemo(() => {
-    if (requestType === 'campaign') {
-      return [
-        'influencer', 'requestType', 'clientType', 'campaignSetup', 'campaignPosts',
-        'channels', 'extras', ...(contactComplete ? [] : ['contact'] as StepId[]), 'terms', 'confirm',
-      ]
-    }
-    const base: StepId[] = ['influencer', 'requestType', 'clientType', 'category']
-    if (isCompetitionCategory || needsSubOption) base.push('subOption')
-    base.push('details', 'channels', 'extras')
-    if (!contactComplete) base.push('contact')
-    base.push('terms', 'confirm')
-    return base
-  }, [requestType, isCompetitionCategory, needsSubOption, contactComplete])
-
-  const totalSteps   = steps.length
-
-  // ضمان بقاء المؤشر ضمن النطاق إذا تغيّر مسار الخطوات (مثلاً بعد استرجاع مسودة)
-  useEffect(() => {
-    if (stepIndex > totalSteps - 1) setStepIndex(totalSteps - 1)
-  }, [totalSteps, stepIndex])
-
-  const currentStep  = steps[stepIndex]
-
-  // ── Load data ──────────────────────────────────────────────────
+  // ── تحميل البيانات ──────────────────────────────────────────────
   useEffect(() => {
     const supabase = createClient()
     supabase.from('influencers').select('*').eq('is_active', true).then(({ data }) => {
@@ -263,7 +223,6 @@ export default function RequestWizard() {
           if (d.contact)              setContact(d.contact)
           if (d.campaignSetup)        setCampaignSetup(d.campaignSetup)
           if (Array.isArray(d.campaignPosts) && d.campaignPosts.length) setCampaignPosts(d.campaignPosts)
-          if (typeof d.stepIndex === 'number') setStepIndex(d.stepIndex)
           showToast('تم استرجاع طلبك غير المكتمل ✨', 'info')
         }
       }
@@ -279,50 +238,89 @@ export default function RequestWizard() {
         savedAt: Date.now(),
         selectedInfluencer, requestType, clientType, category, subOption,
         competitionSelection, details, channels, selectedExtras, contact,
-        campaignSetup, campaignPosts, stepIndex,
+        campaignSetup, campaignPosts,
       }))
     } catch { /* تجاوز سعة التخزين — نتجاهل بهدوء */ }
   }, [
     hydrated, selectedInfluencer, requestType, clientType, category, subOption,
     competitionSelection, details, channels, selectedExtras, contact,
-    campaignSetup, campaignPosts, stepIndex,
+    campaignSetup, campaignPosts,
   ])
 
-  const selectedInf = influencers.find(i => i.id === selectedInfluencer) ?? null
+  // ── اكتمال بيانات التواصل ───────────────────────────────────────
+  // إن كان المستخدم مسجّلاً وبروفايله مكتمل، نخفي حقول التواصل تلقائياً
+  const contactComplete =
+    isLoggedIn &&
+    contact.fullName.trim() !== '' &&
+    contact.phone.trim() !== '' &&
+    validateEmail(contact.email).valid
 
-  // ── Validation ─────────────────────────────────────────────────
-  const canProceed = (): boolean => {
-    switch (currentStep) {
-      case 'influencer':    return selectedInfluencer !== null
-      case 'requestType':   return requestType !== null
-      case 'clientType':    return clientType !== null
-      case 'category':      return category !== null
-      case 'subOption':
-        if (isCompetitionCategory) {
-          return competitionSelection !== null &&
-                 competitionSelection.subcategory !== '' &&
-                 competitionSelection.position !== ''
-        }
-        return subOption !== null
-      case 'details':       return details.title.trim() !== '' && details.content.trim() !== ''
-      case 'channels':      return channels.length > 0
-      case 'extras':        return true
-      case 'contact':
-        return contact.fullName.trim() !== ''
-          && contact.phone.trim() !== ''
-          && validateEmail(contact.email).valid
-      case 'terms':         return termsAccepted && privacyAccepted
-      case 'confirm':       return true
-      case 'campaignSetup': return campaignSetup.postCount >= 2
-      case 'campaignPosts': return campaignPosts.every(isPostComplete)
-      default:              return true
+  // ── تبديل الخدمات الإضافية (مع تعارض pin6/pin12) ────────────────
+  const toggleExtra = (id: string) => {
+    if (id === 'pin6' && !selectedExtras.includes('pin6')) {
+      setSelectedExtras([...selectedExtras.filter(e => e !== 'pin12'), 'pin6']); return
     }
+    if (id === 'pin12' && !selectedExtras.includes('pin12')) {
+      setSelectedExtras([...selectedExtras.filter(e => e !== 'pin6'), 'pin12']); return
+    }
+    setSelectedExtras(
+      selectedExtras.includes(id) ? selectedExtras.filter(e => e !== id) : [...selectedExtras, id]
+    )
   }
 
-  const goNext = () => { if (stepIndex < totalSteps - 1) setStepIndex(stepIndex + 1) }
-  const goBack = () => { if (stepIndex > 0) setStepIndex(stepIndex - 1) }
+  // ── اكتمال الأقسام ──────────────────────────────────────────────
+  const subOptionSatisfied =
+    isCompetitionCategory
+      ? !!competitionSelection?.subcategory && !!competitionSelection?.position
+      : needsSubOption ? !!subOption : true
 
-  // ── Submit ─────────────────────────────────────────────────────
+  const aboutComplete =
+    !!selectedInfluencer && !!requestType && !!clientType && (
+      requestType === 'campaign'
+        ? campaignSetup.postCount >= 2
+        : (!!category && subOptionSatisfied)
+    )
+
+  const contentComplete =
+    requestType === 'campaign'
+      ? campaignPosts.length > 0 && campaignPosts.every(isPostComplete)
+      : requestType === 'single'
+        ? details.title.trim() !== '' && details.content.trim() !== ''
+        : false
+
+  const publishComplete = channels.length > 0
+
+  const contactReady = contactComplete || (
+    contact.fullName.trim() !== '' &&
+    contact.phone.trim() !== '' &&
+    validateEmail(contact.email).valid
+  )
+  const finishComplete = contactReady && termsAccepted && privacyAccepted
+
+  const sectionComplete = [aboutComplete, contentComplete, publishComplete, finishComplete]
+  const canSubmit = sectionComplete.every(Boolean)
+
+  // أول متطلب ناقص — يُعرض كتلميح فوق زر الإرسال
+  const missingHint = (): string | null => {
+    if (!selectedInfluencer) return 'اختر الحساب الذي تريد النشر معه'
+    if (!requestType) return 'اختر نوع الطلب'
+    if (!clientType) return 'اختر صفة مقدّم الطلب'
+    if (requestType === 'single') {
+      if (!category) return 'اختر فئة المحتوى'
+      if (!subOptionSatisfied) return 'أكمل الخيار الفرعي للفئة'
+      if (details.title.trim() === '' || details.content.trim() === '') return 'أكمل عنوان ونص المنشور'
+    }
+    if (requestType === 'campaign') {
+      if (campaignSetup.postCount < 2) return 'حدّد عدد المنشورات'
+      if (!campaignPosts.every(isPostComplete)) return 'أكمل تفاصيل جميع منشورات الحملة'
+    }
+    if (channels.length === 0) return 'اختر قناة نشر واحدة على الأقل'
+    if (!contactReady) return 'أكمل بيانات التواصل'
+    if (!termsAccepted || !privacyAccepted) return 'فعّل الموافقة على الشروط والخصوصية'
+    return null
+  }
+
+  // ── الإرسال ─────────────────────────────────────────────────────
   const handleSubmit = async () => {
     setSubmitting(true)
     try {
@@ -391,10 +389,9 @@ export default function RequestWizard() {
       if (!res.ok) throw new Error(data.error ?? 'حدث خطأ')
 
       setRequestNumber(data.requestNumber)
-      setQuotedTotal(data.quotedTotal ?? 0)
       try { localStorage.removeItem(DRAFT_KEY) } catch { /* تجاهل */ }
       setSuccess(true)
-      showToast('تم إرسال طلبك وعرض السعر بنجاح!')
+      showToast('تم إرسال طلبك بنجاح!')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'حدث خطأ أثناء إرسال الطلب'
       showToast(msg, 'error')
@@ -404,271 +401,325 @@ export default function RequestWizard() {
   }
 
   if (loading || catsLoading) return <LoadingSpinner size="lg" />
-  if (success) return <SuccessScreen requestNumber={requestNumber} quotedTotal={quotedTotal} />
+  if (success) return <SuccessScreen requestNumber={requestNumber} />
 
-  // ── Render ─────────────────────────────────────────────────────
+  const competitionPositions = competitionSelection?.subcategory
+    ? getCompetitionPositions(competitionSelection.subcategory)
+    : []
+
+  // ── العرض ───────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col bg-cream">
-      <div className="max-w-3xl mx-auto w-full px-4 pt-6 flex-1 flex flex-col">
-        <WizardProgress current={stepIndex + 1} total={totalSteps} />
+    <div className="bg-cream min-h-screen pb-28">
+      <div className="max-w-2xl mx-auto w-full px-4 pt-6">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl md:text-3xl font-black text-dark mb-1">📋 طلب نشر جديد</h1>
+          <p className="text-sm text-muted">عبّئ النموذج دفعة واحدة — وبمجرد الإرسال يصلك العرض</p>
+        </div>
 
-        {liveEstimate > 0 && currentStep !== 'confirm' && (
-          <div className="flex justify-center -mt-3 mb-1">
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-green bg-green/5 border border-green/20 rounded-full px-3 py-1 wizard-enter">
-              💰 تقدير حالي: {formatNumber(liveEstimate)} ر.س
-            </span>
-          </div>
-        )}
+        <div className="space-y-3">
 
-        <div className="flex-1 py-4">
+          {/* ① عن الطلب ─────────────────────────────────────────── */}
+          <FormSection
+            index={1}
+            title="عن الطلب"
+            subtitle="الحساب ونوع الطلب وصفتك والفئة"
+            complete={aboutComplete}
+            open={openSection === 0}
+            onToggle={() => setOpenSection(openSection === 0 ? -1 : 0)}
+          >
+            <div className="space-y-4">
+              <div>
+                <label className={fieldLabel}>الحساب الذي تنشر معه *</label>
+                <select
+                  value={selectedInfluencer ?? ''}
+                  onChange={e => setSelectedInfluencer(e.target.value || null)}
+                  className={selectCls}
+                >
+                  <option value="">— اختر الحساب —</option>
+                  {influencers.map(inf => (
+                    <option key={inf.id} value={inf.id}>{inf.name_ar}</option>
+                  ))}
+                </select>
+              </div>
 
-          {currentStep === 'influencer' && (
-            <StepInfluencer influencers={influencers} selected={selectedInfluencer} onSelect={setSelectedInfluencer} />
-          )}
+              <div>
+                <label className={fieldLabel}>نوع الطلب *</label>
+                <select
+                  value={requestType ?? ''}
+                  onChange={e => {
+                    const v = (e.target.value || null) as RequestType | null
+                    setRequestType(v)
+                    if (v === 'campaign') {
+                      setCategory(null); setSubOption(null); setCompetitionSelection(null)
+                    }
+                  }}
+                  className={selectCls}
+                >
+                  <option value="">— اختر النوع —</option>
+                  {REQUEST_TYPE_OPTIONS.map(o => (
+                    <option key={o.id} value={o.id}>{o.label}</option>
+                  ))}
+                </select>
+                {requestType === 'campaign' && (
+                  <p className="text-xs text-green-700 mt-1.5">🎉 الحملة المتعددة تمنحك خصماً على الإجمالي</p>
+                )}
+              </div>
 
-          {currentStep === 'requestType' && (
-            <RStepRequestType
-              selected={requestType}
-              onSelect={(v) => {
-                setRequestType(v)
-                // reset single-post fields when switching type
-                if (v === 'campaign') {
-                  setCategory(null); setSubOption(null); setCompetitionSelection(null)
-                }
-              }}
-            />
-          )}
+              <div>
+                <label className={fieldLabel}>صفة مقدّم الطلب *</label>
+                <select
+                  value={clientType ?? ''}
+                  onChange={e => {
+                    const v = (e.target.value || null) as ClientType | null
+                    if (clientType !== v) {
+                      setCategory(null)
+                      setSubOption(null)
+                      setCompetitionSelection(null)
+                      setCampaignPosts(prev => prev.map(p => ({ ...p, category: '', subOption: null })))
+                    }
+                    setClientType(v)
+                  }}
+                  className={selectCls}
+                >
+                  <option value="">— اختر الصفة —</option>
+                  {CLIENT_TYPE_OPTIONS.map(o => (
+                    <option key={o.id} value={o.id}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
 
-          {currentStep === 'clientType' && (
-            <RStep1ClientType
-              selected={clientType}
-              onSelect={(v) => {
-                if (clientType !== v) {
-                  setCategory(null)
-                  setSubOption(null)
-                  // إعادة تعيين تصنيفات منشورات الحملة عند تغيير نوع العميل
-                  setCampaignPosts(prev => prev.map(p => ({ ...p, category: '', subOption: null })))
-                }
-                setClientType(v)
-              }}
-            />
-          )}
+              {/* منشور واحد: الفئة + الخيار الفرعي */}
+              {requestType === 'single' && (
+                <>
+                  <div>
+                    <label className={fieldLabel}>فئة المحتوى *</label>
+                    <select
+                      value={category ?? ''}
+                      onChange={e => {
+                        setCategory(e.target.value || null)
+                        setSubOption(null)
+                        setCompetitionSelection(null)
+                      }}
+                      disabled={!clientType}
+                      className={cn(selectCls, !clientType && 'opacity-50 cursor-not-allowed')}
+                    >
+                      <option value="">{clientType ? '— اختر الفئة —' : 'اختر صفتك أولاً'}</option>
+                      {availableCategories.map(c => (
+                        <option key={c.id} value={c.id}>{c.icon} {c.name_ar}</option>
+                      ))}
+                    </select>
+                  </div>
 
-          {currentStep === 'category' && (
-            <Step1Category
-              selected={category}
-              onSelect={(id) => { setCategory(id); setSubOption(null); setCompetitionSelection(null) }}
-              categories={categories}
-              clientType={clientType}
-            />
-          )}
+                  {/* المسابقات: نوع المسابقة + المركز */}
+                  {isCompetitionCategory && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-muted/5 rounded-xl p-3">
+                      <div>
+                        <label className={fieldLabel}>نوع المسابقة *</label>
+                        <select
+                          value={competitionSelection?.subcategory ?? ''}
+                          onChange={e => setCompetitionSelection({ subcategory: e.target.value, position: '' })}
+                          className={selectCls}
+                        >
+                          <option value="">— اختر النوع —</option>
+                          {COMPETITION_SUBCATEGORIES.map(s => (
+                            <option key={s.id} value={s.id}>{s.nameAr}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {competitionSelection?.subcategory && (
+                        <div>
+                          <label className={fieldLabel}>المركز / الإنجاز *</label>
+                          <select
+                            value={competitionSelection?.position ?? ''}
+                            onChange={e => setCompetitionSelection({
+                              subcategory: competitionSelection!.subcategory,
+                              position: e.target.value,
+                            })}
+                            className={selectCls}
+                          >
+                            <option value="">— اختر المركز —</option>
+                            {competitionPositions.map(p => (
+                              <option key={p.id} value={p.id}>{p.nameAr}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-          {currentStep === 'subOption' && (
-            <>
-              {isCompetitionCategory ? (
-                <StepCompetition selected={competitionSelection} onSelect={setCompetitionSelection} />
-              ) : selectedCat ? (
-                <StepSubOption category={selectedCat} selected={subOption} onSelect={setSubOption} />
-              ) : null}
-            </>
-          )}
-
-          {currentStep === 'details' && (
-            <RStep3Details data={details} onChange={setDetails} />
-          )}
-
-          {currentStep === 'campaignSetup' && (
-            <RStepCampaignSetup data={campaignSetup} onChange={setCampaignSetup} />
-          )}
-
-          {currentStep === 'campaignPosts' && (
-            <RStepCampaignPosts
-              posts={campaignPosts}
-              onChange={setCampaignPosts}
-              clientType={clientType}
-              categories={categories}
-            />
-          )}
-
-          {currentStep === 'channels' && (
-            <RStepChannels
-              influencer={selectedInf}
-              selected={channels}
-              onToggle={(id) => setChannels(prev =>
-                prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+                  {/* فئات أخرى لها خيار فرعي (مثل الاختراعات) */}
+                  {!isCompetitionCategory && needsSubOption && selectedCat?.sub_options && (
+                    <div>
+                      <label className={fieldLabel}>{selectedCat.sub_option_title ?? 'الخيار الفرعي'} *</label>
+                      <select
+                        value={subOption ?? ''}
+                        onChange={e => setSubOption(e.target.value || null)}
+                        className={selectCls}
+                      >
+                        <option value="">— اختر —</option>
+                        {selectedCat.sub_options.map(opt => (
+                          <option key={opt.id} value={opt.id}>{opt.icon} {opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
               )}
-            />
-          )}
 
-          {currentStep === 'extras' && (
-            <RStepExtras
-              selected={selectedExtras}
-              onChange={setSelectedExtras}
-              basePrice={
-                requestType === 'campaign'
-                  ? (campaignPriceCalc?.afterDiscount ?? 0)
-                  : (priceCalc?.basePrice ?? 0)
-              }
-              baseLabel={
-                requestType === 'campaign'
-                  ? `إجمالي الحملة (بعد خصم ${CAMPAIGN_DISCOUNT_PCT}%)`
-                  : undefined
-              }
-            />
-          )}
-
-          {currentStep === 'contact' && (
-            <RStep5Contact data={contact} onChange={setContact} />
-          )}
-
-          {currentStep === 'terms' && (
-            <RStep6Terms
-              termsAccepted={termsAccepted}
-              privacyAccepted={privacyAccepted}
-              onTermsChange={setTermsAccepted}
-              onPrivacyChange={setPrivacyAccepted}
-            />
-          )}
-
-          {/* ── Confirm ─────────────────────────────────────────── */}
-          {currentStep === 'confirm' && (() => {
-            const rawTotal = requestType === 'campaign'
-              ? (campaignPriceCalc?.total ?? 0)
-              : (priceCalc?.total ?? 0)
-            const discountAmount = appliedDiscount ? Math.round(rawTotal * appliedDiscount.pct / 100) : 0
-            const discountedTotal = rawTotal - discountAmount
-            return (
-            <div className="wizard-enter max-w-lg mx-auto space-y-5">
-              <h2 className="text-xl md:text-2xl font-black text-dark text-center mb-1">
-                كل شي تمام؟
-              </h2>
-              <p className="text-sm text-muted text-center">
-                راجع ملخص طلبك — وبمجرد الإرسال يصلك عرض السعر فوراً
-              </p>
-
-              {/* ملخص الطلب */}
-              <div className="bg-card rounded-2xl border border-border overflow-hidden">
-                <div className="p-5 space-y-3 text-sm">
-                  {selectedInf && (
-                    <div className="flex justify-between">
-                      <span className="text-muted">المؤثر</span>
-                      <span className="font-medium">{selectedInf.name_ar}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-muted">نوع الطلب</span>
-                    <span className="font-medium">
-                      {requestType === 'campaign' ? `🚀 حملة (${campaignSetup.postCount} منشورات)` : '📄 منشور واحد'}
-                    </span>
-                  </div>
-                  {requestType === 'single' && category && (
-                    <div className="flex justify-between">
-                      <span className="text-muted">الفئة</span>
-                      <span className="font-medium">
-                        {CATEGORIES.find(c => c.id === category)?.nameAr ?? category}
-                      </span>
-                    </div>
-                  )}
-                  {requestType === 'campaign' && campaignSetup.duration && (
-                    <div className="flex justify-between">
-                      <span className="text-muted">مدة الحملة</span>
-                      <span className="font-medium">{DURATION_LABELS[campaignSetup.duration] ?? campaignSetup.duration}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-muted">القنوات</span>
-                    <span className="font-medium">{channels.map(c => CHANNEL_LABELS[c] ?? c).join('، ')}</span>
-                  </div>
-                  {contact.email.trim() && (
-                    <div className="flex justify-between">
-                      <span className="text-muted">يصلك العرض على</span>
-                      <span className="font-medium" dir="ltr">{contact.email}</span>
-                    </div>
-                  )}
-                  {requestType === 'single' && (
-                    <div className="border-t border-border pt-3">
-                      <div className="flex justify-between">
-                        <span className="text-muted">عنوان الخبر</span>
-                        <span className="font-medium text-right max-w-[200px] truncate">{details.title}</span>
-                      </div>
-                    </div>
-                  )}
-                  {requestType === 'campaign' && (
-                    <div className="border-t border-border pt-3 space-y-1">
-                      {campaignPosts.map((p, i) => (
-                        <div key={i} className="flex justify-between text-xs">
-                          <span className="text-muted">منشور {i + 1}</span>
-                          <span className="font-medium truncate max-w-[180px]">{p.title || '—'}</span>
-                        </div>
+              {/* حملة: عدد المنشورات + المدة */}
+              {requestType === 'campaign' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className={fieldLabel}>عدد المنشورات *</label>
+                    <select
+                      value={campaignSetup.postCount}
+                      onChange={e => setCampaignSetup({ ...campaignSetup, postCount: Number(e.target.value) })}
+                      className={selectCls}
+                    >
+                      {Array.from({ length: 9 }, (_, i) => i + 2).map(n => (
+                        <option key={n} value={n}>{n} منشورات</option>
                       ))}
-                    </div>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={fieldLabel}>مدة الحملة (اختياري)</label>
+                    <select
+                      value={campaignSetup.duration}
+                      onChange={e => setCampaignSetup({ ...campaignSetup, duration: e.target.value })}
+                      className={selectCls}
+                    >
+                      <option value="">— غير محدّدة —</option>
+                      {DURATION_OPTIONS.map(d => (
+                        <option key={d.id} value={d.id}>{d.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end pt-2">
+                <Button size="sm" onClick={() => setOpenSection(1)} disabled={!aboutComplete}>
+                  التالي ←
+                </Button>
+              </div>
+            </div>
+          </FormSection>
+
+          {/* ② تفاصيل المحتوى ───────────────────────────────────── */}
+          <FormSection
+            index={2}
+            title="تفاصيل المحتوى"
+            subtitle={requestType === 'campaign' ? 'منشورات الحملة' : 'عنوان ونص المنشور'}
+            complete={contentComplete}
+            open={openSection === 1}
+            onToggle={() => setOpenSection(openSection === 1 ? -1 : 1)}
+          >
+            {!requestType ? (
+              <p className="text-sm text-muted text-center py-4">اختر نوع الطلب في القسم السابق أولاً</p>
+            ) : requestType === 'campaign' ? (
+              <RStepCampaignPosts
+                posts={campaignPosts}
+                onChange={setCampaignPosts}
+                clientType={clientType}
+                categories={categories}
+              />
+            ) : (
+              <RStep3Details data={details} onChange={setDetails} />
+            )}
+
+            <div className="flex justify-end pt-4">
+              <Button size="sm" onClick={() => setOpenSection(2)} disabled={!contentComplete}>
+                التالي ←
+              </Button>
+            </div>
+          </FormSection>
+
+          {/* ③ النشر والإضافات ──────────────────────────────────── */}
+          <FormSection
+            index={3}
+            title="النشر والإضافات"
+            subtitle="القنوات والخدمات الإضافية"
+            complete={publishComplete}
+            open={openSection === 2}
+            onToggle={() => setOpenSection(openSection === 2 ? -1 : 2)}
+          >
+            <div className="space-y-6">
+              {selectedInf ? (
+                <RStepChannels
+                  influencer={selectedInf}
+                  selected={channels}
+                  onToggle={(id) => setChannels(prev =>
+                    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
                   )}
+                />
+              ) : (
+                <p className="text-sm text-muted text-center py-4">اختر الحساب في القسم الأول أولاً</p>
+              )}
+
+              <div>
+                <h3 className="font-bold text-dark text-sm mb-1">خدمات إضافية (اختياري)</h3>
+                <p className="text-xs text-muted mb-3">اختر ما يناسبك — يمكنك تجاوز هذا القسم</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {AQ_EXTRAS_LIST.map(id => {
+                    const isSel = selectedExtras.includes(id)
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => toggleExtra(id)}
+                        className={cn(
+                          'relative text-right p-3 rounded-xl border-2 transition-all',
+                          isSel ? 'border-green bg-green/5' : 'border-border bg-card hover:border-green/40',
+                        )}
+                      >
+                        <div className={cn(
+                          'absolute top-2 left-2 w-5 h-5 rounded-md border-2 flex items-center justify-center',
+                          isSel ? 'bg-green border-green' : 'border-border',
+                        )}>
+                          {isSel && <span className="text-white text-xs leading-none">✓</span>}
+                        </div>
+                        <div className="text-xl mb-1">{AQ_EXTRAS_ICONS[id]}</div>
+                        <div className="text-sm font-semibold text-dark leading-tight pl-5">
+                          {AQ_EXTRAS_NAMES[id]}
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 
-              {/* تفاصيل السعر */}
-              <div className="bg-card rounded-2xl border border-border overflow-hidden">
-                <div className="bg-green/5 border-b border-border px-5 py-3">
-                  <p className="font-bold text-dark text-sm">💰 تفاصيل العرض</p>
-                </div>
-                <div className="p-5 space-y-2 text-sm">
-                  {requestType === 'campaign' && campaignPriceCalc ? (
-                    <>
-                      <div className="flex justify-between text-muted">
-                        <span>مجموع المنشورات ({campaignSetup.postCount})</span>
-                        <span>{formatNumber(campaignPriceCalc.singleChannelSubtotal)} ر.س</span>
-                      </div>
-                      {campaignPriceCalc.channelSurcharge > 0 && (
-                        <div className="flex justify-between text-muted">
-                          <span>قنوات إضافية ({campaignPriceCalc.channelCount} قنوات)</span>
-                          <span>+{formatNumber(campaignPriceCalc.channelSurcharge)} ر.س</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between text-green font-semibold">
-                        <span>خصم الحملة ({CAMPAIGN_DISCOUNT_PCT}%)</span>
-                        <span>− {formatNumber(campaignPriceCalc.discountAmount)} ر.س</span>
-                      </div>
-                      {campaignPriceCalc.extrasBreakdown.map(e => (
-                        <div key={e.id} className="flex justify-between text-muted">
-                          <span>{e.name}</span>
-                          <span>+{formatNumber(e.price)} ر.س</span>
-                        </div>
-                      ))}
-                    </>
-                  ) : priceCalc ? (
-                    <>
-                      <div className="flex justify-between text-muted">
-                        <span>السعر الأساسي</span>
-                        <span>{formatNumber(priceCalc.singleChannelBase)} ر.س</span>
-                      </div>
-                      {priceCalc.channelSurcharge > 0 && (
-                        <div className="flex justify-between text-muted">
-                          <span>قنوات إضافية ({priceCalc.channelCount} قنوات)</span>
-                          <span>+{formatNumber(priceCalc.channelSurcharge)} ر.س</span>
-                        </div>
-                      )}
-                      {priceCalc.extrasBreakdown.map(e => (
-                        <div key={e.id} className="flex justify-between text-muted">
-                          <span>{e.name}</span>
-                          <span>+{formatNumber(e.price)} ر.س</span>
-                        </div>
-                      ))}
-                    </>
-                  ) : null}
-
-                  {appliedDiscount && (
-                    <div className="flex justify-between text-green font-semibold">
-                      <span>كود خصم {appliedDiscount.occasion ? `(${appliedDiscount.occasion})` : ''} − {appliedDiscount.pct}%</span>
-                      <span>− {formatNumber(discountAmount)} ر.س</span>
-                    </div>
-                  )}
-
-                  <div className="flex justify-between font-black text-dark text-lg border-t border-border pt-3 mt-1">
-                    <span>الإجمالي</span>
-                    <span className="text-green">{formatNumber(discountedTotal)} ر.س</span>
-                  </div>
-                </div>
+              <div className="flex justify-end">
+                <Button size="sm" onClick={() => setOpenSection(3)} disabled={!publishComplete}>
+                  التالي ←
+                </Button>
               </div>
+            </div>
+          </FormSection>
+
+          {/* ④ بياناتك والموافقة ────────────────────────────────── */}
+          <FormSection
+            index={4}
+            title="بياناتك والموافقة"
+            subtitle="بيانات التواصل والشروط"
+            complete={finishComplete}
+            open={openSection === 3}
+            onToggle={() => setOpenSection(openSection === 3 ? -1 : 3)}
+          >
+            <div className="space-y-6">
+              {contactComplete ? (
+                <div className="bg-green/5 border border-green/20 rounded-xl px-4 py-3 text-center text-sm text-green-700">
+                  ✓ بياناتك جاهزة من حسابك — يمكنك المتابعة مباشرة
+                </div>
+              ) : (
+                <RStep5Contact data={contact} onChange={setContact} />
+              )}
+
+              <RStep6Terms
+                termsAccepted={termsAccepted}
+                privacyAccepted={privacyAccepted}
+                onTermsChange={setTermsAccepted}
+                onPrivacyChange={setPrivacyAccepted}
+              />
 
               {/* كود الخصم */}
               <div className="bg-card rounded-2xl border border-border p-4">
@@ -678,7 +729,7 @@ export default function RequestWizard() {
                       <span className="text-green text-lg">✅</span>
                       <div>
                         <p className="text-sm font-bold text-dark">
-                          كود <span className="font-mono">{appliedDiscount.code}</span> — خصم {appliedDiscount.pct}%
+                          تم تطبيق الكود <span className="font-mono">{appliedDiscount.code}</span>
                         </p>
                         {appliedDiscount.occasion && (
                           <p className="text-xs text-muted">{appliedDiscount.occasion}</p>
@@ -694,7 +745,7 @@ export default function RequestWizard() {
                   </div>
                 ) : (
                   <div>
-                    <p className="text-sm font-medium text-dark mb-2">🏷️ لديك كود خصم؟</p>
+                    <p className="text-sm font-medium text-dark mb-2">🏷️ لديك كود خصم؟ (اختياري)</p>
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -730,31 +781,26 @@ export default function RequestWizard() {
                 </p>
               </div>
             </div>
-            )
-          })()}
+          </FormSection>
 
-          {STEP_AFFIRMATIONS[currentStep] && (
-            <MicroAffirmation show={canProceed()} text={STEP_AFFIRMATIONS[currentStep]!} />
-          )}
         </div>
+      </div>
 
-        {/* Footer */}
-        {currentStep !== 'confirm' ? (
-          <WizardFooter
-            onNext={goNext}
-            onBack={stepIndex > 0 ? goBack : undefined}
-            showBack={stepIndex > 0}
-            nextDisabled={!canProceed()}
-          />
-        ) : (
-          <div className="sticky bottom-0 bg-card/95 backdrop-blur-md border-t border-border px-4 py-3 flex items-center gap-3">
-            <Button variant="ghost" onClick={goBack}>→ رجوع</Button>
-            <div className="flex-1" />
-            <Button onClick={handleSubmit} disabled={submitting} loading={submitting}>
-              {submitting ? 'جارٍ إرسال طلبك...' : 'إرسال الطلب والحصول على العرض'}
-            </Button>
-          </div>
-        )}
+      {/* شريط الإرسال الثابت */}
+      <div className="fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur-md border-t border-border px-4 py-3">
+        <div className="max-w-2xl mx-auto">
+          {!canSubmit && missingHint() && (
+            <p className="text-xs text-muted text-center mb-2">⬑ {missingHint()}</p>
+          )}
+          <Button
+            onClick={handleSubmit}
+            disabled={!canSubmit || submitting}
+            loading={submitting}
+            className="w-full"
+          >
+            {submitting ? 'جارٍ إرسال طلبك...' : 'إرسال الطلب والحصول على العرض'}
+          </Button>
+        </div>
       </div>
     </div>
   )
