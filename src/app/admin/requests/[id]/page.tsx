@@ -353,6 +353,21 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                     <span className="font-medium">{CLIENT_TYPE_LABELS[request.client_type] ?? request.client_type}</span>
                   </InfoRow>
                 )}
+                {request.org_name && (
+                  <InfoRow label="اسم الجهة">
+                    <span className="font-medium">{request.org_name}</span>
+                  </InfoRow>
+                )}
+                {request.org_representative && (
+                  <InfoRow label="ممثل الجهة">
+                    <span className="font-medium">{request.org_representative}</span>
+                  </InfoRow>
+                )}
+                {request.org_license && (
+                  <InfoRow label="السجل / الترخيص">
+                    <span className="font-medium">{request.org_license}</span>
+                  </InfoRow>
+                )}
                 {request.x_handle && (
                   <InfoRow label="حساب X / تويتر">
                     <a
