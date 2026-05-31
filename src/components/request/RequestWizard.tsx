@@ -613,7 +613,7 @@ export default function RequestWizard() {
               )}
 
               <div>
-                <h3 className="font-bold text-dark text-sm mb-1">خدمات إضافية (اختياري)</h3>
+                <h3 className="font-bold text-dark text-sm mb-1">خدمات إضافية (اختياري بمقابل اضافي لوصول اكبر)</h3>
                 <p className="text-xs text-muted mb-3">اختر ما يناسبك — يمكنك تجاوز هذا القسم</p>
                 <div className="grid grid-cols-2 gap-3">
                   {AQ_EXTRAS_LIST.map(id => {
