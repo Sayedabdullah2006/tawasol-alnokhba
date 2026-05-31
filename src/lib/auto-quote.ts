@@ -10,9 +10,9 @@ import { EXTRAS } from '@/lib/constants'
 export const AQ_VAT = 0
 
 // ─── معامل القنوات ───
-// الأسعار الأساسية محسوبة لقناة واحدة. كل قناة إضافية تضيف CHANNEL_RATE من الأساس.
-// المعامل = 1 + r × (عدد القنوات − 1)   مثال (r=30%): 1→×1.0 | 2→×1.3 | 3→×1.6 | 4→×1.9
-export const CHANNEL_RATE = 0.30
+// السعر ثابت بغضّ النظر عن عدد القنوات: المعامل = 1 دائماً مهما تعددت القنوات.
+// (CHANNEL_RATE = 0 ⇒ لا توجد زيادة على القنوات الإضافية)
+export const CHANNEL_RATE = 0
 
 export function channelMultiplier(channelCount: number | null | undefined): number {
   const n = Math.max(1, Math.floor(channelCount || 1))
