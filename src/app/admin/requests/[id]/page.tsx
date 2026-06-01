@@ -301,7 +301,8 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   if (!request) return null
 
   const cat = CATEGORIES.find(c => c.id === request.category)
-  const selectedExtras: string[] = Array.isArray(request.extras) ? request.extras : []
+  // الخدمات الإضافية التي اختارها العميل بعد وصول العرض
+  const selectedExtras: string[] = Array.isArray(request.user_selected_extras) ? request.user_selected_extras : []
   const subOptionLabel = renderSubOptionLabel(request.category, request.sub_option)
   const influencerName = request.influencer?.name_ar ?? null
 
@@ -595,33 +596,49 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
               </div>
             )}
 
-            {/* ③ الخدمات الإضافية */}
-            {selectedExtras.length > 0 && (
-              <div className="bg-card rounded-2xl border border-border p-5">
-                <h2 className="font-bold text-dark mb-4 flex items-center gap-2">
-                  ✨ الخدمات الإضافية المختارة
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {selectedExtras.map((id: string) => {
-                    const extra = EXTRAS_MAP[id]
-                    return (
-                      <div
-                        key={id}
-                        className="flex items-center justify-between bg-green/5 rounded-xl px-4 py-3 border border-green/20"
-                      >
-                        <span className="flex items-center gap-2 text-sm font-medium text-dark">
-                          <span>{extra?.icon ?? '•'}</span>
-                          <span>{extra?.nameAr ?? id}</span>
-                        </span>
-                        <span className="text-sm font-bold text-green">
-                          +{formatNumber(extra?.price ?? 0)} ر.س
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
+            {/* ③ الخدمات الإضافية التي اختارها العميل بعد العرض */}
+            <div className="bg-card rounded-2xl border border-border p-5">
+              <h2 className="font-bold text-dark mb-4 flex items-center gap-2">
+                ✨ الخدمات الإضافية
+              </h2>
+              {selectedExtras.length > 0 ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {selectedExtras.map((id: string) => {
+                      const extra = EXTRAS_MAP[id]
+                      return (
+                        <div
+                          key={id}
+                          className="flex items-center justify-between bg-green/5 rounded-xl px-4 py-3 border border-green/20"
+                        >
+                          <span className="flex items-center gap-2 text-sm font-medium text-dark">
+                            <span>{extra?.icon ?? '•'}</span>
+                            <span>{extra?.nameAr ?? id}</span>
+                          </span>
+                          <span className="text-sm font-bold text-green">
+                            +{formatNumber(extra?.price ?? 0)} ر.س
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div className="mt-4 space-y-2 text-sm border-t border-border pt-3">
+                    <div className="flex justify-between text-muted">
+                      <span>إجمالي الخدمات الإضافية ({selectedExtras.length})</span>
+                      <span>+{formatNumber(request.extras_selected_total ?? 0)} ر.س</span>
+                    </div>
+                    <div className="flex justify-between font-black text-dark text-base">
+                      <span>الإجمالي النهائي</span>
+                      <span className="text-gold">
+                        {formatNumber(request.final_total ?? request.admin_quoted_price ?? 0)} ر.س
+                      </span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted">لا توجد خدمات إضافية مختارة</p>
+              )}
+            </div>
 
             {/* ④ معلومات التسعير */}
             {request.admin_quoted_price != null && (

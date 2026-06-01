@@ -43,11 +43,10 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     const {
-      requestId, quotedPrice, offeredExtras, adminNotes, baseReach,
+      requestId, quotedPrice, adminNotes, baseReach,
     } = body as {
       requestId: string
       quotedPrice: number
-      offeredExtras: OfferedExtra[]
       adminNotes?: string
       baseReach: number
     }
@@ -56,6 +55,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'السعر غير صالح' }, { status: 400 })
     }
 
+    // نحتاج فئة الطلب لتحديد الخدمات الإضافية المقيّدة بفئة (categoryOnly)
+    const { data: reqRow } = await supabase
+      .from('publish_requests')
+      .select('category')
+      .eq('id', requestId)
+      .single()
+
+    // عرض جميع الخدمات الإضافية المتاحة تلقائياً (مع احترام قيد الفئة)
+    const offeredExtras = buildOfferedExtras(reqRow?.category)
+
     // مهلة الموافقة على العرض — 24 ساعة من إرسال التسعيرة
     const quoteExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
 
@@ -63,7 +72,7 @@ export async function POST(request: Request) {
       .from('publish_requests')
       .update({
         admin_quoted_price:            quotedPrice,
-        admin_offered_extras:          offeredExtras ?? [],
+        admin_offered_extras:          offeredExtras,
         user_selected_extras:          [],
         extras_selected_total:         0,
         final_total:                   quotedPrice,
