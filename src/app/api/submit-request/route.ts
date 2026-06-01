@@ -48,6 +48,23 @@ export async function POST(request: Request) {
       }
     }
 
+    // ── منع تقديم طلب جديد عند وجود عرض بانتظار موافقة العميل ──────
+    // لا يحق للعميل رفع طلب جديد ما دام لديه عرض قائم لم يتّخذ بشأنه إجراءً (موافقة/رفض/تفاوض)
+    if (userId) {
+      const { data: pending } = await serviceClient
+        .from('publish_requests')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('status', 'quoted')
+        .limit(1)
+      if (pending && pending.length > 0) {
+        return NextResponse.json({
+          error: 'لديك عرض قائم بانتظار موافقتك. يُرجى اتخاذ إجراء بشأنه — بالموافقة أو الرفض أو طلب التفاوض — قبل تقديم طلب جديد.',
+          code: 'PENDING_QUOTE',
+        }, { status: 409 })
+      }
+    }
+
     const selectedExtras: string[] = Array.isArray(body.selected_extras) ? body.selected_extras : []
     const channels: string[]       = Array.isArray(body.channels) ? body.channels : []
     const scope = channels.length > 1 ? 'all' : 'single'
