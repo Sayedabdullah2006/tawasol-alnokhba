@@ -1,12 +1,31 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { notifyQuoteReadyToClient, notifyFreeGiftToClient } from '@/lib/email'
+import { EXTRAS } from '@/lib/constants'
+import { EXTRAS_REACH_BOOST } from '@/lib/pricing-engine'
 
 interface OfferedExtra {
   id: string
   name: string
   price: number
-  reachBoost: number
+  reachBoost?: number
+}
+
+// يبني القائمة الكاملة للخدمات الإضافية المعروضة على العميل بعد وصول العرض.
+// يستثني الخدمات المقيّدة بفئة (categoryOnly) إذا لم تطابق فئة الطلب.
+function buildOfferedExtras(category: string | null | undefined): OfferedExtra[] {
+  return (EXTRAS as Array<{ id: string; nameAr: string; price: number; categoryOnly?: string }>)
+    .filter(extra => !extra.categoryOnly || extra.categoryOnly === category)
+    .map(extra => {
+      const offered: OfferedExtra = {
+        id:    extra.id,
+        name:  extra.nameAr,
+        price: extra.price,
+      }
+      const boost = EXTRAS_REACH_BOOST[extra.id]
+      if (boost != null) offered.reachBoost = boost
+      return offered
+    })
 }
 
 export async function POST(request: Request) {

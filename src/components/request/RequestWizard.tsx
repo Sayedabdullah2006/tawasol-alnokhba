@@ -17,7 +17,6 @@ import SuccessScreen from './SuccessScreen'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
 import { COMPETITION_SUBCATEGORIES, getCompetitionPositions } from '@/lib/constants'
-import { AQ_EXTRAS_LIST, AQ_EXTRAS_NAMES, AQ_EXTRAS_ICONS } from '@/lib/auto-quote'
 
 // ─── خيارات القوائم المنسدلة ───────────────────────────────────────
 const REQUEST_TYPE_OPTIONS: { id: RequestType; label: string }[] = [
@@ -120,7 +119,8 @@ export default function RequestWizard() {
     title: '', content: '', link: '', hashtags: '', preferredDate: '', images: [] as string[],
   })
   const [channels, setChannels]         = useState<string[]>([])
-  const [selectedExtras, setSelectedExtras] = useState<string[]>([])
+  // الخدمات الإضافية لم تَعُد تُختار أثناء الإرسال — تُعرض على العميل بعد وصول العرض
+  const selectedExtras: string[] = []
   const [contact, setContact]           = useState<ContactData>({ fullName: '', phone: '', email: '', city: '', xHandle: '' })
   const [orgInfo, setOrgInfo]           = useState({ name: '', representative: '', license: '' })
   const [termsAccepted, setTermsAccepted]   = useState(false)
@@ -191,7 +191,6 @@ export default function RequestWizard() {
           if (d.competitionSelection) setCompetitionSelection(d.competitionSelection)
           if (d.details)              setDetails(d.details)
           if (Array.isArray(d.channels))        setChannels(d.channels)
-          if (Array.isArray(d.selectedExtras))  setSelectedExtras(d.selectedExtras)
           if (d.contact)              setContact(d.contact)
           if (d.orgInfo)              setOrgInfo(d.orgInfo)
           if (d.campaignSetup)        setCampaignSetup(d.campaignSetup)
@@ -223,31 +222,18 @@ export default function RequestWizard() {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({
         savedAt: Date.now(),
         selectedInfluencer, requestType, clientType, category, subOption,
-        competitionSelection, details, channels, selectedExtras, contact, orgInfo,
+        competitionSelection, details, channels, contact, orgInfo,
         campaignSetup, campaignPosts,
       }))
     } catch { /* تجاوز سعة التخزين — نتجاهل بهدوء */ }
   }, [
     hydrated, selectedInfluencer, requestType, clientType, category, subOption,
-    competitionSelection, details, channels, selectedExtras, contact, orgInfo,
+    competitionSelection, details, channels, contact, orgInfo,
     campaignSetup, campaignPosts,
   ])
 
   // ملاحظة: بيانات التواصل تُحمَّل تلقائياً من بروفايل الحساب وتُرسَل مع الطلب،
   // دون عرض حقول إدخال — لأنها مُسجّلة مسبقاً عند إنشاء الحساب.
-
-  // ── تبديل الخدمات الإضافية (مع تعارض pin6/pin12) ────────────────
-  const toggleExtra = (id: string) => {
-    if (id === 'pin6' && !selectedExtras.includes('pin6')) {
-      setSelectedExtras([...selectedExtras.filter(e => e !== 'pin12'), 'pin6']); return
-    }
-    if (id === 'pin12' && !selectedExtras.includes('pin12')) {
-      setSelectedExtras([...selectedExtras.filter(e => e !== 'pin6'), 'pin12']); return
-    }
-    setSelectedExtras(
-      selectedExtras.includes(id) ? selectedExtras.filter(e => e !== id) : [...selectedExtras, id]
-    )
-  }
 
   // ── اكتمال الأقسام ──────────────────────────────────────────────
   const subOptionSatisfied =
@@ -269,11 +255,9 @@ export default function RequestWizard() {
         ? details.title.trim() !== '' && details.content.trim() !== ''
         : false
 
-  const publishComplete = true   // القسم أصبح للخدمات الإضافية الاختيارية فقط
-
   const finishComplete = termsAccepted && privacyAccepted
 
-  const sectionComplete = [aboutComplete, contentComplete, publishComplete, finishComplete]
+  const sectionComplete = [aboutComplete, contentComplete, finishComplete]
   const canSubmit = sectionComplete.every(Boolean)
 
   // أول متطلب ناقص — يُعرض كتلميح فوق زر الإرسال
@@ -650,64 +634,14 @@ export default function RequestWizard() {
             </div>
           </FormSection>
 
-          {/* ③ الخدمات الإضافية ──────────────────────────────────── */}
+          {/* ③ الموافقة على الشروط ──────────────────────────────── */}
           <FormSection
             index={3}
-            title="الخدمات الإضافية"
-            subtitle="خدمات اختيارية لوصول أكبر"
-            complete={publishComplete}
-            open={openSection === 2}
-            onToggle={() => setOpenSection(openSection === 2 ? -1 : 2)}
-          >
-            <div className="space-y-6">
-              <div>
-                <h3 className="font-bold text-dark text-sm mb-1">خدمات إضافية (اختياري بمقابل اضافي لوصول اكبر)</h3>
-                <p className="text-xs text-muted mb-3">اختر ما يناسبك — يمكنك تجاوز هذا القسم</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {AQ_EXTRAS_LIST.map(id => {
-                    const isSel = selectedExtras.includes(id)
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => toggleExtra(id)}
-                        className={cn(
-                          'relative text-right p-3 rounded-xl border-2 transition-all',
-                          isSel ? 'border-green bg-green/5' : 'border-border bg-card hover:border-green/40',
-                        )}
-                      >
-                        <div className={cn(
-                          'absolute top-2 left-2 w-5 h-5 rounded-md border-2 flex items-center justify-center',
-                          isSel ? 'bg-green border-green' : 'border-border',
-                        )}>
-                          {isSel && <span className="text-white text-xs leading-none">✓</span>}
-                        </div>
-                        <div className="text-xl mb-1">{AQ_EXTRAS_ICONS[id]}</div>
-                        <div className="text-sm font-semibold text-dark leading-tight pl-5">
-                          {AQ_EXTRAS_NAMES[id]}
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button size="sm" onClick={() => setOpenSection(3)} disabled={!publishComplete}>
-                  التالي ←
-                </Button>
-              </div>
-            </div>
-          </FormSection>
-
-          {/* ④ الموافقة على الشروط ──────────────────────────────── */}
-          <FormSection
-            index={4}
             title="الموافقة على الشروط"
             subtitle="اقرأ الشروط والأحكام ووافق عليها"
             complete={finishComplete}
-            open={openSection === 3}
-            onToggle={() => setOpenSection(openSection === 3 ? -1 : 3)}
+            open={openSection === 2}
+            onToggle={() => setOpenSection(openSection === 2 ? -1 : 2)}
           >
             <div className="space-y-6">
               <RStep6Terms
