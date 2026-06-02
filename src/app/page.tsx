@@ -37,13 +37,9 @@ export default function HomePage() {
               <span>★</span>
               <span>منصة النخبة الإعلامية</span>
             </div>
-            <h1 className="text-4xl md:text-6xl font-black text-cream mb-5 leading-tight">
+            <h1 className="text-4xl md:text-6xl font-black text-cream mb-8 leading-tight">
               اترك أثراً <span className="text-gold">دائماً</span>
             </h1>
-            <p className="text-base md:text-lg text-cream/80 mb-8 leading-relaxed">
-              منصة <span className="text-gold font-bold">تواصل النخبة</span> لنشر أخبارك وإنجازاتك ومنتجاتك عبر أبرز المؤثرين في المملكة العربية السعودية،
-              لأكثر من نصف مليون متابع حقيقي.
-            </p>
             <div className="flex flex-wrap gap-3 justify-center">
               <Link href="/request"
                 className="px-8 py-4 bg-gold text-dark rounded-xl text-base font-black hover:bg-gold/90 transition-all active:scale-[0.98] shadow-lg shadow-gold/20">
