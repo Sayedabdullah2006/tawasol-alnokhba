@@ -3,6 +3,8 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { calculateReach } from '@/lib/pricing-engine'
+import { parseSubOption } from '@/lib/auto-quote'
+import { getCompetitionPositions } from '@/lib/constants'
 import { useToast } from '@/components/ui/Toast'
 import { formatNumber, formatNumberShort } from '@/lib/utils'
 import Button from '@/components/ui/Button'
@@ -37,6 +39,8 @@ interface Props {
   negotiationRejected?: boolean
   negotiationRound?: number
   quoteExpiresAt?: string | null
+  category?: string
+  subOption?: string | null
 }
 
 function formatCountdown(ms: number): string {
@@ -53,7 +57,7 @@ function formatCountdown(ms: number): string {
 
 export default function QuoteApproval({
   requestId, quotedPrice, offeredExtras, influencer, scope, adminNotes, negotiationRejected,
-  negotiationRound = 0, quoteExpiresAt,
+  negotiationRound = 0, quoteExpiresAt, category, subOption,
 }: Props) {
   const router = useRouter()
   const { showToast } = useToast()
@@ -227,7 +231,38 @@ export default function QuoteApproval({
 
   const isFreeBase = quotedPrice <= 0
   const isFreeFinal = finalTotal <= 0
-  const actualValue = Math.round(quotedPrice * 5)
+  const actualValue = Math.round(quotedPrice * 3)
+
+  // ─── تأطير «تقدير النخبة» ───
+  // عندما يُسعَّر الطلب وفق قاعدة النخبة (مراكز المسابقات الأولى + اختراع ببراءة)
+  // نعرض السعر كتقدير/خصم بدلاً من رقم منخفض محيّر.
+  const { isEliteRecognition, usualPrice } = useMemo<{
+    isEliteRecognition: boolean
+    usualPrice: number | null
+  }>(() => {
+    const parsed = parseSubOption(subOption)
+
+    // اختراع ببراءة اختراع — السعر 499 < سعر بدون براءة 699
+    if (category === 'inventions' && parsed === 'with_patent') {
+      return { isEliteRecognition: true, usualPrice: 699 }
+    }
+
+    // مسابقات — المركز الأول هو حالة التقدير
+    if (
+      category === 'competitions' &&
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      'subcategory' in parsed &&
+      'position' in parsed &&
+      parsed.position === 'first' &&
+      getCompetitionPositions(parsed.subcategory).length > 0
+    ) {
+      const reference = quotedPrice < 699 ? 699 : null
+      return { isEliteRecognition: reference !== null, usualPrice: reference }
+    }
+
+    return { isEliteRecognition: false, usualPrice: null }
+  }, [category, subOption, quotedPrice])
 
   return (
     <div className="space-y-4">
@@ -275,6 +310,17 @@ export default function QuoteApproval({
           </div>
           <p className="text-[11px] text-blue-700 mt-2">
             اعتمد العرض أو اطلب تفاوضاً قبل انتهاء المهلة
+          </p>
+        </div>
+      )}
+
+      {isEliteRecognition && !isFreeBase && usualPrice && usualPrice > quotedPrice && (
+        <div className="bg-gradient-to-l from-amber-50 to-yellow-50 border border-amber-300 rounded-2xl p-4 text-center">
+          <div className="text-2xl mb-1">🏅</div>
+          <p className="font-bold text-amber-800 text-sm mb-1">عرض تقدير النخبة</p>
+          <p className="text-xs text-amber-700 leading-relaxed">
+            السعر المعتاد <span className="line-through">{formatNumber(usualPrice)} ر.س</span> —
+            سعرك الخاص <strong>{formatNumber(quotedPrice)} ر.س</strong> تقديراً لإنجازك كأحد المتميّزين.
           </p>
         </div>
       )}

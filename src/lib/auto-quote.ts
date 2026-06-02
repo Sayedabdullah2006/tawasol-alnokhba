@@ -71,16 +71,16 @@ export const AGENCY_MULTIPLIER = 3
 
 // الفئات البسيطة (بدون فئات فرعية تؤثر على السعر)
 const SIMPLE_BASE: Record<string, ClientPrices> = {
-  books:       { individual: 699,  business: 2000 },
-  research:    { individual: 799,  business: 2500 },
-  certs:       { individual: 1300 },
+  books:       { individual: 699,  business: 1999 },
+  research:    { individual: 799,  business: 2499 },
+  certs:       { individual: 899  },
   graduation:  { individual: 799  },
-  appointment: { individual: 899,  business: 2500, government: 5000 },
-  award:       { individual: 599,  business: 2000 },
+  appointment: { individual: 1199, business: 2499, government: 4999 },
+  award:       { individual: 599,  business: 1999 },
   cv:          { individual: 799  },
-  product:     { business: 2500 },
+  product:     { business: 2499 },
   charity:     { charity: 999 },
-  government:  { government: 4500 },
+  government:  { government: 4499 },
 }
 
 // مسابقات: نوع المسابقة × المركز

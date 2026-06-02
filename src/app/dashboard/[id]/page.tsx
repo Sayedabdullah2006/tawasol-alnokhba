@@ -245,6 +245,8 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
               negotiationRejected={!!request.negotiation_rejected}
               negotiationRound={request.negotiation_round ?? 0}
               quoteExpiresAt={request.quote_expires_at}
+              category={request.category}
+              subOption={request.sub_option}
             />
           </div>
         )}
