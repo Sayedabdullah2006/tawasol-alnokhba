@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import DesignShowcase from '@/components/home/DesignShowcase'
 
 const features = [
   { icon: '🎯', title: 'وصول واسع', desc: 'أكثر من نصف مليون متابع حقيقي عبر شبكة مؤثرين مميزين' },
@@ -30,8 +31,8 @@ export default function HomePage() {
         {/* Subtle gold glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gold/10 rounded-full blur-3xl" />
 
-        <div className="relative max-w-6xl mx-auto px-4 py-20 md:py-32 grid md:grid-cols-2 gap-10 items-center">
-          <div className="text-right order-2 md:order-1">
+        <div className="relative max-w-6xl mx-auto px-4 py-16 md:py-24">
+          <div className="text-center max-w-2xl mx-auto">
             <div className="inline-flex items-center gap-2 bg-gold/15 border border-gold/30 text-gold text-xs font-bold px-4 py-2 rounded-full mb-5">
               <span>★</span>
               <span>منصة النخبة الإعلامية</span>
@@ -43,7 +44,7 @@ export default function HomePage() {
               منصة <span className="text-gold font-bold">تواصل النخبة</span> لنشر أخبارك وإنجازاتك ومنتجاتك عبر أبرز المؤثرين في المملكة العربية السعودية،
               لأكثر من نصف مليون متابع حقيقي.
             </p>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 justify-center">
               <Link href="/request"
                 className="px-8 py-4 bg-gold text-dark rounded-xl text-base font-black hover:bg-gold/90 transition-all active:scale-[0.98] shadow-lg shadow-gold/20">
                 ابدأ طلبك الآن
@@ -55,16 +56,9 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Logo showcase */}
-          <div className="order-1 md:order-2 flex justify-center">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gold/20 rounded-full blur-3xl scale-90" />
-              <div className="relative bg-cream/95 rounded-3xl p-8 shadow-2xl flex items-center justify-center w-64 h-64 md:w-80 md:h-80">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/logo.png" alt="تواصل النخبة"
-                  className="w-full h-auto object-contain" />
-              </div>
-            </div>
+          {/* معرض التصاميم المعتمدة — شريط متحرّك بعرض كامل (متجاوب للجوال) */}
+          <div className="mt-12 md:mt-16">
+            <DesignShowcase />
           </div>
         </div>
       </section>
