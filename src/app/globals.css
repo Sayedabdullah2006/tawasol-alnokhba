@@ -262,17 +262,11 @@ td[class*="client"], th[class*="client"] {
   overflow: hidden;
 }
 
-/* Design showcase marquee — شريط التصاميم المعتمدة المتحرّك */
-.design-marquee-track {
-  animation: designMarquee 40s linear infinite;
+/* Design showcase — شريط التصاميم المعتمدة (حركة تلقائية بـ JS + تمرير يدوي) */
+.design-scroller {
+  -ms-overflow-style: none;  /* IE/Edge */
+  scrollbar-width: none;     /* Firefox */
 }
-.design-marquee:hover .design-marquee-track {
-  animation-play-state: paused;
-}
-@keyframes designMarquee {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .design-marquee-track { animation: none; }
+.design-scroller::-webkit-scrollbar {
+  display: none;             /* Chrome/Safari */
 }
