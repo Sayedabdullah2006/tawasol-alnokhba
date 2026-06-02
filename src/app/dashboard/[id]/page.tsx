@@ -253,23 +253,26 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
 
         {effectiveStatus === 'approved' && request.admin_quoted_price != null && (
           <div className="mt-4 space-y-4">
-            <EditableExtras
-              requestId={request.id}
-              category={request.category}
-              basePrice={Number(request.admin_quoted_price)}
-              initialSelected={(request.user_selected_extras ?? []) as string[]}
-              offered={(request.admin_offered_extras ?? []) as { id: string; name: string; price: number; reachBoost: number }[]}
-              influencer={influencer}
-              scope={scope}
-              onUpdated={(newTotal, newReach, newSelected) => {
-                setRequest((prev: any) => ({
-                  ...prev,
-                  final_total: newTotal,
-                  estimated_reach: newReach,
-                  user_selected_extras: newSelected,
-                }))
-              }}
-            />
+            {/* الخدمات الإضافية ما بعد العرض — تُعطَّل عند اختيار باقة */}
+            {!request.auto_quote_tier && (
+              <EditableExtras
+                requestId={request.id}
+                category={request.category}
+                basePrice={Number(request.admin_quoted_price)}
+                initialSelected={(request.user_selected_extras ?? []) as string[]}
+                offered={(request.admin_offered_extras ?? []) as { id: string; name: string; price: number; reachBoost: number }[]}
+                influencer={influencer}
+                scope={scope}
+                onUpdated={(newTotal, newReach, newSelected) => {
+                  setRequest((prev: any) => ({
+                    ...prev,
+                    final_total: newTotal,
+                    estimated_reach: newReach,
+                    user_selected_extras: newSelected,
+                  }))
+                }}
+              />
+            )}
             <Button onClick={() => router.push(`/payment/${request.id}`)} className="w-full" size="lg">
               الانتقال للدفع — {formatNumber(request.final_total ?? request.admin_quoted_price)} ر.س
             </Button>

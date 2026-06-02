@@ -17,7 +17,8 @@ import RStepCampaignPosts, { type CampaignPostData, makeEmptyPost, isPostComplet
 import SuccessScreen from './SuccessScreen'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
-import { COMPETITION_SUBCATEGORIES, getCompetitionPositions } from '@/lib/constants'
+import { COMPETITION_SUBCATEGORIES, getCompetitionPositions, PACKAGES } from '@/lib/constants'
+import { calculateAutoQuote } from '@/lib/auto-quote'
 
 // ─── خيارات القوائم المنسدلة ───────────────────────────────────────
 const REQUEST_TYPE_OPTIONS: { id: RequestType; label: string }[] = [
@@ -129,6 +130,8 @@ export default function RequestWizard() {
   const [orgInfo, setOrgInfo]           = useState({ name: '', representative: '', license: '' })
   const [termsAccepted, setTermsAccepted]   = useState(false)
   const [privacyAccepted, setPrivacyAccepted] = useState(false)
+  // الباقة المختارة (للأفراد + المنشور الواحد فقط)
+  const [selectedPackage, setSelectedPackage] = useState<string | null>(null)
 
   // ── بيانات الحملة ──────────────────────────────────────────────
   const [campaignSetup, setCampaignSetup] = useState<CampaignSetup>({ postCount: 2, duration: '' })
@@ -209,6 +212,7 @@ export default function RequestWizard() {
           if (d.contact)              setContact(d.contact)
           if (d.orgInfo)              setOrgInfo(d.orgInfo)
           if (d.campaignSetup)        setCampaignSetup(d.campaignSetup)
+          if (d.selectedPackage)      setSelectedPackage(d.selectedPackage)
           if (Array.isArray(d.campaignPosts) && d.campaignPosts.length) setCampaignPosts(d.campaignPosts)
           showToast('تم استرجاع طلبك غير المكتمل ✨', 'info')
         }
@@ -238,13 +242,13 @@ export default function RequestWizard() {
         savedAt: Date.now(),
         selectedInfluencer, requestType, clientType, category, subOption,
         competitionSelection, details, channels, contact, orgInfo,
-        campaignSetup, campaignPosts,
+        campaignSetup, campaignPosts, selectedPackage,
       }))
     } catch { /* تجاوز سعة التخزين — نتجاهل بهدوء */ }
   }, [
     hydrated, selectedInfluencer, requestType, clientType, category, subOption,
     competitionSelection, details, channels, contact, orgInfo,
-    campaignSetup, campaignPosts,
+    campaignSetup, campaignPosts, selectedPackage,
   ])
 
   // ملاحظة: بيانات التواصل تُحمَّل تلقائياً من بروفايل الحساب وتُرسَل مع الطلب،
@@ -272,7 +276,28 @@ export default function RequestWizard() {
 
   const finishComplete = termsAccepted && privacyAccepted
 
-  const sectionComplete = [aboutComplete, contentComplete, finishComplete]
+  // ── الباقات تُعرض للأفراد + المنشور الواحد فقط ───────────────────
+  const showPackages = requestType === 'single' && clientType === 'individual'
+  const packagesComplete = !showPackages || !!selectedPackage
+
+  // السعر الديناميكي للباقة الأساسية = سعر التسعير التلقائي حسب نوع الخبر
+  const basicDynamicPrice: number | null = (() => {
+    if (!showPackages || !category || !subOptionSatisfied) return null
+    try {
+      const subOptionForCalc = isCompetitionCategory ? competitionSelection : subOption
+      return calculateAutoQuote({
+        category,
+        subOption: subOptionForCalc,
+        clientType: 'individual',
+        selectedExtras: [],
+        channelCount: 1,
+      }).total
+    } catch {
+      return null
+    }
+  })()
+
+  const sectionComplete = [aboutComplete, contentComplete, packagesComplete, finishComplete]
   const canSubmit = sectionComplete.every(Boolean)
 
   // أول متطلب ناقص — يُعرض كتلميح فوق زر الإرسال
@@ -290,6 +315,7 @@ export default function RequestWizard() {
       if (campaignSetup.postCount < 2) return 'حدّد عدد المنشورات'
       if (!campaignPosts.every(isPostComplete)) return 'أكمل تفاصيل جميع منشورات الحملة'
     }
+    if (showPackages && !selectedPackage) return 'اختر الباقة المناسبة'
     if (!termsAccepted || !privacyAccepted) return 'فعّل الموافقة على الشروط والخصوصية'
     return null
   }
@@ -354,6 +380,7 @@ export default function RequestWizard() {
           x_handle:        contact.xHandle || null,
           channels,
           selected_extras: selectedExtras,
+          selected_package: showPackages ? selectedPackage : null,
         }
       }
 
@@ -671,20 +698,80 @@ export default function RequestWizard() {
             )}
 
             <div className="flex justify-end pt-4">
-              <Button size="sm" onClick={() => setOpenSection(2)} disabled={!contentComplete}>
+              <Button size="sm" onClick={() => setOpenSection(showPackages ? 2 : 3)} disabled={!contentComplete}>
                 التالي ←
               </Button>
             </div>
           </FormSection>
 
-          {/* ③ الموافقة على الشروط ──────────────────────────────── */}
+          {/* ③ اختيار الباقة — للأفراد + المنشور الواحد فقط ──────── */}
+          {showPackages && (
+            <FormSection
+              index={3}
+              title="اختر الباقة"
+              subtitle="حدّد الباقة المناسبة لخبرك"
+              complete={packagesComplete}
+              open={openSection === 2}
+              onToggle={() => setOpenSection(openSection === 2 ? -1 : 2)}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {PACKAGES.map(pkg => {
+                  const isSelected = selectedPackage === pkg.id
+                  const priceLabel = pkg.id === 'basic'
+                    ? (basicDynamicPrice != null ? `${basicDynamicPrice} ر.س` : 'حسب نوع الخبر')
+                    : `${pkg.price} ر.س`
+                  return (
+                    <button
+                      type="button"
+                      key={pkg.id}
+                      onClick={() => setSelectedPackage(pkg.id)}
+                      className={cn(
+                        'relative text-right rounded-2xl border-2 p-4 transition-all flex flex-col',
+                        isSelected
+                          ? 'border-green bg-green/5 ring-2 ring-green/30'
+                          : 'border-border bg-card hover:border-green/40',
+                      )}
+                    >
+                      {pkg.highlighted && (
+                        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-green text-white text-[10px] font-black px-2.5 py-0.5 rounded-full whitespace-nowrap">
+                          الأكثر اختياراً
+                        </span>
+                      )}
+                      <div className="flex items-center justify-between gap-2 mb-1 mt-1">
+                        <span className="font-black text-dark text-sm">{pkg.name}</span>
+                        {isSelected && <span className="text-green text-base flex-shrink-0">✓</span>}
+                      </div>
+                      <div className="text-green font-black text-lg mb-1">{priceLabel}</div>
+                      <p className="text-xs text-muted mb-3">{pkg.blurb}</p>
+                      <ul className="space-y-1.5 mt-auto">
+                        {pkg.features.map((f, i) => (
+                          <li key={i} className="flex items-start gap-1.5 text-xs text-dark">
+                            <span className="text-green flex-shrink-0">✓</span>
+                            <span>{f}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="flex justify-end pt-4">
+                <Button size="sm" onClick={() => setOpenSection(3)} disabled={!packagesComplete}>
+                  التالي ←
+                </Button>
+              </div>
+            </FormSection>
+          )}
+
+          {/* ④ الموافقة على الشروط ──────────────────────────────── */}
           <FormSection
-            index={3}
+            index={showPackages ? 4 : 3}
             title="الموافقة على الشروط"
             subtitle="اقرأ الشروط والأحكام ووافق عليها"
             complete={finishComplete}
-            open={openSection === 2}
-            onToggle={() => setOpenSection(openSection === 2 ? -1 : 2)}
+            open={openSection === 3}
+            onToggle={() => setOpenSection(openSection === 3 ? -1 : 3)}
           >
             <div className="space-y-6">
               <RStep6Terms

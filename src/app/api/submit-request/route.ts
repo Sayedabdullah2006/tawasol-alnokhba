@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { generateRequestNumber } from '@/lib/utils'
 import { notifyNewRequestToAdmin, notifyQuoteReadyToClient } from '@/lib/email'
-import { CATEGORIES } from '@/lib/constants'
+import { CATEGORIES, PACKAGES } from '@/lib/constants'
 import { calculateAutoQuote, calculateCampaignQuote, CAMPAIGN_DISCOUNT_PCT } from '@/lib/auto-quote'
 
 export async function POST(request: Request) {
@@ -247,19 +247,59 @@ export async function POST(request: Request) {
         ? body.sub_option
         : (typeof body.sub_option === 'string' ? body.sub_option : null)
 
+    // ── الباقة المختارة (للأفراد + المنشور الواحد فقط) ──────────────
+    const selectedPackage: string | null = body.selected_package ?? null
+    const pkg = selectedPackage
+      ? PACKAGES.find(p => p.id === selectedPackage) ?? null
+      : null
+
+    // قنوات النشر الفعلية: باقات الاحتراف/التميز تنشر على كل قنوات الحساب المتاحة
+    let effectiveChannels = channels
+    if (pkg?.allChannels) {
+      const { data: inf } = await serviceClient
+        .from('influencers')
+        .select('*')
+        .eq('id', body.influencer_id)
+        .single()
+      if (inf) {
+        const allCh = [
+          inf.x_followers  ? 'x'  : null,
+          inf.ig_followers ? 'ig' : null,
+          inf.li_followers ? 'li' : null,
+          inf.tk_followers ? 'tk' : null,
+        ].filter(Boolean) as string[]
+        if (allCh.length > 0) effectiveChannels = allCh
+      }
+    }
+    const effectiveScope = effectiveChannels.length > 1 ? 'all' : 'single'
+
+    // الإضافات المضمَّنة في الباقة (مدمجة في السعر الثابت — لا تُضاف فوقه)
+    const packageIncludedExtras: string[] = pkg ? pkg.includedExtras : []
+
     const priceCalc = calculateAutoQuote({
       category:       body.category ?? '',
       subOption:      subOptionForCalc,
       clientType:     body.client_type ?? 'individual',
       selectedExtras,
-      channelCount:   channels.length,
+      channelCount:   effectiveChannels.length,
     })
 
-    // تطبيق كود الخصم على المنشور الواحد
+    // سعر الباقة: basic = السعر الديناميكي، pro/elite = السعر الثابت
+    const packagePrice = pkg
+      ? (pkg.price != null ? pkg.price : priceCalc.total)
+      : priceCalc.total
+
+    // تطبيق كود الخصم على سعر الباقة النهائي
     const singleDiscountAmt = discountRow
-      ? Math.round(priceCalc.total * Number(discountRow.discount_pct) / 100)
+      ? Math.round(packagePrice * Number(discountRow.discount_pct) / 100)
       : 0
-    const singleFinalPrice = priceCalc.total - singleDiscountAmt
+    const singleFinalPrice = packagePrice - singleDiscountAmt
+
+    // قيم التسعير المخزَّنة: basic يستخدم قيم التسعير التلقائي، pro/elite سعر ثابت بلا إضافات منفصلة
+    const isFixedPackage = pkg != null && pkg.price != null
+    const storedBasePrice   = isFixedPackage ? packagePrice : priceCalc.basePrice
+    const storedExtrasTotal = isFixedPackage ? 0 : priceCalc.extrasTotal
+    const storedTotalAmount = isFixedPackage ? packagePrice : priceCalc.total
 
     const { data, error } = await serviceClient
       .from('publish_requests')
@@ -276,8 +316,8 @@ export async function POST(request: Request) {
               ? JSON.stringify(body.sub_option)
               : body.sub_option)
           : null,
-        channels,
-        scope,
+        channels:         effectiveChannels,
+        scope:            effectiveScope,
         images:           'one',
         extras:           selectedExtras,
         num_posts:        1,
@@ -295,13 +335,13 @@ export async function POST(request: Request) {
 
         request_type:     'single',
 
-        base_price:            priceCalc.basePrice,
-        extras_total:          priceCalc.extrasTotal,
+        base_price:            storedBasePrice,
+        extras_total:          storedExtrasTotal,
         vat_amount:            priceCalc.vatAmount,
-        total_amount:          priceCalc.total,
+        total_amount:          storedTotalAmount,
         admin_quoted_price:    singleFinalPrice,
         admin_offered_extras:  [],
-        user_selected_extras:  [],
+        user_selected_extras:  packageIncludedExtras,
         extras_selected_total: 0,
         final_total:           singleFinalPrice,
         estimated_reach:       0,
@@ -316,9 +356,11 @@ export async function POST(request: Request) {
         quoted_at:         now,
         last_status_change: now,
         quote_expires_at:  quoteExpiresAt,
-        auto_quote_tier:   null,
+        auto_quote_tier:   selectedPackage,
         auto_quoted_at:    now,
-        auto_quote_note:   `تسعير تلقائي — فئة: ${body.category}، إضافات: ${selectedExtras.length}`,
+        auto_quote_note:   pkg
+          ? `باقة: ${pkg.name} — فئة: ${body.category}`
+          : `تسعير تلقائي — فئة: ${body.category}، إضافات: ${selectedExtras.length}`,
         updated_at:        now,
       })
       .select('request_number, id')
@@ -342,7 +384,7 @@ export async function POST(request: Request) {
       category:    catNameAr,
       title:       body.title,
       content:     body.content,
-      channels,
+      channels:    effectiveChannels,
     }).catch(e => console.error('Admin email failed:', e))
 
     if (body.client_email) {
@@ -350,7 +392,7 @@ export async function POST(request: Request) {
         email:                 body.client_email,
         requestNumber,
         clientName:            body.client_name ?? 'عزيزنا',
-        price:                 priceCalc.total,
+        price:                 singleFinalPrice,
         reach:                 0,
         quoteExpiresAt,
       }).catch(e => console.error('Quote email failed:', e))

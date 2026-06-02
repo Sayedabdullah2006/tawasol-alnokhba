@@ -125,6 +125,67 @@ export const EXTRAS = [
   { id: 'infographic', nameAr: 'تصميم انفوجرافيك', icon: '🎨', price: 300, categoryOnly: 'cv' },
 ]
 
+// ─── Packages (الباقات) — للأفراد + المنشور الواحد فقط ───
+// price = null ⇒ سعر ديناميكي يُحتسب من auto-quote حسب نوع الخبر
+export interface Package {
+  id: 'basic' | 'pro' | 'elite'
+  name: string
+  price: number | null
+  blurb: string
+  features: string[]
+  includedExtras: string[]
+  allChannels: boolean
+  highlighted?: boolean
+}
+
+export const PACKAGES: Package[] = [
+  {
+    id: 'basic',
+    name: 'الباقة الأساسية',
+    price: null,
+    blurb: 'انطلاقة مثالية لنشر خبرك',
+    features: [
+      'النشر في قناة واحدة',
+      'صياغة الخبر',
+      'تصميم خاص',
+    ],
+    includedExtras: [],
+    allChannels: false,
+  },
+  {
+    id: 'pro',
+    name: 'باقة الاحتراف',
+    price: 1499,
+    blurb: 'انتشار أوسع عبر جميع القنوات',
+    features: [
+      'النشر في جميع القنوات (X, LinkedIn, Instagram, TikTok)',
+      'صياغة الخبر',
+      'تصميم خاص',
+      'عمل منشن/تاق لحساب المستخدم',
+    ],
+    includedExtras: ['mention'],
+    allChannels: true,
+    highlighted: true,
+  },
+  {
+    id: 'elite',
+    name: 'باقة التميز',
+    price: 1799,
+    blurb: 'الحضور الأقوى والأثر الأطول',
+    features: [
+      'النشر في جميع القنوات (X, LinkedIn, Instagram, TikTok)',
+      'صياغة الخبر',
+      'تصميم خاص',
+      'عمل منشن/تاق لحساب المستخدم',
+      'التوثيق في موسوعة أول سعودي First1saudi.net',
+      'التثبيت 6 ساعات في X',
+      'رتويت بعد يوم/يومين',
+    ],
+    includedExtras: ['mention', 'encyclopedia', 'pin6', 'repost'],
+    allChannels: true,
+  },
+]
+
 // ─── Post count messages ───
 export const POST_COUNT_MESSAGES: Record<number, string> = {
   1: 'سيتم احتساب السعر الأساسي',

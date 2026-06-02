@@ -4,7 +4,7 @@ import { useState, useEffect, use } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { CATEGORIES, EXTRAS, REQUEST_STATUSES } from '@/lib/constants'
+import { CATEGORIES, EXTRAS, PACKAGES, REQUEST_STATUSES } from '@/lib/constants'
 import { formatNumber, formatDate, generateRequestNumber } from '@/lib/utils'
 import { fixTextDirection } from '@/lib/text-utils'
 import { useToast } from '@/components/ui/Toast'
@@ -403,6 +403,27 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                 <InfoRow label="الفئة">
                   <span className="font-medium">{cat?.icon} {cat?.nameAr ?? request.category}</span>
                 </InfoRow>
+
+                {/* الباقة المختارة (للأفراد + المنشور الواحد) */}
+                {request.auto_quote_tier && (() => {
+                  const pkg = PACKAGES.find(p => p.id === request.auto_quote_tier)
+                  if (!pkg) return null
+                  return (
+                    <InfoRow label="الباقة">
+                      <div className="flex flex-col gap-1.5">
+                        <span className="font-bold text-green">{pkg.name}</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {pkg.features.map((f, i) => (
+                            <span key={i} className="px-2 py-0.5 rounded-lg bg-green/10 text-green text-[11px] font-medium">
+                              {f}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </InfoRow>
+                  )
+                })()}
+
                 {subOptionLabel && (
                   <InfoRow label="التفاصيل الفرعية">
                     <span className="font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg">
