@@ -22,6 +22,7 @@ export default function AdminRequestsPage() {
   const [requests, setRequests] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [duplicatesOnly, setDuplicatesOnly] = useState(false)
   const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [requestToDelete, setRequestToDelete] = useState<any>(null)
@@ -56,20 +57,43 @@ export default function AdminRequestsPage() {
 
   // Removed drawer useEffect
 
-  const filteredRequests = requests.filter(r => {
-    if (statusFilter && r.status !== statusFilter) return false
-    if (search) {
-      const q = search.toLowerCase()
-      return (
-        r.client_name?.toLowerCase().includes(q) ||
-        r.client_email?.toLowerCase().includes(q) ||
-        r.title?.toLowerCase().includes(q) ||
-        r.content?.toLowerCase().includes(q) ||
-        generateRequestNumber(r.request_number).toLowerCase().includes(q)
-      )
-    }
-    return true
-  })
+  // مفتاح هوية صاحب الطلب — user_id أولاً، وإلا البريد، وإلا الجوال
+  const ownerKey = (r: any): string =>
+    r.user_id || r.client_email?.toLowerCase() || r.client_phone || ''
+
+  // عدد طلبات كل مستخدم (لتحديد المكررين وعرض الشارة)
+  const requestCountByOwner = requests.reduce((acc: Record<string, number>, r) => {
+    const key = ownerKey(r)
+    if (key) acc[key] = (acc[key] ?? 0) + 1
+    return acc
+  }, {})
+
+  const isDuplicate = (r: any): boolean => {
+    const key = ownerKey(r)
+    return !!key && (requestCountByOwner[key] ?? 0) > 1
+  }
+
+  const filteredRequests = requests
+    .filter(r => {
+      if (duplicatesOnly && !isDuplicate(r)) return false
+      if (statusFilter && r.status !== statusFilter) return false
+      if (search) {
+        const q = search.toLowerCase()
+        return (
+          r.client_name?.toLowerCase().includes(q) ||
+          r.client_email?.toLowerCase().includes(q) ||
+          r.title?.toLowerCase().includes(q) ||
+          r.content?.toLowerCase().includes(q) ||
+          generateRequestNumber(r.request_number).toLowerCase().includes(q)
+        )
+      }
+      return true
+    })
+    // عند تفعيل فلتر المكرر: تجميع طلبات كل مستخدم معاً (مع الحفاظ على ترتيب التاريخ داخل كل مجموعة)
+    .sort((a, b) => (duplicatesOnly ? ownerKey(a).localeCompare(ownerKey(b)) : 0))
+
+  // عدد المستخدمين الذين لديهم أكثر من طلب (لعرضه على زر الفلتر)
+  const duplicateOwnersCount = Object.values(requestCountByOwner).filter(c => c > 1).length
 
   // قطع المحتوى لعرض جزء منه فقط
   const truncateContent = (text: string, maxLength: number = 60) => {
@@ -335,6 +359,17 @@ export default function AdminRequestsPage() {
           🔔 تذكير جماعي للعروض ({quotedCount})
         </Button>
 
+        <Button
+          variant="outline"
+          onClick={() => setDuplicatesOnly(v => !v)}
+          disabled={!duplicatesOnly && duplicateOwnersCount === 0}
+          className={duplicatesOnly
+            ? 'border-purple-400 bg-purple-50 text-purple-700'
+            : 'border-purple-300 text-purple-700 hover:bg-purple-50 disabled:opacity-50'}
+        >
+          👥 {duplicatesOnly ? 'إلغاء فلتر المكرر' : `الطلبات المكررة (${duplicateOwnersCount})`}
+        </Button>
+
         <button
           onClick={() => setShowDebug(!showDebug)}
           className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
@@ -432,6 +467,11 @@ export default function AdminRequestsPage() {
                         maxLength={20}
                         className="font-medium"
                       />
+                      {isDuplicate(r) && (
+                        <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-bold">
+                          👥 {requestCountByOwner[ownerKey(r)]} طلبات
+                        </span>
+                      )}
                     </td>
 
                     {/* الفئة */}
@@ -512,10 +552,10 @@ export default function AdminRequestsPage() {
         </div>
         {filteredRequests.length === 0 && (
           <div className="p-8 text-center text-muted">
-            <p>لا توجد طلبات {search || statusFilter ? 'تطابق البحث' : 'بعد'}</p>
-            {(search || statusFilter) && (
+            <p>لا توجد طلبات {search || statusFilter || duplicatesOnly ? 'تطابق البحث' : 'بعد'}</p>
+            {(search || statusFilter || duplicatesOnly) && (
               <button
-                onClick={() => { setSearch(''); setStatusFilter(''); }}
+                onClick={() => { setSearch(''); setStatusFilter(''); setDuplicatesOnly(false); }}
                 className="mt-2 text-xs text-blue-600 hover:underline"
               >
                 إظهار جميع الطلبات
