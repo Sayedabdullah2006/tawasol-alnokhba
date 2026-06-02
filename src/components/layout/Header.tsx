@@ -9,9 +9,6 @@ import ClientNameFixed from '@/components/ui/ClientNameFixed'
 
 const navLinks = [
   { href: '/', label: 'الرئيسية' },
-  { href: '/services', label: 'الخدمات' },
-  { href: '/pricing', label: 'الأسعار' },
-  { href: '/policies', label: 'السياسات' },
   { href: '/request', label: 'تقديم طلب' },
 ]
 
