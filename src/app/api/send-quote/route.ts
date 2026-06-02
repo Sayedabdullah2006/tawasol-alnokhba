@@ -115,6 +115,7 @@ export async function POST(request: Request) {
             price: quotedPrice,
             reach: baseReach ?? 0,
             quoteExpiresAt,
+            adminMessage: adminNotes ?? undefined,
           })
       promise.catch(e => console.error('Quote email failed:', e))
     }

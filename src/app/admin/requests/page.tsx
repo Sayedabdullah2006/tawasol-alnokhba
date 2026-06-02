@@ -478,6 +478,17 @@ export default function AdminRequestsPage() {
                           </svg>
                         </button>
 
+                        {/* زر إرسال عرض جديد — يظهر فقط للطلبات التي رفضها العميل */}
+                        {r.status === 'client_rejected' && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openRequest(r) }}
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors shrink-0"
+                            title="إرسال عرض جديد للعميل"
+                          >
+                            <span className="text-xs">📤</span>
+                          </button>
+                        )}
+
                         {/* زر الحذف */}
                         <button
                           onClick={(e) => handleDeleteClick(r, e)}

@@ -55,7 +55,7 @@ export async function notifyRequestReceivedToClient(d: templates.ClientRequestDa
 
 export async function notifyQuoteReadyToClient(args: {
   email: string; requestNumber: string; clientName: string; price: number; reach: number
-  quoteExpiresAt?: string | null
+  quoteExpiresAt?: string | null; adminMessage?: string
 }) {
   const t = templates.quoteReadyToClient(args)
   return sendEmail(args.email, t.subject, t.html)

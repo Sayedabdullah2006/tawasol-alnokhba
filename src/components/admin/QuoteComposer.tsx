@@ -33,7 +33,11 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
   const [manualPrice, setManualPrice] = useState<string>('')
   const [isFree, setIsFree] = useState(false)
   const [selectedExtrasToOffer, setSelectedExtrasToOffer] = useState<string[]>([])
-  const [adminNotes, setAdminNotes] = useState(request.admin_notes ?? '')
+  // رسالة اعتذار احترافية تُعبّأ تلقائياً عند إرسال عرض جديد لطلب رفضه العميل
+  const REOFFER_NOTE = 'نعتذر أن العرض السابق لم يلبِّ طموحك، ويسعدنا أن نقدّم لك هذا العرض الجديد. نقدّر ثقتك ونتطلّع لخدمتك.'
+  const [adminNotes, setAdminNotes] = useState(
+    request.status === 'client_rejected' ? REOFFER_NOTE : (request.admin_notes ?? '')
+  )
 
   useEffect(() => {
     const load = async () => {

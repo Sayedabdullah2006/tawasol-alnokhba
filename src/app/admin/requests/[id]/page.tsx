@@ -834,7 +834,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                 )
               })()}
 
-              {request.status === 'pending' ? (
+              {request.status === 'pending' || request.status === 'client_rejected' ? (
                 composingQuote ? (
                   <QuoteComposer
                     request={request}
@@ -856,6 +856,19 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                       <Button variant="ghost" onClick={() => { setRejecting(false); setRejectReason('') }} className="flex-1">إلغاء</Button>
                       <Button onClick={handleReject} loading={saving} disabled={!rejectReason.trim()} className="flex-1">تأكيد الرفض</Button>
                     </div>
+                  </div>
+                ) : request.status === 'client_rejected' ? (
+                  <div className="space-y-3">
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1">
+                      <p className="text-sm font-bold text-red-700">❌ رفض العميل العرض السابق</p>
+                      {request.client_rejection_reason && (
+                        <p className="text-xs text-red-600 whitespace-pre-line">
+                          سبب الرفض: {request.client_rejection_reason}
+                        </p>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted">يمكنك تعديل السعر وإرسال عرض جديد — سيعود الطلب لحالة «بانتظار موافقة العميل» بمهلة جديدة.</p>
+                    <Button onClick={() => setComposingQuote(true)} className="w-full">📤 إرسال عرض جديد للعميل</Button>
                   </div>
                 ) : (
                   <div className="space-y-3">

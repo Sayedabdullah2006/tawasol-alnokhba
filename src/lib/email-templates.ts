@@ -191,7 +191,14 @@ export function quoteReadyToClient(d: {
   price: number
   reach: number
   quoteExpiresAt?: string | null
+  adminMessage?: string
 }) {
+  const adminBlock = d.adminMessage && d.adminMessage.trim()
+    ? `
+      <p style="margin:0 0 8px 0; font-size:13px; color:#6B7C99;">رسالة من الإدارة:</p>
+      ${note(d.adminMessage)}`
+    : ''
+
   const expiryBlock = d.quoteExpiresAt
     ? `
       <div style="background:#FEF3C7; border:1px solid #F59E0B; border-radius:10px; padding:12px; margin-bottom:14px; text-align:center;">
@@ -208,6 +215,7 @@ export function quoteReadyToClient(d: {
       <p style="margin:0 0 18px 0; font-size:14px; line-height:1.8;">
         فريقنا من الصياغة والتصميم والنشر انتهى من مراجعة طلبك <strong>${escapeHtml(d.requestNumber)}</strong> وأعد العرض المخصص.
       </p>
+      ${adminBlock}
       <div style="background:#F7F4ED; border-radius:12px; padding:18px; text-align:center; margin-bottom:14px;">
         <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">المطلوب دفعه</p>
         <p style="margin:0 0 6px 0; font-size:28px; font-weight:900; color:${BRAND_GOLD};">${d.price.toLocaleString('ar-SA')} ر.س</p>
