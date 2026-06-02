@@ -253,7 +253,9 @@ export async function POST(request: Request) {
       ? PACKAGES.find(p => p.id === selectedPackage) ?? null
       : null
 
-    // قنوات النشر الفعلية: باقات الاحتراف/التميز تنشر على كل قنوات الحساب المتاحة
+    // قنوات النشر الفعلية:
+    //  - الاحتراف/التميز: كل قنوات الحساب المتاحة
+    //  - الأساسية: القناة الواحدة التي اختارها المستخدم (basic_channel)
     let effectiveChannels = channels
     if (pkg?.allChannels) {
       const { data: inf } = await serviceClient
@@ -270,6 +272,9 @@ export async function POST(request: Request) {
         ].filter(Boolean) as string[]
         if (allCh.length > 0) effectiveChannels = allCh
       }
+    } else if (pkg && !pkg.allChannels && body.basic_channel) {
+      // الباقة الأساسية: قناة واحدة فقط يحددها المستخدم
+      effectiveChannels = [body.basic_channel]
     }
     const effectiveScope = effectiveChannels.length > 1 ? 'all' : 'single'
 

@@ -34,6 +34,11 @@ const CLIENT_TYPE_OPTIONS: { id: ClientType; label: string }[] = [
   { id: 'agency',     label: '📣 وكالة دعاية وإعلان' },
 ]
 
+// تسميات قنوات النشر (لاختيار قناة الباقة الأساسية)
+const CHANNEL_LABELS: Record<string, string> = {
+  x: 'X (تويتر)', ig: 'Instagram', li: 'LinkedIn', tk: 'TikTok',
+}
+
 const DURATION_OPTIONS = [
   { id: 'week_1',  label: 'أسبوع' },
   { id: 'week_2',  label: 'أسبوعان' },
@@ -132,6 +137,8 @@ export default function RequestWizard() {
   const [privacyAccepted, setPrivacyAccepted] = useState(false)
   // الباقة المختارة (للأفراد + المنشور الواحد فقط)
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null)
+  // قناة النشر للباقة الأساسية (قناة واحدة يحددها المستخدم)
+  const [basicChannel, setBasicChannel] = useState<string | null>(null)
 
   // ── بيانات الحملة ──────────────────────────────────────────────
   const [campaignSetup, setCampaignSetup] = useState<CampaignSetup>({ postCount: 2, duration: '' })
@@ -156,6 +163,16 @@ export default function RequestWizard() {
     ? categories.filter(c => !c.client_types || c.client_types.includes(effectiveClientType))
     : categories
   const selectedInf = influencers.find(i => i.id === selectedInfluencer) ?? null
+
+  // قنوات الحساب المتاحة (لاختيار قناة الباقة الأساسية)
+  const availableChannels: string[] = selectedInf
+    ? [
+        selectedInf.x_followers  ? 'x'  : null,
+        selectedInf.ig_followers ? 'ig' : null,
+        selectedInf.li_followers ? 'li' : null,
+        selectedInf.tk_followers ? 'tk' : null,
+      ].filter(Boolean) as string[]
+    : []
 
   // ── تحميل البيانات ──────────────────────────────────────────────
   useEffect(() => {
@@ -213,6 +230,7 @@ export default function RequestWizard() {
           if (d.orgInfo)              setOrgInfo(d.orgInfo)
           if (d.campaignSetup)        setCampaignSetup(d.campaignSetup)
           if (d.selectedPackage)      setSelectedPackage(d.selectedPackage)
+          if (d.basicChannel)         setBasicChannel(d.basicChannel)
           if (Array.isArray(d.campaignPosts) && d.campaignPosts.length) setCampaignPosts(d.campaignPosts)
           showToast('تم استرجاع طلبك غير المكتمل ✨', 'info')
         }
@@ -242,7 +260,7 @@ export default function RequestWizard() {
         savedAt: Date.now(),
         selectedInfluencer, requestType, clientType, category, subOption,
         competitionSelection, details, channels, contact, orgInfo,
-        campaignSetup, campaignPosts, selectedPackage,
+        campaignSetup, campaignPosts, selectedPackage, basicChannel,
       }))
     } catch { /* تجاوز سعة التخزين — نتجاهل بهدوء */ }
   }, [
@@ -278,7 +296,9 @@ export default function RequestWizard() {
 
   // ── الباقات تُعرض للأفراد + المنشور الواحد فقط ───────────────────
   const showPackages = requestType === 'single' && clientType === 'individual'
-  const packagesComplete = !showPackages || !!selectedPackage
+  // الباقة الأساسية تتطلّب اختيار قناة واحدة للنشر
+  const basicNeedsChannel = showPackages && selectedPackage === 'basic'
+  const packagesComplete = !showPackages || (!!selectedPackage && (!basicNeedsChannel || !!basicChannel))
 
   // السعر الديناميكي للباقة الأساسية = سعر التسعير التلقائي حسب نوع الخبر
   const basicDynamicPrice: number | null = (() => {
@@ -316,6 +336,7 @@ export default function RequestWizard() {
       if (!campaignPosts.every(isPostComplete)) return 'أكمل تفاصيل جميع منشورات الحملة'
     }
     if (showPackages && !selectedPackage) return 'اختر الباقة المناسبة'
+    if (basicNeedsChannel && !basicChannel) return 'اختر قناة النشر للباقة الأساسية'
     if (!termsAccepted || !privacyAccepted) return 'فعّل الموافقة على الشروط والخصوصية'
     return null
   }
@@ -381,6 +402,7 @@ export default function RequestWizard() {
           channels,
           selected_extras: selectedExtras,
           selected_package: showPackages ? selectedPackage : null,
+          basic_channel: showPackages && selectedPackage === 'basic' ? basicChannel : null,
         }
       }
 
@@ -755,6 +777,36 @@ export default function RequestWizard() {
                   )
                 })}
               </div>
+
+              {/* اختيار قناة النشر — للباقة الأساسية فقط (قناة واحدة) */}
+              {basicNeedsChannel && (
+                <div className="mt-4 bg-cream rounded-xl p-4">
+                  <label className={fieldLabel}>اختر قناة النشر *</label>
+                  <p className="text-xs text-muted mb-3">الباقة الأساسية تشمل النشر في قناة واحدة فقط</p>
+                  {availableChannels.length === 0 ? (
+                    <p className="text-xs text-muted">لا توجد قنوات متاحة لهذا الحساب</p>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {availableChannels.map(ch => (
+                        <button
+                          type="button"
+                          key={ch}
+                          onClick={() => setBasicChannel(ch)}
+                          className={cn(
+                            'rounded-xl border-2 px-3 py-2.5 text-sm font-medium transition-all',
+                            basicChannel === ch
+                              ? 'border-green bg-green/5 text-dark'
+                              : 'border-border bg-white text-muted hover:border-green/40',
+                          )}
+                        >
+                          {basicChannel === ch && <span className="text-green">✓ </span>}
+                          {CHANNEL_LABELS[ch] ?? ch}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex justify-end pt-4">
                 <Button size="sm" onClick={() => setOpenSection(3)} disabled={!packagesComplete}>
