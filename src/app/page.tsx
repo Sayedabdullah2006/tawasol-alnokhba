@@ -33,10 +33,6 @@ export default function HomePage() {
 
         <div className="relative max-w-6xl mx-auto px-4 py-16 md:py-24">
           <div className="text-center max-w-2xl mx-auto">
-            <div className="inline-flex items-center gap-2 bg-gold/15 border border-gold/30 text-gold text-xs font-bold px-4 py-2 rounded-full mb-5">
-              <span>★</span>
-              <span>منصة النخبة الإعلامية</span>
-            </div>
             <h1 className="text-4xl md:text-6xl font-black text-cream mb-8 leading-tight">
               اترك أثراً <span className="text-gold">دائماً</span>
             </h1>
