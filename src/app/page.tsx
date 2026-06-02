@@ -41,6 +41,10 @@ export default function HomePage() {
                 className="px-8 py-4 bg-gold text-dark rounded-xl text-base font-black hover:bg-gold/90 transition-all active:scale-[0.98] shadow-lg shadow-gold/20">
                 ابدأ طلبك الآن
               </Link>
+              <Link href="/services"
+                className="px-8 py-4 bg-cream/10 backdrop-blur border border-cream/30 text-cream rounded-xl text-base font-bold hover:bg-cream/20 transition-all">
+                تعرّف على خدماتنا
+              </Link>
             </div>
           </div>
 
