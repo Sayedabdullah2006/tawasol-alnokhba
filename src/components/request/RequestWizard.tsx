@@ -12,7 +12,7 @@ import type { ClientType } from './RStep1ClientType'
 import type { CampaignSetup } from './RStepCampaignSetup'
 import RStep3Details from './RStep3Details'
 import { type ContactData } from './RStep5Contact'
-import RStep6Terms from './RStep6Terms'
+import { TERMS_TEXT } from './RStep6Terms'
 import RStepCampaignPosts, { type CampaignPostData, makeEmptyPost, isPostComplete } from './RStepCampaignPosts'
 import SuccessScreen from './SuccessScreen'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -133,8 +133,8 @@ export default function RequestWizard() {
   const selectedExtras: string[] = []
   const [contact, setContact]           = useState<ContactData>({ fullName: '', phone: '', email: '', city: '', xHandle: '' })
   const [orgInfo, setOrgInfo]           = useState({ name: '', representative: '', license: '' })
-  const [termsAccepted, setTermsAccepted]   = useState(false)
-  const [privacyAccepted, setPrivacyAccepted] = useState(false)
+  // الموافقة على الشروط ضمنية بالضغط على «إرسال الطلب» — مع رابط لعرضها في نافذة منبثقة
+  const [showTerms, setShowTerms] = useState(false)
   // الباقة المختارة (للأفراد + المنشور الواحد فقط)
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null)
   // قناة النشر للباقة الأساسية (قناة واحدة يحددها المستخدم)
@@ -178,7 +178,10 @@ export default function RequestWizard() {
   useEffect(() => {
     const supabase = createClient()
     supabase.from('influencers').select('*').eq('is_active', true).then(({ data }) => {
-      setInfluencers((data as Influencer[]) ?? [])
+      const list = (data as Influencer[]) ?? []
+      setInfluencers(list)
+      // حساب النشر مثبّت تلقائياً على الحساب النشط الوحيد (أول سعودي) — لا يُختار يدوياً
+      if (list.length > 0) setSelectedInfluencer(prev => prev ?? list[0].id!)
       setLoading(false)
     })
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -292,7 +295,6 @@ export default function RequestWizard() {
         ? details.title.trim() !== '' && details.content.trim() !== ''
         : false
 
-  const finishComplete = termsAccepted && privacyAccepted
 
   // ── الباقات تُعرض للأفراد + المنشور الواحد فقط ───────────────────
   const showPackages = requestType === 'single' && clientType === 'individual'
@@ -317,12 +319,11 @@ export default function RequestWizard() {
     }
   })()
 
-  const sectionComplete = [aboutComplete, contentComplete, packagesComplete, finishComplete]
+  const sectionComplete = [aboutComplete, contentComplete, packagesComplete]
   const canSubmit = sectionComplete.every(Boolean)
 
   // أول متطلب ناقص — يُعرض كتلميح فوق زر الإرسال
   const missingHint = (): string | null => {
-    if (!selectedInfluencer) return 'اختر الحساب الذي تريد النشر معه'
     if (!requestType) return 'اختر نوع الطلب'
     if (!clientType) return 'اختر صفة مقدّم الطلب'
     if (clientType !== 'individual' && orgInfo.name.trim() === '') return 'أدخل اسم الجهة'
@@ -337,7 +338,6 @@ export default function RequestWizard() {
     }
     if (showPackages && !selectedPackage) return 'اختر الباقة المناسبة'
     if (basicNeedsChannel && !basicChannel) return 'اختر قناة النشر للباقة الأساسية'
-    if (!termsAccepted || !privacyAccepted) return 'فعّل الموافقة على الشروط والخصوصية'
     return null
   }
 
@@ -483,20 +483,6 @@ export default function RequestWizard() {
             onToggle={() => setOpenSection(openSection === 0 ? -1 : 0)}
           >
             <div className="space-y-4">
-              <div>
-                <label className={fieldLabel}>الحساب الذي تنشر معه *</label>
-                <select
-                  value={selectedInfluencer ?? ''}
-                  onChange={e => setSelectedInfluencer(e.target.value || null)}
-                  className={selectCls}
-                >
-                  <option value="">— اختر الحساب —</option>
-                  {influencers.map(inf => (
-                    <option key={inf.id} value={inf.id}>{inf.name_ar}</option>
-                  ))}
-                </select>
-              </div>
-
               <div>
                 <label className={fieldLabel}>نوع الطلب *</label>
                 <select
@@ -818,35 +804,6 @@ export default function RequestWizard() {
             </FormSection>
           )}
 
-          {/* ④ الموافقة على الشروط ──────────────────────────────── */}
-          <FormSection
-            index={showPackages ? 4 : 3}
-            title="الموافقة على الشروط"
-            subtitle="اقرأ الشروط والأحكام ووافق عليها"
-            complete={finishComplete}
-            open={openSection === 3}
-            onToggle={() => setOpenSection(openSection === 3 ? -1 : 3)}
-          >
-            <div className="space-y-6">
-              <RStep6Terms
-                termsAccepted={termsAccepted}
-                privacyAccepted={privacyAccepted}
-                onTermsChange={setTermsAccepted}
-                onPrivacyChange={setPrivacyAccepted}
-              />
-
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center">
-                <div className="text-2xl mb-2">📧</div>
-                <p className="font-bold text-blue-700 text-sm">
-                  بمجرد إرسالك سيصلك عرضك خلال دقائق
-                </p>
-                <p className="text-xs text-blue-600 mt-1">
-                  مُحتسَب خصيصاً بحسب طبيعة خبرك — ولا يوجد أي التزام مالي قبل موافقتك
-                </p>
-              </div>
-            </div>
-          </FormSection>
-
         </div>
       </div>
 
@@ -856,6 +813,17 @@ export default function RequestWizard() {
           {!canSubmit && missingHint() && (
             <p className="text-xs text-muted text-center mb-2">⬑ {missingHint()}</p>
           )}
+          {/* الموافقة على الشروط ضمنية بالإرسال — مع رابط لعرضها */}
+          <p className="text-[11px] text-muted text-center mb-2 leading-relaxed">
+            بالضغط على «إرسال الطلب» فإنك توافق على{' '}
+            <button
+              type="button"
+              onClick={() => setShowTerms(true)}
+              className="text-green font-medium underline hover:text-green/80"
+            >
+              الشروط والأحكام وسياسة الخصوصية
+            </button>
+          </p>
           <Button
             onClick={handleSubmit}
             disabled={!canSubmit || submitting}
@@ -866,6 +834,37 @@ export default function RequestWizard() {
           </Button>
         </div>
       </div>
+
+      {/* نافذة الشروط والأحكام */}
+      {showTerms && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setShowTerms(false)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <h3 className="font-black text-dark text-base">الشروط والأحكام وسياسة الخصوصية</h3>
+              <button
+                type="button"
+                onClick={() => setShowTerms(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-muted hover:bg-muted/10 text-lg"
+                aria-label="إغلاق"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="px-5 py-4 overflow-y-auto text-sm text-dark/80 leading-relaxed whitespace-pre-line">
+              {TERMS_TEXT}
+            </div>
+            <div className="px-5 py-3 border-t border-border">
+              <Button onClick={() => setShowTerms(false)} className="w-full">إغلاق</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

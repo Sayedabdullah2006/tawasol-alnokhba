@@ -9,7 +9,7 @@ interface Props {
   onPrivacyChange: (v: boolean) => void
 }
 
-const TERMS_TEXT = `أولاً: قبول الشروط
+export const TERMS_TEXT = `أولاً: قبول الشروط
 بتقديم طلب النشر عبر منصة تواصل النخبة، فإنك توافق على الالتزام بهذه الشروط والأحكام كاملةً.
 
 ثانياً: طبيعة الخدمة
