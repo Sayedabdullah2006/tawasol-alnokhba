@@ -289,9 +289,11 @@ export async function POST(request: Request) {
       channelCount:   effectiveChannels.length,
     })
 
-    // سعر الباقة: basic = السعر الديناميكي، pro/elite = السعر الثابت
+    // سعر الباقة = سعر الباقة الأساسية (الديناميكي حسب نوع الخبر) × معامل الباقة
+    //  - الأساسية: المعامل 1.0  → السعر التلقائي للخبر
+    //  - الاحتراف: ×1.46 ، التميز: ×1.60
     const packagePrice = pkg
-      ? (pkg.price != null ? pkg.price : priceCalc.total)
+      ? Math.round(priceCalc.total * pkg.priceMultiplier)
       : priceCalc.total
 
     // تطبيق كود الخصم على سعر الباقة النهائي
@@ -300,11 +302,11 @@ export async function POST(request: Request) {
       : 0
     const singleFinalPrice = packagePrice - singleDiscountAmt
 
-    // قيم التسعير المخزَّنة: basic يستخدم قيم التسعير التلقائي، pro/elite سعر ثابت بلا إضافات منفصلة
-    const isFixedPackage = pkg != null && pkg.price != null
-    const storedBasePrice   = isFixedPackage ? packagePrice : priceCalc.basePrice
-    const storedExtrasTotal = isFixedPackage ? 0 : priceCalc.extrasTotal
-    const storedTotalAmount = isFixedPackage ? packagePrice : priceCalc.total
+    // قيم التسعير المخزَّنة: باقات الاحتراف/التميز تُخزَّن بسعرها الكامل بلا إضافات منفصلة
+    const isUpgradedPackage = pkg != null && pkg.id !== 'basic'
+    const storedBasePrice   = isUpgradedPackage ? packagePrice : priceCalc.basePrice
+    const storedExtrasTotal = isUpgradedPackage ? 0 : priceCalc.extrasTotal
+    const storedTotalAmount = isUpgradedPackage ? packagePrice : priceCalc.total
 
     const { data, error } = await serviceClient
       .from('publish_requests')

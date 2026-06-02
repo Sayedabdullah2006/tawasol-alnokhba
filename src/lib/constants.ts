@@ -126,11 +126,11 @@ export const EXTRAS = [
 ]
 
 // ─── Packages (الباقات) — للأفراد + المنشور الواحد فقط ───
-// price = null ⇒ سعر ديناميكي يُحتسب من auto-quote حسب نوع الخبر
+// السعر = سعر الباقة الأساسية (الديناميكي حسب نوع الخبر لقناة واحدة) × priceMultiplier
 export interface Package {
   id: 'basic' | 'pro' | 'elite'
   name: string
-  price: number | null
+  priceMultiplier: number
   blurb: string
   features: string[]
   includedExtras: string[]
@@ -142,7 +142,7 @@ export const PACKAGES: Package[] = [
   {
     id: 'basic',
     name: 'الباقة الأساسية',
-    price: null,
+    priceMultiplier: 1.0,
     blurb: 'انطلاقة مثالية لنشر خبرك',
     features: [
       'النشر في قناة واحدة',
@@ -155,7 +155,7 @@ export const PACKAGES: Package[] = [
   {
     id: 'pro',
     name: 'باقة الاحتراف',
-    price: 1499,
+    priceMultiplier: 1.46,
     blurb: 'انتشار أوسع عبر جميع القنوات',
     features: [
       'النشر في جميع القنوات (X, LinkedIn, Instagram, TikTok)',
@@ -170,7 +170,7 @@ export const PACKAGES: Package[] = [
   {
     id: 'elite',
     name: 'باقة التميز',
-    price: 1799,
+    priceMultiplier: 1.60,
     blurb: 'الحضور الأقوى والأثر الأطول',
     features: [
       'النشر في جميع القنوات (X, LinkedIn, Instagram, TikTok)',

@@ -739,9 +739,11 @@ export default function RequestWizard() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {PACKAGES.map(pkg => {
                   const isSelected = selectedPackage === pkg.id
-                  const priceLabel = pkg.id === 'basic'
-                    ? (basicDynamicPrice != null ? `${basicDynamicPrice} ر.س` : 'حسب نوع الخبر')
-                    : `${pkg.price} ر.س`
+                  // السعر = سعر الباقة الأساسية × معامل الباقة
+                  const pkgPrice = basicDynamicPrice != null
+                    ? Math.round(basicDynamicPrice * pkg.priceMultiplier)
+                    : null
+                  const priceLabel = pkgPrice != null ? `${pkgPrice} ر.س` : 'حسب نوع الخبر'
                   return (
                     <button
                       type="button"
