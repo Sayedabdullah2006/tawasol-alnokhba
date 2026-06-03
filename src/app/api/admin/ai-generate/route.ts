@@ -8,6 +8,9 @@ export const dynamic = 'force-dynamic'
 // Image generation can be slow — give it room.
 export const maxDuration = 300
 
+// موديل OpenAI النصّي المستخدم في الخطوات 1-3 + بناء برومبت التصميم
+const OPENAI_MODEL = 'gpt-5.5'
+
 type Step = 'analyze' | 'tweets' | 'concepts' | 'image'
 
 export async function POST(req: Request) {
@@ -72,7 +75,7 @@ export async function POST(req: Request) {
       }
 
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: OPENAI_MODEL,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: SYS_ANALYZE },
@@ -105,7 +108,7 @@ export async function POST(req: Request) {
       }
 
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: OPENAI_MODEL,
         messages: [
           { role: 'system', content: SYS_TWEETS },
           {
@@ -132,7 +135,7 @@ export async function POST(req: Request) {
       }
 
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: OPENAI_MODEL,
         messages: [
           { role: 'system', content: SYS_CONCEPTS },
           {
@@ -180,7 +183,7 @@ export async function POST(req: Request) {
 
       // 1) Generate the detailed design prompt.
       const promptCompletion = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: OPENAI_MODEL,
         messages: [
           { role: 'system', content: SYS_IMAGE },
           {
