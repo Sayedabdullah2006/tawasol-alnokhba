@@ -14,8 +14,8 @@ export const POSTER_WIDTH = 1080
 export const POSTER_HEIGHT = 1350
 
 /**
- * يضبط الصورة على مقاس 1080×1350 بالضبط (4:5) بالتحجيم مع قص مركزي عند اللزوم،
- * لضمان توحيد مقاس كل التصاميم المولّدة بغضّ النظر عمّا يُخرجه النموذج.
+ * يضبط الصورة على مقاس 1080×1350 بالضبط (4:5) **بالتحجيم فقط دون قصّ**.
+ * بما أن النموذج يُطلب منه إخراج 4:5، يكون التحجيم لنفس النسبة بلا تشويه يُذكر.
  */
 export async function resizeToPoster(
   img: Buffer,
@@ -23,7 +23,7 @@ export async function resizeToPoster(
   height: number = POSTER_HEIGHT,
 ): Promise<Buffer> {
   return sharp(img)
-    .resize(width, height, { fit: 'cover', position: 'centre' })
+    .resize(width, height, { fit: 'fill' })
     .png()
     .toBuffer()
 }

@@ -104,7 +104,8 @@ export const SYS_IMAGE = `أنت مهندس برومبتات تصميم لحسا
 - لا نِسب مئوية، لا كلام إنشائي، لا اختلاق.
 
 === القالب (أخرج بهذا الشكل) ===
-PHOTO EDIT TASK — add a FIRST1SAUDI Arabic graphic-design layer onto the provided real photograph. This is NOT image generation; it is editing the existing photo. Portrait social poster, ultra-HD.
+PHOTO EDIT TASK — add a FIRST1SAUDI Arabic graphic-design layer onto the provided real photograph. This is NOT image generation; it is editing the existing photo.
+OUTPUT SIZE: EXACTLY 1080×1350 pixels — portrait 4:5 aspect ratio. Compose the ENTIRE design to fit this 4:5 portrait canvas (do not output square or any other ratio). ultra-HD.
 
 === 🔒 KEEP THE REAL PEOPLE — IRON-CLAD (أقوى قاعدة) ===
 ⛔ The provided photo is the ONLY source of the person/people. EDIT IT IN PLACE. ⛔
@@ -152,4 +153,4 @@ Render all Arabic text crisp, correctly shaped and connected (RTL), exactly as q
 ✗ emojis / 3D / sparkles inside the design
 ✗ the phrase "أول سعودية" unless it appears in the source
 
-FINAL REMINDER: EDIT THE PROVIDED PHOTO IN PLACE. The real person stays pixel-identical; you only add the FIRST1SAUDI graphic layer around/over the background.`
+FINAL REMINDER: EDIT THE PROVIDED PHOTO IN PLACE. The real person stays pixel-identical; you only add the FIRST1SAUDI graphic layer around/over the background. Output the result as a 1080×1350 (4:5) portrait image.`
