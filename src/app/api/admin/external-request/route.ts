@@ -21,15 +21,20 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     const {
-      clientName, category, amount, title, paidAt, influencerId,
+      clientName, category, amount, title, content, paidAt, influencerId, mode,
     } = body as {
       clientName?: string
       category?: string
       amount?: number
       title?: string
+      content?: string
       paidAt?: string
       influencerId?: string | null
+      mode?: 'completed' | 'in_progress'
     }
+
+    // الوضع: مكتمل (نُشر ودُفع مسبقاً) أو قيد التنفيذ (سيُجهَّز محتواه عبر الاستوديو)
+    const isInProgress = mode === 'in_progress'
 
     // تحقق من المدخلات الأساسية
     if (!clientName?.trim()) {
@@ -60,7 +65,9 @@ export async function POST(request: Request) {
         images:             'one',
         request_type:       'single',
         title:              title?.trim() || 'طلب خارجي',
-        content:            title?.trim() || 'طلب مُسجَّل يدوياً من الإدارة (نُشر ودُفع خارج المنصة)',
+        content:            content?.trim() || title?.trim() || (isInProgress
+                              ? 'طلب خارجي — بانتظار صياغة المحتوى عبر الاستوديو'
+                              : 'طلب مُسجَّل يدوياً من الإدارة (نُشر ودُفع خارج المنصة)'),
         client_name:        clientName.trim(),
         client_phone:       '-',
         client_email:       '-',
@@ -71,7 +78,7 @@ export async function POST(request: Request) {
         total_amount:       price,
         admin_quoted_price: price,
         final_total:        price,
-        status:             'completed',
+        status:             isInProgress ? 'in_progress' : 'completed',
         quoted_at:          paidIso,
         approved_at:        paidIso,
         paid_at:            paidIso,

@@ -47,6 +47,8 @@ export default function AdminRequestsPage() {
   const [extAmount, setExtAmount] = useState('')
   const [extTitle, setExtTitle] = useState('')
   const [extDate, setExtDate] = useState('')
+  const [extMode, setExtMode] = useState<'completed' | 'in_progress'>('completed')
+  const [extContent, setExtContent] = useState('')
   // Removed drawer-related state since we now use full-page view
 
   const loadData = useCallback(async () => {
@@ -373,6 +375,7 @@ export default function AdminRequestsPage() {
 
   const resetExternalForm = () => {
     setExtName(''); setExtCategory(''); setExtAmount(''); setExtTitle(''); setExtDate('')
+    setExtMode('completed'); setExtContent('')
   }
 
   const handleSaveExternal = async () => {
@@ -380,6 +383,10 @@ export default function AdminRequestsPage() {
     if (!extCategory) { showToast('اختر الفئة', 'error'); return }
     const amount = parseFloat(extAmount)
     if (!Number.isFinite(amount) || amount < 0) { showToast('أدخل مبلغاً صحيحاً', 'error'); return }
+    if (extMode === 'in_progress') {
+      if (!extTitle.trim()) { showToast('أدخل عنوان الخبر', 'error'); return }
+      if (!extContent.trim()) { showToast('أدخل تفاصيل/نص الخبر', 'error'); return }
+    }
 
     setSavingExternal(true)
     try {
@@ -391,15 +398,19 @@ export default function AdminRequestsPage() {
           category: extCategory,
           amount,
           title: extTitle.trim() || null,
+          content: extContent.trim() || null,
           paidAt: extDate || null,
+          mode: extMode,
         }),
       })
       const data = await res.json()
       if (res.ok && data.success) {
         showToast('تم تسجيل الطلب الخارجي بنجاح', 'success')
         setShowExternalForm(false)
+        const goToRequest = extMode === 'in_progress' && data.id
         resetExternalForm()
-        loadData()
+        if (goToRequest) router.push(`/admin/requests/${data.id}`)
+        else loadData()
       } else {
         showToast(data.error || 'فشل تسجيل الطلب', 'error')
       }
@@ -934,11 +945,34 @@ export default function AdminRequestsPage() {
               <div className="text-4xl mb-2">➕</div>
               <h3 className="text-lg font-bold text-green-700 mb-1">تسجيل طلب خارجي</h3>
               <p className="text-xs text-gray-600">
-                لطلب نُشر ودُفع خارج المنصة — يُحتسب ضمن إحصاءات الموقع وإيراداته
+                طلب من خارج المنصة — يُحتسب ضمن إحصاءات الموقع وإيراداته
               </p>
             </div>
 
             <div className="space-y-3">
+              {/* وضع الطلب */}
+              <div>
+                <label className="block text-sm font-medium text-dark mb-1">نوع التسجيل *</label>
+                <div className="grid grid-cols-1 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setExtMode('completed')}
+                    className={`text-right rounded-xl border-2 p-3 transition-all ${extMode === 'completed' ? 'border-green bg-green/5 ring-2 ring-green/30' : 'border-border bg-white hover:border-green/40'}`}
+                  >
+                    <div className="font-bold text-sm text-dark">✅ مكتمل (نُشر ودُفع مسبقاً)</div>
+                    <div className="text-xs text-muted">تسجيل للإحصاءات فقط — يُحفظ كطلب مكتمل.</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExtMode('in_progress')}
+                    className={`text-right rounded-xl border-2 p-3 transition-all ${extMode === 'in_progress' ? 'border-green bg-green/5 ring-2 ring-green/30' : 'border-border bg-white hover:border-green/40'}`}
+                  >
+                    <div className="font-bold text-sm text-dark">⚡ قيد التنفيذ (سأجهّز المحتوى)</div>
+                    <div className="text-xs text-muted">أدخل تفاصيل الخبر، ويُفتح الطلب لتصميمه عبر استوديو الذكاء الاصطناعي، ثم غيّر الحالة لمكتمل لاحقاً.</div>
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-dark mb-1">اسم العميل *</label>
                 <Input value={extName} onChange={e => setExtName(e.target.value)} placeholder="اسم العميل" />
@@ -964,9 +998,24 @@ export default function AdminRequestsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-dark mb-1">عنوان/وصف (اختياري)</label>
+                <label className="block text-sm font-medium text-dark mb-1">
+                  عنوان الخبر {extMode === 'in_progress' ? '*' : '(اختياري)'}
+                </label>
                 <Input value={extTitle} onChange={e => setExtTitle(e.target.value)} placeholder="عنوان الخبر" />
               </div>
+
+              {extMode === 'in_progress' && (
+                <div>
+                  <label className="block text-sm font-medium text-dark mb-1">تفاصيل/نص الخبر *</label>
+                  <textarea
+                    value={extContent}
+                    onChange={e => setExtContent(e.target.value)}
+                    placeholder="اكتب تفاصيل الخبر التي سيُصاغ منها المحتوى والتصاميم عبر الاستوديو..."
+                    className="w-full px-4 py-2 rounded-xl border border-border bg-white text-sm min-h-[120px] resize-y"
+                  />
+                  <p className="text-xs text-muted mt-1">يمكنك لاحقاً رفع صورة المصدر من داخل الاستوديو.</p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-dark mb-1">تاريخ النشر/الدفع (اختياري)</label>
