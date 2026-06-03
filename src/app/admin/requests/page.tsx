@@ -23,6 +23,10 @@ export default function AdminRequestsPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [duplicatesOnly, setDuplicatesOnly] = useState(false)
+  // فلتر المستخدم: مفتاح المستخدم المختار + نص البحث في القائمة + إظهار القائمة
+  const [userFilter, setUserFilter] = useState('')
+  const [userQuery, setUserQuery] = useState('')
+  const [showUserList, setShowUserList] = useState(false)
   const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [requestToDelete, setRequestToDelete] = useState<any>(null)
@@ -81,8 +85,42 @@ export default function AdminRequestsPage() {
     return !!key && (requestCountByOwner[key] ?? 0) > 1
   }
 
+  // قائمة المستخدمين الفريدة الذين لديهم طلبات (للفلتر بالاسم)
+  const usersList = (() => {
+    const map = new Map<string, { key: string; name: string; email: string; count: number }>()
+    for (const r of requests) {
+      const key = ownerKey(r)
+      if (!key) continue
+      const existing = map.get(key)
+      if (existing) {
+        existing.count += 1
+      } else {
+        map.set(key, {
+          key,
+          name: r.client_name || r.client_email || r.client_phone || '—',
+          email: r.client_email || '',
+          count: 1,
+        })
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'ar'))
+  })()
+
+  // قائمة المستخدمين بعد تطبيق نص البحث داخل القائمة
+  const filteredUsersList = userQuery.trim()
+    ? usersList.filter(u => {
+        const q = userQuery.trim().toLowerCase()
+        return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+      })
+    : usersList
+
+  const selectedUserName = userFilter
+    ? (usersList.find(u => u.key === userFilter)?.name ?? '')
+    : ''
+
   const filteredRequests = requests
     .filter(r => {
+      if (userFilter && ownerKey(r) !== userFilter) return false
       if (duplicatesOnly && !isDuplicate(r)) return false
       if (statusFilter && r.status !== statusFilter) return false
       if (search) {
@@ -396,6 +434,47 @@ export default function AdminRequestsPage() {
             <option key={k} value={k}>{v.label}</option>
           ))}
         </select>
+
+        {/* فلتر باسم المستخدم — قائمة قابلة للبحث بكل المستخدمين الذين لديهم طلبات */}
+        <div className="relative">
+          <input
+            type="text"
+            value={userFilter ? selectedUserName : userQuery}
+            onChange={e => { setUserFilter(''); setUserQuery(e.target.value); setShowUserList(true) }}
+            onFocus={() => setShowUserList(true)}
+            onBlur={() => setTimeout(() => setShowUserList(false), 150)}
+            placeholder={`👤 فلترة بالمستخدم (${usersList.length})`}
+            className="px-4 py-2 rounded-xl border border-border bg-card text-sm min-h-[48px] w-56"
+          />
+          {userFilter && (
+            <button
+              onClick={() => { setUserFilter(''); setUserQuery('') }}
+              className="absolute left-2 top-1/2 -translate-y-1/2 text-muted hover:text-red-600 text-sm"
+              title="مسح الفلتر"
+            >
+              ✕
+            </button>
+          )}
+          {showUserList && (
+            <div className="absolute z-30 mt-1 w-72 max-h-72 overflow-y-auto bg-white border border-border rounded-xl shadow-lg right-0">
+              {filteredUsersList.length === 0 ? (
+                <div className="px-4 py-3 text-xs text-muted text-center">لا يوجد مستخدمون مطابقون</div>
+              ) : (
+                filteredUsersList.map(u => (
+                  <button
+                    key={u.key}
+                    onMouseDown={() => { setUserFilter(u.key); setUserQuery(''); setShowUserList(false) }}
+                    className="w-full text-right px-4 py-2.5 hover:bg-cream/60 transition-colors border-b border-border/50 last:border-0 flex items-center justify-between gap-2"
+                  >
+                    <span className="text-sm text-dark font-medium truncate">{u.name}</span>
+                    <span className="text-[10px] text-muted bg-cream px-1.5 py-0.5 rounded-md shrink-0">{u.count} طلب</span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
         <Button variant="outline" onClick={handleExport}>تصدير CSV</Button>
 
         <Button
@@ -612,10 +691,10 @@ export default function AdminRequestsPage() {
         </div>
         {filteredRequests.length === 0 && (
           <div className="p-8 text-center text-muted">
-            <p>لا توجد طلبات {search || statusFilter || duplicatesOnly ? 'تطابق البحث' : 'بعد'}</p>
-            {(search || statusFilter || duplicatesOnly) && (
+            <p>لا توجد طلبات {search || statusFilter || duplicatesOnly || userFilter ? 'تطابق البحث' : 'بعد'}</p>
+            {(search || statusFilter || duplicatesOnly || userFilter) && (
               <button
-                onClick={() => { setSearch(''); setStatusFilter(''); setDuplicatesOnly(false); }}
+                onClick={() => { setSearch(''); setStatusFilter(''); setDuplicatesOnly(false); setUserFilter(''); setUserQuery(''); }}
                 className="mt-2 text-xs text-blue-600 hover:underline"
               >
                 إظهار جميع الطلبات
