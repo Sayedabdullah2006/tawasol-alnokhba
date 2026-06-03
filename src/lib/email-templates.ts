@@ -1278,3 +1278,54 @@ export function negotiationRejectedToClient(d: {
     `)
   }
 }
+
+export function infoRequestedToClient(d: {
+  requestNumber: string; clientName: string; message: string
+}) {
+  return {
+    subject: `مطلوب تعديل على طلبك ${d.requestNumber} · تواصل النخبة`,
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:48px; margin-bottom:16px;">📩</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">يحتاج فريقنا إلى تعديل بسيط على طلبك</h2>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+      </div>
+      <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
+        لإكمال تحضير المحتوى على أكمل وجه، نحتاج منك تعديل طلبك (مثل إضافة صورة أوضح أو تفاصيل أكثر عن الخبر):
+      </p>
+      <div style="background:#FEF3C7; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${BRAND_GOLD};">
+        <h3 style="margin:0 0 8px 0; color:#856404; font-size:15px;">المطلوب</h3>
+        <p style="margin:0; color:#856404; font-size:14px; line-height:1.8; white-space:pre-line;">${d.message}</p>
+      </div>
+      <div style="margin:32px 0; text-align:center;">
+        <a href="${SITE_URL}/dashboard/${d.requestNumber.replace('ATH-', '')}" style="display:inline-block; background:${BRAND_GOLD}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+          تعديل الطلب الآن
+        </a>
+      </div>
+    `)
+  }
+}
+
+export function infoResubmittedToAdmin(d: {
+  requestNumber: string; clientName: string
+}) {
+  return {
+    subject: `العميل عدّل طلبه ${d.requestNumber} · تواصل النخبة`,
+    html: wrap(`
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:48px; margin-bottom:16px;">✅</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">قام العميل بتعديل طلبه</h2>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+      </div>
+      <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
+        قام <strong>${d.clientName}</strong> بتحديث المحتوى/الصور بناءً على طلبكم. عاد الطلب إلى مرحلة «قيد التنفيذ» لمتابعة تحضير المحتوى.
+      </p>
+      <div style="margin:32px 0; text-align:center;">
+        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+          فتح الطلب
+        </a>
+      </div>
+    `)
+  }
+}

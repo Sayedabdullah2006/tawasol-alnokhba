@@ -106,6 +106,19 @@ export function getAdminActions(status: RequestStatus): AdminActionConfig {
         }
       }
 
+    case 'info_requested':
+      return {
+        showStatusUpdate: false,
+        showAdminNotes: false,
+        showQuickActions: false,
+        allowedActions: [],
+        message: {
+          type: 'waiting',
+          text: 'تم طلب معلومات/صور إضافية من العميل، في انتظار تعديله وإعادة الإرسال',
+          icon: '📩'
+        }
+      }
+
     case 'content_review':
       return {
         showStatusUpdate: true,
@@ -177,7 +190,8 @@ export function waitingForClient(status: RequestStatus): boolean {
   const clientActions = [
     'quoted',           // موافقة على العرض
     'approved',         // دفع المبلغ
-    'content_review'    // مراجعة المحتوى
+    'content_review',   // مراجعة المحتوى
+    'info_requested'    // تعديل الطلب بناءً على طلب الإدارة
   ]
   return clientActions.includes(status)
 }

@@ -119,6 +119,8 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   const [deleting, setDeleting] = useState(false)
   const [sendingReminder, setSendingReminder] = useState(false)
   const [activeTab, setActiveTab] = useState<TabKey>('details')
+  const [infoMessage, setInfoMessage] = useState('')
+  const [requestingInfo, setRequestingInfo] = useState(false)
   // يُبدّل قيمته لإعادة تهيئة محرّر الإرسال بالمحتوى الجديد عند «استخدم هذا التصميم»
   const [senderNonce, setSenderNonce] = useState(0)
 
@@ -306,6 +308,33 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
     }
   }
 
+  const handleRequestMoreInfo = async () => {
+    if (!request) return
+    if (infoMessage.trim().length < 5) {
+      showToast('اكتب رسالة توضّح المطلوب من العميل', 'error')
+      return
+    }
+    setRequestingInfo(true)
+    try {
+      const res = await fetch('/api/admin/request-more-info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: request.id, message: infoMessage.trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        showToast('تم إرسال الطلب للعميل')
+        window.location.reload()
+      } else {
+        showToast(data.error ?? 'فشل إرسال الطلب', 'error')
+      }
+    } catch {
+      showToast('حدث خطأ في الاتصال', 'error')
+    } finally {
+      setRequestingInfo(false)
+    }
+  }
+
   if (loading) return <LoadingSpinner size="lg" />
   if (!request) return null
 
@@ -406,6 +435,31 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                   })()}
               </div>
 
+              {/* طلب صورة/معلومات من العميل */}
+              {!sendingContent && (
+                <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
+                  <h4 className="font-bold text-dark">📩 طلب صورة/معلومات من العميل</h4>
+                  <p className="text-xs text-muted">
+                    إن كانت الصورة المرفقة غير مناسبة أو تحتاج تفاصيل أكثر عن الخبر، اكتب ما تريده — سيتمكّن العميل من تعديل طلبه (الصور/المحتوى) وإعادة إرساله.
+                  </p>
+                  <textarea
+                    value={infoMessage}
+                    onChange={e => setInfoMessage(e.target.value)}
+                    placeholder="مثلاً: الصورة غير واضحة، يرجى إرفاق صورة أعلى دقة، أو إضافة تفاصيل عن مكان وتاريخ الإنجاز..."
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[80px] resize-y"
+                  />
+                  <Button
+                    onClick={handleRequestMoreInfo}
+                    loading={requestingInfo}
+                    disabled={requestingInfo || !infoMessage.trim()}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    📩 إرسال الطلب للعميل
+                  </Button>
+                </div>
+              )}
+
               {/* إرسال المحتوى — مطالبات الحالة (المسار العام/القديم) */}
               {!sendingContent && (() => {
                 const hasClientFeedback = !!request.user_feedback
@@ -487,6 +541,17 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                 </div>
               )}
             </>
+          ) : request.status === 'info_requested' ? (
+            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 space-y-2">
+              <h4 className="font-bold text-orange-700">📩 بانتظار تعديل العميل</h4>
+              <p className="text-sm text-orange-600">تم طلب معلومات/صور إضافية من العميل. ستعود أدوات المحتوى بعد تعديله وإعادة إرساله.</p>
+              {request.admin_info_request && (
+                <div className="bg-white rounded-lg p-3 border border-orange-200">
+                  <p className="text-xs font-bold text-orange-700 mb-1">رسالتك المُرسلة:</p>
+                  <p className="text-sm text-dark whitespace-pre-line">{request.admin_info_request}</p>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="bg-card rounded-2xl border border-border p-5 text-sm text-muted">
               أدوات المحتوى (الاستوديو والإرسال) متاحة عندما يكون الطلب في مرحلة «قيد التنفيذ».

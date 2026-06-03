@@ -19,7 +19,8 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   approved:        ['in_progress', 'paid', 'payment_review', 'rejected'],
   payment_review:  ['approved', 'paid', 'rejected'],
   paid:            ['in_progress'],
-  in_progress:     ['content_review', 'completed'],
+  in_progress:     ['content_review', 'completed', 'info_requested'],
+  info_requested:  ['in_progress', 'content_review'],
   content_review:  ['in_progress', 'completed'],
   completed:       [],          // حالة نهائية — لا تراجع
   rejected:        ['pending'], // يمكن إعادة فتح الطلب المرفوض

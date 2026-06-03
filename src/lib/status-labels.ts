@@ -43,6 +43,11 @@ export const CLIENT_STATUS_LABELS: Record<RequestStatus, { label: string; color:
     color: 'orange',
     description: 'جاري تحضير المحتوى وتنفيذ طلبك'
   },
+  info_requested: {
+    label: 'مطلوب تعديل طلبك',
+    color: 'orange',
+    description: 'طلبت الإدارة تعديل أو إضافة معلومات/صور — عدّل طلبك وأعد الإرسال'
+  },
   content_review: {
     label: 'راجع المحتوى المقترح',
     color: 'purple',
@@ -107,6 +112,11 @@ export const ADMIN_STATUS_LABELS: Record<RequestStatus, { label: string; color: 
     color: 'orange',
     description: 'جاري تنفيذ المشروع وتحضير المحتوى'
   },
+  info_requested: {
+    label: 'بانتظار تعديل العميل',
+    color: 'orange',
+    description: 'تم طلب معلومات/صور إضافية من العميل، بانتظار تعديله وإعادة الإرسال'
+  },
   content_review: {
     label: 'العميل يراجع المحتوى',
     color: 'purple',
@@ -152,7 +162,7 @@ export function isActionRequiredForAdmin(status: RequestStatus): boolean {
 }
 
 export function isActionRequiredForClient(status: RequestStatus): boolean {
-  return ['quoted', 'content_review'].includes(status)
+  return ['quoted', 'content_review', 'info_requested'].includes(status)
 }
 
 export function isWaitingStatus(status: RequestStatus): boolean {

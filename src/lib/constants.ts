@@ -211,6 +211,7 @@ export const REQUEST_STATUSES = {
   payment_review: { label: 'بانتظار تحقق الدفع', color: 'orange' },
   paid: { label: 'تم الدفع', color: 'cyan' },
   in_progress: { label: 'التحضير', color: 'orange' },
+  info_requested: { label: 'بانتظار تعديل العميل', color: 'orange' },
   content_review: { label: 'مراجعة المحتوى', color: 'purple' },
   completed: { label: 'مكتمل', color: 'green' },
   rejected: { label: 'مرفوض', color: 'red' },

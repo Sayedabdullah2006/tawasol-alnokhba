@@ -175,6 +175,20 @@ export async function notifyContentChangesRequested(args: {
   return sendEmail(ADMIN_EMAIL, t.subject, t.html)
 }
 
+export async function notifyInfoRequestedToClient(args: {
+  email: string; requestNumber: string; clientName: string; message: string
+}) {
+  const t = templates.infoRequestedToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
+export async function notifyInfoResubmittedToAdmin(args: {
+  requestNumber: string; clientName: string
+}) {
+  const t = templates.infoResubmittedToAdmin(args)
+  return sendEmail(ADMIN_EMAIL, t.subject, t.html)
+}
+
 export async function notifyQuoteApprovedToAdmin(args: {
   requestNumber: string; clientName: string; totalAmount: number; hasExtras: boolean; selectedExtras: string[]
 }) {

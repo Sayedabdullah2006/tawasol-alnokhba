@@ -11,6 +11,7 @@ import ProgressTracker from '@/components/dashboard/ProgressTracker'
 import QuoteApproval from '@/components/dashboard/QuoteApproval'
 import EditableExtras from '@/components/dashboard/EditableExtras'
 import PostReviews from '@/components/dashboard/PostReviews'
+import RequestInfoEditor from '@/components/dashboard/RequestInfoEditor'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useToast } from '@/components/ui/Toast'
@@ -429,6 +430,9 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
         )}
+
+        {/* تعديل الطلب عند طلب الإدارة معلومات/صورة */}
+        {request.status === 'info_requested' && <RequestInfoEditor request={request} />}
 
         {/* مراجعة المحتوى لكل خبر على حدة (يبقى الطلب «قيد التنفيذ») */}
         <PostReviews request={request} />
