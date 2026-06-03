@@ -752,7 +752,12 @@ export default function RequestWizard() {
                         {isSelected && <span className="text-green text-base flex-shrink-0">✓</span>}
                       </div>
                       <div className="text-green font-black text-lg mb-1">{priceLabel}</div>
-                      <p className="text-xs text-muted mb-3">{pkg.blurb}</p>
+                      <p className="text-xs text-muted mb-2">{pkg.blurb}</p>
+                      {pkg.badge && (
+                        <span className="inline-flex items-center gap-1 self-start bg-pink-50 text-pink-600 border border-pink-200 text-[10px] font-bold px-2 py-1 rounded-lg mb-3">
+                          🛍️ {pkg.badge}
+                        </span>
+                      )}
                       <ul className="space-y-1.5 mt-auto">
                         {pkg.features.map((f, i) => (
                           <li key={i} className="flex items-start gap-1.5 text-xs text-dark">

@@ -136,6 +136,7 @@ export interface Package {
   includedExtras: string[]
   allChannels: boolean
   highlighted?: boolean
+  badge?: string
 }
 
 export const PACKAGES: Package[] = [
@@ -166,6 +167,7 @@ export const PACKAGES: Package[] = [
     includedExtras: ['mention'],
     allChannels: true,
     highlighted: true,
+    badge: 'تمارا · ادفع على 3 أقساط',
   },
   {
     id: 'elite',
@@ -183,6 +185,7 @@ export const PACKAGES: Package[] = [
     ],
     includedExtras: ['mention', 'encyclopedia', 'pin6', 'repost'],
     allChannels: true,
+    badge: 'تمارا · ادفع على 3 أقساط',
   },
 ]
 
