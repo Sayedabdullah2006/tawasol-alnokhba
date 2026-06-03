@@ -444,11 +444,23 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                   )
                 }
 
+                const isCampaign = request.request_type === 'campaign' && Array.isArray(request.campaign_posts) && request.campaign_posts.length > 0
                 return (
                   <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 space-y-3">
                     <h4 className="font-bold text-blue-700">📝 إرسال المحتوى للمراجعة</h4>
-                    <p className="text-sm text-blue-600">استخدم الاستوديو أعلاه لتوليد المحتوى، أو أرسل محتوى يدوياً مباشرةً للعميل.</p>
-                    <Button onClick={() => setSendingContent(true)} className="w-full">📤 إرسال محتوى يدوياً للعميل</Button>
+                    {isCampaign ? (
+                      <p className="text-sm text-blue-600">لكل خبر في الحملة استوديو خاص به — استخدم الاستوديو أعلاه لتوليد وإرسال محتوى كل خبر على حدة. يمكنك بعد الإرسال تعديله من «حالة مراجعة العميل» أدناه.</p>
+                    ) : (
+                      <>
+                        <p className="text-sm text-blue-600">استخدم الاستوديو أعلاه لتوليد المحتوى، أو أرسل محتوى يدوياً مباشرةً للعميل. بعد الإرسال يمكنك تعديله من «حالة مراجعة العميل» أدناه قبل موافقة العميل.</p>
+                        <Button
+                          onClick={() => { setAiContent(null); setAiImages(null); setAiPostIndex(0); setSendingContent(true) }}
+                          className="w-full"
+                        >
+                          📤 إرسال محتوى يدوياً للعميل
+                        </Button>
+                      </>
+                    )}
                   </div>
                 )
               })()}
