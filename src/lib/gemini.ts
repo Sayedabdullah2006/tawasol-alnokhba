@@ -6,8 +6,9 @@
  * يقرأ المفتاح من process.env.GEMINI_API_KEY فقط — لا يُكتب في الكود.
  */
 
-// نموذج توليد/تحرير الصور من Google (يقبل صوراً مرجعية ويعيد صورة)
-const GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image'
+// نموذج توليد/تحرير الصور من Google — «نانو بانانا برو» (Gemini 3 Pro Image)
+// أقوى بكثير في رسم النص العربي مقارنة بـ nano-banana العادي (gemini-2.5-flash-image)
+const GEMINI_IMAGE_MODEL = 'gemini-3-pro-image-preview'
 
 interface RefImage {
   mimeType: string
@@ -54,6 +55,11 @@ export async function generateImageWithGemini(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ role: 'user', parts }],
+      generationConfig: {
+        responseModalities: ['IMAGE'],
+        // نانو بانانا برو يدعم ضبط نسبة الأبعاد والدقة — 4:5 عمودي لمنشورات السوشال
+        imageConfig: { aspectRatio: '4:5' },
+      },
     }),
   })
 
