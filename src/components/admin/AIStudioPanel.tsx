@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createClient } from '@/lib/supabase'
 import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -14,10 +15,45 @@ type StepKey = 'analyze' | 'tweets' | 'concepts' | 'image'
 
 export default function AIStudioPanel({ request, onUsedContent }: Props) {
   const { showToast } = useToast()
+  const supabase = createClient()
 
-  const contentImages: string[] = Array.isArray(request.content_images)
+  // صور الخبر الأصلية + أي صور يرفعها الأدمن يدوياً
+  const initialContentImages: string[] = Array.isArray(request.content_images)
     ? request.content_images
     : []
+  const [contentImages, setContentImages] = useState<string[]>(initialContentImages)
+  const [uploading, setUploading] = useState(false)
+
+  // رفع صورة مصدر من الأدمن (إن لم توجد صورة بالخبر أو أراد صورة أخرى)
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const ALLOWED = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
+    if (!ALLOWED.includes(file.type)) {
+      showToast('صيغة الصورة غير مدعومة (PNG/JPG/WEBP)', 'error')
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('حجم الصورة يتجاوز 10 ميجابايت', 'error')
+      return
+    }
+    setUploading(true)
+    try {
+      const ext = file.name.split('.').pop()
+      const path = `ai-src-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const { error: upErr } = await supabase.storage.from('content-images').upload(path, file)
+      if (upErr) throw upErr
+      const { data } = supabase.storage.from('content-images').getPublicUrl(path)
+      setContentImages(prev => [...prev, data.publicUrl])
+      setSelectedImage(data.publicUrl)
+      showToast('تم رفع الصورة', 'success')
+    } catch {
+      showToast('فشل رفع الصورة', 'error')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   // ── State (prefilled from existing ai_* columns when re-opened) ──
   const [selectedImage, setSelectedImage] = useState<string | null>(
@@ -89,18 +125,8 @@ export default function AIStudioPanel({ request, onUsedContent }: Props) {
         <h4 className="font-bold text-dark">اختيار صورة المصدر</h4>
         {contentImages.length === 0 ? (
           <p className="text-sm text-muted">
-            لا توجد صورة مرفقة. يُنصح بإرفاق صورة، لكن يمكنك تحليل الخبر بدونها.
+            لا توجد صورة مرفقة بالخبر. ارفع صورة المصدر أدناه، أو حلّل الخبر بدونها.
           </p>
-        ) : contentImages.length === 1 ? (
-          <div className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={contentImages[0]}
-              alt="صورة المصدر"
-              className="w-20 h-20 object-cover rounded-xl border-2 border-green"
-            />
-            <span className="text-sm text-green font-medium">تم اختيارها تلقائياً</span>
-          </div>
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
             {contentImages.map((url) => (
@@ -123,6 +149,18 @@ export default function AIStudioPanel({ request, onUsedContent }: Props) {
             ))}
           </div>
         )}
+
+        {/* رفع صورة مصدر من الأدمن */}
+        <label className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-border text-sm text-muted hover:border-green hover:text-green cursor-pointer transition-colors">
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/webp"
+            onChange={handleUpload}
+            disabled={uploading}
+            className="hidden"
+          />
+          {uploading ? 'جارٍ الرفع...' : '⬆️ رفع صورة مصدر'}
+        </label>
       </div>
 
       {/* ── الخطوة 1 — تحليل الخبر ── */}
