@@ -33,6 +33,7 @@ async function fetchImageAsBase64(url: string): Promise<RefImage> {
 export async function generateImageWithGemini(
   promptText: string,
   referenceImageUrls: string[],
+  opts: { aspectRatio?: string } = {},
 ): Promise<{ b64: string; mimeType: string }> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
@@ -57,8 +58,9 @@ export async function generateImageWithGemini(
       contents: [{ role: 'user', parts }],
       generationConfig: {
         responseModalities: ['IMAGE'],
-        // نانو بانانا برو يدعم ضبط نسبة الأبعاد والدقة — 4:5 عمودي لمنشورات السوشال
-        imageConfig: { aspectRatio: '4:5' },
+        // لا نفرض نسبة أبعاد افتراضياً: في وضع التحرير، فرض 4:5 يدفع النموذج
+        // لإعادة تكوين المشهد وتوليد شخص جديد. نمرّر aspectRatio فقط عند الطلب.
+        ...(opts.aspectRatio ? { imageConfig: { aspectRatio: opts.aspectRatio } } : {}),
       },
     }),
   })
