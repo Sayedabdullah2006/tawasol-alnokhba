@@ -35,6 +35,14 @@ export default function AdminRequestsPage() {
   const [singleApplyDiscount, setSingleApplyDiscount] = useState(false)
   const [singleDiscountPct, setSingleDiscountPct] = useState<number>(10)
   const [showDebug, setShowDebug] = useState(false)
+  // نموذج إضافة طلب خارجي (نُشر ودُفع خارج المنصة)
+  const [showExternalForm, setShowExternalForm] = useState(false)
+  const [savingExternal, setSavingExternal] = useState(false)
+  const [extName, setExtName] = useState('')
+  const [extCategory, setExtCategory] = useState('')
+  const [extAmount, setExtAmount] = useState('')
+  const [extTitle, setExtTitle] = useState('')
+  const [extDate, setExtDate] = useState('')
   // Removed drawer-related state since we now use full-page view
 
   const loadData = useCallback(async () => {
@@ -325,6 +333,46 @@ export default function AdminRequestsPage() {
     }
   }
 
+  const resetExternalForm = () => {
+    setExtName(''); setExtCategory(''); setExtAmount(''); setExtTitle(''); setExtDate('')
+  }
+
+  const handleSaveExternal = async () => {
+    if (!extName.trim()) { showToast('أدخل اسم العميل', 'error'); return }
+    if (!extCategory) { showToast('اختر الفئة', 'error'); return }
+    const amount = parseFloat(extAmount)
+    if (!Number.isFinite(amount) || amount < 0) { showToast('أدخل مبلغاً صحيحاً', 'error'); return }
+
+    setSavingExternal(true)
+    try {
+      const res = await fetch('/api/admin/external-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName: extName.trim(),
+          category: extCategory,
+          amount,
+          title: extTitle.trim() || null,
+          paidAt: extDate || null,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        showToast('تم تسجيل الطلب الخارجي بنجاح', 'success')
+        setShowExternalForm(false)
+        resetExternalForm()
+        loadData()
+      } else {
+        showToast(data.error || 'فشل تسجيل الطلب', 'error')
+      }
+    } catch (error) {
+      console.error('External request error:', error)
+      showToast('خطأ في الاتصال بالخادم', 'error')
+    } finally {
+      setSavingExternal(false)
+    }
+  }
+
   if (loading) return <LoadingSpinner size="lg" />
 
   return (
@@ -349,6 +397,13 @@ export default function AdminRequestsPage() {
           ))}
         </select>
         <Button variant="outline" onClick={handleExport}>تصدير CSV</Button>
+
+        <Button
+          onClick={() => setShowExternalForm(true)}
+          className="bg-green-600 hover:bg-green-700"
+        >
+          ➕ تسجيل طلب خارجي
+        </Button>
 
         <Button
           variant="outline"
@@ -470,6 +525,11 @@ export default function AdminRequestsPage() {
                       {isDuplicate(r) && (
                         <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-bold">
                           👥 {requestCountByOwner[ownerKey(r)]} طلبات
+                        </span>
+                      )}
+                      {r.is_external && (
+                        <span className="inline-flex items-center gap-1 mt-1 mr-1 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-bold">
+                          ➕ خارجي
                         </span>
                       )}
                     </td>
@@ -781,6 +841,76 @@ export default function AdminRequestsPage() {
                 className="flex-1 bg-red-600 hover:bg-red-700"
               >
                 حذف نهائياً
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* External Request Dialog — تسجيل طلب نُشر ودُفع خارج المنصة */}
+      {showExternalForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="text-center mb-4">
+              <div className="text-4xl mb-2">➕</div>
+              <h3 className="text-lg font-bold text-green-700 mb-1">تسجيل طلب خارجي</h3>
+              <p className="text-xs text-gray-600">
+                لطلب نُشر ودُفع خارج المنصة — يُحتسب ضمن إحصاءات الموقع وإيراداته
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-dark mb-1">اسم العميل *</label>
+                <Input value={extName} onChange={e => setExtName(e.target.value)} placeholder="اسم العميل" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark mb-1">الفئة (نوع الخبر) *</label>
+                <select
+                  value={extCategory}
+                  onChange={e => setExtCategory(e.target.value)}
+                  className="w-full px-4 py-2 rounded-xl border border-border bg-white text-sm min-h-[44px]"
+                >
+                  <option value="">— اختر الفئة —</option>
+                  {CATEGORIES.map(c => (
+                    <option key={c.id} value={c.id}>{c.icon} {c.nameAr}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark mb-1">المبلغ المدفوع (ر.س) *</label>
+                <Input type="number" value={extAmount} onChange={e => setExtAmount(e.target.value)} placeholder="0" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark mb-1">عنوان/وصف (اختياري)</label>
+                <Input value={extTitle} onChange={e => setExtTitle(e.target.value)} placeholder="عنوان الخبر" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark mb-1">تاريخ النشر/الدفع (اختياري)</label>
+                <Input type="date" value={extDate} onChange={e => setExtDate(e.target.value)} />
+                <p className="text-xs text-muted mt-1">يُترك فارغاً = تاريخ اليوم</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-5">
+              <Button
+                variant="outline"
+                onClick={() => { setShowExternalForm(false); resetExternalForm() }}
+                className="flex-1"
+                disabled={savingExternal}
+              >
+                إلغاء
+              </Button>
+              <Button
+                onClick={handleSaveExternal}
+                loading={savingExternal}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+              >
+                حفظ الطلب
               </Button>
             </div>
           </div>
