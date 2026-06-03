@@ -646,20 +646,24 @@ function formatDateAr(iso: string): string {
 // ─── Content Review Templates ───
 
 export function contentReadyForReview(d: {
-  email: string; requestNumber: string; clientName: string; proposedContent: string; proposedImages: string[]
+  email: string; requestNumber: string; clientName: string; proposedContent: string; proposedImages: string[]; edited?: boolean
 }) {
   return {
-    subject: `المحتوى جاهز للمراجعة - طلب ${d.requestNumber} · تواصل النخبة`,
+    subject: d.edited
+      ? `تم تعديل المحتوى - طلب ${d.requestNumber} · تواصل النخبة`
+      : `المحتوى جاهز للمراجعة - طلب ${d.requestNumber} · تواصل النخبة`,
     html: wrap(`
       ${greeting(d.clientName)}
       <div style="text-align:center; margin:20px 0;">
-        <div style="font-size:48px; margin-bottom:16px;">👁️</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">المحتوى جاهز للمراجعة</h2>
+        <div style="font-size:48px; margin-bottom:16px;">${d.edited ? '✏️' : '👁️'}</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">${d.edited ? 'تم تعديل المحتوى' : 'المحتوى جاهز للمراجعة'}</h2>
         <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
       </div>
 
       <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
-        تم الانتهاء من تحضير المحتوى الخاص بطلبك. يرجى مراجعة النص والتصميم المقترح أدناه والموافقة عليه أو طلب التعديلات المطلوبة.
+        ${d.edited
+          ? 'قام الفريق بتعديل المحتوى المقترح الخاص بطلبك. يرجى مراجعة النسخة المحدّثة أدناه والموافقة عليها أو طلب تعديلات إضافية.'
+          : 'تم الانتهاء من تحضير المحتوى الخاص بطلبك. يرجى مراجعة النص والتصميم المقترح أدناه والموافقة عليه أو طلب التعديلات المطلوبة.'}
       </p>
 
       <div style="background:#F8FAFC; border-radius:12px; padding:20px; margin:24px 0;">

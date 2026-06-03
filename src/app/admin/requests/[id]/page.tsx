@@ -823,8 +823,18 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
               </div>
             )}
 
-            {/* حالة مراجعة العميل لكل خبر */}
-            <PostReviewStatus request={request} />
+            {/* حالة مراجعة العميل لكل خبر + تعديل المحتوى المُرسل قبل الموافقة */}
+            <PostReviewStatus
+              request={request}
+              onEdit={(idx, content, images) => {
+                setAiContent(content ?? '')
+                setAiImages(Array.isArray(images) ? images : [])
+                setAiPostIndex(idx)
+                setShowAIStudio(false)
+                setSendingContent(true)
+                if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+            />
           </div>
 
           {/* ── Actions Sidebar ──────────────────────────────────────── */}

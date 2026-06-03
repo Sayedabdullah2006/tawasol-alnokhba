@@ -57,6 +57,9 @@ export async function POST(request: Request) {
         ? { ...existingRequest.post_reviews }
         : {}
 
+    // إن كان لهذا الخبر محتوى مُرسل سابقاً فهذا تعديل/إعادة إرسال (نُخصّص الإيميل)
+    const isEdit = !!reviews[postIndex]
+
     reviews[postIndex] = {
       proposed_content: proposedContent.trim(),
       proposed_images: Array.isArray(proposedImages) ? proposedImages : [],
@@ -86,6 +89,7 @@ export async function POST(request: Request) {
         clientName: existingRequest.client_name ?? 'عزيزنا العميل',
         proposedContent,
         proposedImages: Array.isArray(proposedImages) ? proposedImages : [],
+        edited: isEdit,
       }).catch(e => console.error('Email notification failed:', e))
     }
 

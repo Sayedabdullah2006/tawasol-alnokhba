@@ -148,7 +148,7 @@ export async function notifyStatusUpdateToClient(args: {
 // ─── Content Review Email Functions ───
 
 export async function notifyContentReadyForReview(args: {
-  email: string; requestNumber: string; clientName: string; proposedContent: string; proposedImages: string[]
+  email: string; requestNumber: string; clientName: string; proposedContent: string; proposedImages: string[]; edited?: boolean
 }) {
   const t = templates.contentReadyForReview(args)
   return sendEmail(args.email, t.subject, t.html)

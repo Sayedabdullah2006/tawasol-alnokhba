@@ -6,6 +6,8 @@ import { getReviewItems, getPostReviews } from '@/lib/review-items'
 
 interface Props {
   request: any
+  // تعديل المحتوى/الصور المُرسلة لخبر قبل موافقة العميل (يفتح محرّر الإرسال مملوءاً)
+  onEdit?: (index: number, content: string, images: string[]) => void
 }
 
 const STATUS_META: Record<string, { label: string; cls: string }> = {
@@ -19,7 +21,7 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
  * (حتى قبل موافقة العميل)، مع ليبل الحالة: مراجعة / معتمد / ملاحظات.
  * عند الاعتماد يُميَّز التصميم المختار؛ وعند الملاحظات تظهر ملاحظات العميل.
  */
-export default function PostReviewStatus({ request }: Props) {
+export default function PostReviewStatus({ request, onEdit }: Props) {
   const items = getReviewItems(request)
   const reviews = getPostReviews(request)
   const [lightbox, setLightbox] = useState<string | null>(null)
@@ -109,8 +111,19 @@ export default function PostReviewStatus({ request }: Props) {
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2">
                   <p className="text-[11px] font-bold text-yellow-700 mb-0.5">ملاحظات العميل:</p>
                   <p className="text-xs text-yellow-700 whitespace-pre-line">{r.user_feedback}</p>
-                  <p className="text-[11px] text-muted mt-1">أعد توليد التصميم لهذا الخبر من الاستوديو ثم أرسله مجدداً.</p>
+                  <p className="text-[11px] text-muted mt-1">عدّل المحتوى/الصور وأعد الإرسال، أو أعد التوليد من الاستوديو.</p>
                 </div>
+              )}
+
+              {/* تعديل المحتوى/الصور المُرسلة قبل موافقة العميل */}
+              {status !== 'approved' && onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit(item.index, r.proposed_content ?? '', images)}
+                  className="w-full rounded-lg py-1.5 text-[11px] font-bold bg-white border border-green text-green hover:bg-green/5 transition-colors"
+                >
+                  ✏️ تعديل المحتوى والصور المُرسلة
+                </button>
               )}
             </div>
           )
