@@ -922,17 +922,38 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                       >
                         🤖 {showAIStudio ? 'إخفاء استوديو الذكاء الاصطناعي' : 'استوديو الذكاء الاصطناعي'}
                       </Button>
-                      {showAIStudio && (
-                        <AIStudioPanel
-                          request={request}
-                          onUsedContent={(text, img) => {
-                            setAiContent(text)
-                            setAiImages(img ? [img] : [])
-                            setShowAIStudio(false)
-                            setSendingContent(true)
-                          }}
-                        />
-                      )}
+                      {showAIStudio && (() => {
+                        const onUsed = (text: string, img: string) => {
+                          setAiContent(text)
+                          setAiImages(img ? [img] : [])
+                          setShowAIStudio(false)
+                          setSendingContent(true)
+                        }
+                        // حملة متعددة المنشورات: استوديو مستقل لكل خبر
+                        const campaignPosts = Array.isArray(request.campaign_posts) ? request.campaign_posts : []
+                        if (request.request_type === 'campaign' && campaignPosts.length > 0) {
+                          return (
+                            <div className="space-y-5">
+                              <p className="text-xs text-muted bg-cream rounded-lg p-2">
+                                🚀 هذه حملة من {campaignPosts.length} منشورات — لكل خبر استوديو مستقل خاص به.
+                              </p>
+                              {campaignPosts.map((post: Record<string, unknown>, idx: number) => (
+                                <div key={idx} className="rounded-2xl border border-border/70 p-3 bg-cream/30">
+                                  <AIStudioPanel
+                                    request={request}
+                                    postIndex={idx}
+                                    postTitle={(post.title as string) || undefined}
+                                    postImages={Array.isArray(post.images) ? (post.images as string[]) : []}
+                                    savedStudio={request.ai_posts?.[idx]}
+                                    onUsedContent={onUsed}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )
+                        }
+                        return <AIStudioPanel request={request} onUsedContent={onUsed} />
+                      })()}
                     </div>
                   )}
 

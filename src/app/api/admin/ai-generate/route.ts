@@ -26,6 +26,7 @@ export async function POST(req: Request) {
     step?: Step
     sourceImage?: string
     chosenConcept?: string
+    postIndex?: number
   }
   try {
     body = await req.json()
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 })
   }
 
-  const { requestId, step, sourceImage, chosenConcept } = body
+  const { requestId, step, sourceImage, chosenConcept, postIndex } = body
   if (!requestId || !step) {
     return NextResponse.json({ error: 'بيانات ناقصة (requestId/step)' }, { status: 400 })
   }
@@ -51,6 +52,74 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 })
   }
 
+  // ── تحديد المصدر: منشور حملة محدّد أم الطلب المفرد ─────────────
+  // عند تمرير postIndex نتعامل مع منشور بعينه من campaign_posts،
+  // ونخزّن مخرجات الذكاء الاصطناعي داخل ai_posts[postIndex] بدل أعمدة الطلب.
+  const isCampaignPost =
+    typeof postIndex === 'number' && Number.isInteger(postIndex) && postIndex >= 0
+
+  let newsText: string
+  let priorAnalysis: unknown
+  if (isCampaignPost) {
+    const posts = Array.isArray(reqRow.campaign_posts) ? reqRow.campaign_posts : []
+    const post = posts[postIndex as number]
+    if (!post) {
+      return NextResponse.json({ error: 'منشور الحملة غير موجود' }, { status: 404 })
+    }
+    newsText = `العنوان: ${post.title ?? ''}\nالمحتوى: ${post.content ?? ''}`
+    priorAnalysis = reqRow.ai_posts?.[postIndex as number]?.analysis ?? null
+  } else {
+    newsText = `العنوان: ${reqRow.title ?? ''}\nالمحتوى: ${reqRow.content ?? ''}`
+    priorAnalysis = reqRow.ai_analysis ?? null
+  }
+
+  // يحفظ مخرجات خطوة في الموضع الصحيح (أعمدة الطلب أو ai_posts[postIndex]).
+  // يحافظ على نفس أشكال البيانات في الحالتين ليقرأها اللوح بنفس الطريقة.
+  const saveStep = async (patch: {
+    analysis?: unknown
+    tweets?: unknown
+    concepts?: unknown
+    chosenConcept?: unknown
+    imagePrompt?: string
+    sourceImage?: string | null
+    generatedAt?: string
+    imageUrl?: string
+  }) => {
+    if (isCampaignPost) {
+      const aiPosts: Record<string, any> =
+        reqRow.ai_posts && typeof reqRow.ai_posts === 'object' ? { ...reqRow.ai_posts } : {}
+      const entry: Record<string, any> = { ...(aiPosts[postIndex as number] ?? {}) }
+      if ('analysis' in patch) entry.analysis = patch.analysis
+      if ('tweets' in patch) entry.tweets = patch.tweets
+      if ('concepts' in patch) entry.design_concepts = patch.concepts
+      if ('chosenConcept' in patch) entry.chosen_concept = patch.chosenConcept
+      if ('imagePrompt' in patch) entry.image_prompt = patch.imagePrompt
+      if ('sourceImage' in patch) entry.source_image = patch.sourceImage
+      if ('generatedAt' in patch) entry.generated_at = patch.generatedAt
+      if ('imageUrl' in patch) entry.image_url = patch.imageUrl
+      aiPosts[postIndex as number] = entry
+      reqRow.ai_posts = aiPosts // إبقاء النسخة المحلية متزامنة
+      const { error } = await service
+        .from('publish_requests')
+        .update({ ai_posts: aiPosts })
+        .eq('id', requestId)
+      if (error) throw new Error(error.message)
+    } else {
+      const upd: Record<string, unknown> = {}
+      if ('analysis' in patch) upd.ai_analysis = patch.analysis
+      if ('tweets' in patch) upd.ai_tweets = patch.tweets
+      if ('concepts' in patch) upd.ai_design_concepts = patch.concepts
+      if ('chosenConcept' in patch) upd.ai_chosen_concept = patch.chosenConcept
+      if ('imagePrompt' in patch) upd.ai_image_prompt = patch.imagePrompt
+      if ('sourceImage' in patch) upd.ai_source_image = patch.sourceImage
+      if ('generatedAt' in patch) upd.ai_generated_at = patch.generatedAt
+      if (Object.keys(upd).length) {
+        const { error } = await service.from('publish_requests').update(upd).eq('id', requestId)
+        if (error) throw new Error(error.message)
+      }
+    }
+  }
+
   // Build the OpenAI client up front so a missing key returns a clear message.
   let openai: OpenAI
   try {
@@ -61,8 +130,6 @@ export async function POST(req: Request) {
       { status: 500 }
     )
   }
-
-  const newsText = `العنوان: ${reqRow.title ?? ''}\nالمحتوى: ${reqRow.content ?? ''}`
 
   try {
     // ── STEP: analyze ──────────────────────────────────────────
@@ -92,18 +159,14 @@ export async function POST(req: Request) {
         analysis = { raw }
       }
 
-      const { error: upErr } = await service
-        .from('publish_requests')
-        .update({ ai_analysis: analysis, ai_source_image: sourceImage ?? null })
-        .eq('id', requestId)
-      if (upErr) throw new Error(upErr.message)
+      await saveStep({ analysis, sourceImage: sourceImage ?? null })
 
       return NextResponse.json({ analysis })
     }
 
     // ── STEP: tweets ───────────────────────────────────────────
     if (step === 'tweets') {
-      if (!reqRow.ai_analysis) {
+      if (!priorAnalysis) {
         return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 })
       }
 
@@ -113,24 +176,20 @@ export async function POST(req: Request) {
           { role: 'system', content: SYS_TWEETS },
           {
             role: 'user',
-            content: `${JSON.stringify(reqRow.ai_analysis)}\n\n${newsText}`,
+            content: `${JSON.stringify(priorAnalysis)}\n\n${newsText}`,
           },
         ],
       })
 
       const rawText = completion.choices[0]?.message?.content ?? ''
-      const { error: upErr } = await service
-        .from('publish_requests')
-        .update({ ai_tweets: { raw: rawText } })
-        .eq('id', requestId)
-      if (upErr) throw new Error(upErr.message)
+      await saveStep({ tweets: { raw: rawText } })
 
       return NextResponse.json({ tweets: rawText })
     }
 
     // ── STEP: concepts ─────────────────────────────────────────
     if (step === 'concepts') {
-      if (!reqRow.ai_analysis) {
+      if (!priorAnalysis) {
         return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 })
       }
 
@@ -140,24 +199,20 @@ export async function POST(req: Request) {
           { role: 'system', content: SYS_CONCEPTS },
           {
             role: 'user',
-            content: `${JSON.stringify(reqRow.ai_analysis)}\n\n${newsText}`,
+            content: `${JSON.stringify(priorAnalysis)}\n\n${newsText}`,
           },
         ],
       })
 
       const rawText = completion.choices[0]?.message?.content ?? ''
-      const { error: upErr } = await service
-        .from('publish_requests')
-        .update({ ai_design_concepts: { raw: rawText } })
-        .eq('id', requestId)
-      if (upErr) throw new Error(upErr.message)
+      await saveStep({ concepts: { raw: rawText } })
 
       return NextResponse.json({ concepts: rawText })
     }
 
     // ── STEP: image ────────────────────────────────────────────
     if (step === 'image') {
-      if (!reqRow.ai_analysis) {
+      if (!priorAnalysis) {
         return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 })
       }
       if (!chosenConcept) {
@@ -176,10 +231,7 @@ export async function POST(req: Request) {
       const logoUrl: string | null = brand?.first1saudi_logo_url ?? null
 
       // Persist the chosen concept immediately.
-      await service
-        .from('publish_requests')
-        .update({ ai_chosen_concept: { text: chosenConcept } })
-        .eq('id', requestId)
+      await saveStep({ chosenConcept: { text: chosenConcept } })
 
       // 1) Generate the detailed design prompt.
       const promptCompletion = await openai.chat.completions.create({
@@ -189,7 +241,7 @@ export async function POST(req: Request) {
           {
             role: 'user',
             content:
-              `بيانات الخبر (JSON):\n${JSON.stringify(reqRow.ai_analysis)}\n\n` +
+              `بيانات الخبر (JSON):\n${JSON.stringify(priorAnalysis)}\n\n` +
               `الاتجاه المعتمد:\n${chosenConcept}\n\n` +
               `الصورة الحقيقية المرفقة هي على الرابط: ${sourceImage}\n` +
               (logoUrl
@@ -201,10 +253,7 @@ export async function POST(req: Request) {
 
       const designPrompt = promptCompletion.choices[0]?.message?.content ?? ''
 
-      await service
-        .from('publish_requests')
-        .update({ ai_image_prompt: designPrompt })
-        .eq('id', requestId)
+      await saveStep({ imagePrompt: designPrompt })
 
       // 2) توليد الصورة عبر Gemini (نموذج توليد الصور من Google).
       // نمرّر برومبت التصميم المُولَّد من OpenAI + الصور المرجعية:
@@ -215,7 +264,8 @@ export async function POST(req: Request) {
       // 3) Decode and upload to the content-images bucket.
       const imageBuffer = Buffer.from(b64, 'base64')
       const ext = mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg' : 'png'
-      const path = `ai-${requestId}-${Date.now()}.${ext}`
+      const suffix = isCampaignPost ? `-p${postIndex}` : ''
+      const path = `ai-${requestId}${suffix}-${Date.now()}.${ext}`
       const { error: uploadErr } = await service.storage
         .from('content-images')
         .upload(path, imageBuffer, { contentType: mimeType })
@@ -224,18 +274,18 @@ export async function POST(req: Request) {
       const { data: pub } = service.storage.from('content-images').getPublicUrl(path)
       const imageUrl = pub.publicUrl
 
-      // 4) Append to proposed_images and set ai_generated_at.
+      // 4) Append to proposed_images and record the per-post/image state.
       const existing: string[] = Array.isArray(reqRow.proposed_images)
         ? reqRow.proposed_images
         : []
-      const { error: finalErr } = await service
+      const { error: appendErr } = await service
         .from('publish_requests')
-        .update({
-          proposed_images: [...existing, imageUrl],
-          ai_generated_at: new Date().toISOString(),
-        })
+        .update({ proposed_images: [...existing, imageUrl] })
         .eq('id', requestId)
-      if (finalErr) throw new Error(finalErr.message)
+      if (appendErr) throw new Error(appendErr.message)
+      reqRow.proposed_images = [...existing, imageUrl]
+
+      await saveStep({ generatedAt: new Date().toISOString(), imageUrl })
 
       return NextResponse.json({ imageUrl, prompt: designPrompt })
     }

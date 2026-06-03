@@ -9,18 +9,53 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 interface Props {
   request: any
   onUsedContent: (text: string, imageUrl: string) => void
+  // ── وضع منشور الحملة: استوديو مستقل لكل خبر في الحملة ──
+  postIndex?: number          // فهرس المنشور داخل campaign_posts (غير محدّد = الطلب المفرد)
+  postTitle?: string          // عنوان منشور الحملة (للترويسة)
+  postImages?: string[]       // صور هذا المنشور تحديداً
+  savedStudio?: any           // الحالة المحفوظة لهذا المنشور (ai_posts[postIndex])
 }
 
 type StepKey = 'analyze' | 'tweets' | 'concepts' | 'image'
 
-export default function AIStudioPanel({ request, onUsedContent }: Props) {
+export default function AIStudioPanel({
+  request,
+  onUsedContent,
+  postIndex,
+  postTitle,
+  postImages,
+  savedStudio,
+}: Props) {
   const { showToast } = useToast()
   const supabase = createClient()
 
-  // صور الخبر الأصلية + أي صور يرفعها الأدمن يدوياً
-  const initialContentImages: string[] = Array.isArray(request.content_images)
-    ? request.content_images
-    : []
+  const isPost = postIndex !== undefined
+
+  // الحالة المحفوظة سابقاً — من ai_posts[postIndex] (حملة) أو أعمدة الطلب (مفرد)
+  const saved = isPost
+    ? {
+        analysis: savedStudio?.analysis ?? null,
+        tweets: savedStudio?.tweets ?? null,
+        concepts: savedStudio?.design_concepts ?? null,
+        chosenConcept: savedStudio?.chosen_concept ?? null,
+        imagePrompt: savedStudio?.image_prompt ?? '',
+        sourceImage: savedStudio?.source_image ?? null,
+        imageUrl: savedStudio?.image_url ?? '',
+      }
+    : {
+        analysis: request.ai_analysis ?? null,
+        tweets: request.ai_tweets ?? null,
+        concepts: request.ai_design_concepts ?? null,
+        chosenConcept: request.ai_chosen_concept ?? null,
+        imagePrompt: request.ai_image_prompt ?? '',
+        sourceImage: request.ai_source_image ?? null,
+        imageUrl: '',
+      }
+
+  // صور المصدر: صور هذا المنشور (حملة) أو صور الطلب (مفرد) + أي صور يرفعها الأدمن يدوياً
+  const initialContentImages: string[] = isPost
+    ? (Array.isArray(postImages) ? postImages : [])
+    : (Array.isArray(request.content_images) ? request.content_images : [])
   const [contentImages, setContentImages] = useState<string[]>(initialContentImages)
   const [uploading, setUploading] = useState(false)
 
@@ -55,19 +90,17 @@ export default function AIStudioPanel({ request, onUsedContent }: Props) {
     }
   }
 
-  // ── State (prefilled from existing ai_* columns when re-opened) ──
+  // ── State (prefilled from saved studio state when re-opened) ──
   const [selectedImage, setSelectedImage] = useState<string | null>(
-    request.ai_source_image ?? (contentImages.length === 1 ? contentImages[0] : null)
+    saved.sourceImage ?? (contentImages.length === 1 ? contentImages[0] : null)
   )
-  const [analysis, setAnalysis] = useState<any>(request.ai_analysis ?? null)
-  const [tweets, setTweets] = useState<string>(request.ai_tweets?.raw ?? '')
-  const [selectedTweet, setSelectedTweet] = useState<string>(request.ai_tweets?.raw ?? '')
-  const [concepts, setConcepts] = useState<string>(request.ai_design_concepts?.raw ?? '')
-  const [chosenConcept, setChosenConcept] = useState<string>(
-    request.ai_chosen_concept?.text ?? ''
-  )
-  const [imageUrl, setImageUrl] = useState<string>('')
-  const [imagePrompt, setImagePrompt] = useState<string>(request.ai_image_prompt ?? '')
+  const [analysis, setAnalysis] = useState<any>(saved.analysis)
+  const [tweets, setTweets] = useState<string>(saved.tweets?.raw ?? '')
+  const [selectedTweet, setSelectedTweet] = useState<string>(saved.tweets?.raw ?? '')
+  const [concepts, setConcepts] = useState<string>(saved.concepts?.raw ?? '')
+  const [chosenConcept, setChosenConcept] = useState<string>(saved.chosenConcept?.text ?? '')
+  const [imageUrl, setImageUrl] = useState<string>(saved.imageUrl ?? '')
+  const [imagePrompt, setImagePrompt] = useState<string>(saved.imagePrompt ?? '')
 
   const [loadingStep, setLoadingStep] = useState<StepKey | null>(null)
 
@@ -82,6 +115,7 @@ export default function AIStudioPanel({ request, onUsedContent }: Props) {
           step,
           sourceImage: selectedImage ?? undefined,
           chosenConcept: step === 'image' ? chosenConcept : undefined,
+          postIndex: isPost ? postIndex : undefined,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -116,8 +150,14 @@ export default function AIStudioPanel({ request, onUsedContent }: Props) {
 
   return (
     <div className="space-y-4" dir="rtl">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <h3 className="text-lg font-black text-dark">🤖 استوديو الذكاء الاصطناعي</h3>
+        {isPost && (
+          <span className="text-xs bg-green/10 text-green-700 font-bold px-2 py-0.5 rounded-full">
+            منشور {(postIndex as number) + 1}
+            {postTitle ? ` — ${postTitle}` : ''}
+          </span>
+        )}
       </div>
 
       {/* ── اختيار صورة المصدر ── */}

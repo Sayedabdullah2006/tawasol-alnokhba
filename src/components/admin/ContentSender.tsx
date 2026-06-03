@@ -122,6 +122,38 @@ export default function ContentSender({ request, onSent, onCancel, initialConten
         </p>
       </div>
 
+      {/* ── المعاينة قبل الإرسال — كما سيراها العميل ── */}
+      {(proposedContent.trim() || proposedImages.length > 0) && (
+        <div className="rounded-2xl border-2 border-green/30 bg-green-50/40 overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-green/10 border-b border-green/20">
+            <span>👁️</span>
+            <h4 className="text-sm font-bold text-green-700">المعاينة قبل الإرسال — كما سيراها العميل</h4>
+          </div>
+          <div className="p-4 space-y-3" dir="rtl">
+            {proposedContent.trim() ? (
+              <div className="bg-white rounded-xl border border-border p-3 whitespace-pre-line text-sm text-dark">
+                {proposedContent.trim()}
+              </div>
+            ) : (
+              <p className="text-xs text-red-500">⚠️ لا يوجد نص — اكتب التغريدة المختارة أعلاه.</p>
+            )}
+            {proposedImages.length > 0 && (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {proposedImages.map((url, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={i}
+                    src={url}
+                    alt={`تصميم ${i + 1}`}
+                    className="aspect-square w-full object-cover rounded-xl border border-border"
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-3 pt-4">
         <Button variant="ghost" onClick={onCancel} className="flex-1">
           إلغاء
