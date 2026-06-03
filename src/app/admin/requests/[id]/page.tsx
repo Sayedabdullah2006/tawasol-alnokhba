@@ -349,13 +349,23 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   ]
 
   // مُولّد دالة onUsed للاستوديو (يُستخدم في المفرد والحملة)
+  // يُمرّر التركيز إلى محرّر الإرسال (يظهر أسفل الاستوديوهات الطويلة في الحملات)
+  const focusSender = () => {
+    if (typeof window !== 'undefined') {
+      setTimeout(() => {
+        document.getElementById('content-sender-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 120)
+    }
+  }
+
   const studioOnUsed = (text: string, images: string[], reviewIndex: number) => {
     setAiContent(text)
     setAiImages(Array.isArray(images) ? images : [])
     setAiPostIndex(reviewIndex)
+    setShowAIStudio(false) // طيّ الاستوديو لإبراز محرّر الإرسال
     setSendingContent(true)
-    // إبقاء الاستوديو ظاهراً لإعادة التوليد، وإعادة تهيئة المحرّر بالمحتوى الجديد
     setSenderNonce(n => n + 1)
+    focusSender()
   }
 
   return (
@@ -509,7 +519,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                       <>
                         <p className="text-sm text-blue-600">استخدم الاستوديو أعلاه لتوليد المحتوى، أو أرسل محتوى يدوياً مباشرةً للعميل. بعد الإرسال يمكنك تعديله من «حالة مراجعة العميل» أدناه قبل موافقة العميل.</p>
                         <Button
-                          onClick={() => { setAiContent(null); setAiImages(null); setAiPostIndex(0); setSendingContent(true); setSenderNonce(n => n + 1) }}
+                          onClick={() => { setAiContent(null); setAiImages(null); setAiPostIndex(0); setSendingContent(true); setSenderNonce(n => n + 1); focusSender() }}
                           className="w-full"
                         >
                           📤 إرسال محتوى يدوياً للعميل
@@ -522,7 +532,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
 
               {/* محرّر إرسال/تعديل المحتوى */}
               {sendingContent && (
-                <div className="bg-card rounded-2xl border border-border p-5">
+                <div id="content-sender-anchor" className="bg-card rounded-2xl border border-border p-5 scroll-mt-20">
                   <ContentSender
                     key={senderNonce}
                     request={request}
@@ -568,7 +578,8 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
               setShowAIStudio(true) // إظهار الاستوديو لإعادة التوليد مع الحفاظ على الخطوات السابقة
               setSendingContent(true)
               setSenderNonce(n => n + 1)
-              if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
+              setActiveTab('content')
+              focusSender()
             }}
           />
         </div>
