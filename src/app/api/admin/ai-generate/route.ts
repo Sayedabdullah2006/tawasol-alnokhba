@@ -202,26 +202,29 @@ export async function POST(req: Request) {
         .update({ ai_image_prompt: designPrompt })
         .eq('id', requestId)
 
-      // 2) Generate the actual image via gpt-image-1 images.edit.
-      // The source image is the locked edit base. We pass only the source image
-      // as the base for v1; the logo placement is described in the prompt text.
-      // (Newer SDKs accept an array of images for images.edit; if multi-image
-      // support is needed later, the logo File can be added to that array.)
-      const srcResp = await fetch(sourceImage)
-      if (!srcResp.ok) {
-        throw new Error('تعذّر تحميل صورة المصدر')
+      // 2) توليد الصورة عبر أداة image_generation المدمجة في Responses API.
+      // نطلب من النموذج «أنشئ صورة» (مثل ChatGPT) فيختار مولّد الصور داخلياً —
+      // دون تسمية موديل الصورة صراحةً. نمرّر الصورة الحقيقية المرفقة كـ input_image
+      // (طبقة مرجعية مقفلة) + شعار أول سعودي إن وُجد + البرومبت التفصيلي كنص.
+      const userContent: any[] = [
+        { type: 'input_text', text: designPrompt },
+        { type: 'input_image', image_url: sourceImage },
+      ]
+      if (logoUrl) {
+        userContent.push({ type: 'input_image', image_url: logoUrl })
       }
-      const srcBuffer = Buffer.from(await srcResp.arrayBuffer())
-      const sourceFile = await OpenAI.toFile(srcBuffer, 'source.png', { type: 'image/png' })
 
-      const imageResult = await openai.images.edit({
-        model: 'gpt-image-1',
-        image: sourceFile,
-        prompt: designPrompt,
-        size: '1024x1536', // closest portrait to 4:5
+      const imageResponse = await openai.responses.create({
+        model: 'gpt-4o',
+        input: [{ role: 'user', content: userContent }],
+        tools: [{ type: 'image_generation' }],
       })
 
-      const b64 = imageResult.data?.[0]?.b64_json
+      // استخراج الصورة الناتجة (base64) من مخرجات أداة التوليد
+      const imageOutputs = (imageResponse.output ?? [])
+        .filter((o: any) => o.type === 'image_generation_call')
+        .map((o: any) => o.result as string)
+      const b64 = imageOutputs[0]
       if (!b64) {
         throw new Error('لم يُرجِع OpenAI صورة')
       }
