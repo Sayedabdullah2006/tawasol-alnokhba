@@ -119,6 +119,8 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   const [deleting, setDeleting] = useState(false)
   const [sendingReminder, setSendingReminder] = useState(false)
   const [activeTab, setActiveTab] = useState<TabKey>('details')
+  // يُبدّل قيمته لإعادة تهيئة محرّر الإرسال بالمحتوى الجديد عند «استخدم هذا التصميم»
+  const [senderNonce, setSenderNonce] = useState(0)
 
   useEffect(() => {
     const loadData = async () => {
@@ -322,8 +324,9 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
     setAiContent(text)
     setAiImages(Array.isArray(images) ? images : [])
     setAiPostIndex(reviewIndex)
-    setShowAIStudio(false)
     setSendingContent(true)
+    // إبقاء الاستوديو ظاهراً لإعادة التوليد، وإعادة تهيئة المحرّر بالمحتوى الجديد
+    setSenderNonce(n => n + 1)
   }
 
   return (
@@ -371,11 +374,10 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
         <div className={activeTab === 'content' ? 'space-y-5' : 'hidden'}>
           {request.status === 'in_progress' ? (
             <>
-              {/* استوديو الذكاء الاصطناعي */}
-              {!sendingContent && (
-                <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
+              {/* استوديو الذكاء الاصطناعي — متاح دائماً في مرحلة التنفيذ (يشمل أثناء التعديل) */}
+              <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
                   <Button variant="outline" onClick={() => setShowAIStudio(v => !v)} className="w-full">
-                    🤖 {showAIStudio ? 'إخفاء استوديو الذكاء الاصطناعي' : 'استوديو الذكاء الاصطناعي'}
+                    🤖 {showAIStudio ? 'إخفاء استوديو الذكاء الاصطناعي' : 'استوديو الذكاء الاصطناعي (توليد/إعادة توليد)'}
                   </Button>
                   {showAIStudio && (() => {
                     const campaignPosts = Array.isArray(request.campaign_posts) ? request.campaign_posts : []
@@ -402,8 +404,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                     }
                     return <AIStudioPanel request={request} onUsedContent={studioOnUsed} />
                   })()}
-                </div>
-              )}
+              </div>
 
               {/* إرسال المحتوى — مطالبات الحالة (المسار العام/القديم) */}
               {!sendingContent && (() => {
@@ -454,7 +455,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                       <>
                         <p className="text-sm text-blue-600">استخدم الاستوديو أعلاه لتوليد المحتوى، أو أرسل محتوى يدوياً مباشرةً للعميل. بعد الإرسال يمكنك تعديله من «حالة مراجعة العميل» أدناه قبل موافقة العميل.</p>
                         <Button
-                          onClick={() => { setAiContent(null); setAiImages(null); setAiPostIndex(0); setSendingContent(true) }}
+                          onClick={() => { setAiContent(null); setAiImages(null); setAiPostIndex(0); setSendingContent(true); setSenderNonce(n => n + 1) }}
                           className="w-full"
                         >
                           📤 إرسال محتوى يدوياً للعميل
@@ -469,6 +470,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
               {sendingContent && (
                 <div className="bg-card rounded-2xl border border-border p-5">
                   <ContentSender
+                    key={senderNonce}
                     request={request}
                     onSent={() => { setSendingContent(false); setAiContent(null); setAiImages(null); setAiPostIndex(null); window.location.reload() }}
                     onCancel={() => { setSendingContent(false); setAiContent(null); setAiImages(null); setAiPostIndex(null) }}
@@ -498,8 +500,9 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
               setAiContent(content ?? '')
               setAiImages(Array.isArray(images) ? images : [])
               setAiPostIndex(idx)
-              setShowAIStudio(false)
+              setShowAIStudio(true) // إظهار الاستوديو لإعادة التوليد مع الحفاظ على الخطوات السابقة
               setSendingContent(true)
+              setSenderNonce(n => n + 1)
               if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
             }}
           />
