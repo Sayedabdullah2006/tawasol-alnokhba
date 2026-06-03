@@ -6,9 +6,15 @@ import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
+interface ConceptItem {
+  title?: string
+  mood?: string
+  brief?: string
+}
+
 interface Props {
   request: any
-  onUsedContent: (text: string, imageUrl: string) => void
+  onUsedContent: (text: string, images: string[]) => void
   // ── وضع منشور الحملة: استوديو مستقل لكل خبر في الحملة ──
   postIndex?: number          // فهرس المنشور داخل campaign_posts (غير محدّد = الطلب المفرد)
   postTitle?: string          // عنوان منشور الحملة (للترويسة)
@@ -97,12 +103,20 @@ export default function AIStudioPanel({
   const [analysis, setAnalysis] = useState<any>(saved.analysis)
   const [tweets, setTweets] = useState<string>(saved.tweets?.raw ?? '')
   const [selectedTweet, setSelectedTweet] = useState<string>(saved.tweets?.raw ?? '')
-  const [concepts, setConcepts] = useState<string>(saved.concepts?.raw ?? '')
+  const [conceptItems, setConceptItems] = useState<ConceptItem[]>(
+    Array.isArray(saved.concepts?.items) ? saved.concepts.items : []
+  )
   const [chosenConcept, setChosenConcept] = useState<string>(saved.chosenConcept?.text ?? '')
   const [imageUrl, setImageUrl] = useState<string>(saved.imageUrl ?? '')
   const [imagePrompt, setImagePrompt] = useState<string>(saved.imagePrompt ?? '')
 
   const [loadingStep, setLoadingStep] = useState<StepKey | null>(null)
+
+  // توليد الاتجاهات الثلاثة دفعة واحدة + الاختيار منها للإرسال
+  const [batchResults, setBatchResults] = useState<{ title: string; imageUrl: string }[]>([])
+  const [batchLoading, setBatchLoading] = useState(false)
+  const [batchProgress, setBatchProgress] = useState('')
+  const [selectedBatch, setSelectedBatch] = useState<Set<number>>(new Set())
 
   const callStep = async (step: StepKey) => {
     setLoadingStep(step)
@@ -132,7 +146,7 @@ export default function AIStudioPanel({
         setSelectedTweet(data.tweets)
         showToast('تم توليد التغريدات', 'success')
       } else if (step === 'concepts') {
-        setConcepts(data.concepts)
+        setConceptItems(Array.isArray(data.concepts) ? data.concepts : [])
         showToast('تم اقتراح الاتجاهات', 'success')
       } else if (step === 'image') {
         setImageUrl(data.imageUrl)
@@ -144,6 +158,66 @@ export default function AIStudioPanel({
     } finally {
       setLoadingStep(null)
     }
+  }
+
+  // يولّد تصميماً واحداً لاتجاه محدّد ويعيد رابط الصورة (يُستخدم في التوليد المجمّع)
+  const generateOneDesign = async (conceptBrief: string): Promise<string | null> => {
+    const res = await fetch('/api/admin/ai-generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId: request.id,
+        step: 'image',
+        sourceImage: selectedImage ?? undefined,
+        chosenConcept: conceptBrief,
+        postIndex: isPost ? postIndex : undefined,
+      }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      showToast(data.error ?? 'فشل توليد أحد التصاميم', 'error')
+      return null
+    }
+    return data.imageUrl as string
+  }
+
+  // يولّد تصميماً لكل اتجاه من الاتجاهات الثلاثة ثم يعرضها للاختيار
+  const designAll = async () => {
+    if (!conceptItems.length) return
+    if (!selectedImage) {
+      showToast('اختر صورة المصدر أولاً', 'error')
+      return
+    }
+    setBatchLoading(true)
+    setBatchResults([])
+    setSelectedBatch(new Set())
+    try {
+      const results: { title: string; imageUrl: string }[] = []
+      for (let i = 0; i < conceptItems.length; i++) {
+        setBatchProgress(`جارٍ توليد ${i + 1}/${conceptItems.length}…`)
+        const brief = conceptItems[i].brief ?? conceptItems[i].title ?? ''
+        const url = await generateOneDesign(brief)
+        if (url) results.push({ title: conceptItems[i].title ?? `اتجاه ${i + 1}`, imageUrl: url })
+      }
+      setBatchResults(results)
+      // كل التصاميم مختارة افتراضياً للإرسال للعميل
+      setSelectedBatch(new Set(results.map((_, i) => i)))
+      if (results.length) showToast(`تم توليد ${results.length} تصاميم`, 'success')
+    } catch {
+      showToast('حدث خطأ أثناء التوليد المجمّع', 'error')
+    } finally {
+      setBatchLoading(false)
+      setBatchProgress('')
+    }
+  }
+
+  const toggleBatch = (i: number) => {
+    setSelectedBatch(prev => {
+      const next = new Set(prev)
+      if (next.has(i)) next.delete(i)
+      else next.add(i)
+      return next
+    })
   }
 
   const cardCls = 'bg-card rounded-2xl border border-border p-5 space-y-3'
@@ -258,6 +332,9 @@ export default function AIStudioPanel({
       {/* ── الخطوة 3 — اتجاهات التصميم ── */}
       <div className={cardCls}>
         <h4 className="font-bold text-dark">الخطوة 3 — اتجاهات التصميم</h4>
+        <p className="text-xs text-muted">
+          تُولَّد 3 اتجاهات مختلفة بناءً على تحليل الخبر وصورته المختارة.
+        </p>
         <Button
           onClick={() => callStep('concepts')}
           loading={loadingStep === 'concepts'}
@@ -266,21 +343,44 @@ export default function AIStudioPanel({
         >
           اقترح 3 اتجاهات
         </Button>
-        {concepts && (
-          <pre
-            dir="rtl"
-            className="bg-cream rounded-xl p-3 text-xs text-dark whitespace-pre-wrap max-h-60 overflow-y-auto border border-border"
-          >
-            {concepts}
-          </pre>
+        {conceptItems.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {conceptItems.map((c, i) => {
+              const brief = c.brief ?? c.title ?? ''
+              const isChosen = chosenConcept === brief
+              return (
+                <div
+                  key={i}
+                  className={`rounded-xl border p-3 text-xs space-y-1 transition-all ${
+                    isChosen ? 'border-green ring-2 ring-green/30 bg-green/5' : 'border-border bg-cream'
+                  }`}
+                >
+                  <div className="font-bold text-dark">{c.title ?? `اتجاه ${i + 1}`}</div>
+                  {c.mood && <div className="text-[11px] text-green-700">{c.mood}</div>}
+                  <p className="text-[11px] text-muted whitespace-pre-wrap max-h-32 overflow-y-auto">
+                    {brief}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setChosenConcept(brief)}
+                    className={`mt-1 w-full rounded-lg py-1 text-[11px] font-bold transition-colors ${
+                      isChosen ? 'bg-green text-white' : 'bg-white border border-border text-dark hover:border-green'
+                    }`}
+                  >
+                    {isChosen ? '✓ معتمد للمفرد' : 'اعتمد للمفرد'}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
         )}
         <label className="block text-xs font-medium text-dark">
-          الاتجاه المعتمد (الصق نص الاتجاه الذي تريد اعتماده):
+          الاتجاه المعتمد (للتصميم المفرد — عدّله إن شئت):
         </label>
         <textarea
           value={chosenConcept}
           onChange={(e) => setChosenConcept(e.target.value)}
-          placeholder="مثال: الاتجاه 1 — سينمائي هيرو ..."
+          placeholder="اضغط «اعتمد للمفرد» على أحد الاتجاهات أعلاه، أو اكتب اتجاهاً يدوياً."
           className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[80px] resize-y"
         />
       </div>
@@ -288,50 +388,113 @@ export default function AIStudioPanel({
       {/* ── الخطوة 4 — توليد التصميم ── */}
       <div className={cardCls}>
         <h4 className="font-bold text-dark">الخطوة 4 — توليد التصميم</h4>
-        <Button
-          onClick={() => callStep('image')}
-          loading={loadingStep === 'image'}
-          disabled={
-            loadingStep !== null || !analysis || !selectedImage || !chosenConcept.trim()
-          }
-          size="sm"
-        >
-          صمّم الصورة
-        </Button>
-        {loadingStep === 'image' && (
-          <div className="flex items-center gap-2 text-sm text-muted">
-            <LoadingSpinner size="sm" />
-            <span>جارٍ توليد التصميم… قد يستغرق دقيقة</span>
-          </div>
-        )}
-        {imageUrl && (
-          <div className="space-y-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imageUrl}
-              alt="التصميم المولّد"
-              className="max-w-xs rounded-xl border border-border"
-            />
-            {imagePrompt && (
-              <details className="text-xs text-muted">
-                <summary className="cursor-pointer">عرض البرومبت المستخدم</summary>
-                <pre
-                  dir="rtl"
-                  className="bg-cream rounded-xl p-3 mt-2 whitespace-pre-wrap max-h-60 overflow-y-auto border border-border"
-                >
-                  {imagePrompt}
-                </pre>
-              </details>
-            )}
-            <Button
-              onClick={() => onUsedContent(selectedTweet, imageUrl)}
-              variant="secondary"
-              size="sm"
-            >
-              استخدم هذا التصميم والتغريدة
-            </Button>
-          </div>
-        )}
+
+        {/* توليد الاتجاهات الثلاثة دفعة واحدة */}
+        <div className="space-y-2">
+          <Button
+            onClick={designAll}
+            loading={batchLoading}
+            disabled={batchLoading || loadingStep !== null || !analysis || !selectedImage || conceptItems.length === 0}
+            size="sm"
+          >
+            🎨 صمّم الاتجاهات الثلاثة
+          </Button>
+          {batchLoading && (
+            <div className="flex items-center gap-2 text-sm text-muted">
+              <LoadingSpinner size="sm" />
+              <span>{batchProgress || 'جارٍ التوليد المجمّع…'}</span>
+            </div>
+          )}
+          {batchResults.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-xs text-muted">اختر التصاميم التي تريد إرسالها للعميل (مختارة كلها افتراضياً):</p>
+              <div className="grid grid-cols-3 gap-2">
+                {batchResults.map((r, i) => {
+                  const on = selectedBatch.has(i)
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => toggleBatch(i)}
+                      className={`relative rounded-xl overflow-hidden border-2 transition-all ${
+                        on ? 'border-green ring-2 ring-green/30' : 'border-border opacity-60'
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={r.imageUrl} alt={r.title} className="w-full aspect-[4/5] object-cover" />
+                      <span className="absolute top-1 left-1 w-5 h-5 rounded-full bg-green text-white text-xs flex items-center justify-center">
+                        {on ? '✓' : ''}
+                      </span>
+                      <span className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] py-0.5 truncate px-1">
+                        {r.title}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+              <Button
+                onClick={() => {
+                  const urls = batchResults.filter((_, i) => selectedBatch.has(i)).map(r => r.imageUrl)
+                  if (!urls.length) { showToast('اختر تصميماً واحداً على الأقل', 'error'); return }
+                  onUsedContent(selectedTweet, urls)
+                }}
+                variant="secondary"
+                size="sm"
+              >
+                إرسال التصاميم المختارة ({selectedBatch.size}) والتغريدة للعميل
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-border pt-3 space-y-2">
+          <p className="text-xs text-muted">أو صمّم الاتجاه المعتمد فقط (تصميم واحد):</p>
+          <Button
+            onClick={() => callStep('image')}
+            loading={loadingStep === 'image'}
+            disabled={
+              loadingStep !== null || batchLoading || !analysis || !selectedImage || !chosenConcept.trim()
+            }
+            variant="outline"
+            size="sm"
+          >
+            صمّم الصورة (مفرد)
+          </Button>
+          {loadingStep === 'image' && (
+            <div className="flex items-center gap-2 text-sm text-muted">
+              <LoadingSpinner size="sm" />
+              <span>جارٍ توليد التصميم… قد يستغرق دقيقة</span>
+            </div>
+          )}
+          {imageUrl && (
+            <div className="space-y-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imageUrl}
+                alt="التصميم المولّد"
+                className="max-w-xs rounded-xl border border-border"
+              />
+              {imagePrompt && (
+                <details className="text-xs text-muted">
+                  <summary className="cursor-pointer">عرض البرومبت المستخدم</summary>
+                  <pre
+                    dir="rtl"
+                    className="bg-cream rounded-xl p-3 mt-2 whitespace-pre-wrap max-h-60 overflow-y-auto border border-border"
+                  >
+                    {imagePrompt}
+                  </pre>
+                </details>
+              )}
+              <Button
+                onClick={() => onUsedContent(selectedTweet, [imageUrl])}
+                variant="secondary"
+                size="sm"
+              >
+                استخدم هذا التصميم والتغريدة
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

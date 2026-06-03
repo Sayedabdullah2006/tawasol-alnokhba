@@ -923,9 +923,9 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                         🤖 {showAIStudio ? 'إخفاء استوديو الذكاء الاصطناعي' : 'استوديو الذكاء الاصطناعي'}
                       </Button>
                       {showAIStudio && (() => {
-                        const onUsed = (text: string, img: string) => {
+                        const onUsed = (text: string, images: string[]) => {
                           setAiContent(text)
-                          setAiImages(img ? [img] : [])
+                          setAiImages(Array.isArray(images) ? images : [])
                           setShowAIStudio(false)
                           setSendingContent(true)
                         }

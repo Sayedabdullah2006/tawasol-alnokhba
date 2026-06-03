@@ -194,21 +194,38 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 })
       }
 
+      // نمرّر الصورة المختارة (إن وُجدت) ليُراعي الاتجاهات تكوين الصورة ومزاجها،
+      // فتتغيّر الاتجاهات وفق تحليل الخبر + صورته فعلاً لا قوالب ثابتة.
+      const conceptUserContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
+        { type: 'text', text: `${JSON.stringify(priorAnalysis)}\n\n${newsText}` },
+      ]
+      if (sourceImage) {
+        conceptUserContent.push({ type: 'image_url', image_url: { url: sourceImage } })
+      }
+
       const completion = await openai.chat.completions.create({
         model: OPENAI_MODEL,
+        response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: SYS_CONCEPTS },
-          {
-            role: 'user',
-            content: `${JSON.stringify(priorAnalysis)}\n\n${newsText}`,
-          },
+          { role: 'user', content: conceptUserContent },
         ],
       })
 
-      const rawText = completion.choices[0]?.message?.content ?? ''
-      await saveStep({ concepts: { raw: rawText } })
+      const rawText = completion.choices[0]?.message?.content ?? '{}'
+      // نحاول استخراج مصفوفة الاتجاهات المنظّمة { concepts: [{title, mood, brief}] }
+      let items: Array<{ title?: string; mood?: string; brief?: string }> = []
+      try {
+        const parsed = JSON.parse(rawText)
+        if (Array.isArray(parsed?.concepts)) items = parsed.concepts
+        else if (Array.isArray(parsed)) items = parsed
+      } catch {
+        items = []
+      }
 
-      return NextResponse.json({ concepts: rawText })
+      await saveStep({ concepts: { items, raw: rawText } })
+
+      return NextResponse.json({ concepts: items, raw: rawText })
     }
 
     // ── STEP: image ────────────────────────────────────────────
