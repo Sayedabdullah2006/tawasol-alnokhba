@@ -103,7 +103,6 @@ People & subject IDENTICAL — untouched.
 ✗ no face change ✗ no reshaping ✗ no recolor ✗ no enhancement ✗ no swap ✗ no mask removal.
 Only allowed edit: clone out foreign logos (e.g. واس/SPA) from the background.
 Crop to a 4:5 portrait framing centered on the subject.
-NOTE: a SECOND reference image is the FIRST1SAUDI brand logo — composite it UNCHANGED into the footer (see footer section). Keep its exact colors/shape.
 
 === LAYOUT — PHOTO TOP, TEAL TEXT ZONE BELOW ===
 TOP ~58%: the real photo, full width. Its bottom edge fades with a short deep-teal gradient into the text zone.
@@ -139,8 +138,8 @@ Dark teal strip (#0D3D47) full width.
 Two swoosh waves at top edge: Wave 1 dark teal (#0D3D47) · Wave 2 Saudi green (#2D8B3F).
 Thin gold line (#FFD700) along the top edge of Wave 2.
 LEFT side, LEFT-ALIGNED: [X icon] [LinkedIn icon] [Instagram icon] [TikTok icon] — all pure white #FFFFFF, same size — then "@First1Saudi" bold white.
-RIGHT side: place the FIRST1SAUDI brand LOGO (the second reference image) bottom-right, sitting on the green footer curve, kept UNCHANGED (same colors/shape), height ≈ the social-icons row. Do NOT redraw or restyle it.
-FORBIDDEN: the word "FIRST1SAUDI" as text anywhere except the @handle (the logo image itself is required).
+RIGHT side: leave a CLEAR EMPTY area (no text, no icon, no logo) — a brand logo will be composited there afterwards. Keep this corner clean.
+FORBIDDEN: do NOT draw any logo or the word "FIRST1SAUDI" as text anywhere except the @handle.
 
 === DECORATION ===
 Thin gold vertical accent lines at far left & right edges.

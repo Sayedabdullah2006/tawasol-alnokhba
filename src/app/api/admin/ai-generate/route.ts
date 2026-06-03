@@ -3,6 +3,7 @@ import OpenAI from 'openai'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { getOpenAI, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE } from '@/lib/openai'
 import { generateImageWithGemini } from '@/lib/gemini'
+import { compositeLogoBottomRight } from '@/lib/logo-overlay'
 
 export const dynamic = 'force-dynamic'
 // Image generation can be slow — give it room.
@@ -244,9 +245,8 @@ export async function POST(req: Request) {
               `بيانات الخبر (JSON):\n${JSON.stringify(priorAnalysis)}\n\n` +
               `الاتجاه المعتمد:\n${chosenConcept}\n\n` +
               `الصورة الحقيقية المرفقة هي على الرابط: ${sourceImage}\n` +
-              (logoUrl
-                ? `شعار First1Saudi متوفر على الرابط: ${logoUrl} — ضعه أسفل اليمين فوق منحنى الفوتر.\n`
-                : `ضع شعار First1Saudi أسفل اليمين فوق منحنى الفوتر.\n`),
+              // اللوقو يُركَّب برمجياً بعد التوليد — اطلب ترك مكانه فارغاً فقط.
+              `اترك مساحة فارغة أسفل يمين الفوتر للوقو (سيُضاف لاحقاً برمجياً) ولا ترسم أي شعار هناك.\n`,
           },
         ],
       })
@@ -256,19 +256,23 @@ export async function POST(req: Request) {
       await saveStep({ imagePrompt: designPrompt })
 
       // 2) توليد الصورة عبر Gemini (نموذج توليد الصور من Google).
-      // نمرّر برومبت التصميم المُولَّد من OpenAI + الصور المرجعية:
-      // الصورة الشخصية الحقيقية أولاً (طبقة مرجعية) ثم شعار أول سعودي إن وُجد.
-      const referenceImages = [sourceImage, ...(logoUrl ? [logoUrl] : [])]
-      const { b64, mimeType } = await generateImageWithGemini(designPrompt, referenceImages)
+      // نمرّر الصورة الشخصية الحقيقية فقط كمرجع. لا نمرّر اللوقو إطلاقاً لأن
+      // النموذج يُعيد رسمه ويُشوّه نصه العربي — سنُركّبه برمجياً بعد التوليد.
+      const referenceImages = [sourceImage]
+      const { b64 } = await generateImageWithGemini(designPrompt, referenceImages)
 
-      // 3) Decode and upload to the content-images bucket.
-      const imageBuffer = Buffer.from(b64, 'base64')
-      const ext = mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg' : 'png'
+      // 3) فكّ الترميز ثم تركيب لوقو أول سعودي أسفل اليمين (إن وُجد) بدقة بكسل.
+      const rawImage = Buffer.from(b64, 'base64')
+      const { buffer: finalImage, mimeType: finalMime } = logoUrl
+        ? await compositeLogoBottomRight(rawImage, logoUrl)
+        : { buffer: rawImage, mimeType: 'image/png' }
+
+      const ext = finalMime.includes('jpeg') || finalMime.includes('jpg') ? 'jpg' : 'png'
       const suffix = isCampaignPost ? `-p${postIndex}` : ''
       const path = `ai-${requestId}${suffix}-${Date.now()}.${ext}`
       const { error: uploadErr } = await service.storage
         .from('content-images')
-        .upload(path, imageBuffer, { contentType: mimeType })
+        .upload(path, finalImage, { contentType: finalMime })
       if (uploadErr) throw new Error(`فشل رفع الصورة: ${uploadErr.message}`)
 
       const { data: pub } = service.storage.from('content-images').getPublicUrl(path)
