@@ -16,6 +16,7 @@ import Input from '@/components/ui/Input'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import QuoteComposer from '@/components/admin/QuoteComposer'
 import ContentSender from '@/components/admin/ContentSender'
+import AIStudioPanel from '@/components/admin/AIStudioPanel'
 import { getAdminActions, requiresAdminAction, waitingForClient, isFinalStatus, messageColors } from '@/lib/admin-actions'
 
 // ── مساعدات عرض البيانات ───────────────────────────────────────────
@@ -106,6 +107,9 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   const [rejecting, setRejecting] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [sendingContent, setSendingContent] = useState(false)
+  const [showAIStudio, setShowAIStudio] = useState(false)
+  const [aiContent, setAiContent] = useState<string | null>(null)
+  const [aiImages, setAiImages] = useState<string[] | null>(null)
   const [respondingToNegotiation, setRespondingToNegotiation] = useState(false)
   const [discountPercentage, setDiscountPercentage] = useState('')
   const [negotiationNotes, setNegotiationNotes] = useState('')
@@ -908,6 +912,30 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                     </div>
                   )}
 
+                  {/* استوديو الذكاء الاصطناعي */}
+                  {request.status === 'in_progress' && !sendingContent && (
+                    <div className="space-y-3">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowAIStudio(v => !v)}
+                        className="w-full"
+                      >
+                        🤖 {showAIStudio ? 'إخفاء استوديو الذكاء الاصطناعي' : 'استوديو الذكاء الاصطناعي'}
+                      </Button>
+                      {showAIStudio && (
+                        <AIStudioPanel
+                          request={request}
+                          onUsedContent={(text, img) => {
+                            setAiContent(text)
+                            setAiImages(img ? [img] : [])
+                            setShowAIStudio(false)
+                            setSendingContent(true)
+                          }}
+                        />
+                      )}
+                    </div>
+                  )}
+
                   {/* إرسال المحتوى */}
                   {request.status === 'in_progress' && !sendingContent && (() => {
                     const hasClientFeedback = !!request.user_feedback
@@ -965,10 +993,10 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                   {sendingContent && request.status === 'in_progress' && (
                     <ContentSender
                       request={request}
-                      onSent={() => { setSendingContent(false); window.location.reload() }}
-                      onCancel={() => setSendingContent(false)}
-                      initialContent={request.user_feedback ? (request.proposed_content ?? '') : undefined}
-                      initialImages={request.user_feedback ? (request.proposed_images ?? []) : undefined}
+                      onSent={() => { setSendingContent(false); setAiContent(null); setAiImages(null); window.location.reload() }}
+                      onCancel={() => { setSendingContent(false); setAiContent(null); setAiImages(null) }}
+                      initialContent={aiContent ?? (request.user_feedback ? (request.proposed_content ?? '') : undefined)}
+                      initialImages={aiImages ?? (request.user_feedback ? (request.proposed_images ?? []) : undefined)}
                       isRevision={!!request.user_feedback}
                     />
                   )}
