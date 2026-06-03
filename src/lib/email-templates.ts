@@ -1329,3 +1329,34 @@ export function infoResubmittedToAdmin(d: {
     `)
   }
 }
+
+export function motivateUserToSubmit(d: { clientName?: string }) {
+  const name = d.clientName?.trim() || 'عزيزنا'
+  return {
+    subject: 'نتطلّع لسماع إنجازك · تواصل النخبة',
+    html: wrap(`
+      <p style="font-size:15px; color:${BRAND_NAVY}; margin:0 0 16px 0;">مرحباً ${name}،</p>
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:48px; margin-bottom:12px;">🤍</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:21px;">نتطلّع لسماع إنجازك</h2>
+      </div>
+      <p style="font-size:15px; color:#5A6B85; line-height:1.9; margin:16px 0; text-align:center;">
+        مرّ وقتٌ منذ انضمامك إلينا، وصدقًا نتطلّع لسماع قصتك.<br/>
+        ما حقّقته يهمّنا، ويسعدنا أن نساعدك في إيصاله للناس بأجمل صورة — متى ما كنت مستعدّاً.
+      </p>
+      <div style="background:#F8FAFC; border-radius:12px; padding:18px; margin:24px 0; border-right:4px solid ${BRAND_GOLD};">
+        <p style="margin:0; font-size:14px; color:${BRAND_NAVY}; line-height:1.8;">
+          نحن نتكفّل بالباقي: صياغة احترافية، وتصميم مميّز، ونشر يليق بإنجازك. كل ما عليك هو أن تبدأ.
+        </p>
+      </div>
+      <div style="margin:32px 0; text-align:center;">
+        <a href="${SITE_URL}/request" style="display:inline-block; background:${BRAND_GOLD}; color:#FFFFFF; padding:14px 32px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:15px;">
+          ابدأ قصتك الآن
+        </a>
+      </div>
+      <p style="font-size:13px; color:#9AA7BC; line-height:1.8; margin:20px 0 0 0; text-align:center;">
+        وإن احتجت أي مساعدة، نحن على بُعد رسالة. 🌿
+      </p>
+    `)
+  }
+}

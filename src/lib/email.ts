@@ -182,6 +182,11 @@ export async function notifyInfoRequestedToClient(args: {
   return sendEmail(args.email, t.subject, t.html)
 }
 
+export async function notifyMotivateUser(args: { email: string; clientName?: string }) {
+  const t = templates.motivateUserToSubmit(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
 export async function notifyInfoResubmittedToAdmin(args: {
   requestNumber: string; clientName: string
 }) {

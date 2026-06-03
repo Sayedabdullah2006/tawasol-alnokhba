@@ -33,6 +33,9 @@ export default function AdminUsersPage() {
   const [pwUser, setPwUser] = useState<UserData | null>(null)
   const [pwValue, setPwValue] = useState('')
   const [pwSaving, setPwSaving] = useState(false)
+  const [bulkMotivating, setBulkMotivating] = useState(false)
+  const [showMotivateConfirm, setShowMotivateConfirm] = useState(false)
+  const [motivatingId, setMotivatingId] = useState<string | null>(null)
 
   const loadUsers = useCallback(async () => {
     // Verify admin
@@ -97,6 +100,48 @@ export default function AdminUsersPage() {
     setActionLoading(null)
   }
 
+  // العملاء بلا طلبات (غير الإداريين وغير الموقوفين) — مؤهّلون للتحفيز
+  const noRequestUsers = users.filter(
+    u => u.role !== 'admin' && !u.is_banned && (u.requests_count ?? 0) === 0 && u.email && u.email !== '-'
+  )
+
+  const handleMotivateBulk = async () => {
+    setBulkMotivating(true)
+    try {
+      const res = await fetch('/api/admin/motivate-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) showToast(`تم إرسال ${data.sent} رسالة تحفيز`)
+      else showToast(data.error ?? 'فشل الإرسال', 'error')
+    } catch {
+      showToast('حدث خطأ في الاتصال', 'error')
+    } finally {
+      setBulkMotivating(false)
+      setShowMotivateConfirm(false)
+    }
+  }
+
+  const handleMotivateOne = async (u: UserData) => {
+    setMotivatingId(u.id)
+    try {
+      const res = await fetch('/api/admin/motivate-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: u.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) showToast(`تم إرسال رسالة تحفيز إلى ${u.full_name || u.email}`)
+      else showToast(data.error ?? 'فشل الإرسال', 'error')
+    } catch {
+      showToast('حدث خطأ في الاتصال', 'error')
+    } finally {
+      setMotivatingId(null)
+    }
+  }
+
   const filtered = users.filter(u => {
     if (!search) return true
     const q = search.toLowerCase()
@@ -109,9 +154,19 @@ export default function AdminUsersPage() {
 
   return (
     <div className="p-4 md:p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
         <h1 className="text-2xl font-black text-dark">إدارة المستخدمين</h1>
-        <span className="text-sm text-muted">{users.length} مستخدم</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted">{users.length} مستخدم</span>
+          <Button
+            onClick={() => setShowMotivateConfirm(true)}
+            disabled={noRequestUsers.length === 0 || bulkMotivating}
+            loading={bulkMotivating}
+            className="bg-gold hover:bg-gold/90"
+          >
+            🤍 تحفيز من ليس لديهم طلبات ({noRequestUsers.length})
+          </Button>
+        </div>
       </div>
 
       <div className="mb-4">
@@ -181,6 +236,16 @@ export default function AdminUsersPage() {
                       >
                         🔑 كلمة المرور
                       </button>
+                      {u.role !== 'admin' && !u.is_banned && (u.requests_count ?? 0) === 0 && u.email && u.email !== '-' && (
+                        <button
+                          onClick={() => handleMotivateOne(u)}
+                          disabled={motivatingId === u.id}
+                          title="إرسال رسالة تحفيز لتقديم أول طلب"
+                          className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all disabled:opacity-50 bg-gold/10 text-gold hover:bg-gold/20"
+                        >
+                          {motivatingId === u.id ? '...' : '🤍 تحفيز'}
+                        </button>
+                      )}
                       {u.role !== 'admin' && (
                         <button
                           onClick={() => handleToggleBan(u.id, u.is_banned)}
@@ -205,6 +270,26 @@ export default function AdminUsersPage() {
           <p className="p-8 text-center text-muted">لا توجد نتائج</p>
         )}
       </div>
+
+      {showMotivateConfirm && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-dark/50 p-0 md:p-4">
+          <div className="bg-card rounded-t-2xl md:rounded-2xl border border-border w-full md:max-w-md p-5 md:p-6 space-y-4 max-h-[90dvh] overflow-y-auto">
+            <div className="text-center">
+              <div className="text-4xl mb-2">🤍</div>
+              <h3 className="font-black text-dark text-lg">تحفيز المستخدمين بلا طلبات</h3>
+              <p className="text-sm text-muted mt-1">
+                سيتم إرسال رسالة «نتطلّع لسماع إنجازك» إلى <strong>{noRequestUsers.length}</strong> مستخدماً لم يقدّموا أي طلب بعد.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => setShowMotivateConfirm(false)} className="flex-1" disabled={bulkMotivating}>إلغاء</Button>
+              <Button onClick={handleMotivateBulk} loading={bulkMotivating} className="flex-1 bg-gold hover:bg-gold/90">
+                إرسال للجميع
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {pwUser && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-dark/50 p-0 md:p-4">
