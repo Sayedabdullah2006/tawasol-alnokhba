@@ -3,7 +3,7 @@ import OpenAI from 'openai'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { getOpenAI, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE } from '@/lib/openai'
 import { generateImageWithGemini } from '@/lib/gemini'
-import { compositeLogoBottomRight } from '@/lib/logo-overlay'
+import { compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
 
 export const dynamic = 'force-dynamic'
 // Image generation can be slow — give it room.
@@ -276,13 +276,15 @@ export async function POST(req: Request) {
       // نمرّر الصورة الشخصية الحقيقية فقط كمرجع. لا نمرّر اللوقو إطلاقاً لأن
       // النموذج يُعيد رسمه ويُشوّه نصه العربي — سنُركّبه برمجياً بعد التوليد.
       const referenceImages = [sourceImage]
-      const { b64 } = await generateImageWithGemini(designPrompt, referenceImages)
+      // نلمّح بنسبة 4:5 ليكون التكوين قريباً من المقاس النهائي فيقلّ القصّ.
+      const { b64 } = await generateImageWithGemini(designPrompt, referenceImages, { aspectRatio: '4:5' })
 
-      // 3) فكّ الترميز ثم تركيب لوقو أول سعودي أسفل اليمين (إن وُجد) بدقة بكسل.
+      // 3) ضبط المقاس إلى 1080×1350 بالضبط، ثم تركيب لوقو أول سعودي أسفل اليمين (إن وُجد).
       const rawImage = Buffer.from(b64, 'base64')
+      const posterBase = await resizeToPoster(rawImage)
       const { buffer: finalImage, mimeType: finalMime } = logoUrl
-        ? await compositeLogoBottomRight(rawImage, logoUrl)
-        : { buffer: rawImage, mimeType: 'image/png' }
+        ? await compositeLogoBottomRight(posterBase, logoUrl)
+        : { buffer: posterBase, mimeType: 'image/png' }
 
       const ext = finalMime.includes('jpeg') || finalMime.includes('jpg') ? 'jpg' : 'png'
       const suffix = isCampaignPost ? `-p${postIndex}` : ''

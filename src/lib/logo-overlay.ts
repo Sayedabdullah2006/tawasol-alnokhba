@@ -9,6 +9,25 @@
  */
 import sharp from 'sharp'
 
+// مقاس منشور السوشال الثابت (4:5)
+export const POSTER_WIDTH = 1080
+export const POSTER_HEIGHT = 1350
+
+/**
+ * يضبط الصورة على مقاس 1080×1350 بالضبط (4:5) بالتحجيم مع قص مركزي عند اللزوم،
+ * لضمان توحيد مقاس كل التصاميم المولّدة بغضّ النظر عمّا يُخرجه النموذج.
+ */
+export async function resizeToPoster(
+  img: Buffer,
+  width: number = POSTER_WIDTH,
+  height: number = POSTER_HEIGHT,
+): Promise<Buffer> {
+  return sharp(img)
+    .resize(width, height, { fit: 'cover', position: 'centre' })
+    .png()
+    .toBuffer()
+}
+
 interface OverlayOptions {
   // عرض اللوقو كنسبة من عرض التصميم
   widthRatio?: number
