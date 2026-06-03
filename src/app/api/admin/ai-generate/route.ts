@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { getOpenAI, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE } from '@/lib/openai'
+import { generateImageWithGemini } from '@/lib/gemini'
 
 export const dynamic = 'force-dynamic'
 // Image generation can be slow — give it room.
@@ -202,39 +203,19 @@ export async function POST(req: Request) {
         .update({ ai_image_prompt: designPrompt })
         .eq('id', requestId)
 
-      // 2) توليد الصورة عبر أداة image_generation المدمجة في Responses API.
-      // نطلب من النموذج «أنشئ صورة» (مثل ChatGPT) فيختار مولّد الصور داخلياً —
-      // دون تسمية موديل الصورة صراحةً. نمرّر الصورة الحقيقية المرفقة كـ input_image
-      // (طبقة مرجعية مقفلة) + شعار أول سعودي إن وُجد + البرومبت التفصيلي كنص.
-      const userContent: any[] = [
-        { type: 'input_text', text: designPrompt },
-        { type: 'input_image', image_url: sourceImage },
-      ]
-      if (logoUrl) {
-        userContent.push({ type: 'input_image', image_url: logoUrl })
-      }
-
-      const imageResponse = await openai.responses.create({
-        model: 'gpt-4o',
-        input: [{ role: 'user', content: userContent }],
-        tools: [{ type: 'image_generation' }],
-      })
-
-      // استخراج الصورة الناتجة (base64) من مخرجات أداة التوليد
-      const imageOutputs = (imageResponse.output ?? [])
-        .filter((o: any) => o.type === 'image_generation_call')
-        .map((o: any) => o.result as string)
-      const b64 = imageOutputs[0]
-      if (!b64) {
-        throw new Error('لم يُرجِع OpenAI صورة')
-      }
+      // 2) توليد الصورة عبر Gemini (نموذج توليد الصور من Google).
+      // نمرّر برومبت التصميم المُولَّد من OpenAI + الصور المرجعية:
+      // الصورة الشخصية الحقيقية أولاً (طبقة مرجعية) ثم شعار أول سعودي إن وُجد.
+      const referenceImages = [sourceImage, ...(logoUrl ? [logoUrl] : [])]
+      const { b64, mimeType } = await generateImageWithGemini(designPrompt, referenceImages)
 
       // 3) Decode and upload to the content-images bucket.
       const imageBuffer = Buffer.from(b64, 'base64')
-      const path = `ai-${requestId}-${Date.now()}.png`
+      const ext = mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg' : 'png'
+      const path = `ai-${requestId}-${Date.now()}.${ext}`
       const { error: uploadErr } = await service.storage
         .from('content-images')
-        .upload(path, imageBuffer, { contentType: 'image/png' })
+        .upload(path, imageBuffer, { contentType: mimeType })
       if (uploadErr) throw new Error(`فشل رفع الصورة: ${uploadErr.message}`)
 
       const { data: pub } = service.storage.from('content-images').getPublicUrl(path)
