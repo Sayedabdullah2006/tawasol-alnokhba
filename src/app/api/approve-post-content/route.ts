@@ -1,0 +1,86 @@
+import { NextResponse } from 'next/server'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { notifyContentApprovedToAdmin } from '@/lib/email'
+
+/**
+ * اعتماد العميل لمحتوى/تصميم خبر واحد (postIndex) مع اختيار تصميم واحد.
+ * يُحدّث post_reviews[postIndex] فقط؛ يبقى الطلب «قيد التنفيذ».
+ */
+export async function POST(request: Request) {
+  try {
+    const supabase = await createServerSupabaseClient()
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
+
+    const body = await request.json()
+    const { requestId, selectedImage } = body
+    const postIndex = Number(body.postIndex)
+
+    if (!requestId || !Number.isInteger(postIndex) || postIndex < 0) {
+      return NextResponse.json({ error: 'بيانات غير كاملة' }, { status: 400 })
+    }
+
+    const { data: existingRequest } = await supabase
+      .from('publish_requests')
+      .select('*')
+      .eq('id', requestId)
+      .single()
+
+    if (!existingRequest) {
+      return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 })
+    }
+    if (existingRequest.user_id !== user.id) {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
+    }
+
+    const reviews: Record<string, any> =
+      existingRequest.post_reviews && typeof existingRequest.post_reviews === 'object'
+        ? { ...existingRequest.post_reviews }
+        : {}
+    const entry = reviews[postIndex]
+
+    if (!entry || entry.status !== 'content_review') {
+      return NextResponse.json({ error: 'هذا الخبر ليس في مرحلة المراجعة' }, { status: 400 })
+    }
+
+    // التصميم المختار يجب أن يكون من بين التصاميم المُرسلة (إن وُجدت تصاميم)
+    const images: string[] = Array.isArray(entry.proposed_images) ? entry.proposed_images : []
+    const chosen = typeof selectedImage === 'string' && images.includes(selectedImage)
+      ? selectedImage
+      : (images[0] ?? null)
+
+    if (images.length > 0 && !chosen) {
+      return NextResponse.json({ error: 'اختر تصميماً أولاً' }, { status: 400 })
+    }
+
+    reviews[postIndex] = {
+      ...entry,
+      status: 'approved',
+      selected_image: chosen,
+      user_feedback: null,
+      content_approved_at: new Date().toISOString(),
+    }
+
+    const { error } = await supabase
+      .from('publish_requests')
+      .update({ post_reviews: reviews, updated_at: new Date().toISOString() })
+      .eq('id', requestId)
+
+    if (error) {
+      console.error('Database error:', error)
+      return NextResponse.json({ error: 'فشل تحديث الطلب' }, { status: 500 })
+    }
+
+    const requestNumber = `ATH-${String(existingRequest.request_number).padStart(4, '0')}`
+    notifyContentApprovedToAdmin({
+      requestNumber,
+      clientName: existingRequest.client_name ?? 'العميل',
+    }).catch(e => console.error('Admin notification failed:', e))
+
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error('Approve post content error:', err)
+    return NextResponse.json({ error: 'حدث خطأ في الخادم' }, { status: 500 })
+  }
+}

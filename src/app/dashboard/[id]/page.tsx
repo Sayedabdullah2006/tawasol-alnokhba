@@ -10,6 +10,7 @@ import StatusBadge from '@/components/dashboard/StatusBadge'
 import ProgressTracker from '@/components/dashboard/ProgressTracker'
 import QuoteApproval from '@/components/dashboard/QuoteApproval'
 import EditableExtras from '@/components/dashboard/EditableExtras'
+import PostReviews from '@/components/dashboard/PostReviews'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useToast } from '@/components/ui/Toast'
@@ -428,6 +429,9 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
         )}
+
+        {/* مراجعة المحتوى لكل خبر على حدة (يبقى الطلب «قيد التنفيذ») */}
+        <PostReviews request={request} />
 
         {request.admin_notes && request.status !== 'quoted' && request.status !== 'rejected' && (
           <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-3">

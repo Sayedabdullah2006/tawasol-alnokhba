@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
 import ContentImagesUploader from '@/components/request/ContentImagesUploader'
+import ImageLightbox from '@/components/ui/ImageLightbox'
 
 interface ContentSenderProps {
   request: any
@@ -13,14 +14,18 @@ interface ContentSenderProps {
   initialContent?: string
   initialImages?: string[]
   isRevision?: boolean
+  // عند تمريره: يُرسل محتوى خبر واحد (postIndex) عبر مسار المراجعة لكل منشور
+  postIndex?: number
+  postLabel?: string
 }
 
-export default function ContentSender({ request, onSent, onCancel, initialContent, initialImages, isRevision }: ContentSenderProps) {
+export default function ContentSender({ request, onSent, onCancel, initialContent, initialImages, isRevision, postIndex, postLabel }: ContentSenderProps) {
   const supabase = createClient()
   const { showToast } = useToast()
   const [loading, setLoading] = useState(false)
   const [proposedContent, setProposedContent] = useState(initialContent ?? '')
   const [proposedImages, setProposedImages] = useState<string[]>(initialImages ?? [])
+  const [lightbox, setLightbox] = useState<string | null>(null)
 
   const handleSend = async () => {
     if (!proposedContent.trim()) {
@@ -35,17 +40,22 @@ export default function ContentSender({ request, onSent, onCancel, initialConten
       images: proposedImages
     })
 
+    const perPost = typeof postIndex === 'number'
     setLoading(true)
     try {
-      const res = await fetch('/api/send-content-for-review', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requestId: request.id,
-          proposedContent: proposedContent.trim(),
-          proposedImages,
-        }),
-      })
+      const res = await fetch(
+        perPost ? '/api/send-post-content-for-review' : '/api/send-content-for-review',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requestId: request.id,
+            proposedContent: proposedContent.trim(),
+            proposedImages,
+            ...(perPost ? { postIndex } : {}),
+          }),
+        }
+      )
 
       const responseData = await res.json().catch(() => ({}))
       console.log('📡 استجابة الخادم:', { status: res.status, data: responseData })
@@ -72,6 +82,7 @@ export default function ContentSender({ request, onSent, onCancel, initialConten
       <div className="flex items-center justify-between">
         <h3 className="font-bold text-dark">
           {isRevision ? 'تعديل المحتوى وإعادة الإرسال' : 'إرسال المحتوى للمراجعة'}
+          {postLabel ? <span className="text-green text-sm font-normal"> — {postLabel}</span> : null}
         </h3>
         <button
           onClick={onCancel}
@@ -145,7 +156,9 @@ export default function ContentSender({ request, onSent, onCancel, initialConten
                     key={i}
                     src={url}
                     alt={`تصميم ${i + 1}`}
-                    className="aspect-square w-full object-cover rounded-xl border border-border"
+                    onClick={() => setLightbox(url)}
+                    className="aspect-square w-full object-cover rounded-xl border border-border cursor-zoom-in"
+                    title="اضغط للتكبير"
                   />
                 ))}
               </div>
@@ -167,6 +180,8 @@ export default function ContentSender({ request, onSent, onCancel, initialConten
           📤 إرسال للعميل
         </Button>
       </div>
+
+      <ImageLightbox src={lightbox} onClose={() => setLightbox(null)} />
     </div>
   )
 }

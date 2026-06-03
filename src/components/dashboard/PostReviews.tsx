@@ -1,0 +1,264 @@
+'use client'
+
+import { useState } from 'react'
+import { useToast } from '@/components/ui/Toast'
+import Button from '@/components/ui/Button'
+import ImageLightbox from '@/components/ui/ImageLightbox'
+import { getReviewItems, getPostReviews } from '@/lib/review-items'
+
+interface Props {
+  request: any
+}
+
+/**
+ * مراجعة العميل لمحتوى كل خبر على حدة:
+ * - يرى النص + التصاميم المُرسلة لذلك الخبر.
+ * - يختار تصميماً واحداً (راديو) ثم يعتمد، أو يطلب تعديلاً.
+ * - كل خبر يحمل حالته (بانتظار/معتمد/تعديل مطلوب) مستقلاً.
+ */
+export default function PostReviews({ request }: Props) {
+  const { showToast } = useToast()
+  const items = getReviewItems(request)
+  const reviews = getPostReviews(request)
+
+  const [selected, setSelected] = useState<Record<number, string>>({})
+  const [feedbackOpen, setFeedbackOpen] = useState<Record<number, boolean>>({})
+  const [feedback, setFeedback] = useState<Record<number, string>>({})
+  const [busy, setBusy] = useState<number | null>(null)
+  const [lightbox, setLightbox] = useState<string | null>(null)
+
+  // نعرض فقط إن كان هناك أي خبر أُرسل محتواه
+  const hasAny = items.some(it => reviews[it.index])
+  if (!hasAny) return null
+
+  const isCampaign = request?.request_type === 'campaign'
+
+  const approve = async (index: number, images: string[]) => {
+    const chosen = selected[index] ?? (images.length === 1 ? images[0] : undefined)
+    if (images.length > 0 && !chosen) {
+      showToast('اختر تصميماً أولاً', 'error')
+      return
+    }
+    setBusy(index)
+    try {
+      const res = await fetch('/api/approve-post-content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: request.id, postIndex: index, selectedImage: chosen ?? null }),
+      })
+      if (res.ok) {
+        showToast('تم اعتماد المحتوى')
+        window.location.reload()
+      } else {
+        const d = await res.json().catch(() => ({}))
+        showToast(d.error ?? 'فشل الاعتماد', 'error')
+      }
+    } catch {
+      showToast('حدث خطأ في الاتصال', 'error')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const requestChanges = async (index: number) => {
+    const fb = (feedback[index] ?? '').trim()
+    if (!fb) { showToast('اكتب ملاحظاتك', 'error'); return }
+    setBusy(index)
+    try {
+      const res = await fetch('/api/request-post-content-changes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: request.id, postIndex: index, feedback: fb }),
+      })
+      if (res.ok) {
+        showToast('تم إرسال ملاحظاتك للإدارة')
+        window.location.reload()
+      } else {
+        const d = await res.json().catch(() => ({}))
+        showToast(d.error ?? 'فشل إرسال الملاحظات', 'error')
+      }
+    } catch {
+      showToast('حدث خطأ في الاتصال', 'error')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <div className="mt-4 space-y-4" dir="rtl">
+      <div className="text-center">
+        <div className="text-3xl mb-1">👁️</div>
+        <h3 className="font-bold text-purple-700 text-lg">
+          {isCampaign ? 'مراجعة محتوى الحملة (كل خبر على حدة)' : 'المحتوى جاهز للمراجعة'}
+        </h3>
+        <p className="text-sm text-purple-600 mt-1">
+          راجع كل خبر، اختر التصميم الذي تريده ثم اعتمده، أو اطلب تعديلاً.
+        </p>
+      </div>
+
+      {items.map(item => {
+        const r = reviews[item.index]
+        if (!r) {
+          // خبر لم يُرسل محتواه بعد (في الحملات)
+          return isCampaign ? (
+            <div key={item.index} className="bg-gray-50 border border-border rounded-2xl p-4 opacity-70">
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-gray-200 text-gray-600 text-xs font-bold flex items-center justify-center">
+                  {item.index + 1}
+                </span>
+                <span className="font-bold text-dark text-sm">{item.title}</span>
+                <span className="text-xs text-muted mr-auto">⏳ لم يصل محتواه بعد</span>
+              </div>
+            </div>
+          ) : null
+        }
+
+        const images: string[] = Array.isArray(r.proposed_images) ? r.proposed_images : []
+        const status = r.status ?? 'content_review'
+        const isReview = status === 'content_review'
+        const isApproved = status === 'approved'
+        const isChanges = status === 'changes_requested'
+        const chosen = selected[item.index] ?? (images.length === 1 ? images[0] : undefined)
+
+        return (
+          <div
+            key={item.index}
+            className={`rounded-2xl p-5 border ${
+              isApproved ? 'bg-green-50 border-green-200'
+              : isChanges ? 'bg-yellow-50 border-yellow-200'
+              : 'bg-purple-50 border-purple-200'
+            }`}
+          >
+            {/* ترويسة الخبر */}
+            <div className="flex items-center gap-2 mb-3">
+              {isCampaign && (
+                <span className="w-6 h-6 rounded-full bg-purple-200 text-purple-700 text-xs font-bold flex items-center justify-center">
+                  {item.index + 1}
+                </span>
+              )}
+              <span className="font-bold text-dark text-sm flex-1">{item.title}</span>
+              {isApproved && <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">✅ معتمد</span>}
+              {isChanges && <span className="text-xs font-bold text-yellow-700 bg-yellow-100 px-2 py-0.5 rounded-full">🔄 طلبت تعديلاً</span>}
+              {isReview && <span className="text-xs font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">👁️ بانتظار مراجعتك</span>}
+            </div>
+
+            {/* النص المقترح */}
+            {r.proposed_content && (
+              <div className="bg-white rounded-xl p-3 mb-3">
+                <h4 className="font-bold text-dark text-xs mb-1">النص المقترح:</h4>
+                <p className="text-dark text-sm leading-relaxed whitespace-pre-line">{r.proposed_content}</p>
+              </div>
+            )}
+
+            {/* التصاميم */}
+            {images.length > 0 && (
+              <div className="bg-white rounded-xl p-3 mb-3">
+                <h4 className="font-bold text-dark text-xs mb-2">
+                  {isApproved ? 'التصميم المعتمد:' : 'اختر تصميماً:'}
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {images.map((img, i) => {
+                    const isSel = isApproved ? r.selected_image === img : chosen === img
+                    const dim = isApproved && r.selected_image && r.selected_image !== img
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        disabled={!isReview}
+                        onClick={() => setSelected(prev => ({ ...prev, [item.index]: img }))}
+                        className={`relative aspect-[4/5] rounded-lg overflow-hidden border-2 transition-all ${
+                          isSel ? 'border-green ring-2 ring-green/40' : 'border-border'
+                        } ${dim ? 'opacity-40' : ''} ${isReview ? 'cursor-pointer hover:border-purple-300' : 'cursor-default'}`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img} alt={`تصميم ${i + 1}`} className="w-full h-full object-cover" />
+                        {isSel && (
+                          <span className="absolute top-1 left-1 w-5 h-5 rounded-full bg-green text-white text-xs flex items-center justify-center">✓</span>
+                        )}
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => { e.stopPropagation(); setLightbox(img) }}
+                          className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/55 hover:bg-black/75 text-white text-xs flex items-center justify-center"
+                          title="تكبير"
+                        >
+                          ⛶
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ملاحظات سابقة عند طلب التعديل */}
+            {isChanges && r.user_feedback && (
+              <div className="bg-white rounded-xl p-3 mb-3">
+                <h4 className="font-bold text-yellow-700 text-xs mb-1">ملاحظاتك المُرسلة:</h4>
+                <p className="text-sm text-yellow-700 whitespace-pre-line">{r.user_feedback}</p>
+                <p className="text-xs text-muted mt-1">بانتظار تعديل الإدارة وإعادة الإرسال.</p>
+              </div>
+            )}
+
+            {/* الإجراءات — فقط أثناء المراجعة */}
+            {isReview && (
+              !feedbackOpen[item.index] ? (
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => approve(item.index, images)}
+                    loading={busy === item.index}
+                    disabled={busy !== null}
+                    className="flex-1"
+                    size="sm"
+                  >
+                    ✅ اعتمد هذا الخبر
+                  </Button>
+                  <Button
+                    onClick={() => setFeedbackOpen(prev => ({ ...prev, [item.index]: true }))}
+                    variant="outline"
+                    disabled={busy !== null}
+                    className="flex-1"
+                    size="sm"
+                  >
+                    ✏️ اطلب تعديلاً
+                  </Button>
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl p-3 space-y-2">
+                  <textarea
+                    value={feedback[item.index] ?? ''}
+                    onChange={e => setFeedback(prev => ({ ...prev, [item.index]: e.target.value }))}
+                    placeholder="اكتب ملاحظاتك والتعديلات المطلوبة..."
+                    className="w-full px-3 py-2 rounded-lg border border-border text-sm min-h-[90px] resize-y"
+                    maxLength={500}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => { setFeedbackOpen(prev => ({ ...prev, [item.index]: false })); setFeedback(prev => ({ ...prev, [item.index]: '' })) }}
+                      className="flex-1"
+                      size="sm"
+                    >
+                      إلغاء
+                    </Button>
+                    <Button
+                      onClick={() => requestChanges(item.index)}
+                      loading={busy === item.index}
+                      disabled={busy !== null || !(feedback[item.index] ?? '').trim()}
+                      className="flex-1"
+                      size="sm"
+                    >
+                      📤 إرسال الملاحظات
+                    </Button>
+                  </div>
+                </div>
+              )
+            )}
+          </div>
+        )
+      })}
+
+      <ImageLightbox src={lightbox} onClose={() => setLightbox(null)} />
+    </div>
+  )
+}

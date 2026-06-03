@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import ImageLightbox from '@/components/ui/ImageLightbox'
 
 interface ConceptItem {
   title?: string
@@ -14,7 +15,7 @@ interface ConceptItem {
 
 interface Props {
   request: any
-  onUsedContent: (text: string, images: string[]) => void
+  onUsedContent: (text: string, images: string[], reviewIndex: number) => void
   // ── وضع منشور الحملة: استوديو مستقل لكل خبر في الحملة ──
   postIndex?: number          // فهرس المنشور داخل campaign_posts (غير محدّد = الطلب المفرد)
   postTitle?: string          // عنوان منشور الحملة (للترويسة)
@@ -117,6 +118,7 @@ export default function AIStudioPanel({
   const [batchLoading, setBatchLoading] = useState(false)
   const [batchProgress, setBatchProgress] = useState('')
   const [selectedBatch, setSelectedBatch] = useState<Set<number>>(new Set())
+  const [lightbox, setLightbox] = useState<string | null>(null)
 
   const callStep = async (step: StepKey) => {
     setLoadingStep(step)
@@ -425,6 +427,15 @@ export default function AIStudioPanel({
                       <span className="absolute top-1 left-1 w-5 h-5 rounded-full bg-green text-white text-xs flex items-center justify-center">
                         {on ? '✓' : ''}
                       </span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); setLightbox(r.imageUrl) }}
+                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/50 hover:bg-black/70 text-white text-[11px] flex items-center justify-center"
+                        title="تكبير"
+                      >
+                        ⛶
+                      </span>
                       <span className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] py-0.5 truncate px-1">
                         {r.title}
                       </span>
@@ -436,7 +447,7 @@ export default function AIStudioPanel({
                 onClick={() => {
                   const urls = batchResults.filter((_, i) => selectedBatch.has(i)).map(r => r.imageUrl)
                   if (!urls.length) { showToast('اختر تصميماً واحداً على الأقل', 'error'); return }
-                  onUsedContent(selectedTweet, urls)
+                  onUsedContent(selectedTweet, urls, isPost ? (postIndex as number) : 0)
                 }}
                 variant="secondary"
                 size="sm"
@@ -472,7 +483,9 @@ export default function AIStudioPanel({
               <img
                 src={imageUrl}
                 alt="التصميم المولّد"
-                className="max-w-xs rounded-xl border border-border"
+                onClick={() => setLightbox(imageUrl)}
+                className="max-w-xs rounded-xl border border-border cursor-zoom-in"
+                title="اضغط للتكبير"
               />
               {imagePrompt && (
                 <details className="text-xs text-muted">
@@ -486,7 +499,7 @@ export default function AIStudioPanel({
                 </details>
               )}
               <Button
-                onClick={() => onUsedContent(selectedTweet, [imageUrl])}
+                onClick={() => onUsedContent(selectedTweet, [imageUrl], isPost ? (postIndex as number) : 0)}
                 variant="secondary"
                 size="sm"
               >
@@ -496,6 +509,8 @@ export default function AIStudioPanel({
           )}
         </div>
       </div>
+
+      <ImageLightbox src={lightbox} onClose={() => setLightbox(null)} />
     </div>
   )
 }

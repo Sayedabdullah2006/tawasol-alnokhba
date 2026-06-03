@@ -17,6 +17,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import QuoteComposer from '@/components/admin/QuoteComposer'
 import ContentSender from '@/components/admin/ContentSender'
 import AIStudioPanel from '@/components/admin/AIStudioPanel'
+import PostReviewStatus from '@/components/admin/PostReviewStatus'
 import { getAdminActions, requiresAdminAction, waitingForClient, isFinalStatus, messageColors } from '@/lib/admin-actions'
 
 // ── مساعدات عرض البيانات ───────────────────────────────────────────
@@ -110,6 +111,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   const [showAIStudio, setShowAIStudio] = useState(false)
   const [aiContent, setAiContent] = useState<string | null>(null)
   const [aiImages, setAiImages] = useState<string[] | null>(null)
+  const [aiPostIndex, setAiPostIndex] = useState<number | null>(null)
   const [respondingToNegotiation, setRespondingToNegotiation] = useState(false)
   const [discountPercentage, setDiscountPercentage] = useState('')
   const [negotiationNotes, setNegotiationNotes] = useState('')
@@ -821,6 +823,9 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                 <p className="text-sm text-yellow-700 whitespace-pre-line">{request.admin_notes}</p>
               </div>
             )}
+
+            {/* حالة مراجعة العميل لكل خبر */}
+            <PostReviewStatus request={request} />
           </div>
 
           {/* ── Actions Sidebar ──────────────────────────────────────── */}
@@ -923,9 +928,10 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                         🤖 {showAIStudio ? 'إخفاء استوديو الذكاء الاصطناعي' : 'استوديو الذكاء الاصطناعي'}
                       </Button>
                       {showAIStudio && (() => {
-                        const onUsed = (text: string, images: string[]) => {
+                        const onUsed = (text: string, images: string[], reviewIndex: number) => {
                           setAiContent(text)
                           setAiImages(Array.isArray(images) ? images : [])
+                          setAiPostIndex(reviewIndex)
                           setShowAIStudio(false)
                           setSendingContent(true)
                         }
@@ -1014,11 +1020,17 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                   {sendingContent && request.status === 'in_progress' && (
                     <ContentSender
                       request={request}
-                      onSent={() => { setSendingContent(false); setAiContent(null); setAiImages(null); window.location.reload() }}
-                      onCancel={() => { setSendingContent(false); setAiContent(null); setAiImages(null) }}
+                      onSent={() => { setSendingContent(false); setAiContent(null); setAiImages(null); setAiPostIndex(null); window.location.reload() }}
+                      onCancel={() => { setSendingContent(false); setAiContent(null); setAiImages(null); setAiPostIndex(null) }}
                       initialContent={aiContent ?? (request.user_feedback ? (request.proposed_content ?? '') : undefined)}
                       initialImages={aiImages ?? (request.user_feedback ? (request.proposed_images ?? []) : undefined)}
                       isRevision={!!request.user_feedback}
+                      postIndex={aiPostIndex ?? undefined}
+                      postLabel={
+                        aiPostIndex != null && request.request_type === 'campaign' && Array.isArray(request.campaign_posts)
+                          ? `منشور ${aiPostIndex + 1}${request.campaign_posts[aiPostIndex]?.title ? ' — ' + request.campaign_posts[aiPostIndex].title : ''}`
+                          : undefined
+                      }
                     />
                   )}
 
