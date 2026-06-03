@@ -74,6 +74,27 @@ export async function POST(req: Request) {
     priorAnalysis = reqRow.ai_analysis ?? null
   }
 
+  // ── سياق الحملة: لأي خبر بعد الأول، نمرّر الخبر الأول كمرجع ──────
+  // (الحملات مترابطة: الخبر الأول غالباً يحوي التعريف بالشخصية/الموضوع،
+  //  فتستفيد منه بقية الأخبار لتكون متناسقة دون تكراره حرفياً.)
+  let campaignContext = ''
+  if (isCampaignPost && (postIndex as number) > 0) {
+    const posts = Array.isArray(reqRow.campaign_posts) ? reqRow.campaign_posts : []
+    const first = posts[0]
+    if (first) {
+      campaignContext =
+        `سياق الحملة — الخبر الأول (مرجع للتعريف بالشخصية/الموضوع؛ استفد منه للتناسق ولا تكرّره حرفياً، وركّز على الخبر الحالي):\n` +
+        `العنوان: ${first.title ?? ''}\nالمحتوى: ${first.content ?? ''}`
+      const firstAnalysis = reqRow.ai_posts?.[0]?.analysis
+      if (firstAnalysis) {
+        campaignContext += `\n\nتحليل الخبر الأول (JSON للاسترشاد): ${JSON.stringify(firstAnalysis)}`
+      }
+    }
+  }
+  // يُدمج السياق قبل نص الخبر الحالي عند بناء رسائل المستخدم
+  const withContext = (text: string) =>
+    campaignContext ? `${campaignContext}\n\n──────\n\nالخبر الحالي:\n${text}` : text
+
   // يحفظ مخرجات خطوة في الموضع الصحيح (أعمدة الطلب أو ai_posts[postIndex]).
   // يحافظ على نفس أشكال البيانات في الحالتين ليقرأها اللوح بنفس الطريقة.
   const saveStep = async (patch: {
@@ -136,7 +157,7 @@ export async function POST(req: Request) {
     // ── STEP: analyze ──────────────────────────────────────────
     if (step === 'analyze') {
       const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
-        { type: 'text', text: newsText },
+        { type: 'text', text: withContext(newsText) },
       ]
       if (sourceImage) {
         userContent.push({ type: 'image_url', image_url: { url: sourceImage } })
@@ -177,7 +198,7 @@ export async function POST(req: Request) {
           { role: 'system', content: SYS_TWEETS },
           {
             role: 'user',
-            content: `${JSON.stringify(priorAnalysis)}\n\n${newsText}`,
+            content: `${JSON.stringify(priorAnalysis)}\n\n${withContext(newsText)}`,
           },
         ],
       })
@@ -197,7 +218,7 @@ export async function POST(req: Request) {
       // نمرّر الصورة المختارة (إن وُجدت) ليُراعي الاتجاهات تكوين الصورة ومزاجها،
       // فتتغيّر الاتجاهات وفق تحليل الخبر + صورته فعلاً لا قوالب ثابتة.
       const conceptUserContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
-        { type: 'text', text: `${JSON.stringify(priorAnalysis)}\n\n${newsText}` },
+        { type: 'text', text: `${JSON.stringify(priorAnalysis)}\n\n${withContext(newsText)}` },
       ]
       if (sourceImage) {
         conceptUserContent.push({ type: 'image_url', image_url: { url: sourceImage } })
