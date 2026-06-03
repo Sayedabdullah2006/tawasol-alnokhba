@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, useRef, use } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -121,6 +121,8 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   const [activeTab, setActiveTab] = useState<TabKey>('details')
   const [infoMessage, setInfoMessage] = useState('')
   const [requestingInfo, setRequestingInfo] = useState(false)
+  const [autogenRunning, setAutogenRunning] = useState(false)
+  const autogenTriggered = useRef(false)
   // يُبدّل قيمته لإعادة تهيئة محرّر الإرسال بالمحتوى الجديد عند «استخدم هذا التصميم»
   const [senderNonce, setSenderNonce] = useState(0)
 
@@ -308,6 +310,44 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
     }
   }
 
+  // توليد الخطوات 1-3 (تحليل/تغريدات/اتجاهات) — تلقائياً عند الدخول أو يدوياً (force)
+  const runAutogen = async (force = false) => {
+    if (!request) return
+    setAutogenRunning(true)
+    try {
+      const res = await fetch('/api/admin/ai-autogen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: request.id, force }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok && force) showToast(data.error ?? 'فشل التوليد', 'error')
+      else if (res.ok && force) showToast('تم إعادة توليد الخطوات 1-3', 'success')
+      // إعادة جلب الطلب لإظهار المخرجات في الاستوديو
+      const { data: updated } = await supabase
+        .from('publish_requests')
+        .select('*, influencer:influencers(name_ar, name_en)')
+        .eq('id', id)
+        .single()
+      if (updated) setRequest(updated)
+    } catch {
+      if (force) showToast('حدث خطأ في الاتصال', 'error')
+    } finally {
+      setAutogenRunning(false)
+    }
+  }
+
+  // التشغيل التلقائي مرة واحدة عند دخول الطلب مرحلة الدفع/التنفيذ
+  useEffect(() => {
+    if (!request) return
+    if (autogenTriggered.current) return
+    if (request.ai_autogen_at) return
+    if (!['paid', 'in_progress'].includes(request.status)) return
+    autogenTriggered.current = true
+    runAutogen(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request])
+
   const handleRequestMoreInfo = async () => {
     if (!request) return
     if (infoMessage.trim().length < 5) {
@@ -418,6 +458,23 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                   <Button variant="outline" onClick={() => setShowAIStudio(v => !v)} className="w-full">
                     🤖 {showAIStudio ? 'إخفاء استوديو الذكاء الاصطناعي' : 'استوديو الذكاء الاصطناعي (توليد/إعادة توليد)'}
                   </Button>
+                  {autogenRunning ? (
+                    <div className="flex items-center gap-2 text-sm text-muted">
+                      <LoadingSpinner size="sm" />
+                      <span>جارٍ تجهيز المحتوى تلقائياً (التحليل + التغريدات + الاتجاهات)…</span>
+                    </div>
+                  ) : request.ai_autogen_at ? (
+                    <div className="flex items-center justify-between gap-2 text-xs text-muted">
+                      <span>✅ تم تجهيز الخطوات 1-3 تلقائياً — راجِعها ثم صمّم.</span>
+                      <button
+                        type="button"
+                        onClick={() => runAutogen(true)}
+                        className="text-green font-bold hover:underline whitespace-nowrap"
+                      >
+                        🔄 إعادة توليد 1-3
+                      </button>
+                    </div>
+                  ) : null}
                   {showAIStudio && (() => {
                     const campaignPosts = Array.isArray(request.campaign_posts) ? request.campaign_posts : []
                     if (request.request_type === 'campaign' && campaignPosts.length > 0) {
