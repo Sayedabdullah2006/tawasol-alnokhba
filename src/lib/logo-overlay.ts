@@ -46,9 +46,10 @@ export async function compositeLogoBottomRight(
   logoUrl: string,
   opts: OverlayOptions = {},
 ): Promise<{ buffer: Buffer; mimeType: string }> {
-  const widthRatio = opts.widthRatio ?? 0.16
-  const rightMarginRatio = opts.rightMarginRatio ?? 0.05
-  const bottomMarginRatio = opts.bottomMarginRatio ?? 0.035
+  // شعار أصغر ومُلاصق لأقصى الزاوية اليمنى السفلية لتفادي تداخله مع النص/الفوتر
+  const widthRatio = opts.widthRatio ?? 0.11
+  const rightMarginRatio = opts.rightMarginRatio ?? 0.02
+  const bottomMarginRatio = opts.bottomMarginRatio ?? 0.025
 
   try {
     const base = sharp(baseImage)
