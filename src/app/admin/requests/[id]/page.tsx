@@ -363,7 +363,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
     setAiContent(text)
     setAiImages(Array.isArray(images) ? images : [])
     setAiPostIndex(reviewIndex)
-    setShowAIStudio(false) // طيّ الاستوديو لإبراز محرّر الإرسال
+    // نُبقي الاستوديو مفتوحاً ليبقى زر «الملاحظة وإعادة التوليد» متاحاً فوق شاشة الإرسال
     setSendingContent(true)
     setSenderNonce(n => n + 1)
     focusSender()
