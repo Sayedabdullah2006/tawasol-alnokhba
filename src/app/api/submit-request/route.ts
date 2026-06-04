@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { generateRequestNumber } from '@/lib/utils'
-import { notifyNewRequestToAdmin, notifyQuoteReadyToClient } from '@/lib/email'
+import { notifyNewRequestToAdmin, notifyQuoteReadyToClient, notifyRequestReceivedToClient } from '@/lib/email'
 import { CATEGORIES, PACKAGES } from '@/lib/constants'
 import { calculateAutoQuote, calculateCampaignQuote, CAMPAIGN_DISCOUNT_PCT } from '@/lib/auto-quote'
 
@@ -71,6 +71,10 @@ export async function POST(request: Request) {
     const now   = new Date().toISOString()
     const quoteExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
     const isCampaign = body.request_type === 'campaign'
+
+    // الأفراد فقط يحصلون على تسعير تلقائي. الجهات (شركة/حكومة/خيرية/وكالة)
+    // تذهب لحالة «بانتظار المراجعة» ليُسعّرها الأدمن يدوياً بعد مراجعة الخبر.
+    const isIndividual = (body.client_type ?? 'individual') === 'individual'
 
     // ── تحقق من كود الخصم (إن وُجد) ─────────────────────────────
     let discountRow: any = null
@@ -178,31 +182,44 @@ export async function POST(request: Request) {
           client_city:      body.client_city,
           x_handle:         body.x_handle,
 
-          // تسعير
+          // تسعير (admin_quoted_price / final_total تُضبط حسب نوع العميل بالأسفل)
           base_price:            campaignCalc.afterDiscount,
           extras_total:          campaignCalc.extrasTotal,
           vat_amount:            0,
           total_amount:          campaignCalc.total,
-          admin_quoted_price:    campaignFinalPrice,
           admin_offered_extras:  [],
           user_selected_extras:  [],
           extras_selected_total: 0,
-          final_total:           campaignFinalPrice,
           estimated_reach:       0,
 
           // كود الخصم
           discount_code:         discountRow ? discountRow.code : null,
           discount_code_id:      discountRow ? discountRow.id   : null,
           discount_pct:          discountRow ? Number(discountRow.discount_pct) : null,
-          discount_amount:       campaignDiscountAmt > 0 ? campaignDiscountAmt : null,
+          discount_amount:       isIndividual && campaignDiscountAmt > 0 ? campaignDiscountAmt : null,
 
-          status:            'quoted',
-          quoted_at:         now,
+          // الأفراد: عرض تلقائي. الجهات: بانتظار تسعير الإدارة يدوياً.
+          ...(isIndividual
+            ? {
+                admin_quoted_price: campaignFinalPrice,
+                final_total:        campaignFinalPrice,
+                status:             'quoted',
+                quoted_at:          now,
+                quote_expires_at:   quoteExpiresAt,
+                auto_quoted_at:     now,
+                auto_quote_note:    `حملة ${campaignPostsRaw.length} منشورات — خصم ${CAMPAIGN_DISCOUNT_PCT}%`,
+              }
+            : {
+                admin_quoted_price: null,
+                final_total:        null,
+                status:             'pending',
+                quoted_at:          null,
+                quote_expires_at:   null,
+                auto_quoted_at:     null,
+                auto_quote_note:    `بانتظار تسعير الإدارة — حملة ${campaignPostsRaw.length} منشورات (نوع عميل: ${body.client_type})`,
+              }),
           last_status_change: now,
-          quote_expires_at:  quoteExpiresAt,
           auto_quote_tier:   null,
-          auto_quoted_at:    now,
-          auto_quote_note:   `حملة ${campaignPostsRaw.length} منشورات — خصم ${CAMPAIGN_DISCOUNT_PCT}%`,
           updated_at:        now,
         })
         .select('request_number, id')
@@ -227,17 +244,29 @@ export async function POST(request: Request) {
       }).catch(e => console.error('Admin campaign email failed:', e))
 
       if (body.client_email) {
-        notifyQuoteReadyToClient({
-          email:                 body.client_email,
-          requestNumber,
-          clientName:            body.client_name ?? 'عزيزنا',
-          price:                 campaignCalc.total,
-          reach:                 0,
-          quoteExpiresAt,
-        }).catch(e => console.error('Campaign quote email failed:', e))
+        if (isIndividual) {
+          notifyQuoteReadyToClient({
+            email:                 body.client_email,
+            requestNumber,
+            clientName:            body.client_name ?? 'عزيزنا',
+            price:                 campaignCalc.total,
+            reach:                 0,
+            quoteExpiresAt,
+          }).catch(e => console.error('Campaign quote email failed:', e))
+        } else {
+          notifyRequestReceivedToClient({
+            clientEmail: body.client_email,
+            requestNumber,
+            clientName:  body.client_name ?? 'عزيزنا',
+            category:    `حملة (${campaignPostsRaw.length} منشورات)`,
+            title:       firstPost.title,
+            content:     firstPost.content,
+            channels,
+          }).catch(e => console.error('Campaign received email failed:', e))
+        }
       }
 
-      return NextResponse.json({ requestNumber, quotedTotal: campaignFinalPrice })
+      return NextResponse.json({ requestNumber, quotedTotal: isIndividual ? campaignFinalPrice : null })
     }
 
     // ── مسار المنشور الواحد ───────────────────────────────────────
@@ -346,28 +375,42 @@ export async function POST(request: Request) {
         extras_total:          storedExtrasTotal,
         vat_amount:            priceCalc.vatAmount,
         total_amount:          storedTotalAmount,
-        admin_quoted_price:    singleFinalPrice,
         admin_offered_extras:  [],
         user_selected_extras:  packageIncludedExtras,
         extras_selected_total: 0,
-        final_total:           singleFinalPrice,
         estimated_reach:       0,
 
         // كود الخصم
         discount_code:    discountRow ? discountRow.code : null,
         discount_code_id: discountRow ? discountRow.id   : null,
         discount_pct:     discountRow ? Number(discountRow.discount_pct) : null,
-        discount_amount:  singleDiscountAmt > 0 ? singleDiscountAmt : null,
+        discount_amount:  isIndividual && singleDiscountAmt > 0 ? singleDiscountAmt : null,
 
-        status:            'quoted',
-        quoted_at:         now,
+        // الأفراد: عرض تلقائي. الجهات: بانتظار تسعير الإدارة يدوياً.
+        ...(isIndividual
+          ? {
+              admin_quoted_price: singleFinalPrice,
+              final_total:        singleFinalPrice,
+              status:             'quoted',
+              quoted_at:          now,
+              quote_expires_at:   quoteExpiresAt,
+              auto_quote_tier:    selectedPackage,
+              auto_quoted_at:     now,
+              auto_quote_note:    pkg
+                ? `باقة: ${pkg.name} — فئة: ${body.category}`
+                : `تسعير تلقائي — فئة: ${body.category}، إضافات: ${selectedExtras.length}`,
+            }
+          : {
+              admin_quoted_price: null,
+              final_total:        null,
+              status:             'pending',
+              quoted_at:          null,
+              quote_expires_at:   null,
+              auto_quote_tier:    null,
+              auto_quoted_at:     null,
+              auto_quote_note:    `بانتظار تسعير الإدارة — فئة: ${body.category} (نوع عميل: ${body.client_type})`,
+            }),
         last_status_change: now,
-        quote_expires_at:  quoteExpiresAt,
-        auto_quote_tier:   selectedPackage,
-        auto_quoted_at:    now,
-        auto_quote_note:   pkg
-          ? `باقة: ${pkg.name} — فئة: ${body.category}`
-          : `تسعير تلقائي — فئة: ${body.category}، إضافات: ${selectedExtras.length}`,
         updated_at:        now,
       })
       .select('request_number, id')
@@ -395,17 +438,29 @@ export async function POST(request: Request) {
     }).catch(e => console.error('Admin email failed:', e))
 
     if (body.client_email) {
-      notifyQuoteReadyToClient({
-        email:                 body.client_email,
-        requestNumber,
-        clientName:            body.client_name ?? 'عزيزنا',
-        price:                 singleFinalPrice,
-        reach:                 0,
-        quoteExpiresAt,
-      }).catch(e => console.error('Quote email failed:', e))
+      if (isIndividual) {
+        notifyQuoteReadyToClient({
+          email:                 body.client_email,
+          requestNumber,
+          clientName:            body.client_name ?? 'عزيزنا',
+          price:                 singleFinalPrice,
+          reach:                 0,
+          quoteExpiresAt,
+        }).catch(e => console.error('Quote email failed:', e))
+      } else {
+        notifyRequestReceivedToClient({
+          clientEmail: body.client_email,
+          requestNumber,
+          clientName:  body.client_name ?? 'عزيزنا',
+          category:    catNameAr,
+          title:       body.title,
+          content:     body.content,
+          channels:    effectiveChannels,
+        }).catch(e => console.error('Received email failed:', e))
+      }
     }
 
-    return NextResponse.json({ requestNumber, quotedTotal: singleFinalPrice })
+    return NextResponse.json({ requestNumber, quotedTotal: isIndividual ? singleFinalPrice : null })
 
   } catch (err) {
     console.error('Submit error:', err)
