@@ -71,9 +71,15 @@ export default function AdminRequestsPage() {
 
   // Removed drawer useEffect
 
-  // مفتاح هوية صاحب الطلب — user_id أولاً، وإلا البريد، وإلا الجوال
+  // مفتاح هوية صاحب الطلب — user_id أولاً، وإلا البريد، وإلا الجوال.
+  // نتجاهل القيم النائبة ('-' أو الفارغة) — مثل الطلبات الخارجية — ونعطيها
+  // مفتاحاً فريداً لكل طلب حتى لا تُجمَّع طلبات أشخاص مختلفين معاً.
+  const cleanId = (v: any): string => {
+    const s = String(v ?? '').trim().toLowerCase()
+    return s && s !== '-' ? s : ''
+  }
   const ownerKey = (r: any): string =>
-    r.user_id || r.client_email?.toLowerCase() || r.client_phone || ''
+    r.user_id || cleanId(r.client_email) || cleanId(r.client_phone) || `req:${r.id}`
 
   // عدد طلبات كل مستخدم (لتحديد المكررين وعرض الشارة)
   const requestCountByOwner = requests.reduce((acc: Record<string, number>, r) => {
