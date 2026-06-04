@@ -440,8 +440,16 @@ export default function RequestWizard() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'حدث خطأ')
 
-      setRequestNumber(data.requestNumber)
       try { localStorage.removeItem(DRAFT_KEY) } catch { /* تجاهل */ }
+
+      // الحملة (فرد): معتمدة مباشرةً — تحويل العميل لصفحة الدفع دون عرض/تفاوض
+      if (data.readyForPayment && data.id) {
+        showToast('تم إنشاء حملتك — أكمل الدفع')
+        router.push(`/payment/${data.id}`)
+        return
+      }
+
+      setRequestNumber(data.requestNumber)
       setSuccess(true)
       showToast('تم إرسال طلبك بنجاح!')
     } catch (err: unknown) {

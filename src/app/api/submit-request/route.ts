@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { generateRequestNumber } from '@/lib/utils'
-import { notifyNewRequestToAdmin, notifyQuoteReadyToClient, notifyRequestReceivedToClient } from '@/lib/email'
+import { notifyNewRequestToAdmin, notifyQuoteReadyToClient, notifyRequestReceivedToClient, notifyQuoteApprovedAwaitingPaymentToClient } from '@/lib/email'
 import { CATEGORIES, PACKAGES } from '@/lib/constants'
 import { calculateAutoQuote, calculateCampaignQuote, CAMPAIGN_DISCOUNT_PCT } from '@/lib/auto-quote'
 
@@ -234,14 +234,14 @@ export async function POST(request: Request) {
           discount_pct:          discountRow ? Number(discountRow.discount_pct) : null,
           discount_amount:       isIndividual && campaignDiscountAmt > 0 ? campaignDiscountAmt : null,
 
-          // الأفراد: عرض تلقائي. الجهات: بانتظار تسعير الإدارة يدوياً.
+          // الأفراد: الحملة معتمدة مباشرةً للدفع (بلا عرض/تفاوض). الجهات: تسعير يدوي.
           ...(isIndividual
             ? {
                 admin_quoted_price: campaignFinalPrice,
                 final_total:        campaignFinalPrice,
-                status:             'quoted',
+                status:             'approved',
                 quoted_at:          now,
-                quote_expires_at:   quoteExpiresAt,
+                approved_at:        now,
                 auto_quoted_at:     now,
                 auto_quote_note:    campaignPkg
                   ? `حملة ${campaignPostsRaw.length} منشورات — باقة: ${campaignPkg.name} — خصم ${CAMPAIGN_DISCOUNT_PCT}%`
@@ -283,14 +283,13 @@ export async function POST(request: Request) {
 
       if (body.client_email) {
         if (isIndividual) {
-          notifyQuoteReadyToClient({
-            email:                 body.client_email,
+          // الحملة معتمدة مباشرةً — بانتظار الدفع
+          notifyQuoteApprovedAwaitingPaymentToClient({
+            email:        body.client_email,
             requestNumber,
-            clientName:            body.client_name ?? 'عزيزنا',
-            price:                 campaignCalc.total,
-            reach:                 0,
-            quoteExpiresAt,
-          }).catch(e => console.error('Campaign quote email failed:', e))
+            clientName:   body.client_name ?? 'عزيزنا',
+            total:        campaignFinalPrice,
+          }).catch(e => console.error('Campaign awaiting-payment email failed:', e))
         } else {
           notifyRequestReceivedToClient({
             clientEmail: body.client_email,
@@ -304,7 +303,12 @@ export async function POST(request: Request) {
         }
       }
 
-      return NextResponse.json({ requestNumber, quotedTotal: isIndividual ? campaignFinalPrice : null })
+      return NextResponse.json({
+        requestNumber,
+        id: data.id,
+        quotedTotal: isIndividual ? campaignFinalPrice : null,
+        readyForPayment: isIndividual,
+      })
     }
 
     // ── مسار المنشور الواحد ───────────────────────────────────────
