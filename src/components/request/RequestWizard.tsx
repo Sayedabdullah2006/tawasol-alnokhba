@@ -725,6 +725,17 @@ export default function RequestWizard() {
             open={openSection === 1}
             onToggle={() => setOpenSection(openSection === 1 ? -1 : 1)}
           >
+            {/* شروط قبول الخبر */}
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-[11px] leading-6 text-red-600">
+              <p className="font-bold mb-1">⚠️ شروط قبول الخبر:</p>
+              <ul className="list-disc pr-4 space-y-0.5">
+                <li>أن يتضمّن الخبر إنجازاً واقعياً مع إرفاق كل الإثباتات.</li>
+                <li>إن ذُكرت «أوّلية» (الأول/الأولى) فيلزم إرفاق ما يُثبتها (إيميل أو خطاب أو مراسلة رسمية).</li>
+                <li>إن ذُكرت جهة فيلزم إرفاق موافقتها على النشر.</li>
+              </ul>
+              <p className="font-bold mt-1">عدم الالتزام بذلك سيؤدي إلى إلغاء الخبر.</p>
+            </div>
+
             {!requestType ? (
               <p className="text-sm text-muted text-center py-4">اختر نوع الطلب في القسم السابق أولاً</p>
             ) : requestType === 'campaign' ? (
