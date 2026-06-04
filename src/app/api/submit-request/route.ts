@@ -432,11 +432,9 @@ export async function POST(request: Request) {
           ? {
               admin_quoted_price: singleFinalPrice,
               final_total:        singleFinalPrice,
-              // خصم 100% (نادر) → مجاني → قيد التنفيذ مباشرة بلا دفع
-              status:             singleFinalPrice <= 0 ? 'in_progress' : 'approved',
+              status:             'approved',
               quoted_at:          now,
               approved_at:        now,
-              ...(singleFinalPrice <= 0 ? { paid_at: now } : {}),
               auto_quote_tier:    selectedPackage,
               auto_quoted_at:     now,
               auto_quote_note:    pkg
@@ -481,25 +479,14 @@ export async function POST(request: Request) {
     }).catch(e => console.error('Admin email failed:', e))
 
     if (body.client_email) {
-      if (isIndividual && singleFinalPrice > 0) {
-        // معتمد مباشرةً — بانتظار الدفع
+      if (isIndividual) {
+        // معتمد مباشرةً — بانتظار الدفع (مطابق لتدفّق الحملة)
         notifyQuoteApprovedAwaitingPaymentToClient({
           email:        body.client_email,
           requestNumber,
           clientName:   body.client_name ?? 'عزيزنا',
           total:        singleFinalPrice,
         }).catch(e => console.error('Awaiting-payment email failed:', e))
-      } else if (isIndividual) {
-        // مجاني (خصم 100%) → قيد التنفيذ
-        notifyRequestReceivedToClient({
-          clientEmail: body.client_email,
-          requestNumber,
-          clientName:  body.client_name ?? 'عزيزنا',
-          category:    catNameAr,
-          title:       body.title,
-          content:     body.content,
-          channels:    effectiveChannels,
-        }).catch(e => console.error('Received email failed:', e))
       } else {
         notifyRequestReceivedToClient({
           clientEmail: body.client_email,
@@ -517,8 +504,7 @@ export async function POST(request: Request) {
       requestNumber,
       id: data.id,
       quotedTotal: isIndividual ? singleFinalPrice : null,
-      // تحويل مباشر للدفع للأفراد (إن لم يكن مجانياً)
-      readyForPayment: isIndividual && singleFinalPrice > 0,
+      readyForPayment: isIndividual,
     })
 
   } catch (err) {
