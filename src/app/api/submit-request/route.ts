@@ -133,11 +133,47 @@ export async function POST(request: Request) {
         channels.length,
       )
 
-      // تطبيق كود الخصم على إجمالي الحملة
+      // ── باقة الحملة (للأفراد فقط) — باقة واحدة تنطبق على كل الأخبار ──
+      const campaignSelectedPackage: string | null = isIndividual ? (body.selected_package ?? null) : null
+      const campaignPkg = campaignSelectedPackage ? PACKAGES.find(p => p.id === campaignSelectedPackage) ?? null : null
+      const isUpgradedCampaignPkg = campaignPkg != null && campaignPkg.id !== 'basic'
+
+      // القنوات: الباقة الأساسية = قناة واحدة يحددها العميل ؛ غيرها = كل القنوات
+      const campaignChannels = (campaignPkg && !campaignPkg.allChannels && body.basic_channel)
+        ? [body.basic_channel as string]
+        : channels
+      const campaignScope = campaignChannels.length > 1 ? 'all' : 'single'
+
+      // الأساس: مجموع الأخبار × معامل الباقة − خصم الحملة (مزايا الباقة المرقّاة مدمجة)
+      let campaignBaseTotal: number
+      let campaignExtrasTotal: number
+      let campaignUserExtras: string[]
+      if (campaignPkg) {
+        const withPackage = Math.round(campaignCalc.postsSubtotal * campaignPkg.priceMultiplier)
+        const afterDisc = withPackage - Math.round(withPackage * CAMPAIGN_DISCOUNT_PCT / 100)
+        if (isUpgradedCampaignPkg) {
+          campaignBaseTotal = afterDisc
+          campaignExtrasTotal = 0
+          campaignUserExtras = campaignPkg.includedExtras
+        } else {
+          campaignBaseTotal = afterDisc + campaignCalc.extrasTotal
+          campaignExtrasTotal = campaignCalc.extrasTotal
+          campaignUserExtras = selectedExtras
+        }
+      } else {
+        campaignBaseTotal = campaignCalc.total
+        campaignExtrasTotal = campaignCalc.extrasTotal
+        campaignUserExtras = []
+      }
+      const campaignSubtotalDisplay = campaignPkg
+        ? Math.round(campaignCalc.postsSubtotal * campaignPkg.priceMultiplier)
+        : campaignCalc.postsSubtotal
+
+      // تطبيق كود الخصم على الأساس بعد الباقة
       const campaignDiscountAmt = discountRow
-        ? Math.round(campaignCalc.total * Number(discountRow.discount_pct) / 100)
+        ? Math.round(campaignBaseTotal * Number(discountRow.discount_pct) / 100)
         : 0
-      const campaignFinalPrice = campaignCalc.total - campaignDiscountAmt
+      const campaignFinalPrice = campaignBaseTotal - campaignDiscountAmt
 
       // استخدم بيانات أول منشور لحقول title/content/category الإلزامية في الجدول
       const firstPost = campaignPostsRaw[0]
@@ -156,7 +192,7 @@ export async function POST(request: Request) {
           category:         'campaign',
           title:            firstPost.title,
           content:          firstPost.content,
-          scope,
+          scope:            campaignScope,
           images:           'one',
 
           // حقول الحملة
@@ -164,11 +200,11 @@ export async function POST(request: Request) {
           campaign_post_count:  campaignPostsRaw.length,
           campaign_duration:    body.campaign_duration ?? null,
           campaign_posts:       campaignPostsRaw,
-          campaign_subtotal:    campaignCalc.postsSubtotal,
+          campaign_subtotal:    campaignSubtotalDisplay,
           campaign_discount_pct: CAMPAIGN_DISCOUNT_PCT,
 
-          channels,
-          extras:           selectedExtras,
+          channels:         campaignChannels,
+          extras:           campaignUserExtras,
           num_posts:        campaignPostsRaw.length,
 
           link:             firstPost.link ?? null,
@@ -183,12 +219,12 @@ export async function POST(request: Request) {
           x_handle:         body.x_handle,
 
           // تسعير (admin_quoted_price / final_total تُضبط حسب نوع العميل بالأسفل)
-          base_price:            campaignCalc.afterDiscount,
-          extras_total:          campaignCalc.extrasTotal,
+          base_price:            campaignBaseTotal,
+          extras_total:          campaignExtrasTotal,
           vat_amount:            0,
-          total_amount:          campaignCalc.total,
+          total_amount:          campaignBaseTotal,
           admin_offered_extras:  [],
-          user_selected_extras:  [],
+          user_selected_extras:  campaignUserExtras,
           extras_selected_total: 0,
           estimated_reach:       0,
 
@@ -207,7 +243,9 @@ export async function POST(request: Request) {
                 quoted_at:          now,
                 quote_expires_at:   quoteExpiresAt,
                 auto_quoted_at:     now,
-                auto_quote_note:    `حملة ${campaignPostsRaw.length} منشورات — خصم ${CAMPAIGN_DISCOUNT_PCT}%`,
+                auto_quote_note:    campaignPkg
+                  ? `حملة ${campaignPostsRaw.length} منشورات — باقة: ${campaignPkg.name} — خصم ${CAMPAIGN_DISCOUNT_PCT}%`
+                  : `حملة ${campaignPostsRaw.length} منشورات — خصم ${CAMPAIGN_DISCOUNT_PCT}%`,
               }
             : {
                 admin_quoted_price: null,
@@ -219,7 +257,7 @@ export async function POST(request: Request) {
                 auto_quote_note:    `بانتظار تسعير الإدارة — حملة ${campaignPostsRaw.length} منشورات (نوع عميل: ${body.client_type})`,
               }),
           last_status_change: now,
-          auto_quote_tier:   null,
+          auto_quote_tier:   campaignSelectedPackage,
           updated_at:        now,
         })
         .select('request_number, id')

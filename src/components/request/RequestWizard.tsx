@@ -296,15 +296,15 @@ export default function RequestWizard() {
         : false
 
 
-  // ── الباقات تُعرض للأفراد + المنشور الواحد فقط ───────────────────
-  const showPackages = requestType === 'single' && clientType === 'individual'
+  // ── الباقات تُعرض للأفراد (المنشور الواحد + الحملة) ───────────────
+  const showPackages = clientType === 'individual'
   // الباقة الأساسية تتطلّب اختيار قناة واحدة للنشر
   const basicNeedsChannel = showPackages && selectedPackage === 'basic'
   const packagesComplete = !showPackages || (!!selectedPackage && (!basicNeedsChannel || !!basicChannel))
 
   // السعر الديناميكي للباقة الأساسية = سعر التسعير التلقائي حسب نوع الخبر
   const basicDynamicPrice: number | null = (() => {
-    if (!showPackages || !category || !subOptionSatisfied) return null
+    if (!showPackages || requestType !== 'single' || !category || !subOptionSatisfied) return null
     try {
       const subOptionForCalc = isCompetitionCategory ? competitionSelection : subOption
       return calculateAutoQuote({
@@ -314,6 +314,28 @@ export default function RequestWizard() {
         selectedExtras: [],
         channelCount: 1,
       }).total
+    } catch {
+      return null
+    }
+  })()
+
+  // مجموع أسعار أخبار الحملة (قبل الباقة والخصم) — لعرض سعر الباقة في الحملة
+  const CAMPAIGN_DISCOUNT = 30
+  const campaignBaseSubtotal: number | null = (() => {
+    if (!showPackages || requestType !== 'campaign') return null
+    try {
+      let sum = 0
+      for (const p of campaignPosts) {
+        if (!p.category) return null
+        sum += calculateAutoQuote({
+          category: p.category,
+          subOption: (p as any).subOption ?? null,
+          clientType: 'individual',
+          selectedExtras: [],
+          channelCount: 1,
+        }).total
+      }
+      return sum
     } catch {
       return null
     }
@@ -357,6 +379,9 @@ export default function RequestWizard() {
           org_license:        clientType !== 'individual' ? (orgInfo.license.trim() || null) : null,
           channels,
           selected_extras:  selectedExtras,
+          // باقة واحدة للحملة كلها (للأفراد)
+          selected_package: showPackages ? selectedPackage : null,
+          basic_channel:    showPackages && selectedPackage === 'basic' ? basicChannel : null,
           client_name:      contact.fullName,
           client_phone:     contact.phone,
           client_email:     contact.email,
@@ -717,18 +742,29 @@ export default function RequestWizard() {
             <FormSection
               index={3}
               title="اختر الباقة"
-              subtitle="حدّد الباقة المناسبة لخبرك"
+              subtitle={requestType === 'campaign' ? 'باقة واحدة تنطبق على كل أخبار الحملة' : 'حدّد الباقة المناسبة لخبرك'}
               complete={packagesComplete}
               open={openSection === 2}
               onToggle={() => setOpenSection(openSection === 2 ? -1 : 2)}
             >
+              {requestType === 'campaign' && (
+                <p className="text-xs text-muted mb-3 bg-cream rounded-lg p-2">
+                  🚀 الباقة المختارة تنطبق على كل أخبار الحملة ({campaignPosts.length} منشورات) — السعر يشمل خصم الحملة {CAMPAIGN_DISCOUNT}%.
+                </p>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {PACKAGES.map(pkg => {
                   const isSelected = selectedPackage === pkg.id
-                  // السعر = سعر الباقة الأساسية × معامل الباقة
-                  const pkgPrice = basicDynamicPrice != null
-                    ? Math.round(basicDynamicPrice * pkg.priceMultiplier)
-                    : null
+                  // السعر: المفرد = سعر الخبر × معامل الباقة ؛ الحملة = مجموع الأخبار × معامل الباقة − خصم الحملة
+                  let pkgPrice: number | null = null
+                  if (requestType === 'campaign') {
+                    if (campaignBaseSubtotal != null) {
+                      const withPkg = Math.round(campaignBaseSubtotal * pkg.priceMultiplier)
+                      pkgPrice = withPkg - Math.round(withPkg * CAMPAIGN_DISCOUNT / 100)
+                    }
+                  } else if (basicDynamicPrice != null) {
+                    pkgPrice = Math.round(basicDynamicPrice * pkg.priceMultiplier)
+                  }
                   const priceLabel = pkgPrice != null ? `${pkgPrice} ر.س` : 'حسب نوع الخبر'
                   return (
                     <button
