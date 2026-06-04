@@ -114,11 +114,16 @@ export default function AIStudioPanel({
   const [loadingStep, setLoadingStep] = useState<StepKey | null>(null)
 
   // توليد الاتجاهات الثلاثة دفعة واحدة + الاختيار منها للإرسال
-  const [batchResults, setBatchResults] = useState<{ title: string; imageUrl: string }[]>([])
+  const [batchResults, setBatchResults] = useState<{ title: string; imageUrl: string; brief: string }[]>([])
   const [batchLoading, setBatchLoading] = useState(false)
   const [batchProgress, setBatchProgress] = useState('')
   const [selectedBatch, setSelectedBatch] = useState<Set<number>>(new Set())
   const [lightbox, setLightbox] = useState<string | null>(null)
+  // ملاحظات وإعادة توليد التصاميم
+  const [noteByIndex, setNoteByIndex] = useState<Record<number, string>>({})
+  const [regenIndex, setRegenIndex] = useState<number | null>(null)
+  const [singleNote, setSingleNote] = useState('')
+  const [regenSingle, setRegenSingle] = useState(false)
 
   const callStep = async (step: StepKey) => {
     setLoadingStep(step)
@@ -162,8 +167,8 @@ export default function AIStudioPanel({
     }
   }
 
-  // يولّد تصميماً واحداً لاتجاه محدّد ويعيد رابط الصورة (يُستخدم في التوليد المجمّع)
-  const generateOneDesign = async (conceptBrief: string): Promise<string | null> => {
+  // يولّد تصميماً واحداً لاتجاه محدّد ويعيد رابط الصورة (يُستخدم في التوليد المجمّع وإعادة التوليد بالملاحظة)
+  const generateOneDesign = async (conceptBrief: string, note?: string): Promise<string | null> => {
     const res = await fetch('/api/admin/ai-generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -172,6 +177,7 @@ export default function AIStudioPanel({
         step: 'image',
         sourceImage: selectedImage ?? undefined,
         chosenConcept: conceptBrief,
+        note: note?.trim() || undefined,
         postIndex: isPost ? postIndex : undefined,
       }),
     })
@@ -194,14 +200,15 @@ export default function AIStudioPanel({
     setBatchResults([])
     setSelectedBatch(new Set())
     try {
-      const results: { title: string; imageUrl: string }[] = []
+      const results: { title: string; imageUrl: string; brief: string }[] = []
       for (let i = 0; i < conceptItems.length; i++) {
         setBatchProgress(`جارٍ توليد ${i + 1}/${conceptItems.length}…`)
         const brief = conceptItems[i].brief ?? conceptItems[i].title ?? ''
         const url = await generateOneDesign(brief)
-        if (url) results.push({ title: conceptItems[i].title ?? `اتجاه ${i + 1}`, imageUrl: url })
+        if (url) results.push({ title: conceptItems[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief })
       }
       setBatchResults(results)
+      setNoteByIndex({})
       // كل التصاميم مختارة افتراضياً للإرسال للعميل
       setSelectedBatch(new Set(results.map((_, i) => i)))
       if (results.length) showToast(`تم توليد ${results.length} تصاميم`, 'success')
@@ -220,6 +227,39 @@ export default function AIStudioPanel({
       else next.add(i)
       return next
     })
+  }
+
+  // إعادة توليد تصميم محدّد من الشبكة بناءً على ملاحظة الأدمن
+  const regenerateBatchDesign = async (i: number) => {
+    const r = batchResults[i]
+    const note = (noteByIndex[i] ?? '').trim()
+    if (!r) return
+    if (!note) { showToast('اكتب ملاحظة لإعادة التوليد', 'error'); return }
+    setRegenIndex(i)
+    try {
+      const url = await generateOneDesign(r.brief, note)
+      if (url) {
+        setBatchResults(prev => prev.map((x, idx) => (idx === i ? { ...x, imageUrl: url } : x)))
+        setSelectedBatch(prev => new Set(prev).add(i)) // اجعله مختاراً تلقائياً
+        showToast('تم إعادة توليد التصميم بناءً على ملاحظتك', 'success')
+      }
+    } finally {
+      setRegenIndex(null)
+    }
+  }
+
+  // إعادة توليد التصميم المفرد بناءً على ملاحظة
+  const regenerateSingle = async () => {
+    const note = singleNote.trim()
+    if (!note) { showToast('اكتب ملاحظة لإعادة التوليد', 'error'); return }
+    if (!chosenConcept.trim()) { showToast('لا يوجد اتجاه معتمد', 'error'); return }
+    setRegenSingle(true)
+    try {
+      const url = await generateOneDesign(chosenConcept, note)
+      if (url) { setImageUrl(url); showToast('تم إعادة توليد التصميم بناءً على ملاحظتك', 'success') }
+    } finally {
+      setRegenSingle(false)
+    }
   }
 
   const cardCls = 'bg-card rounded-2xl border border-border p-5 space-y-3'
@@ -409,37 +449,52 @@ export default function AIStudioPanel({
           )}
           {batchResults.length > 0 && (
             <div className="space-y-3">
-              <p className="text-xs text-muted">اختر التصاميم التي تريد إرسالها للعميل (مختارة كلها افتراضياً):</p>
-              <div className="grid grid-cols-3 gap-2">
+              <p className="text-xs text-muted">اختر التصاميم لإرسالها للعميل، أو اكتب ملاحظة وأعد توليد أي تصميم:</p>
+              <div className="space-y-3">
                 {batchResults.map((r, i) => {
                   const on = selectedBatch.has(i)
+                  const regenerating = regenIndex === i
                   return (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => toggleBatch(i)}
-                      className={`relative rounded-xl overflow-hidden border-2 transition-all ${
-                        on ? 'border-green ring-2 ring-green/30' : 'border-border opacity-60'
-                      }`}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={r.imageUrl} alt={r.title} className="w-full aspect-[4/5] object-cover" />
-                      <span className="absolute top-1 left-1 w-5 h-5 rounded-full bg-green text-white text-xs flex items-center justify-center">
-                        {on ? '✓' : ''}
-                      </span>
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => { e.stopPropagation(); setLightbox(r.imageUrl) }}
-                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/50 hover:bg-black/70 text-white text-[11px] flex items-center justify-center"
-                        title="تكبير"
-                      >
-                        ⛶
-                      </span>
-                      <span className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] py-0.5 truncate px-1">
-                        {r.title}
-                      </span>
-                    </button>
+                    <div key={i} className={`rounded-xl border-2 p-2 transition-all ${on ? 'border-green bg-green/5' : 'border-border'}`}>
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleBatch(i)}
+                          className="relative w-24 flex-shrink-0 rounded-lg overflow-hidden border border-border"
+                          title={on ? 'مختار للإرسال' : 'اضغط للاختيار'}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={r.imageUrl} alt={r.title} className="w-full aspect-[4/5] object-cover" />
+                          {on && (
+                            <span className="absolute top-1 left-1 w-5 h-5 rounded-full bg-green text-white text-xs flex items-center justify-center">✓</span>
+                          )}
+                          {regenerating && (
+                            <span className="absolute inset-0 bg-black/40 flex items-center justify-center"><LoadingSpinner size="sm" /></span>
+                          )}
+                        </button>
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-dark text-xs truncate">{r.title}</span>
+                            <button type="button" onClick={() => setLightbox(r.imageUrl)} className="text-[11px] text-green hover:underline">⛶ تكبير</button>
+                          </div>
+                          <textarea
+                            value={noteByIndex[i] ?? ''}
+                            onChange={e => setNoteByIndex(prev => ({ ...prev, [i]: e.target.value }))}
+                            placeholder="ملاحظة لإعادة التوليد (مثال: اجعل الخلفية أغمق، كبّر الاسم، خفّف الزخارف...)"
+                            className="w-full px-2 py-1.5 rounded-lg border border-border bg-white text-xs min-h-[52px] resize-y"
+                          />
+                          <Button
+                            onClick={() => regenerateBatchDesign(i)}
+                            loading={regenerating}
+                            disabled={regenIndex !== null || batchLoading || !(noteByIndex[i] ?? '').trim()}
+                            variant="outline"
+                            size="sm"
+                          >
+                            🔄 إعادة التوليد بالملاحظة
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   )
                 })}
               </div>
@@ -498,6 +553,24 @@ export default function AIStudioPanel({
                   </pre>
                 </details>
               )}
+              {/* ملاحظة وإعادة توليد التصميم المفرد */}
+              <div className="bg-cream/60 rounded-xl p-2 space-y-1.5">
+                <textarea
+                  value={singleNote}
+                  onChange={e => setSingleNote(e.target.value)}
+                  placeholder="ملاحظة لإعادة توليد هذا التصميم (مثال: اجعل الخلفية أغمق، كبّر الاسم...)"
+                  className="w-full px-2 py-1.5 rounded-lg border border-border bg-white text-xs min-h-[52px] resize-y"
+                />
+                <Button
+                  onClick={regenerateSingle}
+                  loading={regenSingle}
+                  disabled={regenSingle || loadingStep !== null || !singleNote.trim()}
+                  variant="outline"
+                  size="sm"
+                >
+                  🔄 إعادة التوليد بالملاحظة
+                </Button>
+              </div>
               <Button
                 onClick={() => onUsedContent(selectedTweet, [imageUrl], isPost ? (postIndex as number) : 0)}
                 variant="secondary"

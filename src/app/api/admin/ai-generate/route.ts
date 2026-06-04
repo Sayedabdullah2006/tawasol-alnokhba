@@ -28,6 +28,7 @@ export async function POST(req: Request) {
     sourceImage?: string
     chosenConcept?: string
     postIndex?: number
+    note?: string
   }
   try {
     body = await req.json()
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 })
   }
 
-  const { requestId, step, sourceImage, chosenConcept, postIndex } = body
+  const { requestId, step, sourceImage, chosenConcept, postIndex, note } = body
   if (!requestId || !step) {
     return NextResponse.json({ error: 'بيانات ناقصة (requestId/step)' }, { status: 400 })
   }
@@ -284,7 +285,11 @@ export async function POST(req: Request) {
               `الاتجاه المعتمد:\n${chosenConcept}\n\n` +
               `الصورة الحقيقية المرفقة هي على الرابط: ${sourceImage}\n` +
               // اللوقو يُركَّب برمجياً بعد التوليد — اطلب ترك مكانه فارغاً فقط.
-              `اترك مساحة فارغة أسفل يمين الفوتر للوقو (سيُضاف لاحقاً برمجياً) ولا ترسم أي شعار هناك.\n`,
+              `اترك مساحة فارغة أسفل يمين الفوتر للوقو (سيُضاف لاحقاً برمجياً) ولا ترسم أي شعار هناك.\n` +
+              // ملاحظات الأدمن لإعادة التوليد — تُطبَّق بدقّة مع الحفاظ على القواعد والهوية والصورة الحقيقية.
+              (note && note.trim()
+                ? `\n‼️ ملاحظات الأدمن على التصميم (طبّقها بدقّة مع الحفاظ على ثوابت الهوية والصورة الحقيقية): ${note.trim()}\n`
+                : ''),
           },
         ],
       })
