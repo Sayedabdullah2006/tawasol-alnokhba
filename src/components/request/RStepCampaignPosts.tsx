@@ -266,31 +266,6 @@ function PostCard({ index, post, onChange, clientType, categories, isOpen, onTog
               maxImages={4}
             />
           </div>
-
-          {/* الرابط */}
-          <div>
-            <label className={label}>رابط مرفق (اختياري)</label>
-            <input
-              type="url"
-              value={post.link}
-              onChange={e => onChange({ ...post, link: e.target.value })}
-              placeholder="https://..."
-              dir="ltr"
-              className={input}
-            />
-          </div>
-
-          {/* الهاشتاق */}
-          <div>
-            <label className={label}>هاشتاق (اختياري)</label>
-            <input
-              type="text"
-              value={post.hashtags}
-              onChange={e => onChange({ ...post, hashtags: e.target.value })}
-              placeholder="#الهاشتاق"
-              className={input}
-            />
-          </div>
         </div>
       )}
     </div>
