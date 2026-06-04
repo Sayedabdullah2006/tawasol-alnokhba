@@ -82,7 +82,7 @@ const SIMPLE_BASE: Record<string, ClientPrices> = {
   charity:     { charity: 999 },
   government:  { government: 4499 },
   // الإعلان عن فعاليات ومؤتمرات (متاح: شركة/حكومة/خيرية)
-  events:      { business: 2999, government: 4999, charity: 1499 },
+  events:      { business: 2999, government: 2999, charity: 1499 },
   // فئة «أخرى» (متاحة للجميع)
   Others:      { individual: 999, business: 1999, government: 2999, charity: 999 },
 }
