@@ -2,7 +2,7 @@
 // PRICING ENGINE — مصدر الحقيقة الوحيد
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-import { COMPETITION_SUBCATEGORIES, getCompetitionPositions } from './constants'
+import { calculateAutoQuote } from './auto-quote'
 
 export const BASE_PRICES: Record<string, number> = {
   inventions: 3000,
@@ -175,98 +175,62 @@ export function calculateReach(input: ReachInput): number {
   return Math.round(base * (1 + boost))
 }
 
+// ⚠️ مصدر الأسعار الوحيد المعتمد = محرك auto-quote (calculateAutoQuote).
+// تفوّض هذه الدالة الحساب إليه (الأسعار حسب الفئة × نوع العميل، بلا ضريبة ولا
+// معاملات نطاق/صور) وتُعيد النتيجة بنفس شكل PriceBreakdown ليبقى كل المستهلكين
+// (مُنشئ عرض الأدمن، حاسبة الأسعار) يعملون دون تغيير ومع أسعار موحّدة معتمدة.
 export function calculatePrice(input: PriceInput): PriceBreakdown {
-  // Determine which pricing to use
-  const clientType = input.clientType ?? 'individual'
-  let basePrices = BASE_PRICES
-  let extrasPrices = EXTRAS_PRICES
-
-  // Use custom pricing if provided (from influencer-specific config)
-  if (input.customPricing) {
-    basePrices = input.customPricing.base_prices[clientType] ?? BASE_PRICES
-    extrasPrices = input.customPricing.extras_prices[clientType] ?? EXTRAS_PRICES
-  }
-
-  if (!basePrices[input.category] && !BASE_PRICES[input.category]) {
-    throw new Error(`فئة غير معروفة: ${input.category}`)
-  }
   if (input.numPosts < 1) {
     throw new Error('عدد المنشورات يجب أن يكون 1 على الأقل')
   }
 
+  const clientType = input.clientType ?? 'individual'
   const multiplier = input.influencerPriceMultiplier ?? 1.0
 
-  // Step 1: Base price + special cases
-  let basePrice = (basePrices[input.category] ?? BASE_PRICES[input.category] ?? 0) * multiplier
-  let isFree = false
-  let isHalfOff = false
+  // الأسعار المعتمدة من auto-quote (تشمل المعالجة الخاصة للمسابقات/الاختراعات والوكالة)
+  const aq = calculateAutoQuote({
+    category: input.category,
+    subOption: input.subOption ?? null,
+    clientType,
+    selectedExtras: input.extras,
+    channelCount: 1, // لا معامل قنوات في النظام المعتمد
+  })
 
-  if (input.category === 'inventions') {
-    if (input.subOption === 'with_patent') { basePrice = 0; isFree = true }
-    if (input.subOption === 'no_patent') { isHalfOff = true }
-  }
-  if (input.category === 'competitions') {
-    // Handle new competition structure with position multipliers
-    if (typeof input.subOption === 'object' && input.subOption?.subcategory && input.subOption?.position) {
-      const { subcategory, position } = input.subOption
-      const positions = getCompetitionPositions(subcategory)
-      const positionData = positions.find(p => p.id === position)
-      if (positionData) {
-        if (position === 'first' && subcategory !== 'hackathon') {
-          // First place in international/local competitions is free
-          basePrice = 0
-          isFree = true
-        } else {
-          // Apply position multiplier
-          basePrice = basePrice * positionData.multiplier
-        }
-      }
-    } else if (typeof input.subOption === 'string') {
-      // Legacy support for old competition structure
-      if (input.subOption === 'first_place') { basePrice = 0; isFree = true }
-      if (input.subOption === 'other_place') { isHalfOff = true }
-    }
-  }
+  const basePrice = aq.singleChannelBase * multiplier
+  const isFree = basePrice === 0
 
-  // Step 2: Scope multiplier
-  const scopeMultiplier = SCOPE_MULTIPLIERS[input.scope]
-  const afterScope = basePrice * scopeMultiplier
+  // لا معاملات نطاق/صور — موحّدة مع auto-quote
+  const scopeMultiplier = 1
+  const imageMultiplier = 1
+  const afterScope = basePrice
+  const afterImages = basePrice
+  const baseAfterSpecial = basePrice
 
-  // Step 3: Image multiplier
-  const imageMultiplier = IMAGE_MULTIPLIERS[input.images]
-  const afterImages = afterScope * imageMultiplier
-
-  // Step 4: Special discount (50% for no_patent / other_place)
-  const baseAfterSpecial = isHalfOff ? afterImages * 0.5 : afterImages
-
-  // Step 5: Extras (always full price)
-  const extrasDetail = input.extras.map(id => ({
-    id,
-    name: EXTRAS_NAMES[id] ?? id,
-    price: (extrasPrices[id] ?? EXTRAS_PRICES[id] ?? 0) * multiplier,
+  // الإضافات بأسعارها المعتمدة (من constants عبر auto-quote)
+  const extrasDetail = aq.extrasBreakdown.map(e => ({
+    id: e.id,
+    name: EXTRAS_NAMES[e.id] ?? e.name,
+    price: e.price * multiplier,
   }))
   const extrasTotal = extrasDetail.reduce((sum, e) => sum + e.price, 0)
 
-  // Step 6: Per post price
   const perPostPrice = baseAfterSpecial + extrasTotal
-
-  // Step 7: Subtotal
   const subtotalBeforeDiscount = perPostPrice * input.numPosts
 
-  // Step 8: Volume discount
+  // خصم الكمية يبقى لتعدد المنشورات
   const discountPct = getDiscountPct(input.numPosts)
   const discountAmount = subtotalBeforeDiscount * (discountPct / 100)
   const subtotalAfterDiscount = subtotalBeforeDiscount - discountAmount
 
-  // Step 9: VAT
-  const vatAmount = subtotalAfterDiscount * VAT_RATE
-  const totalFinal = subtotalAfterDiscount + vatAmount
+  // لا ضريبة (مطابقةً لـ auto-quote: AQ_VAT = 0)
+  const vatAmount = 0
+  const totalFinal = subtotalAfterDiscount
 
   return {
     category: input.category,
     subOption: input.subOption ?? null,
     isFree,
-    isHalfOff,
+    isHalfOff: false,
     basePrice,
     afterScope,
     afterImages,
