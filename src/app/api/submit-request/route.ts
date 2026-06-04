@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { generateRequestNumber } from '@/lib/utils'
-import { notifyNewRequestToAdmin, notifyQuoteReadyToClient, notifyRequestReceivedToClient, notifyQuoteApprovedAwaitingPaymentToClient } from '@/lib/email'
+import { notifyNewRequestToAdmin, notifyRequestReceivedToClient, notifyQuoteApprovedAwaitingPaymentToClient } from '@/lib/email'
 import { CATEGORIES, PACKAGES } from '@/lib/constants'
 import { calculateAutoQuote, calculateCampaignQuote, CAMPAIGN_DISCOUNT_PCT } from '@/lib/auto-quote'
 
@@ -69,7 +69,6 @@ export async function POST(request: Request) {
     const channels: string[]       = Array.isArray(body.channels) ? body.channels : []
     const scope = channels.length > 1 ? 'all' : 'single'
     const now   = new Date().toISOString()
-    const quoteExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
     const isCampaign = body.request_type === 'campaign'
 
     // الأفراد فقط يحصلون على تسعير تلقائي. الجهات (شركة/حكومة/خيرية/وكالة)
@@ -428,14 +427,16 @@ export async function POST(request: Request) {
         discount_pct:     discountRow ? Number(discountRow.discount_pct) : null,
         discount_amount:  isIndividual && singleDiscountAmt > 0 ? singleDiscountAmt : null,
 
-        // الأفراد: عرض تلقائي. الجهات: بانتظار تسعير الإدارة يدوياً.
+        // الأفراد: اعتماد مباشر للدفع (بلا عرض/تفاوض). الجهات: بانتظار تسعير الإدارة يدوياً.
         ...(isIndividual
           ? {
               admin_quoted_price: singleFinalPrice,
               final_total:        singleFinalPrice,
-              status:             'quoted',
+              // خصم 100% (نادر) → مجاني → قيد التنفيذ مباشرة بلا دفع
+              status:             singleFinalPrice <= 0 ? 'in_progress' : 'approved',
               quoted_at:          now,
-              quote_expires_at:   quoteExpiresAt,
+              approved_at:        now,
+              ...(singleFinalPrice <= 0 ? { paid_at: now } : {}),
               auto_quote_tier:    selectedPackage,
               auto_quoted_at:     now,
               auto_quote_note:    pkg
@@ -480,15 +481,25 @@ export async function POST(request: Request) {
     }).catch(e => console.error('Admin email failed:', e))
 
     if (body.client_email) {
-      if (isIndividual) {
-        notifyQuoteReadyToClient({
-          email:                 body.client_email,
+      if (isIndividual && singleFinalPrice > 0) {
+        // معتمد مباشرةً — بانتظار الدفع
+        notifyQuoteApprovedAwaitingPaymentToClient({
+          email:        body.client_email,
           requestNumber,
-          clientName:            body.client_name ?? 'عزيزنا',
-          price:                 singleFinalPrice,
-          reach:                 0,
-          quoteExpiresAt,
-        }).catch(e => console.error('Quote email failed:', e))
+          clientName:   body.client_name ?? 'عزيزنا',
+          total:        singleFinalPrice,
+        }).catch(e => console.error('Awaiting-payment email failed:', e))
+      } else if (isIndividual) {
+        // مجاني (خصم 100%) → قيد التنفيذ
+        notifyRequestReceivedToClient({
+          clientEmail: body.client_email,
+          requestNumber,
+          clientName:  body.client_name ?? 'عزيزنا',
+          category:    catNameAr,
+          title:       body.title,
+          content:     body.content,
+          channels:    effectiveChannels,
+        }).catch(e => console.error('Received email failed:', e))
       } else {
         notifyRequestReceivedToClient({
           clientEmail: body.client_email,
@@ -502,7 +513,13 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ requestNumber, quotedTotal: isIndividual ? singleFinalPrice : null })
+    return NextResponse.json({
+      requestNumber,
+      id: data.id,
+      quotedTotal: isIndividual ? singleFinalPrice : null,
+      // تحويل مباشر للدفع للأفراد (إن لم يكن مجانياً)
+      readyForPayment: isIndividual && singleFinalPrice > 0,
+    })
 
   } catch (err) {
     console.error('Submit error:', err)

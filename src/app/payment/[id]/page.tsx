@@ -32,6 +32,8 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [tamaraLoading, setTamaraLoading] = useState(false)
+  const [discountCode, setDiscountCode] = useState('')
+  const [applyingDiscount, setApplyingDiscount] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -112,6 +114,35 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
     }
   }
 
+  const applyDiscount = async () => {
+    if (!discountCode.trim()) { showToast('أدخل كود الخصم', 'error'); return }
+    setApplyingDiscount(true)
+    try {
+      const res = await fetch('/api/apply-discount-to-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: id, code: discountCode.trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.success) {
+        showToast(`تم تطبيق خصم ${data.discountPct}%`)
+        setRequest((prev: any) => ({
+          ...prev,
+          final_total: data.total,
+          discount_pct: data.discountPct,
+          discount_amount: data.discountAmount,
+          discount_code: data.code,
+        }))
+      } else {
+        showToast(data.error ?? 'فشل تطبيق الكود', 'error')
+      }
+    } catch {
+      showToast('حدث خطأ في الاتصال', 'error')
+    } finally {
+      setApplyingDiscount(false)
+    }
+  }
+
   if (loading) return <LoadingSpinner size="lg" />
   if (!request) return null
 
@@ -147,10 +178,35 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                 <span>+{formatNumber(e.price)} ر.س</span>
               </div>
             ))}
+            {request.discount_amount > 0 && (
+              <div className="flex justify-between text-xs text-green font-semibold">
+                <span>خصم{request.discount_code ? ` (${request.discount_code})` : ''} {request.discount_pct ? `${request.discount_pct}%` : ''}</span>
+                <span>−{formatNumber(request.discount_amount)} ر.س</span>
+              </div>
+            )}
             <div className="flex justify-between border-t border-border pt-2 mt-2">
               <span className="font-bold">المطلوب دفعه</span>
               <span className="font-black text-2xl text-gold">{formatNumber(totalDue)} ر.س</span>
             </div>
+
+            {/* كود الخصم — قبل الدفع */}
+            {!isPaid && (
+              <div className="pt-2 border-t border-border">
+                <label className="text-xs text-muted block mb-1">لديك كود خصم؟</label>
+                <div className="flex gap-2">
+                  <input
+                    value={discountCode}
+                    onChange={e => setDiscountCode(e.target.value.toUpperCase())}
+                    placeholder="أدخل الكود"
+                    dir="ltr"
+                    className="flex-1 px-3 py-2 rounded-lg border border-border bg-white text-sm text-left"
+                  />
+                  <Button onClick={applyDiscount} loading={applyingDiscount} disabled={applyingDiscount || !discountCode.trim()} variant="outline" size="sm">
+                    تطبيق
+                  </Button>
+                </div>
+              </div>
+            )}
             {request.estimated_reach > 0 && (
               <div className="flex justify-between text-xs pt-2 border-t border-border">
                 <span className="text-muted">الوصول المتوقع</span>
