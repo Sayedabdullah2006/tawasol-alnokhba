@@ -756,10 +756,12 @@ export default function RequestWizard() {
                 {PACKAGES.map(pkg => {
                   const isSelected = selectedPackage === pkg.id
                   // السعر: المفرد = سعر الخبر × معامل الباقة ؛ الحملة = مجموع الأخبار × معامل الباقة − خصم الحملة
-                  let pkgPrice: number | null = null
+                  let pkgPrice: number | null = null   // بعد الخصم
+                  let pkgBefore: number | null = null  // قبل خصم الحملة (مشطوب)
                   if (requestType === 'campaign') {
                     if (campaignBaseSubtotal != null) {
                       const withPkg = Math.round(campaignBaseSubtotal * pkg.priceMultiplier)
+                      pkgBefore = withPkg
                       pkgPrice = withPkg - Math.round(withPkg * CAMPAIGN_DISCOUNT / 100)
                     }
                   } else if (basicDynamicPrice != null) {
@@ -787,7 +789,12 @@ export default function RequestWizard() {
                         <span className="font-black text-dark text-sm">{pkg.name}</span>
                         {isSelected && <span className="text-green text-base flex-shrink-0">✓</span>}
                       </div>
-                      <div className="text-green font-black text-lg mb-1">{priceLabel}</div>
+                      <div className="flex items-baseline gap-2 mb-1">
+                        {pkgBefore != null && pkgBefore !== pkgPrice && (
+                          <span className="text-muted text-sm line-through">{pkgBefore} ر.س</span>
+                        )}
+                        <span className="text-green font-black text-lg">{priceLabel}</span>
+                      </div>
                       <p className="text-xs text-muted mb-2">{pkg.blurb}</p>
                       {pkg.badge && (
                         <span className="inline-flex items-center gap-1 self-start bg-pink-50 text-pink-600 border border-pink-200 text-[10px] font-bold px-2 py-1 rounded-lg mb-3">
