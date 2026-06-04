@@ -187,6 +187,13 @@ export async function notifyMotivateUser(args: { email: string; clientName?: str
   return sendEmail(args.email, t.subject, t.html)
 }
 
+export async function notifyPostCompletedToClient(args: {
+  email: string; requestNumber: string; clientName: string; postTitle: string; postIndex: number
+}) {
+  const t = templates.postCompletedToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
 export async function notifyInfoResubmittedToAdmin(args: {
   requestNumber: string; clientName: string
 }) {

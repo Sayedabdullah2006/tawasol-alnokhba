@@ -39,3 +39,11 @@ export function getPostReviews(request: any): Record<string, PostReview> {
   const pr = request?.post_reviews
   return pr && typeof pr === 'object' && !Array.isArray(pr) ? (pr as Record<string, PostReview>) : {}
 }
+
+export type PostStatus = 'in_progress' | 'completed'
+
+/** يعيد كائن post_statuses (حالة نشر كل منشور). الافتراضي: قيد التنفيذ. */
+export function getPostStatuses(request: any): Record<string, PostStatus> {
+  const ps = request?.post_statuses
+  return ps && typeof ps === 'object' && !Array.isArray(ps) ? (ps as Record<string, PostStatus>) : {}
+}

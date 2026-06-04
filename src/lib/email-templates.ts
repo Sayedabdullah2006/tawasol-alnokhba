@@ -1360,3 +1360,37 @@ export function motivateUserToSubmit(d: { clientName?: string }) {
     `)
   }
 }
+
+export function postCompletedToClient(d: {
+  requestNumber: string; clientName: string; postTitle: string; postIndex: number
+}) {
+  const name = d.clientName?.trim() || 'عزيزنا'
+  return {
+    subject: `تم نشر أحد أخبار حملتك ${d.requestNumber} · تواصل النخبة`,
+    html: wrap(`
+      <p style="font-size:15px; color:${BRAND_NAVY}; margin:0 0 16px 0;">مرحباً ${name}،</p>
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:48px; margin-bottom:12px;">🎉</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:21px;">تم نشر أحد أخبار حملتك</h2>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+      </div>
+      <p style="font-size:15px; color:#5A6B85; line-height:1.9; margin:16px 0; text-align:center;">
+        يسعدنا إبلاغك بأنه تم إكمال ونشر الخبر التالي ضمن حملتك:
+      </p>
+      <div style="background:#E8F5E8; border-radius:12px; padding:18px; margin:24px 0; border-right:4px solid #2D8B3F;">
+        <p style="margin:0; font-size:15px; color:${BRAND_NAVY}; font-weight:bold; line-height:1.8;">
+          📣 المنشور رقم ${d.postIndex + 1}: ${d.postTitle}
+        </p>
+        <p style="margin:8px 0 0 0; font-size:13px; color:#5A6B85;">الحالة: ✅ مكتمل / منشور</p>
+      </div>
+      <p style="font-size:14px; color:#6B7C99; line-height:1.8; margin:16px 0; text-align:center;">
+        بقية أخبار الحملة قيد التنفيذ، وسنوافيك بكل خبر فور نشره. شكراً لثقتك بنا 🌿
+      </p>
+      <div style="margin:28px 0; text-align:center;">
+        <a href="${SITE_URL}/dashboard/${d.requestNumber.replace('ATH-', '')}" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:12px 26px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+          متابعة الحملة
+        </a>
+      </div>
+    `)
+  }
+}

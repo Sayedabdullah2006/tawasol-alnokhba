@@ -15,6 +15,7 @@ import QuoteComposer from '@/components/admin/QuoteComposer'
 import ContentSender from '@/components/admin/ContentSender'
 import AIStudioPanel from '@/components/admin/AIStudioPanel'
 import PostReviewStatus from '@/components/admin/PostReviewStatus'
+import CampaignPostStatusManager from '@/components/admin/CampaignPostStatusManager'
 import { getReviewItems, getPostReviews } from '@/lib/review-items'
 import { getAdminActions, waitingForClient, isFinalStatus, messageColors } from '@/lib/admin-actions'
 
@@ -586,6 +587,9 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
 
         {/* ════════ تبويب: الإجراءات ════════ */}
         <div className={activeTab === 'actions' ? 'space-y-5' : 'hidden'}>
+          {/* حالة نشر كل خبر في الحملة (للحملات فقط) */}
+          <CampaignPostStatusManager request={request} />
+
           {/* إيصال الدفع */}
           {request.receipt_url && (
             <div className="bg-card rounded-2xl border border-border p-5">
