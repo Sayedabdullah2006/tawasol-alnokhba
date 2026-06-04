@@ -47,7 +47,9 @@ export default function AIStudioPanel({
         chosenConcept: savedStudio?.chosen_concept ?? null,
         imagePrompt: savedStudio?.image_prompt ?? '',
         sourceImage: savedStudio?.source_image ?? null,
-        imageUrl: savedStudio?.image_url ?? '',
+        imageUrl: '', // المعاينة المفردة للجلسة فقط؛ الحفظ عبر designs
+        designs: Array.isArray(savedStudio?.designs) ? savedStudio.designs : [],
+        uploadedImages: Array.isArray(savedStudio?.uploaded_images) ? savedStudio.uploaded_images : [],
       }
     : {
         analysis: request.ai_analysis ?? null,
@@ -57,14 +59,32 @@ export default function AIStudioPanel({
         imagePrompt: request.ai_image_prompt ?? '',
         sourceImage: request.ai_source_image ?? null,
         imageUrl: '',
+        designs: Array.isArray(request.ai_designs) ? request.ai_designs : [],
+        uploadedImages: Array.isArray(request.ai_uploaded_images) ? request.ai_uploaded_images : [],
       }
 
-  // صور المصدر: صور هذا المنشور (حملة) أو صور الطلب (مفرد) + أي صور يرفعها الأدمن يدوياً
-  const initialContentImages: string[] = isPost
+  // صور المصدر الأصلية للخبر (حملة: صور المنشور، مفرد: صور الطلب)
+  const baseImages: string[] = isPost
     ? (Array.isArray(postImages) ? postImages : [])
     : (Array.isArray(request.content_images) ? request.content_images : [])
-  const [contentImages, setContentImages] = useState<string[]>(initialContentImages)
+  // الصور التي رفعها الأدمن يدوياً (محفوظة وتبقى بعد إعادة التحميل)
+  const [uploadedImages, setUploadedImages] = useState<string[]>(saved.uploadedImages)
   const [uploading, setUploading] = useState(false)
+  // قائمة صور المصدر المعروضة = الأصلية + المرفوعة (دون تكرار)
+  const contentImages: string[] = [...baseImages, ...uploadedImages.filter(u => !baseImages.includes(u))]
+
+  // حفظ حالة الاستوديو (تصاميم/صور مرفوعة) في قاعدة البيانات لتبقى بعد إعادة التحميل
+  const persistStudioState = (patch: { designs?: any[]; uploadedImages?: string[] }) => {
+    fetch('/api/admin/save-studio-state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId: request.id,
+        postIndex: isPost ? postIndex : undefined,
+        ...patch,
+      }),
+    }).catch(() => { /* تجاهل أخطاء الحفظ الصامت */ })
+  }
 
   // رفع صورة مصدر من الأدمن (إن لم توجد صورة بالخبر أو أراد صورة أخرى)
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,7 +107,11 @@ export default function AIStudioPanel({
       const { error: upErr } = await supabase.storage.from('content-images').upload(path, file)
       if (upErr) throw upErr
       const { data } = supabase.storage.from('content-images').getPublicUrl(path)
-      setContentImages(prev => [...prev, data.publicUrl])
+      setUploadedImages(prev => {
+        const next = [...prev, data.publicUrl]
+        persistStudioState({ uploadedImages: next }) // حفظ ليبقى بعد إعادة التحميل
+        return next
+      })
       setSelectedImage(data.publicUrl)
       showToast('تم رفع الصورة', 'success')
     } catch {
@@ -114,10 +138,14 @@ export default function AIStudioPanel({
   const [loadingStep, setLoadingStep] = useState<StepKey | null>(null)
 
   // توليد الاتجاهات الثلاثة دفعة واحدة + الاختيار منها للإرسال
-  const [batchResults, setBatchResults] = useState<{ title: string; imageUrl: string; brief: string }[]>([])
+  // تُعاد تهيئتها من الحالة المحفوظة (saved.designs) فتبقى بعد إعادة التحميل
+  const initialDesigns: { title: string; imageUrl: string; brief: string }[] = (saved.designs as any[]).map(
+    (d, i) => ({ title: d.title ?? `تصميم ${i + 1}`, imageUrl: d.imageUrl ?? d.url ?? '', brief: d.brief ?? '' })
+  ).filter(d => d.imageUrl)
+  const [batchResults, setBatchResults] = useState<{ title: string; imageUrl: string; brief: string }[]>(initialDesigns)
   const [batchLoading, setBatchLoading] = useState(false)
   const [batchProgress, setBatchProgress] = useState('')
-  const [selectedBatch, setSelectedBatch] = useState<Set<number>>(new Set())
+  const [selectedBatch, setSelectedBatch] = useState<Set<number>>(new Set(initialDesigns.map((_, i) => i)))
   const [lightbox, setLightbox] = useState<string | null>(null)
   // ملاحظات وإعادة توليد التصاميم
   const [noteByIndex, setNoteByIndex] = useState<Record<number, string>>({})
@@ -158,6 +186,17 @@ export default function AIStudioPanel({
       } else if (step === 'image') {
         setImageUrl(data.imageUrl)
         setImagePrompt(data.prompt)
+        // أضِف التصميم المفرد إلى القائمة المحفوظة ليبقى بعد إعادة التحميل
+        setBatchResults(prev => {
+          const next = [...prev, { title: 'تصميم مفرد', imageUrl: data.imageUrl, brief: chosenConcept }]
+          persistStudioState({ designs: next })
+          return next
+        })
+        setSelectedBatch(prev => {
+          const next = new Set(prev)
+          next.add(batchResults.length) // فهرس العنصر المُضاف
+          return next
+        })
         showToast('تم توليد التصميم', 'success')
       }
     } catch {
@@ -209,6 +248,7 @@ export default function AIStudioPanel({
       }
       setBatchResults(results)
       setNoteByIndex({})
+      persistStudioState({ designs: results }) // حفظ ليبقى بعد إعادة التحميل
       // كل التصاميم مختارة افتراضياً للإرسال للعميل
       setSelectedBatch(new Set(results.map((_, i) => i)))
       if (results.length) showToast(`تم توليد ${results.length} تصاميم`, 'success')
@@ -239,7 +279,11 @@ export default function AIStudioPanel({
     try {
       const url = await generateOneDesign(r.brief, note)
       if (url) {
-        setBatchResults(prev => prev.map((x, idx) => (idx === i ? { ...x, imageUrl: url } : x)))
+        setBatchResults(prev => {
+          const next = prev.map((x, idx) => (idx === i ? { ...x, imageUrl: url } : x))
+          persistStudioState({ designs: next }) // حفظ التحديث
+          return next
+        })
         setSelectedBatch(prev => new Set(prev).add(i)) // اجعله مختاراً تلقائياً
         showToast('تم إعادة توليد التصميم بناءً على ملاحظتك', 'success')
       }
