@@ -882,7 +882,7 @@ export default function RequestWizard() {
           )}
           {/* الموافقة على الشروط ضمنية بالإرسال — مع رابط لعرضها */}
           <p className="text-[11px] text-muted text-center mb-2 leading-relaxed">
-            بالضغط على «إرسال الطلب» فإنك توافق على{' '}
+            بالضغط على الزر أدناه فإنك توافق على{' '}
             <button
               type="button"
               onClick={() => setShowTerms(true)}
@@ -897,7 +897,9 @@ export default function RequestWizard() {
             loading={submitting}
             className="w-full"
           >
-            {submitting ? 'جارٍ إرسال طلبك...' : 'إرسال الطلب والحصول على العرض'}
+            {submitting
+              ? (clientType === 'individual' ? 'جارٍ التجهيز...' : 'جارٍ إرسال طلبك...')
+              : (clientType === 'individual' ? '💳 المتابعة إلى الدفع' : 'إرسال الطلب للمراجعة')}
           </Button>
         </div>
       </div>
