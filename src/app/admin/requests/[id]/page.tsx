@@ -16,6 +16,7 @@ import ContentSender from '@/components/admin/ContentSender'
 import AIStudioPanel from '@/components/admin/AIStudioPanel'
 import PostReviewStatus from '@/components/admin/PostReviewStatus'
 import CampaignPostStatusManager from '@/components/admin/CampaignPostStatusManager'
+import EditableNewsContent from '@/components/admin/EditableNewsContent'
 import { getReviewItems, getPostReviews } from '@/lib/review-items'
 import { getAdminActions, waitingForClient, isFinalStatus, messageColors } from '@/lib/admin-actions'
 
@@ -955,14 +956,12 @@ function DetailsTab({ request }: { request: any }) {
             </div>
           )}
 
-          <InfoRow label="عنوان الخبر"><p className="font-semibold text-dark">{request.title}</p></InfoRow>
-
-          <div>
-            <span className="text-muted block mb-1.5">نص المحتوى</span>
-            <div className="bg-cream rounded-xl p-4 text-dark text-sm whitespace-pre-line border border-border/50">
-              {request.content}
-            </div>
-          </div>
+          {/* عنوان/نص الخبر — قابل للتعديل من الأدمن */}
+          <EditableNewsContent
+            requestId={request.id}
+            initialTitle={request.title ?? ''}
+            initialContent={request.content ?? ''}
+          />
 
           {request.link && (
             <InfoRow label="رابط مرفق">
@@ -1067,9 +1066,13 @@ function DetailsTab({ request }: { request: any }) {
                     {subLabel && (
                       <div className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-lg inline-block">{subLabel}</div>
                     )}
-                    <div className="text-dark whitespace-pre-line bg-cream rounded-lg p-3 border border-border/50">
-                      {post.content as string}
-                    </div>
+                    {/* عنوان/نص المنشور — قابل للتعديل من الأدمن */}
+                    <EditableNewsContent
+                      requestId={request.id}
+                      initialTitle={(post.title as string) ?? ''}
+                      initialContent={(post.content as string) ?? ''}
+                      postIndex={idx}
+                    />
                     {!!post.link && (
                       <a href={post.link as string} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs break-all" dir="ltr">
                         {post.link as string}
