@@ -28,7 +28,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
 
   const [request, setRequest] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [method, setMethod] = useState<Method>('bank')
+  const [method, setMethod] = useState<Method>('online')
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [tamaraLoading, setTamaraLoading] = useState(false)
@@ -253,24 +253,15 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
           ) : (
             <>
               <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setMethod('bank')}
-                  className={`p-3 rounded-xl border-2 text-center transition-all cursor-pointer ${
-                    method === 'bank' ? 'border-green bg-green/5' : 'border-border bg-white hover:border-green/40'
-                  }`}
-                >
-                  <div className="text-2xl mb-1">🏦</div>
-                  <div className="font-bold text-xs text-dark">تحويل بنكي</div>
-                  <div className="text-[10px] text-muted">للحساب البنكي</div>
-                </button>
+                {/* الأسرع أولاً: إلكتروني → تمارا → تحويل بنكي */}
                 <button
                   type="button"
                   onClick={() => setMethod('online')}
-                  className={`p-3 rounded-xl border-2 text-center transition-all cursor-pointer ${
+                  className={`relative p-3 rounded-xl border-2 text-center transition-all cursor-pointer ${
                     method === 'online' ? 'border-green bg-green/5' : 'border-border bg-white hover:border-green/40'
                   }`}
                 >
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-green text-white text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap">الأسرع</span>
                   <div className="text-2xl mb-1">💳</div>
                   <div className="font-bold text-xs text-dark">دفع إلكتروني</div>
                   <div className="text-[10px] text-muted">مدى / فيزا</div>
@@ -290,6 +281,17 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                   </div>
                   <div className="font-bold text-xs text-dark">تمارا</div>
                   <div className="text-[10px] text-muted">حتى 3 أقساط</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMethod('bank')}
+                  className={`p-3 rounded-xl border-2 text-center transition-all cursor-pointer ${
+                    method === 'bank' ? 'border-green bg-green/5' : 'border-border bg-white hover:border-green/40'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">🏦</div>
+                  <div className="font-bold text-xs text-dark">تحويل بنكي</div>
+                  <div className="text-[10px] text-muted">للحساب البنكي</div>
                 </button>
               </div>
 
