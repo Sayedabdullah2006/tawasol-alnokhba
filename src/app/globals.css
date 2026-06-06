@@ -270,3 +270,13 @@ td[class*="client"], th[class*="client"] {
 .design-scroller::-webkit-scrollbar {
   display: none;             /* Chrome/Safari */
 }
+
+/* منع تكبير iOS Safari التلقائي عند التركيز على الحقول:
+   سفاري يكبّر الصفحة إذا كان خط الحقل أقل من 16px. نضمن 16px على الجوال. */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
