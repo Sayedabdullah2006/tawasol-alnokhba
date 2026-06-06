@@ -282,7 +282,7 @@ export function getPaymentReminder(data: ReminderData, reminderNum: number): {
         </div>
 
         <div style="text-align: center; margin: 32px 0;">
-          <a href="https://nukhba.media/dashboard/${data.requestId}"
+          <a href="https://nukhba.media/payment/${data.requestId}"
              style="display: inline-block; background: #059669; color: #FFFFFF; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; margin: 0 8px 8px 0;">
             💳 إتمام الدفع
           </a>

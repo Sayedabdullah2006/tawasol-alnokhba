@@ -438,7 +438,7 @@ function createPaymentReminderHTML(data: ReminderData, reminderNum: number, amou
       </div>
 
       <div style="text-align: center; margin: 32px 0;">
-        <a href="https://nukhba.media/dashboard/${data.requestId}" style="display: inline-block; background: #059669; color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+        <a href="https://nukhba.media/payment/${data.requestId}" style="display: inline-block; background: #059669; color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold;">
           💳 إتمام الدفع
         </a>
       </div>
