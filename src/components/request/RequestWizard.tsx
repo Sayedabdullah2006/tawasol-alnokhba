@@ -17,7 +17,7 @@ import RStepCampaignPosts, { type CampaignPostData, makeEmptyPost, isPostComplet
 import SuccessScreen from './SuccessScreen'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
-import { COMPETITION_SUBCATEGORIES, getCompetitionPositions, PACKAGES } from '@/lib/constants'
+import { COMPETITION_SUBCATEGORIES, getCompetitionPositions, PACKAGES, CATEGORY_CONDITIONS } from '@/lib/constants'
 import { calculateAutoQuote } from '@/lib/auto-quote'
 
 // ─── خيارات القوائم المنسدلة ───────────────────────────────────────
@@ -725,13 +725,16 @@ export default function RequestWizard() {
             open={openSection === 1}
             onToggle={() => setOpenSection(openSection === 1 ? -1 : 1)}
           >
-            {/* شروط قبول الخبر */}
+            {/* شروط قبول الخبر — قاعدة عامة + شرط الفئة (للمنشور المفرد) */}
             <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-[11px] leading-6 text-red-600">
               <p className="font-bold mb-1">⚠️ شروط قبول الخبر:</p>
               <ul className="list-disc pr-4 space-y-0.5">
                 <li>أن يتضمّن الخبر إنجازاً واقعياً مع إرفاق كل الإثباتات.</li>
                 <li>إن ذُكرت «أوّلية» (الأول/الأولى) فيلزم إرفاق ما يُثبتها (إيميل أو خطاب أو مراسلة رسمية).</li>
                 <li>إن ذُكرت جهة فيلزم إرفاق موافقتها على النشر.</li>
+                {requestType === 'single' && category && CATEGORY_CONDITIONS[category] && (
+                  <li><span className="font-bold">حسب الفئة:</span> {CATEGORY_CONDITIONS[category]}</li>
+                )}
               </ul>
               <p className="font-bold mt-1">عدم الالتزام بذلك سيؤدي إلى إلغاء الخبر.</p>
             </div>

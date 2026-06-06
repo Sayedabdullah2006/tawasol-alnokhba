@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { CATEGORY_CONDITIONS } from '@/lib/constants'
 import type { DBCategory } from '@/lib/hooks'
 import ContentImagesUploader from './ContentImagesUploader'
 
@@ -245,6 +246,14 @@ function PostCard({ index, post, onChange, clientType, categories, isOpen, onTog
               className={cn(input, 'resize-none')}
             />
           </div>
+
+          {/* شرط قبول هذا الخبر حسب فئته */}
+          {post.category && CATEGORY_CONDITIONS[post.category] && (
+            <p className="text-[11px] leading-5 text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">
+              <span className="font-bold">⚠️ شرط الفئة:</span> {CATEGORY_CONDITIONS[post.category]}
+              <br />كما يلزم إثبات أي «أوّلية» وموافقة أي جهة مذكورة، وإلا أُلغي الخبر.
+            </p>
+          )}
 
           {/* تاريخ النشر */}
           <div>
