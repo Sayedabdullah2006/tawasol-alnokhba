@@ -495,6 +495,14 @@ export default function AdminRequestsPage() {
         <Button variant="outline" onClick={handleExport}>تصدير CSV</Button>
 
         <Button
+          variant="outline"
+          onClick={() => router.push('/admin/studio')}
+          className="border-green text-green hover:bg-green/5"
+        >
+          🤖 استوديو الذكاء الاصطناعي
+        </Button>
+
+        <Button
           onClick={() => setShowExternalForm(true)}
           className="bg-green-600 hover:bg-green-700"
         >
