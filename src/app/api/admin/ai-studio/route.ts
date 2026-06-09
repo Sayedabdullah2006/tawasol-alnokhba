@@ -30,16 +30,31 @@ export async function POST(req: Request) {
     title?: string
     content?: string
     sourceImage?: string
+    sourceImages?: string[]
+    extraInfo?: string
     analysis?: unknown
     chosenConcept?: string
     note?: string
   }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 }) }
 
-  const { step, title, content, sourceImage, analysis, chosenConcept, note } = body
+  const { step, title, content, sourceImage, analysis, chosenConcept, note, extraInfo } = body
   if (!step) return NextResponse.json({ error: 'الخطوة مطلوبة' }, { status: 400 })
 
-  const newsText = `العنوان: ${title ?? ''}\nالمحتوى: ${content ?? ''}`
+  // دعم اختيار أكثر من صورة مصدر (مع التوافق الخلفي لصورة مفردة).
+  const sourceImages: string[] =
+    Array.isArray(body.sourceImages) && body.sourceImages.length
+      ? body.sourceImages.filter((u): u is string => typeof u === 'string' && !!u)
+      : sourceImage
+        ? [sourceImage]
+        : []
+  const primarySource: string | null = sourceImages[0] ?? null
+  // معلومات إضافية يدخلها الأدمن قبل التحليل تُدمج مع نص الخبر.
+  const extraInfoText =
+    typeof extraInfo === 'string' && extraInfo.trim()
+      ? `\n\nمعلومات إضافية من الأدمن (راعِها في التحليل والاتجاهات والتصميم):\n${extraInfo.trim()}`
+      : ''
+  const newsText = `العنوان: ${title ?? ''}\nالمحتوى: ${content ?? ''}${extraInfoText}`
 
   let openai: OpenAI
   try { openai = getOpenAI() } catch {
@@ -50,7 +65,7 @@ export async function POST(req: Request) {
     // ── analyze ──
     if (step === 'analyze') {
       const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [{ type: 'text', text: newsText }]
-      if (sourceImage) userContent.push({ type: 'image_url', image_url: { url: sourceImage } })
+      for (const img of sourceImages) userContent.push({ type: 'image_url', image_url: { url: img } })
       const completion = await openai.chat.completions.create({
         model: OPENAI_MODEL,
         response_format: { type: 'json_object' },
@@ -81,7 +96,7 @@ export async function POST(req: Request) {
       const conceptContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
         { type: 'text', text: `${JSON.stringify(analysis)}\n\n${newsText}` },
       ]
-      if (sourceImage) conceptContent.push({ type: 'image_url', image_url: { url: sourceImage } })
+      for (const img of sourceImages) conceptContent.push({ type: 'image_url', image_url: { url: img } })
       const completion = await openai.chat.completions.create({
         model: OPENAI_MODEL,
         response_format: { type: 'json_object' },
@@ -101,7 +116,7 @@ export async function POST(req: Request) {
     if (step === 'image') {
       if (!analysis) return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 })
       if (!chosenConcept) return NextResponse.json({ error: 'اختر اتجاه التصميم أولاً' }, { status: 400 })
-      if (!sourceImage) return NextResponse.json({ error: 'ارفع صورة المصدر أولاً' }, { status: 400 })
+      if (!sourceImages.length) return NextResponse.json({ error: 'ارفع صورة المصدر أولاً' }, { status: 400 })
 
       const service = await createServiceRoleClient()
       const { data: brand } = await service.from('brand_settings').select('first1saudi_logo_url').eq('id', 1).single()
@@ -116,7 +131,9 @@ export async function POST(req: Request) {
             content:
               `بيانات الخبر (JSON):\n${JSON.stringify(analysis)}\n\n` +
               `الاتجاه المعتمد:\n${chosenConcept}\n\n` +
-              `الصورة الحقيقية المرفقة هي على الرابط: ${sourceImage}\n` +
+              (sourceImages.length > 1
+                ? `الصور الحقيقية المرفقة (${sourceImages.length}) على الروابط التالية — ادمجها جميعاً بتكوين متناسق داخل التصميم الواحد مع الحفاظ على واقعيتها:\n${sourceImages.map((u, i) => `${i + 1}. ${u}`).join('\n')}\n`
+                : `الصورة الحقيقية المرفقة هي على الرابط: ${primarySource}\n`) +
               `اترك مساحة فارغة أسفل يمين الفوتر للوقو (سيُضاف لاحقاً برمجياً) ولا ترسم أي شعار هناك.\n` +
               (note && note.trim()
                 ? `\n‼️ ملاحظات الأدمن على التصميم (طبّقها بدقّة مع الحفاظ على ثوابت الهوية والصورة الحقيقية): ${note.trim()}\n`
@@ -126,7 +143,7 @@ export async function POST(req: Request) {
       })
       const designPrompt = promptCompletion.choices[0]?.message?.content ?? ''
 
-      const { b64 } = await generateImageWithGemini(designPrompt, [sourceImage])
+      const { b64 } = await generateImageWithGemini(designPrompt, sourceImages)
       const rawImage = Buffer.from(b64, 'base64')
       const posterBase = await resizeToPoster(rawImage)
       const { buffer: finalImage, mimeType } = logoUrl

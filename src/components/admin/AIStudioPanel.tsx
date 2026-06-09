@@ -112,7 +112,7 @@ export default function AIStudioPanel({
         persistStudioState({ uploadedImages: next }) // حفظ ليبقى بعد إعادة التحميل
         return next
       })
-      setSelectedImage(data.publicUrl)
+      setSelectedImages(prev => (prev.includes(data.publicUrl) ? prev : [...prev, data.publicUrl]))
       showToast('تم رفع الصورة', 'success')
     } catch {
       showToast('فشل رفع الصورة', 'error')
@@ -122,9 +122,13 @@ export default function AIStudioPanel({
   }
 
   // ── State (prefilled from saved studio state when re-opened) ──
-  const [selectedImage, setSelectedImage] = useState<string | null>(
-    saved.sourceImage ?? (contentImages.length === 1 ? contentImages[0] : null)
+  // يمكن اختيار أكثر من صورة مصدر تُضمَّن جميعها ويُبنى عليها التحليل والاتجاهات والتصميم.
+  const [selectedImages, setSelectedImages] = useState<string[]>(
+    saved.sourceImage ? [saved.sourceImage] : (contentImages.length === 1 ? [contentImages[0]] : [])
   )
+  const [extraInfo, setExtraInfo] = useState('')
+  const toggleImage = (url: string) =>
+    setSelectedImages(prev => (prev.includes(url) ? prev.filter(u => u !== url) : [...prev, url]))
   const [analysis, setAnalysis] = useState<any>(saved.analysis)
   const [tweets, setTweets] = useState<string>(saved.tweets?.raw ?? '')
   const [selectedTweet, setSelectedTweet] = useState<string>(saved.tweets?.raw ?? '')
@@ -162,7 +166,8 @@ export default function AIStudioPanel({
         body: JSON.stringify({
           requestId: request.id,
           step,
-          sourceImage: selectedImage ?? undefined,
+          sourceImages: selectedImages,
+          extraInfo,
           chosenConcept: step === 'image' ? chosenConcept : undefined,
           postIndex: isPost ? postIndex : undefined,
         }),
@@ -214,7 +219,8 @@ export default function AIStudioPanel({
       body: JSON.stringify({
         requestId: request.id,
         step: 'image',
-        sourceImage: selectedImage ?? undefined,
+        sourceImages: selectedImages,
+        extraInfo,
         chosenConcept: conceptBrief,
         note: note?.trim() || undefined,
         postIndex: isPost ? postIndex : undefined,
@@ -231,7 +237,7 @@ export default function AIStudioPanel({
   // يولّد تصميماً لكل اتجاه من الاتجاهات الثلاثة ثم يعرضها للاختيار
   const designAll = async () => {
     if (!conceptItems.length) return
-    if (!selectedImage) {
+    if (!selectedImages.length) {
       showToast('اختر صورة المصدر أولاً', 'error')
       return
     }
@@ -320,34 +326,43 @@ export default function AIStudioPanel({
         )}
       </div>
 
-      {/* ── اختيار صورة المصدر ── */}
+      {/* ── اختيار صور المصدر (يمكن اختيار أكثر من صورة) ── */}
       <div className={cardCls}>
-        <h4 className="font-bold text-dark">اختيار صورة المصدر</h4>
+        <h4 className="font-bold text-dark">اختيار صور المصدر</h4>
         {contentImages.length === 0 ? (
           <p className="text-sm text-muted">
             لا توجد صورة مرفقة بالخبر. ارفع صورة المصدر أدناه، أو حلّل الخبر بدونها.
           </p>
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {contentImages.map((url) => (
-              <button
-                key={url}
-                type="button"
-                onClick={() => setSelectedImage(url)}
-                className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all ${
-                  selectedImage === url ? 'border-green ring-2 ring-green/30' : 'border-border'
-                }`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt="صورة" className="w-full h-full object-cover" />
-                {selectedImage === url && (
-                  <span className="absolute top-1 left-1 w-5 h-5 rounded-full bg-green text-white text-xs flex items-center justify-center">
-                    ✓
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
+          <>
+            <p className="text-xs text-muted">اختر صورة أو أكثر لتُضمَّن جميعها في التصميم ويُبنى عليها التحليل والاتجاهات:</p>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {contentImages.map((url) => {
+                const on = selectedImages.includes(url)
+                return (
+                  <button
+                    key={url}
+                    type="button"
+                    onClick={() => toggleImage(url)}
+                    className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all ${
+                      on ? 'border-green ring-2 ring-green/30' : 'border-border'
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt="صورة" className="w-full h-full object-cover" />
+                    {on && (
+                      <span className="absolute top-1 left-1 w-5 h-5 rounded-full bg-green text-white text-xs flex items-center justify-center">
+                        ✓
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+            {selectedImages.length > 0 && (
+              <p className="text-[11px] text-green-700">عدد الصور المحددة: {selectedImages.length}</p>
+            )}
+          </>
         )}
 
         {/* رفع صورة مصدر من الأدمن */}
@@ -361,6 +376,17 @@ export default function AIStudioPanel({
           />
           {uploading ? 'جارٍ الرفع...' : '⬆️ رفع صورة مصدر'}
         </label>
+
+        {/* معلومات إضافية قبل التحليل */}
+        <div className="pt-1">
+          <label className="block text-xs font-medium text-dark mb-1">معلومات إضافية (اختياري):</label>
+          <textarea
+            value={extraInfo}
+            onChange={(e) => setExtraInfo(e.target.value)}
+            placeholder="أضِف أي معلومات تُراعى في التحليل والاتجاهات والتصميم (سياق، أسماء، تفاصيل غير موجودة بالخبر...)"
+            className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[70px] resize-y"
+          />
+        </div>
       </div>
 
       {/* ── الخطوة 1 — تحليل الخبر ── */}
@@ -480,7 +506,7 @@ export default function AIStudioPanel({
           <Button
             onClick={designAll}
             loading={batchLoading}
-            disabled={batchLoading || loadingStep !== null || !analysis || !selectedImage || conceptItems.length === 0}
+            disabled={batchLoading || loadingStep !== null || !analysis || !selectedImages.length || conceptItems.length === 0}
             size="sm"
           >
             🎨 صمّم الاتجاهات الثلاثة
@@ -563,7 +589,7 @@ export default function AIStudioPanel({
             onClick={() => callStep('image')}
             loading={loadingStep === 'image'}
             disabled={
-              loadingStep !== null || batchLoading || !analysis || !selectedImage || !chosenConcept.trim()
+              loadingStep !== null || batchLoading || !analysis || !selectedImages.length || !chosenConcept.trim()
             }
             variant="outline"
             size="sm"

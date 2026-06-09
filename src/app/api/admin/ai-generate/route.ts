@@ -26,6 +26,8 @@ export async function POST(req: Request) {
     requestId?: string
     step?: Step
     sourceImage?: string
+    sourceImages?: string[]
+    extraInfo?: string
     chosenConcept?: string
     postIndex?: number
     note?: string
@@ -36,10 +38,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 })
   }
 
-  const { requestId, step, sourceImage, chosenConcept, postIndex, note } = body
+  const { requestId, step, sourceImage, chosenConcept, postIndex, note, extraInfo } = body
   if (!requestId || !step) {
     return NextResponse.json({ error: 'بيانات ناقصة (requestId/step)' }, { status: 400 })
   }
+
+  // ── دعم اختيار أكثر من صورة مصدر تُضمَّن جميعها في التحليل والاتجاهات والتصميم ──
+  // التوافق الخلفي: إن لم تُرسل sourceImages نستخدم sourceImage المفردة.
+  const sourceImages: string[] =
+    Array.isArray(body.sourceImages) && body.sourceImages.length
+      ? body.sourceImages.filter((u): u is string => typeof u === 'string' && !!u)
+      : sourceImage
+        ? [sourceImage]
+        : []
+  const primarySource: string | null = sourceImages[0] ?? null
+  // معلومات إضافية يدخلها الأدمن قبل التحليل (تُدمج مع نص الخبر).
+  const extraInfoText =
+    typeof extraInfo === 'string' && extraInfo.trim()
+      ? `\n\nمعلومات إضافية من الأدمن (راعِها في التحليل والاتجاهات والتصميم):\n${extraInfo.trim()}`
+      : ''
 
   const service = await createServiceRoleClient()
 
@@ -74,6 +91,8 @@ export async function POST(req: Request) {
     newsText = `العنوان: ${reqRow.title ?? ''}\nالمحتوى: ${reqRow.content ?? ''}`
     priorAnalysis = reqRow.ai_analysis ?? null
   }
+  // دمج المعلومات الإضافية (إن وُجدت) مع نص الخبر قبل أي خطوة.
+  newsText += extraInfoText
 
   // ── سياق الحملة: لأي خبر بعد الأول، نمرّر الخبر الأول كمرجع ──────
   // (الحملات مترابطة: الخبر الأول غالباً يحوي التعريف بالشخصية/الموضوع،
@@ -160,8 +179,9 @@ export async function POST(req: Request) {
       const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
         { type: 'text', text: withContext(newsText) },
       ]
-      if (sourceImage) {
-        userContent.push({ type: 'image_url', image_url: { url: sourceImage } })
+      // نمرّر جميع الصور المختارة ليُبنى التحليل على كل الصور لا صورة واحدة.
+      for (const img of sourceImages) {
+        userContent.push({ type: 'image_url', image_url: { url: img } })
       }
 
       const completion = await openai.chat.completions.create({
@@ -182,7 +202,7 @@ export async function POST(req: Request) {
         analysis = { raw }
       }
 
-      await saveStep({ analysis, sourceImage: sourceImage ?? null })
+      await saveStep({ analysis, sourceImage: primarySource })
 
       return NextResponse.json({ analysis })
     }
@@ -221,8 +241,9 @@ export async function POST(req: Request) {
       const conceptUserContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
         { type: 'text', text: `${JSON.stringify(priorAnalysis)}\n\n${withContext(newsText)}` },
       ]
-      if (sourceImage) {
-        conceptUserContent.push({ type: 'image_url', image_url: { url: sourceImage } })
+      // نمرّر جميع الصور المختارة لتُراعي الاتجاهات تكوين كل الصور ومزاجها.
+      for (const img of sourceImages) {
+        conceptUserContent.push({ type: 'image_url', image_url: { url: img } })
       }
 
       const completion = await openai.chat.completions.create({
@@ -258,7 +279,7 @@ export async function POST(req: Request) {
       if (!chosenConcept) {
         return NextResponse.json({ error: 'اختر اتجاه التصميم أولاً' }, { status: 400 })
       }
-      if (!sourceImage) {
+      if (!sourceImages.length) {
         return NextResponse.json({ error: 'اختر صورة المصدر أولاً' }, { status: 400 })
       }
 
@@ -283,7 +304,9 @@ export async function POST(req: Request) {
             content:
               `بيانات الخبر (JSON):\n${JSON.stringify(priorAnalysis)}\n\n` +
               `الاتجاه المعتمد:\n${chosenConcept}\n\n` +
-              `الصورة الحقيقية المرفقة هي على الرابط: ${sourceImage}\n` +
+              (sourceImages.length > 1
+                ? `الصور الحقيقية المرفقة (${sourceImages.length}) على الروابط التالية — ادمجها جميعاً بتكوين متناسق داخل التصميم الواحد مع الحفاظ على واقعيتها:\n${sourceImages.map((u, i) => `${i + 1}. ${u}`).join('\n')}\n`
+                : `الصورة الحقيقية المرفقة هي على الرابط: ${primarySource}\n`) +
               // اللوقو يُركَّب برمجياً بعد التوليد — اطلب ترك مكانه فارغاً فقط.
               `اترك مساحة فارغة أسفل يمين الفوتر للوقو (سيُضاف لاحقاً برمجياً) ولا ترسم أي شعار هناك.\n` +
               // ملاحظات الأدمن لإعادة التوليد — تُطبَّق بدقّة مع الحفاظ على القواعد والهوية والصورة الحقيقية.
@@ -301,7 +324,7 @@ export async function POST(req: Request) {
       // 2) توليد الصورة عبر Gemini (نموذج توليد الصور من Google).
       // نمرّر الصورة الشخصية الحقيقية فقط كمرجع. لا نمرّر اللوقو إطلاقاً لأن
       // النموذج يُعيد رسمه ويُشوّه نصه العربي — سنُركّبه برمجياً بعد التوليد.
-      const referenceImages = [sourceImage]
+      const referenceImages = sourceImages
       // لا نفرض نسبة 4:5 على النموذج — فرضها يجعله يُعيد تكوين المشهد ويتجاهل الصورة الحقيقية.
       // المقاس النهائي يُضبط بـ sharp إلى 1080×1350 لاحقاً.
       const { b64 } = await generateImageWithGemini(designPrompt, referenceImages)

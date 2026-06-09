@@ -21,8 +21,12 @@ export default function StandaloneStudio() {
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [images, setImages] = useState<string[]>([])
-  const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [selectedImages, setSelectedImages] = useState<string[]>([])
+  const [extraInfo, setExtraInfo] = useState('')
   const [uploading, setUploading] = useState(false)
+
+  const toggleImage = (url: string) =>
+    setSelectedImages(prev => (prev.includes(url) ? prev.filter(u => u !== url) : [...prev, url]))
 
   const [analysis, setAnalysis] = useState<any>(null)
   const [tweets, setTweets] = useState('')
@@ -54,7 +58,7 @@ export default function StandaloneStudio() {
       if (error) throw error
       const { data } = supabase.storage.from('content-images').getPublicUrl(path)
       setImages(prev => [...prev, data.publicUrl])
-      setSelectedImage(data.publicUrl)
+      setSelectedImages(prev => [...prev, data.publicUrl])
       showToast('تم رفع الصورة', 'success')
     } catch {
       showToast('فشل رفع الصورة', 'error')
@@ -76,7 +80,7 @@ export default function StandaloneStudio() {
     if (!content.trim()) { showToast('أدخل نص الخبر أولاً', 'error'); return }
     setLoadingStep(step)
     try {
-      const data = await post({ step, title, content, sourceImage: selectedImage ?? undefined, analysis, chosenConcept: step === 'image' ? chosenConcept : undefined })
+      const data = await post({ step, title, content, sourceImages: selectedImages, extraInfo, analysis, chosenConcept: step === 'image' ? chosenConcept : undefined })
       if (!data) return
       if (step === 'analyze') { setAnalysis(data.analysis); showToast('تم التحليل', 'success') }
       else if (step === 'tweets') { setTweets(data.tweets); setSelectedTweet(data.tweets); showToast('تم توليد التغريدات', 'success') }
@@ -89,13 +93,13 @@ export default function StandaloneStudio() {
   }
 
   const genOne = async (brief: string, note?: string): Promise<string | null> => {
-    const data = await post({ step: 'image', title, content, sourceImage: selectedImage ?? undefined, analysis, chosenConcept: brief, note })
+    const data = await post({ step: 'image', title, content, sourceImages: selectedImages, extraInfo, analysis, chosenConcept: brief, note })
     return data?.imageUrl ?? null
   }
 
   const designAll = async () => {
     if (!conceptItems.length) return
-    if (!selectedImage) { showToast('ارفع صورة المصدر أولاً', 'error'); return }
+    if (!selectedImages.length) { showToast('ارفع صورة المصدر أولاً', 'error'); return }
     setBatchLoading(true); setBatchResults([]); setNoteByIndex({})
     try {
       const results: { title: string; imageUrl: string; brief: string }[] = []
@@ -131,23 +135,33 @@ export default function StandaloneStudio() {
           className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm font-semibold" />
         <textarea value={content} onChange={e => setContent(e.target.value)} placeholder="نص الخبر / التفاصيل..."
           className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[120px] resize-y" />
-        {/* صورة المصدر */}
+        {/* صور المصدر — يمكن اختيار أكثر من صورة لتُضمَّن جميعها في التصميم */}
         {images.length > 0 && (
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {images.map(url => (
-              <button key={url} type="button" onClick={() => setSelectedImage(url)}
-                className={`relative aspect-square rounded-xl overflow-hidden border-2 ${selectedImage === url ? 'border-green ring-2 ring-green/30' : 'border-border'}`}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt="مصدر" className="w-full h-full object-cover" />
-                {selectedImage === url && <span className="absolute top-1 left-1 w-5 h-5 rounded-full bg-green text-white text-xs flex items-center justify-center">✓</span>}
-              </button>
-            ))}
-          </div>
+          <>
+            <p className="text-xs text-muted">اختر صورة أو أكثر لتُضمَّن في التصميم ويُبنى عليها التحليل والاتجاهات:</p>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {images.map(url => {
+                const on = selectedImages.includes(url)
+                return (
+                  <button key={url} type="button" onClick={() => toggleImage(url)}
+                    className={`relative aspect-square rounded-xl overflow-hidden border-2 ${on ? 'border-green ring-2 ring-green/30' : 'border-border'}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt="مصدر" className="w-full h-full object-cover" />
+                    {on && <span className="absolute top-1 left-1 w-5 h-5 rounded-full bg-green text-white text-xs flex items-center justify-center">✓</span>}
+                  </button>
+                )
+              })}
+            </div>
+            {selectedImages.length > 0 && <p className="text-[11px] text-green-700">المحددة: {selectedImages.length}</p>}
+          </>
         )}
         <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-border text-sm text-muted hover:border-green hover:text-green cursor-pointer">
           <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={handleUpload} disabled={uploading} className="hidden" />
           {uploading ? 'جارٍ الرفع...' : '⬆️ رفع صورة المصدر'}
         </label>
+        {/* معلومات إضافية قبل التحليل */}
+        <textarea value={extraInfo} onChange={e => setExtraInfo(e.target.value)} placeholder="معلومات إضافية (اختياري) — تُراعى في التحليل والاتجاهات والتصميم..."
+          className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[70px] resize-y" />
       </div>
 
       {/* 1 تحليل */}
@@ -201,11 +215,11 @@ export default function StandaloneStudio() {
       {/* 4 تصاميم */}
       <div className={card}>
         <h4 className="font-bold text-dark">الخطوة 4 — التصاميم</h4>
-        <Button onClick={designAll} loading={batchLoading} disabled={batchLoading || loadingStep !== null || !analysis || !selectedImage || conceptItems.length === 0} size="sm">🎨 صمّم الاتجاهات الثلاثة</Button>
+        <Button onClick={designAll} loading={batchLoading} disabled={batchLoading || loadingStep !== null || !analysis || !selectedImages.length || conceptItems.length === 0} size="sm">🎨 صمّم الاتجاهات الثلاثة</Button>
         {batchLoading && <div className="flex items-center gap-2 text-sm text-muted"><LoadingSpinner size="sm" /><span>{batchProgress || 'جارٍ التوليد…'}</span></div>}
         <div className="border-t border-border pt-3">
           <p className="text-xs text-muted mb-2">أو صمّم الاتجاه المعتمد (تصميم واحد):</p>
-          <Button onClick={() => callStep('image')} loading={loadingStep === 'image'} disabled={loadingStep !== null || batchLoading || !analysis || !selectedImage || !chosenConcept.trim()} variant="outline" size="sm">صمّم الصورة (مفرد)</Button>
+          <Button onClick={() => callStep('image')} loading={loadingStep === 'image'} disabled={loadingStep !== null || batchLoading || !analysis || !selectedImages.length || !chosenConcept.trim()} variant="outline" size="sm">صمّم الصورة (مفرد)</Button>
         </div>
 
         {batchResults.length > 0 && (
