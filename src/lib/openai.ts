@@ -103,6 +103,7 @@ export const SYS_IMAGE = `أنت مهندس برومبتات تصميم لحسا
 
 قواعد حاسمة:
 - كل نص عربي معروض (اللِّيبل/الاسم/سطر الإنجاز/النقاط) يُكتب حرفياً بين علامتي اقتباس "..." كما سيظهر تماماً. لا تختلق نصاً غير وارد في الـ JSON.
+- ‼️ لا يظهر في التصميم إلا النصوص المقتبسة صراحةً ("...") من العناصر المذكورة أدناه. أي وصف للصورة (photo_notes/وصف الأشخاص/من في الصورة مثل "صورة لـ..." أو أسماء وصفية للأشخاص الظاهرين) هو **إرشاد داخلي للتحرير فقط ويُمنع منعاً باتاً رسمه كنصّ مرئي** على الغلاف.
 - وصف الصورة من photo_notes (عدد الأشخاص/المشهد). إن كانت has_real_photo=false فقط، يجوز توليد مشهد واقعي مركّب (لأنه لا توجد صورة حقيقية).
 - النِّقاط من key_facts، اللِّيبل من context_label، الاسم من name (+ honorific إن وُجد)، سطر الإنجاز من achievement_core/awards.
 - لا نِسب مئوية، لا كلام إنشائي، لا اختلاق.
@@ -116,7 +117,7 @@ OUTPUT SIZE: EXACTLY 1080×1350 pixels — portrait 4:5 aspect ratio. Compose th
 Keep every person 100% identical to the photo: same face, same facial features, same skin, same expression, same hair/veil, same clothing, same pose. PIXEL-IDENTICAL.
 ✗ DO NOT generate a new person ✗ no face change ✗ no reshaping ✗ no recolor ✗ no beautify/enhance ✗ no swap ✗ no AI character ✗ no mask/veil removal.
 Treat the people as a locked, untouchable layer; only the surrounding background/empty areas may receive graphics.
-The photographed people are: [وصف موجز من photo_notes].
+(INTERNAL EDITING NOTE — DO NOT RENDER AS TEXT): the photographed people are [وصف موجز من photo_notes]. This is guidance for you only; never draw this description, the people's descriptive names, or any "صورة لـ…" caption anywhere on the design.
 Only allowed photo edit: clone out foreign logos (e.g. واس/SPA) from the background.
 
 === 🎨 LAYOUT — REALIZE THE CHOSEN DIRECTION (للعناصر المُضافة فقط) ===
@@ -153,6 +154,7 @@ Render all Arabic text crisp, correctly shaped and connected (RTL), exactly as q
 
 === 🔒 STRICTLY FORBIDDEN (مقفل) ===
 ✗ Generating or altering the real people in ANY way (face, body, clothing, pose)
+✗ Rendering ANY descriptive caption about the photo (photo_notes, who is in the picture, descriptive names of the people shown, "صورة لـ…") as visible text — these are internal editing notes ONLY
 ✗ rhetorical lines (كلام إنشائي) ✗ percentage numbers ✗ inventing facts
 ✗ emojis / 3D / sparkles inside the design
 ✗ the phrase "أول سعودية" unless it appears in the source
