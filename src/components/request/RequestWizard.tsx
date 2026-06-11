@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { useCategories, type DBCategory } from '@/lib/hooks'
+import { useCategories, useSiteContent, type DBCategory, type SiteContent } from '@/lib/hooks'
 import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
 import type { Influencer } from '@/components/pricing/StepInfluencer'
@@ -19,6 +19,18 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
 import { COMPETITION_SUBCATEGORIES, getCompetitionPositions, PACKAGES, CATEGORY_CONDITIONS } from '@/lib/constants'
 import { calculateAutoQuote } from '@/lib/auto-quote'
+
+// القيم الافتراضية لمحتوى الموقع (تُستخدم حتى يصل المحتوى المعدَّل من القاعدة)
+const SITE_CONTENT_FALLBACK: SiteContent = {
+  terms_text: TERMS_TEXT,
+  news_conditions_general: [
+    'أن يتضمّن الخبر إنجازاً واقعياً مع إرفاق كل الإثباتات.',
+    'إن ذُكرت «أوّلية» (الأول/الأولى) فيلزم إرفاق ما يُثبتها (إيميل أو خطاب أو مراسلة رسمية).',
+    'إن ذُكرت جهة فيلزم إرفاق موافقتها على النشر.',
+  ],
+  news_conditions_footer: 'عدم الالتزام بذلك سيؤدي إلى إلغاء الخبر.',
+  category_conditions: CATEGORY_CONDITIONS,
+}
 
 // ─── خيارات القوائم المنسدلة ───────────────────────────────────────
 const REQUEST_TYPE_OPTIONS: { id: RequestType; label: string }[] = [
@@ -104,6 +116,8 @@ export default function RequestWizard() {
   const router = useRouter()
   const { showToast } = useToast()
   const { categories, loading: catsLoading } = useCategories()
+  // محتوى الموقع القابل للتعديل من لوحة الأدمن (الشروط + شروط قبول الخبر)
+  const siteContent = useSiteContent(SITE_CONTENT_FALLBACK)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [requestNumber, setRequestNumber] = useState('')
@@ -725,18 +739,20 @@ export default function RequestWizard() {
             open={openSection === 1}
             onToggle={() => setOpenSection(openSection === 1 ? -1 : 1)}
           >
-            {/* شروط قبول الخبر — قاعدة عامة + شرط الفئة (للمنشور المفرد) */}
+            {/* شروط قبول الخبر — قاعدة عامة + شرط الفئة (للمنشور المفرد) — تُدار من لوحة الأدمن */}
             <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-[11px] leading-6 text-red-600">
               <p className="font-bold mb-1">⚠️ شروط قبول الخبر:</p>
               <ul className="list-disc pr-4 space-y-0.5">
-                <li>أن يتضمّن الخبر إنجازاً واقعياً مع إرفاق كل الإثباتات.</li>
-                <li>إن ذُكرت «أوّلية» (الأول/الأولى) فيلزم إرفاق ما يُثبتها (إيميل أو خطاب أو مراسلة رسمية).</li>
-                <li>إن ذُكرت جهة فيلزم إرفاق موافقتها على النشر.</li>
-                {requestType === 'single' && category && CATEGORY_CONDITIONS[category] && (
-                  <li><span className="font-bold">حسب الفئة:</span> {CATEGORY_CONDITIONS[category]}</li>
+                {siteContent.news_conditions_general.map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+                {requestType === 'single' && category && siteContent.category_conditions[category] && (
+                  <li><span className="font-bold">حسب الفئة:</span> {siteContent.category_conditions[category]}</li>
                 )}
               </ul>
-              <p className="font-bold mt-1">عدم الالتزام بذلك سيؤدي إلى إلغاء الخبر.</p>
+              {siteContent.news_conditions_footer && (
+                <p className="font-bold mt-1">{siteContent.news_conditions_footer}</p>
+              )}
             </div>
 
             {!requestType ? (
@@ -747,6 +763,7 @@ export default function RequestWizard() {
                 onChange={setCampaignPosts}
                 clientType={effectiveClientType}
                 categories={categories}
+                categoryConditions={siteContent.category_conditions}
               />
             ) : (
               <RStep3Details data={details} onChange={setDetails} />
@@ -929,7 +946,7 @@ export default function RequestWizard() {
               </button>
             </div>
             <div className="px-5 py-4 overflow-y-auto text-sm text-dark/80 leading-relaxed whitespace-pre-line">
-              {TERMS_TEXT}
+              {siteContent.terms_text}
             </div>
             <div className="px-5 py-3 border-t border-border">
               <Button onClick={() => setShowTerms(false)} className="w-full">إغلاق</Button>

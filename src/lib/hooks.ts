@@ -65,3 +65,45 @@ export function useExtras() {
 
   return { extras, loading }
 }
+
+// ─── محتوى الموقع القابل للتعديل من لوحة الأدمن ───
+// (الشروط والأحكام + شروط قبول الخبر العامة وبحسب الفئة)
+// يُقرأ من جدول site_content؛ وعند فشل الجلب تُستخدم القيم الافتراضية في الكود.
+export interface SiteContent {
+  terms_text: string
+  news_conditions_general: string[]
+  news_conditions_footer: string
+  category_conditions: Record<string, string>
+}
+
+export function useSiteContent(fallback: SiteContent) {
+  const [content, setContent] = useState<SiteContent>(fallback)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('site_content')
+      .select('terms_text, news_conditions_general, news_conditions_footer, category_conditions')
+      .eq('id', 1)
+      .single()
+      .then(({ data }) => {
+        if (!data) return
+        setContent({
+          terms_text: data.terms_text || fallback.terms_text,
+          news_conditions_general: Array.isArray(data.news_conditions_general) && data.news_conditions_general.length
+            ? data.news_conditions_general
+            : fallback.news_conditions_general,
+          news_conditions_footer: data.news_conditions_footer || fallback.news_conditions_footer,
+          category_conditions:
+            data.category_conditions && typeof data.category_conditions === 'object'
+              ? data.category_conditions
+              : fallback.category_conditions,
+        })
+      })
+    // fallback ثابت من الكود — لا حاجة لإعادة الجلب عند تغيّره
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return content
+}
+

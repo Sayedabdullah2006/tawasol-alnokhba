@@ -85,11 +85,14 @@ interface PostCardProps {
   onChange: (p: CampaignPostData) => void
   clientType: string | null
   categories: DBCategory[]
+  categoryConditions?: Record<string, string>
   isOpen: boolean
   onToggle: () => void
 }
 
-function PostCard({ index, post, onChange, clientType, categories, isOpen, onToggle }: PostCardProps) {
+function PostCard({ index, post, onChange, clientType, categories, categoryConditions, isOpen, onToggle }: PostCardProps) {
+  // شروط الفئات تُدار من لوحة الأدمن — مع الافتراضي في الكود كاحتياط
+  const conditions = categoryConditions ?? CATEGORY_CONDITIONS
   const complete          = isPostComplete(post)
   const availableCategories = clientType
     ? categories.filter(c => !c.client_types || c.client_types.includes(clientType))
@@ -248,9 +251,9 @@ function PostCard({ index, post, onChange, clientType, categories, isOpen, onTog
           </div>
 
           {/* شرط قبول هذا الخبر حسب فئته */}
-          {post.category && CATEGORY_CONDITIONS[post.category] && (
+          {post.category && conditions[post.category] && (
             <p className="text-[11px] leading-5 text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">
-              <span className="font-bold">⚠️ شرط الفئة:</span> {CATEGORY_CONDITIONS[post.category]}
+              <span className="font-bold">⚠️ شرط الفئة:</span> {conditions[post.category]}
               <br />كما يلزم إثبات أي «أوّلية» وموافقة أي جهة مذكورة، وإلا أُلغي الخبر.
             </p>
           )}
@@ -288,9 +291,10 @@ interface Props {
   onChange: (posts: CampaignPostData[]) => void
   clientType: string | null
   categories: DBCategory[]
+  categoryConditions?: Record<string, string>
 }
 
-export default function RStepCampaignPosts({ posts, onChange, clientType, categories }: Props) {
+export default function RStepCampaignPosts({ posts, onChange, clientType, categories, categoryConditions }: Props) {
   const [openIndex, setOpenIndex] = useState(0)
 
   const updatePost = (i: number, p: CampaignPostData) => {
@@ -323,6 +327,7 @@ export default function RStepCampaignPosts({ posts, onChange, clientType, catego
             onChange={p => updatePost(i, p)}
             clientType={clientType}
             categories={categories}
+            categoryConditions={categoryConditions}
             isOpen={openIndex === i}
             onToggle={() => setOpenIndex(openIndex === i ? -1 : i)}
           />

@@ -11,6 +11,7 @@ const adminNav = [
   { href: '/admin/categories', label: 'الفئات والمزايا', icon: '⚙️' },
   { href: '/admin/users', label: 'المستخدمون', icon: '👤' },
   { href: '/admin/brand', label: 'شعار التصاميم', icon: '🎨' },
+  { href: '/admin/site-content', label: 'محتوى النموذج', icon: '📄' },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
