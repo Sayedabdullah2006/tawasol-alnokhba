@@ -75,6 +75,7 @@ const SIMPLE_BASE: Record<string, ClientPrices> = {
   research:    { individual: 799,  business: 2499 },
   certs:       { individual: 899  },
   graduation:  { individual: 799  },
+  graduation_project: { individual: 799 },
   appointment: { individual: 1199, business: 2499, government: 4999 },
   award:       { individual: 599,  business: 1999 },
   cv:          { individual: 799  },
