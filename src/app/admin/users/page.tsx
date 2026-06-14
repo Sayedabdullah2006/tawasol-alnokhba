@@ -33,9 +33,17 @@ export default function AdminUsersPage() {
   const [pwUser, setPwUser] = useState<UserData | null>(null)
   const [pwValue, setPwValue] = useState('')
   const [pwSaving, setPwSaving] = useState(false)
-  const [bulkMotivating, setBulkMotivating] = useState(false)
-  const [showMotivateConfirm, setShowMotivateConfirm] = useState(false)
   const [motivatingId, setMotivatingId] = useState<string | null>(null)
+
+  // تحفيز المستخدمين الذين لم يقدّموا أي طلب
+  const DEFAULT_INCENTIVE_MSG =
+    'يسعدنا انضمامك إلى تواصل النخبة! 🎉\n\nلاحظنا أنك لم تقدّم طلبك الأول بعد، ويسعدنا أن نمنحك خصماً خاصاً لتبدأ معنا. استخدم الكود التالي عند تقديم طلبك الأول واحصل على الخصم مباشرةً.\n\nبانتظار إبداعك معنا 🌟'
+  const [incOpen, setIncOpen] = useState(false)
+  const [incPct, setIncPct] = useState('30')
+  const [incExpiry, setIncExpiry] = useState('14')
+  const [incCode, setIncCode] = useState('')
+  const [incMessage, setIncMessage] = useState(DEFAULT_INCENTIVE_MSG)
+  const [incSending, setIncSending] = useState(false)
 
   const loadUsers = useCallback(async () => {
     // Verify admin
@@ -55,9 +63,9 @@ export default function AdminUsersPage() {
   useEffect(() => { loadUsers() }, [loadUsers])
 
   useEffect(() => {
-    document.body.style.overflow = pwUser ? 'hidden' : ''
+    document.body.style.overflow = (pwUser || incOpen) ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
-  }, [pwUser])
+  }, [pwUser, incOpen])
 
   const handleChangePassword = async () => {
     if (!pwUser) return
@@ -101,29 +109,11 @@ export default function AdminUsersPage() {
   }
 
   // العملاء بلا طلبات (غير الإداريين وغير الموقوفين) — مؤهّلون للتحفيز
-  const noRequestUsers = users.filter(
+  const eligibleCount = users.filter(
     u => u.role !== 'admin' && !u.is_banned && (u.requests_count ?? 0) === 0 && u.email && u.email !== '-'
-  )
+  ).length
 
-  const handleMotivateBulk = async () => {
-    setBulkMotivating(true)
-    try {
-      const res = await fetch('/api/admin/motivate-users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (res.ok) showToast(`تم إرسال ${data.sent} رسالة تحفيز`)
-      else showToast(data.error ?? 'فشل الإرسال', 'error')
-    } catch {
-      showToast('حدث خطأ في الاتصال', 'error')
-    } finally {
-      setBulkMotivating(false)
-      setShowMotivateConfirm(false)
-    }
-  }
-
+  // تحفيز فردي سريع — رسالة بسيطة بدون خصم
   const handleMotivateOne = async (u: UserData) => {
     setMotivatingId(u.id)
     try {
@@ -142,6 +132,37 @@ export default function AdminUsersPage() {
     }
   }
 
+  const handleSendIncentive = async () => {
+    const pct = Number(incPct)
+    if (!pct || pct <= 0 || pct > 100) {
+      showToast('نسبة الخصم يجب أن تكون بين 1 و 100', 'error')
+      return
+    }
+    if (!incMessage.trim()) {
+      showToast('الرسالة مطلوبة', 'error')
+      return
+    }
+    setIncSending(true)
+    const res = await fetch('/api/admin/incentivize-users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        discountPct: pct,
+        message: incMessage.trim(),
+        expiryDays: Number(incExpiry) || 14,
+        code: incCode.trim() || undefined,
+      }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) {
+      showToast(`تم الإرسال بنجاح ✅ (${data.sent} رسالة · الكود ${data.code})`)
+      setIncOpen(false)
+    } else {
+      showToast(data.error || 'فشل الإرسال', 'error')
+    }
+    setIncSending(false)
+  }
+
   const filtered = users.filter(u => {
     if (!search) return true
     const q = search.toLowerCase()
@@ -157,15 +178,13 @@ export default function AdminUsersPage() {
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
         <h1 className="text-2xl font-black text-dark">إدارة المستخدمين</h1>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-muted">{users.length} مستخدم</span>
-          <Button
-            onClick={() => setShowMotivateConfirm(true)}
-            disabled={noRequestUsers.length === 0 || bulkMotivating}
-            loading={bulkMotivating}
-            className="bg-gold hover:bg-gold/90"
+          <button
+            onClick={() => setIncOpen(true)}
+            className="px-3 py-2 rounded-lg text-xs font-bold cursor-pointer transition-all bg-green/10 text-green hover:bg-green/20"
           >
-            🤍 تحفيز من ليس لديهم طلبات ({noRequestUsers.length})
-          </Button>
+            🎁 تحفيز من لم يطلبوا ({eligibleCount})
+          </button>
+          <span className="text-sm text-muted">{users.length} مستخدم</span>
         </div>
       </div>
 
@@ -271,26 +290,6 @@ export default function AdminUsersPage() {
         )}
       </div>
 
-      {showMotivateConfirm && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-dark/50 p-0 md:p-4">
-          <div className="bg-card rounded-t-2xl md:rounded-2xl border border-border w-full md:max-w-md p-5 md:p-6 space-y-4 max-h-[90dvh] overflow-y-auto">
-            <div className="text-center">
-              <div className="text-4xl mb-2">🤍</div>
-              <h3 className="font-black text-dark text-lg">تحفيز المستخدمين بلا طلبات</h3>
-              <p className="text-sm text-muted mt-1">
-                سيتم إرسال رسالة «نتطلّع لسماع إنجازك» إلى <strong>{noRequestUsers.length}</strong> مستخدماً لم يقدّموا أي طلب بعد.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => setShowMotivateConfirm(false)} className="flex-1" disabled={bulkMotivating}>إلغاء</Button>
-              <Button onClick={handleMotivateBulk} loading={bulkMotivating} className="flex-1 bg-gold hover:bg-gold/90">
-                إرسال للجميع
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {pwUser && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-dark/50 p-0 md:p-4">
           <div className="bg-card rounded-t-2xl md:rounded-2xl border border-border w-full md:max-w-md p-5 md:p-6 space-y-4 max-h-[90dvh] overflow-y-auto">
@@ -312,6 +311,72 @@ export default function AdminUsersPage() {
               <Button variant="ghost" onClick={() => { setPwUser(null); setPwValue('') }} className="flex-1">إلغاء</Button>
               <Button onClick={handleChangePassword} loading={pwSaving} disabled={!pwValue} className="flex-1">
                 تأكيد التغيير
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {incOpen && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-dark/50 p-0 md:p-4">
+          <div className="bg-card rounded-t-2xl md:rounded-2xl border border-border w-full md:max-w-lg p-5 md:p-6 space-y-4 max-h-[90dvh] overflow-y-auto">
+            <div>
+              <h3 className="font-black text-dark text-lg">🎁 تحفيز المستخدمين بدون طلبات</h3>
+              <p className="text-sm text-muted mt-1">
+                سيُرسَل كود خصم ترحيبي عبر البريد إلى <strong className="text-green">{eligibleCount}</strong> مستخدم لم يقدّموا أي طلب.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                id="inc_pct"
+                label="نسبة الخصم %"
+                type="number"
+                dir="ltr"
+                value={incPct}
+                onChange={e => setIncPct(e.target.value)}
+              />
+              <Input
+                id="inc_expiry"
+                label="صلاحية الكود (أيام)"
+                type="number"
+                dir="ltr"
+                value={incExpiry}
+                onChange={e => setIncExpiry(e.target.value)}
+              />
+            </div>
+
+            <Input
+              id="inc_code"
+              label="كود الخصم (اختياري)"
+              dir="ltr"
+              placeholder={`WELCOME${Number(incPct) || 30} (تلقائي)`}
+              value={incCode}
+              onChange={e => setIncCode(e.target.value)}
+            />
+
+            <div>
+              <label htmlFor="inc_msg" className="block text-sm font-medium text-dark mb-1.5">نص الرسالة</label>
+              <textarea
+                id="inc_msg"
+                rows={6}
+                dir="rtl"
+                value={incMessage}
+                onChange={e => setIncMessage(e.target.value)}
+                className="w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm leading-relaxed text-dark focus:border-green focus:outline-none focus:ring-1 focus:ring-green resize-y"
+              />
+              <p className="text-xs text-muted mt-1">سيظهر هذا النص أعلى بطاقة كود الخصم. تُحفظ الأسطر كما هي.</p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => setIncOpen(false)} className="flex-1">إلغاء</Button>
+              <Button
+                onClick={handleSendIncentive}
+                loading={incSending}
+                disabled={!incPct || !incMessage.trim() || eligibleCount === 0}
+                className="flex-1"
+              >
+                إرسال للجميع ({eligibleCount})
               </Button>
             </div>
           </div>
