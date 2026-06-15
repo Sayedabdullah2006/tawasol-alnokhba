@@ -20,10 +20,16 @@ export const OPENAI_MODEL = 'gpt-5.5'
  * يمنع أي إيحاء بأن الخبر حدثٌ آنيّ/عاجل، لأن الخبر قد يكون قديماً.
  */
 export const EVERGREEN_NOTE =
-  '‼️ مهم — صياغة دائمة (إعادة نشر من الأرشيف): هذا المحتوى يُعاد نشره وقد يكون الخبر قديماً. ' +
+  '‼️ مهم — صياغة دائمة (إعادة نشر): هذا المحتوى يُعاد نشره وقد يكون الخبر قديماً. ' +
   'اكتب بأسلوب دائم يُبرز الإنجاز كقيمة ومصدر فخر مستمر، ولا توحِ إطلاقاً بأنه حدثٌ وقع الآن أو خبرٌ عاجل. ' +
   'تجنّب تماماً كلمات الزمن الآني مثل: (اليوم، الآن، للتو، مؤخراً، أمس، هذا الأسبوع، حديثاً، أعلن اليوم، عاجل، خبر عاجل، تزامناً مع). ' +
   'لا تذكر تاريخاً أو فترة توحي بأن الحدث جديد. ركّز على الإنجاز نفسه وقيمته لا على توقيت وقوعه.'
+
+/** إطار الحملة للتغريدات فقط — عبارة افتتاحية ثابتة + هاشتاق ثابت. */
+export const TWEET_CAMPAIGN_NOTE =
+  'ابدأ كل تغريدة من التغريدات الثلاث بالعبارة الافتتاحية الثابتة في سطرها الأول: «فخرٌ سعودي لا يُنسى» ' +
+  '(يجوز إيموجي واحد لائق قبلها مثل ❤️ أو 🇸🇦). ' +
+  'وأضِف الهاشتاق الثابت #ذاكرة_الإنجاز ضمن هاشتاقات كل تغريدة، إلى جانب #First1Saudi و#اسم_الشخص.'
 
 export interface Concept {
   title?: string
@@ -201,7 +207,11 @@ export async function runStudioPipeline(input: {
   const sourceImages = await Promise.all(input.sourceImages.map(rehostImage))
 
   const analysis = await analyzeNews(openai, { newsText, sourceImages })
-  const tweets = await generateTweets(openai, { analysis, newsText, extra: EVERGREEN_NOTE })
+  const tweets = await generateTweets(openai, {
+    analysis,
+    newsText,
+    extra: `${EVERGREEN_NOTE}\n\n${TWEET_CAMPAIGN_NOTE}`,
+  })
   const concepts = await generateConcepts(openai, { analysis, newsText, sourceImages })
   const chosenConcept = conceptToString(concepts[0])
   const { imageUrl, prompt } = await generateDesign(openai, {
