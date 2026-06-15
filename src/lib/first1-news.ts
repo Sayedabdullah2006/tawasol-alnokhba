@@ -1,41 +1,53 @@
 /**
  * جلب الأخبار من موقع first1saudi.net (ووردبريس) عبر REST API.
  *
- * نستخدم `wp-json/wp/v2/posts?_embed` بدل RSS لأنه يعطي:
- *   - المحتوى الكامل (content.rendered) لا مقتطفاً فقط.
- *   - الصورة البارزة (featured media) — وهي إلزامية لمدخل الاستوديو.
- *   - التصنيفات (للتنويع بين الأخبار المختارة).
+ * مهم: الموقع بطيء جداً تجاه خوادم السحابة (~8s لكل طلب من Railway مقابل ~1s محلياً).
+ * لذلك نتجنّب `_embed` الثقيل (استجابات ضخمة تتجاوز المهلة)، ونستخدم طلبات خفيفة
+ * عبر `_fields`، ونحلّ رابط الصورة البارزة منفصلاً (طلب /media صغير) للأخبار المختارة فقط.
+ * كل طلب محاط بمهلة + إعادة محاولة واحدة.
  */
 
 const WP_BASE = 'https://first1saudi.net/wp-json/wp/v2'
+const UA = 'Mozilla/5.0 (compatible; First1SaudiBot/1.0; +https://nukhba.media)'
+const POST_FIELDS = 'id,link,date,title,content,categories,featured_media'
 
 export interface NewsPost {
   id: number
   url: string
   title: string
   content: string // نص صِرف بلا وسوم HTML
-  imageUrl: string // صورة الشخص/الموضوع (بارزة أو من المتن — مضمون عدم الفراغ بعد الفلترة)
-  imageSource: 'featured' | 'body' // مصدر الصورة (للشفافية/التشخيص)
   categoryIds: number[]
   categoryNames: string[]
   publishedAt: string
+  featuredMediaId: number
+  bodyImages: string[] // صور من متن الخبر (احتياطي إن لم توجد صورة بارزة)
+  imageUrl?: string // يُحلّ لاحقاً عبر resolveImageUrl
+  imageSource?: 'featured' | 'body'
 }
 
-/**
- * يستخرج روابط الصور الحقيقية من متن الخبر (وسوم <img>).
- * يستبعد صور الإيموجي (s.w.org) وروابط data: والصور خارج مكتبة الوسائط،
- * ليبقى فقط ما يُرجَّح أنه صورة الشخص/الموضوع.
- */
-export function extractContentImages(html: string): string[] {
-  const srcs = [...html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)].map(m => m[1])
-  return srcs.filter(
-    s =>
-      !!s &&
-      !s.startsWith('data:') &&
-      !/s\.w\.org/i.test(s) && // إيموجي ووردبريس
-      !/\/emoji\//i.test(s) &&
-      /\/wp-content\/uploads\//i.test(s), // من مكتبة وسائط الموقع فقط
-  )
+export interface NewsCategory {
+  id: number
+  name: string
+  count: number
+}
+
+/** جلب JSON من ووردبريس مع مهلة + إعادة محاولة (الموقع بطيء تجاه السحابة). */
+async function wpFetchJson(url: string, timeoutMs = 25000): Promise<unknown | null> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const ctrl = new AbortController()
+      const to = setTimeout(() => ctrl.abort(), timeoutMs)
+      const r = await fetch(url, {
+        headers: { Accept: 'application/json', 'User-Agent': UA },
+        signal: ctrl.signal,
+      })
+      clearTimeout(to)
+      if (r.ok) return await r.json()
+    } catch {
+      /* مهلة/خطأ شبكة — نعيد المحاولة مرة */
+    }
+  }
+  return null
 }
 
 // ── أدوات تنظيف نص ووردبريس ────────────────────────────────────────────
@@ -62,121 +74,119 @@ export function htmlToPlainText(html: string): string {
       .replace(/<\/(p|div|br|li|h[1-6])>/gi, '\n')
       .replace(/<[^>]+>/g, ''),
   )
-    .replace(/ /g, ' ')
+    .replace(/ /g, ' ')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
 
-interface WPPost {
+/**
+ * يستخرج روابط الصور الحقيقية من متن الخبر (وسوم <img>).
+ * يستبعد صور الإيموجي (s.w.org) وروابط data: والصور خارج مكتبة الوسائط.
+ */
+export function extractContentImages(html: string): string[] {
+  const srcs = [...html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)].map(m => m[1])
+  return srcs.filter(
+    s =>
+      !!s &&
+      !s.startsWith('data:') &&
+      !/s\.w\.org/i.test(s) &&
+      !/\/emoji\//i.test(s) &&
+      /\/wp-content\/uploads\//i.test(s),
+  )
+}
+
+interface WPPostLite {
   id: number
   link: string
   date: string
   title?: { rendered?: string }
   content?: { rendered?: string }
   categories?: number[]
-  _embedded?: {
-    'wp:featuredmedia'?: Array<{ source_url?: string }>
-    'wp:term'?: Array<Array<{ id?: number; name?: string; taxonomy?: string }>>
-  }
+  featured_media?: number
 }
 
-function normalize(p: WPPost): NewsPost | null {
-  // صورة الشخص/الموضوع: الصورة البارزة أولاً، وإلا أول صورة حقيقية من المتن.
-  const featured = p._embedded?.['wp:featuredmedia']?.[0]?.source_url ?? ''
-  const bodyImages = extractContentImages(p.content?.rendered ?? '')
-  const imageUrl = featured || bodyImages[0] || ''
-  if (!imageUrl) return null // الاستوديو يتطلب صورة مصدر حقيقية
-  const imageSource: 'featured' | 'body' = featured ? 'featured' : 'body'
-
-  const terms = (p._embedded?.['wp:term'] ?? []).flat()
-  const cats = terms.filter(t => t?.taxonomy === 'category' && t?.name)
+/** يبني NewsPost خفيفاً (بلا حلّ صورة بعد). */
+function normalizeLite(p: WPPostLite): NewsPost | null {
+  if (!p || typeof p.id !== 'number') return null
   const title = htmlToPlainText(p.title?.rendered ?? '')
   const content = htmlToPlainText(p.content?.rendered ?? '')
   if (!title || !content) return null
-
   return {
     id: p.id,
     url: p.link,
     title,
     content,
-    imageUrl,
-    imageSource,
-    categoryIds: p.categories ?? cats.map(c => c.id ?? 0).filter(Boolean),
-    categoryNames: cats.map(c => c.name as string),
+    categoryIds: Array.isArray(p.categories) ? p.categories : [],
+    categoryNames: [],
     publishedAt: p.date,
-  }
-}
-
-export interface NewsCategory {
-  id: number
-  name: string
-  count: number
-}
-
-/** يجلب أقسام الموقع (التصنيفات) مرتّبة تنازلياً حسب عدد المواضيع. */
-export async function fetchCategories(): Promise<NewsCategory[]> {
-  const url = `${WP_BASE}/categories?per_page=100&orderby=count&order=desc`
-  try {
-    const resp = await fetch(url, { headers: { Accept: 'application/json' } })
-    if (!resp.ok) return []
-    const cats = (await resp.json()) as Array<{ id?: number; name?: string; count?: number }>
-    if (!Array.isArray(cats)) return []
-    return cats
-      .filter(c => typeof c.id === 'number' && c.name)
-      .map(c => ({ id: c.id as number, name: c.name as string, count: c.count ?? 0 }))
-  } catch {
-    return []
-  }
-}
-
-/** يجلب أحدث منشورات قسم معيّن (التي تملك صورة) — لاختيار خبر منوّع من القسم. */
-export async function fetchPostsByCategory(categoryId: number, perPage = 20): Promise<NewsPost[]> {
-  const url = `${WP_BASE}/posts?_embed=1&categories=${categoryId}&per_page=${perPage}&orderby=date&order=desc`
-  try {
-    const resp = await fetch(url, { headers: { Accept: 'application/json' } })
-    if (!resp.ok) return []
-    const posts = (await resp.json()) as WPPost[]
-    if (!Array.isArray(posts)) return []
-    const out: NewsPost[] = []
-    for (const p of posts) {
-      const n = normalize(p)
-      if (n) out.push(n)
-    }
-    return out
-  } catch {
-    return []
+    featuredMediaId: typeof p.featured_media === 'number' ? p.featured_media : 0,
+    bodyImages: extractContentImages(p.content?.rendered ?? ''),
   }
 }
 
 /**
- * يجلب مجموعة من أحدث المنشورات التي تملك صورة بارزة (مرشّحون للاختيار).
- * @param opts.pages عدد الصفحات (كل صفحة perPage منشور) — لتكوين بركة أكبر للتدوير.
+ * يحلّ رابط صورة الخبر: الصورة البارزة (عبر /media) أولاً، وإلا أول صورة من المتن.
+ * يحدّث الكائن (imageUrl/imageSource) ويُعيد الرابط، أو null إن تعذّر.
+ */
+export async function resolveImageUrl(post: NewsPost): Promise<string | null> {
+  if (post.featuredMediaId > 0) {
+    const media = (await wpFetchJson(
+      `${WP_BASE}/media/${post.featuredMediaId}?_fields=source_url`,
+      20000,
+    )) as { source_url?: string } | null
+    if (media?.source_url) {
+      post.imageUrl = media.source_url
+      post.imageSource = 'featured'
+      return media.source_url
+    }
+  }
+  if (post.bodyImages.length) {
+    post.imageUrl = post.bodyImages[0]
+    post.imageSource = 'body'
+    return post.bodyImages[0]
+  }
+  return null
+}
+
+/** يجلب أقسام الموقع (التصنيفات) مرتّبة تنازلياً حسب عدد المواضيع. */
+export async function fetchCategories(): Promise<NewsCategory[]> {
+  const data = await wpFetchJson(`${WP_BASE}/categories?per_page=100&orderby=count&order=desc&_fields=id,name,count`)
+  if (!Array.isArray(data)) return []
+  return (data as Array<{ id?: number; name?: string; count?: number }>)
+    .filter(c => typeof c.id === 'number' && c.name)
+    .map(c => ({ id: c.id as number, name: c.name as string, count: c.count ?? 0 }))
+}
+
+/** يجلب أحدث منشورات قسم معيّن (خفيف، بلا صور بعد). */
+export async function fetchPostsByCategory(categoryId: number, perPage = 12): Promise<NewsPost[]> {
+  const data = await wpFetchJson(
+    `${WP_BASE}/posts?categories=${categoryId}&per_page=${perPage}&orderby=date&order=desc&_fields=${POST_FIELDS}`,
+  )
+  if (!Array.isArray(data)) return []
+  return (data as WPPostLite[]).map(normalizeLite).filter((p): p is NewsPost => p !== null)
+}
+
+/**
+ * يجلب أحدث المنشورات (خفيف، بلا صور بعد) — يُستخدم كاحتياطي.
+ * يجلب الصفحات بالتوازي.
  */
 export async function fetchCandidatePosts(opts: { perPage?: number; pages?: number } = {}): Promise<NewsPost[]> {
-  const perPage = opts.perPage ?? 20
+  const perPage = opts.perPage ?? 30
   const pages = opts.pages ?? 1
-
-  // نجلب كل الصفحات بالتوازي لتقليل زمن الانتظار (المصدر قد يكون بطيئاً).
   const pageNums = Array.from({ length: pages }, (_, i) => i + 1)
-  const responses = await Promise.all(
-    pageNums.map(async page => {
-      const url = `${WP_BASE}/posts?_embed=1&per_page=${perPage}&page=${page}&orderby=date&order=desc`
-      try {
-        const resp = await fetch(url, { headers: { Accept: 'application/json' } })
-        if (!resp.ok) return [] as WPPost[] // الصفحة الزائدة ترجع 400 — نتجاهلها
-        const posts = (await resp.json()) as WPPost[]
-        return Array.isArray(posts) ? posts : []
-      } catch {
-        return [] as WPPost[]
-      }
-    }),
+  const results = await Promise.all(
+    pageNums.map(page =>
+      wpFetchJson(
+        `${WP_BASE}/posts?per_page=${perPage}&page=${page}&orderby=date&order=desc&_fields=${POST_FIELDS}`,
+      ),
+    ),
   )
-
   const out: NewsPost[] = []
-  for (const posts of responses) {
-    for (const p of posts) {
-      const n = normalize(p)
+  for (const data of results) {
+    if (!Array.isArray(data)) continue
+    for (const p of data as WPPostLite[]) {
+      const n = normalizeLite(p)
       if (n) out.push(n)
     }
   }

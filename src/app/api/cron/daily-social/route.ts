@@ -13,7 +13,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
-import { fetchCategories, fetchPostsByCategory, fetchCandidatePosts, type NewsPost } from '@/lib/first1-news'
+import { fetchCategories, fetchPostsByCategory, fetchCandidatePosts, resolveImageUrl, type NewsPost } from '@/lib/first1-news'
 import { runStudioPipeline } from '@/lib/ai-studio'
 import { sendEmail } from '@/lib/email'
 
@@ -74,23 +74,27 @@ async function handle(request: NextRequest) {
     let attempts = 0
     for (const sec of shuffledSections) {
       if (selected.length >= count) break
-      if (attempts++ >= count * 5) break // حدّ أمان لزمن الجلب
-      const posts = await fetchPostsByCategory(sec.id, 20)
+      if (attempts++ >= count * 4) break // حدّ أمان لزمن الجلب
+      const posts = await fetchPostsByCategory(sec.id, 12)
       const fresh = posts.filter(p => !usedIds.has(p.id) && !selected.some(s => s.id === p.id))
-      if (!fresh.length) continue
-      // اختيار عشوائي من بين الأحدث (حتى 10) لتدوير الأرشيف داخل القسم
-      const chosen = fresh[Math.floor(Math.random() * Math.min(fresh.length, 10))]
-      // علّم الخبر بالقسم المختار ليظهر التنويع في الإيميل/التقويم
-      chosen.categoryNames = [sec.name, ...chosen.categoryNames.filter(n => n !== sec.name)]
-      selected.push(chosen)
+      // نحلّ الصورة لأحدث القليل فقط، ونأخذ أول خبر تتوفر له صورة
+      for (const cand of fresh.slice(0, 6)) {
+        const img = await resolveImageUrl(cand)
+        if (!img) continue
+        cand.categoryNames = [sec.name] // علّمه بالقسم المختار (للتنويع/التقويم)
+        selected.push(cand)
+        break
+      }
     }
 
     // ── 3) احتياطي: إن لم تكتمل (نفاد الأقسام/التكرار) نكمل من أحدث الأخبار ──
     if (selected.length < count) {
-      const pool = await fetchCandidatePosts({ perPage: 50, pages: 2 })
+      const pool = await fetchCandidatePosts({ perPage: 40, pages: 1 })
       for (const p of pool) {
         if (selected.length >= count) break
         if (usedIds.has(p.id) || selected.some(s => s.id === p.id)) continue
+        const img = await resolveImageUrl(p)
+        if (!img) continue
         selected.push(p)
       }
     }
@@ -105,7 +109,7 @@ async function handle(request: NextRequest) {
     // ── 4) تمرير كل خبر في الاستوديو (بالتوازي للبقاء ضمن حد المهلة) ──
     const settled = await Promise.allSettled(
       selected.map(post =>
-        runStudioPipeline({ title: post.title, content: post.content, sourceImages: [post.imageUrl] })
+        runStudioPipeline({ title: post.title, content: post.content, sourceImages: [post.imageUrl as string] })
           .then(studio => ({ post, tweets: studio.tweets, designUrl: studio.imageUrl, concept: studio.chosenConcept })),
       ),
     )
