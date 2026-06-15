@@ -108,6 +108,47 @@ function normalize(p: WPPost): NewsPost | null {
   }
 }
 
+export interface NewsCategory {
+  id: number
+  name: string
+  count: number
+}
+
+/** يجلب أقسام الموقع (التصنيفات) مرتّبة تنازلياً حسب عدد المواضيع. */
+export async function fetchCategories(): Promise<NewsCategory[]> {
+  const url = `${WP_BASE}/categories?per_page=100&orderby=count&order=desc`
+  try {
+    const resp = await fetch(url, { headers: { Accept: 'application/json' } })
+    if (!resp.ok) return []
+    const cats = (await resp.json()) as Array<{ id?: number; name?: string; count?: number }>
+    if (!Array.isArray(cats)) return []
+    return cats
+      .filter(c => typeof c.id === 'number' && c.name)
+      .map(c => ({ id: c.id as number, name: c.name as string, count: c.count ?? 0 }))
+  } catch {
+    return []
+  }
+}
+
+/** يجلب أحدث منشورات قسم معيّن (التي تملك صورة) — لاختيار خبر منوّع من القسم. */
+export async function fetchPostsByCategory(categoryId: number, perPage = 20): Promise<NewsPost[]> {
+  const url = `${WP_BASE}/posts?_embed=1&categories=${categoryId}&per_page=${perPage}&orderby=date&order=desc`
+  try {
+    const resp = await fetch(url, { headers: { Accept: 'application/json' } })
+    if (!resp.ok) return []
+    const posts = (await resp.json()) as WPPost[]
+    if (!Array.isArray(posts)) return []
+    const out: NewsPost[] = []
+    for (const p of posts) {
+      const n = normalize(p)
+      if (n) out.push(n)
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
 /**
  * يجلب مجموعة من أحدث المنشورات التي تملك صورة بارزة (مرشّحون للاختيار).
  * @param opts.pages عدد الصفحات (كل صفحة perPage منشور) — لتكوين بركة أكبر للتدوير.

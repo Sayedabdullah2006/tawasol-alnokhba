@@ -13,7 +13,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
-import { fetchCandidatePosts, type NewsPost } from '@/lib/first1-news'
+import { fetchCategories, fetchPostsByCategory, fetchCandidatePosts, type NewsPost } from '@/lib/first1-news'
 import { runStudioPipeline } from '@/lib/ai-studio'
 import { sendEmail } from '@/lib/email'
 
@@ -25,6 +25,13 @@ const ADMIN_EMAIL = 'first1saudi@gmail.com'
 // لا نعيد نشر نفس الخبر خلال هذه النافذة (أيام) — يضمن تدوير الأرشيف.
 const DEDUP_WINDOW_DAYS = Number(process.env.SOCIAL_DEDUP_WINDOW_DAYS) || 30
 const DEFAULT_COUNT = 3
+// أقل عدد مواضيع ليُعتبر القسم مؤهلاً للتنويع.
+const MIN_SECTION_POSTS = 10
+// أقسام نستبعدها من التنويع (عامة/تشغيلية/فارغة).
+const EXCLUDED_SECTIONS = new Set([
+  'غير مصنف', 'Uncategorized', 'عام', 'الأخبار', 'الرصد الإعلامي', 'خزينة ناجحين',
+  'قناة أول سعودى قريبا', 'جائزة أول سعودى قريبا', 'دورات تدريبية',
+])
 
 export async function GET(request: NextRequest) {
   return handle(request)
@@ -49,14 +56,7 @@ async function handle(request: NextRequest) {
   try {
     const sc = await createServiceRoleClient()
 
-    // ── 1) جلب المرشّحين (بركة كبيرة من الأرشيف للتدوير) ──
-    // ~200 خبر تكفي لتغطية شهر كامل (3/يوم) مع نافذة منع التكرار 30 يوماً.
-    const pool = await fetchCandidatePosts({ perPage: 50, pages: 4 })
-    if (pool.length === 0) {
-      return NextResponse.json({ success: false, error: 'لا توجد أخبار صالحة (بصورة بارزة) من المصدر' }, { status: 502 })
-    }
-
-    // ── 2) استبعاد ما نُشر مؤخراً ──
+    // ── 1) منع التكرار: الأخبار المنشورة خلال آخر N يوماً ──
     const since = new Date(Date.now() - DEDUP_WINDOW_DAYS * 86400000).toISOString().slice(0, 10)
     const { data: recent } = await sc
       .from('social_schedule')
@@ -64,12 +64,43 @@ async function handle(request: NextRequest) {
       .gte('batch_date', since)
     const usedIds = new Set<number>((recent ?? []).map(r => Number(r.wp_post_id)))
 
-    let available = pool.filter(p => !usedIds.has(p.id))
-    // إن نفد الأرشيف غير المكرر، نسمح بإعادة الاستخدام (الأقدم استخداماً) بدل الفشل.
-    if (available.length < count) available = pool
+    // ── 2) اختيار أقسام مختلفة فعلاً، وخبر واحد حديث غير مكرّر من كل قسم ──
+    const sections = (await fetchCategories()).filter(
+      c => c.count >= MIN_SECTION_POSTS && !EXCLUDED_SECTIONS.has(c.name),
+    )
+    const shuffledSections = [...sections].sort(() => Math.random() - 0.5)
 
-    // ── 3) اختيار منوّع (تصنيفات مختلفة قدر الإمكان) ──
-    const selected = pickVaried(available, count)
+    const selected: NewsPost[] = []
+    let attempts = 0
+    for (const sec of shuffledSections) {
+      if (selected.length >= count) break
+      if (attempts++ >= count * 5) break // حدّ أمان لزمن الجلب
+      const posts = await fetchPostsByCategory(sec.id, 20)
+      const fresh = posts.filter(p => !usedIds.has(p.id) && !selected.some(s => s.id === p.id))
+      if (!fresh.length) continue
+      // اختيار عشوائي من بين الأحدث (حتى 10) لتدوير الأرشيف داخل القسم
+      const chosen = fresh[Math.floor(Math.random() * Math.min(fresh.length, 10))]
+      // علّم الخبر بالقسم المختار ليظهر التنويع في الإيميل/التقويم
+      chosen.categoryNames = [sec.name, ...chosen.categoryNames.filter(n => n !== sec.name)]
+      selected.push(chosen)
+    }
+
+    // ── 3) احتياطي: إن لم تكتمل (نفاد الأقسام/التكرار) نكمل من أحدث الأخبار ──
+    if (selected.length < count) {
+      const pool = await fetchCandidatePosts({ perPage: 50, pages: 2 })
+      for (const p of pool) {
+        if (selected.length >= count) break
+        if (usedIds.has(p.id) || selected.some(s => s.id === p.id)) continue
+        selected.push(p)
+      }
+    }
+
+    if (selected.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'لا توجد أخبار صالحة (بصورة) من المصدر' },
+        { status: 502 },
+      )
+    }
 
     // ── 4) تمرير كل خبر في الاستوديو (بالتوازي للبقاء ضمن حد المهلة) ──
     const settled = await Promise.allSettled(
@@ -143,29 +174,6 @@ interface ProcessedItem {
   tweets: string
   designUrl: string
   concept: string
-}
-
-/** يختار n أخبار مع تفضيل تنوّع التصنيفات، وبترتيب عشوائي خفيف. */
-function pickVaried(pool: NewsPost[], n: number): NewsPost[] {
-  const shuffled = [...pool].sort(() => Math.random() - 0.5)
-  const picked: NewsPost[] = []
-  const usedCats = new Set<string>()
-
-  // تمريرة أولى: تصنيفات مختلفة
-  for (const p of shuffled) {
-    if (picked.length >= n) break
-    const cat = p.categoryNames[0] ?? ''
-    if (cat && usedCats.has(cat)) continue
-    picked.push(p)
-    if (cat) usedCats.add(cat)
-  }
-  // تمريرة ثانية: إكمال العدد بغضّ النظر عن التصنيف
-  for (const p of shuffled) {
-    if (picked.length >= n) break
-    if (picked.includes(p)) continue
-    picked.push(p)
-  }
-  return picked.slice(0, n)
 }
 
 function escapeHtml(s: string): string {

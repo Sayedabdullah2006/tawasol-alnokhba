@@ -15,6 +15,16 @@ import { createServiceRoleClient } from './supabase-server'
 
 export const OPENAI_MODEL = 'gpt-5.5'
 
+/**
+ * توجيه "الصياغة الدائمة" — يُحقَن في الأتمتة (إعادة نشر الأرشيف) فقط.
+ * يمنع أي إيحاء بأن الخبر حدثٌ آنيّ/عاجل، لأن الخبر قد يكون قديماً.
+ */
+export const EVERGREEN_NOTE =
+  '‼️ مهم — صياغة دائمة (إعادة نشر من الأرشيف): هذا المحتوى يُعاد نشره وقد يكون الخبر قديماً. ' +
+  'اكتب بأسلوب دائم يُبرز الإنجاز كقيمة ومصدر فخر مستمر، ولا توحِ إطلاقاً بأنه حدثٌ وقع الآن أو خبرٌ عاجل. ' +
+  'تجنّب تماماً كلمات الزمن الآني مثل: (اليوم، الآن، للتو، مؤخراً، أمس، هذا الأسبوع، حديثاً، أعلن اليوم، عاجل، خبر عاجل، تزامناً مع). ' +
+  'لا تذكر تاريخاً أو فترة توحي بأن الحدث جديد. ركّز على الإنجاز نفسه وقيمته لا على توقيت وقوعه.'
+
 export interface Concept {
   title?: string
   mood?: string
@@ -46,16 +56,19 @@ export async function analyzeNews(
   try { return JSON.parse(raw) } catch { return { raw } }
 }
 
-/** الخطوة 2 — توليد 3 تغريدات (نص مرقّم). */
+/** الخطوة 2 — توليد 3 تغريدات (نص مرقّم). `extra` تعليمات إضافية اختيارية. */
 export async function generateTweets(
   openai: OpenAI,
-  args: { analysis: unknown; newsText: string },
+  args: { analysis: unknown; newsText: string; extra?: string },
 ): Promise<string> {
+  const user =
+    `${JSON.stringify(args.analysis)}\n\n${args.newsText}` +
+    (args.extra ? `\n\n${args.extra}` : '')
   const completion = await openai.chat.completions.create({
     model: OPENAI_MODEL,
     messages: [
       { role: 'system', content: SYS_TWEETS },
-      { role: 'user', content: `${JSON.stringify(args.analysis)}\n\n${args.newsText}` },
+      { role: 'user', content: user },
     ],
   })
   return completion.choices[0]?.message?.content ?? ''
@@ -93,9 +106,9 @@ export function conceptToString(c: Concept | undefined): string {
 /** الخطوة 4 — توليد التصميم عبر Gemini + تركيب اللوقو + الرفع إلى التخزين. */
 export async function generateDesign(
   openai: OpenAI,
-  args: { analysis: unknown; chosenConcept: string; sourceImages: string[]; note?: string },
+  args: { analysis: unknown; chosenConcept: string; sourceImages: string[]; note?: string; extra?: string },
 ): Promise<{ imageUrl: string; prompt: string }> {
-  const { analysis, chosenConcept, sourceImages, note } = args
+  const { analysis, chosenConcept, sourceImages, note, extra } = args
   const primarySource = sourceImages[0] ?? null
 
   const service = await createServiceRoleClient()
@@ -117,7 +130,8 @@ export async function generateDesign(
           `اترك مساحة فارغة أسفل يمين الفوتر للوقو (سيُضاف لاحقاً برمجياً) ولا ترسم أي شعار هناك.\n` +
           (note && note.trim()
             ? `\n‼️ ملاحظات الأدمن على التصميم (طبّقها بدقّة مع الحفاظ على ثوابت الهوية والصورة الحقيقية): ${note.trim()}\n`
-            : ''),
+            : '') +
+          (extra && extra.trim() ? `\n${extra.trim()}\n` : ''),
       },
     ],
   })
@@ -187,7 +201,7 @@ export async function runStudioPipeline(input: {
   const sourceImages = await Promise.all(input.sourceImages.map(rehostImage))
 
   const analysis = await analyzeNews(openai, { newsText, sourceImages })
-  const tweets = await generateTweets(openai, { analysis, newsText })
+  const tweets = await generateTweets(openai, { analysis, newsText, extra: EVERGREEN_NOTE })
   const concepts = await generateConcepts(openai, { analysis, newsText, sourceImages })
   const chosenConcept = conceptToString(concepts[0])
   const { imageUrl, prompt } = await generateDesign(openai, {
@@ -195,6 +209,7 @@ export async function runStudioPipeline(input: {
     chosenConcept,
     sourceImages,
     note: input.note,
+    extra: EVERGREEN_NOTE,
   })
 
   return { analysis, tweets, concepts, chosenConcept, imageUrl, prompt }
