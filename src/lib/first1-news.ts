@@ -115,23 +115,29 @@ function normalize(p: WPPost): NewsPost | null {
 export async function fetchCandidatePosts(opts: { perPage?: number; pages?: number } = {}): Promise<NewsPost[]> {
   const perPage = opts.perPage ?? 20
   const pages = opts.pages ?? 1
-  const out: NewsPost[] = []
 
-  for (let page = 1; page <= pages; page++) {
-    const url = `${WP_BASE}/posts?_embed=1&per_page=${perPage}&page=${page}&orderby=date&order=desc`
-    const resp = await fetch(url, { headers: { Accept: 'application/json' } })
-    if (!resp.ok) {
-      // الصفحة الزائدة عن العدد ترجع 400 — نتوقف بهدوء بدل الفشل.
-      if (resp.status === 400) break
-      throw new Error(`فشل جلب الأخبار من ووردبريس: ${resp.status}`)
-    }
-    const posts = (await resp.json()) as WPPost[]
-    if (!Array.isArray(posts) || posts.length === 0) break
+  // نجلب كل الصفحات بالتوازي لتقليل زمن الانتظار (المصدر قد يكون بطيئاً).
+  const pageNums = Array.from({ length: pages }, (_, i) => i + 1)
+  const responses = await Promise.all(
+    pageNums.map(async page => {
+      const url = `${WP_BASE}/posts?_embed=1&per_page=${perPage}&page=${page}&orderby=date&order=desc`
+      try {
+        const resp = await fetch(url, { headers: { Accept: 'application/json' } })
+        if (!resp.ok) return [] as WPPost[] // الصفحة الزائدة ترجع 400 — نتجاهلها
+        const posts = (await resp.json()) as WPPost[]
+        return Array.isArray(posts) ? posts : []
+      } catch {
+        return [] as WPPost[]
+      }
+    }),
+  )
+
+  const out: NewsPost[] = []
+  for (const posts of responses) {
     for (const p of posts) {
       const n = normalize(p)
       if (n) out.push(n)
     }
   }
-
   return out
 }

@@ -71,21 +71,20 @@ async function handle(request: NextRequest) {
     // ── 3) اختيار منوّع (تصنيفات مختلفة قدر الإمكان) ──
     const selected = pickVaried(available, count)
 
-    // ── 4) تمرير كل خبر في الاستوديو ──
+    // ── 4) تمرير كل خبر في الاستوديو (بالتوازي للبقاء ضمن حد المهلة) ──
+    const settled = await Promise.allSettled(
+      selected.map(post =>
+        runStudioPipeline({ title: post.title, content: post.content, sourceImages: [post.imageUrl] })
+          .then(studio => ({ post, tweets: studio.tweets, designUrl: studio.imageUrl, concept: studio.chosenConcept })),
+      ),
+    )
     const results: ProcessedItem[] = []
     const errors: { title: string; error: string }[] = []
-    for (const post of selected) {
-      try {
-        const studio = await runStudioPipeline({
-          title: post.title,
-          content: post.content,
-          sourceImages: [post.imageUrl],
-        })
-        results.push({ post, tweets: studio.tweets, designUrl: studio.imageUrl, concept: studio.chosenConcept })
-      } catch (err) {
-        errors.push({ title: post.title, error: err instanceof Error ? err.message : 'خطأ غير معروف' })
-      }
-    }
+    selected.forEach((post, i) => {
+      const r = settled[i]
+      if (r.status === 'fulfilled') results.push(r.value)
+      else errors.push({ title: post.title, error: r.reason instanceof Error ? r.reason.message : 'خطأ غير معروف' })
+    })
 
     if (results.length === 0) {
       return NextResponse.json(

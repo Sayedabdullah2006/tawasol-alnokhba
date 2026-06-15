@@ -139,6 +139,26 @@ export async function generateDesign(
   return { imageUrl: pub.publicUrl, prompt: designPrompt }
 }
 
+/**
+ * يعيد استضافة صورة مصدر خارجية على تخزين Supabase ويُعيد رابطاً عاماً.
+ *
+ * ضروري للأخبار من first1saudi.net: تمرير روابطها مباشرةً إلى OpenAI/Gemini يفشل
+ * لأن تلك الخدمات تحمّل الصورة من المصدر، وموقع الأخبار بطيء/يحجب التحميل الخارجي
+ * ("400 Timeout while downloading ..."). برفعها إلى Supabase (CDN) تصبح سريعة وموثوقة.
+ */
+export async function rehostImage(url: string): Promise<string> {
+  const service = await createServiceRoleClient()
+  const resp = await fetch(url)
+  if (!resp.ok) throw new Error(`تعذّر تحميل صورة المصدر (${resp.status})`)
+  const mime = resp.headers.get('content-type') || 'image/jpeg'
+  const buf = Buffer.from(await resp.arrayBuffer())
+  const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg'
+  const path = `studio-src-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  const { error } = await service.storage.from('content-images').upload(path, buf, { contentType: mime })
+  if (error) throw new Error(`فشل رفع صورة المصدر: ${error.message}`)
+  return service.storage.from('content-images').getPublicUrl(path).data.publicUrl
+}
+
 export interface StudioResult {
   analysis: unknown
   tweets: string
@@ -163,14 +183,17 @@ export async function runStudioPipeline(input: {
   const openai = getOpenAI()
   const newsText = buildNewsText(input)
 
-  const analysis = await analyzeNews(openai, { newsText, sourceImages: input.sourceImages })
+  // أعِد استضافة الصور الخارجية على Supabase أولاً (تجنّب فشل تحميل OpenAI/Gemini).
+  const sourceImages = await Promise.all(input.sourceImages.map(rehostImage))
+
+  const analysis = await analyzeNews(openai, { newsText, sourceImages })
   const tweets = await generateTweets(openai, { analysis, newsText })
-  const concepts = await generateConcepts(openai, { analysis, newsText, sourceImages: input.sourceImages })
+  const concepts = await generateConcepts(openai, { analysis, newsText, sourceImages })
   const chosenConcept = conceptToString(concepts[0])
   const { imageUrl, prompt } = await generateDesign(openai, {
     analysis,
     chosenConcept,
-    sourceImages: input.sourceImages,
+    sourceImages,
     note: input.note,
   })
 
