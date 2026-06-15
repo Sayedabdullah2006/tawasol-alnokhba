@@ -1,0 +1,34 @@
+# خطة النشر الاجتماعي اليومية — يستخرج 3 أخبار، يصممها، ويرسلها بالإيميل
+name: Daily Social Plan
+
+on:
+  schedule:
+    # يومياً 5:00 UTC (8:00 صباحاً بتوقيت السعودية) — قبل بدء اليوم لمراجعة المحتوى
+    - cron: '0 5 * * *'
+
+  # تشغيل يدوي عند الحاجة
+  workflow_dispatch:
+
+jobs:
+  daily-social:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger daily social plan
+        run: |
+          echo "🚀 Generating daily social plan..."
+
+          response=$(curl -s -X POST \
+            "${{ secrets.APP_BASE_URL }}/api/cron/daily-social" \
+            -H "x-api-key: ${{ secrets.CRON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            --max-time 290)
+
+          echo "📊 Response: $response"
+
+          if echo "$response" | grep -q '"success":true'; then
+            echo "✅ Daily social plan generated & emailed"
+          else
+            echo "❌ Daily social plan failed"
+            exit 1
+          fi
