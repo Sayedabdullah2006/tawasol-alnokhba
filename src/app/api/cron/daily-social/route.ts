@@ -159,7 +159,7 @@ async function handle(request: NextRequest) {
           content: post.content,
           sourceImages: [post.imageUrl as string],
           extraInfo: source === 'manhom' ? MANHOM_NOTE : undefined,
-        }).then(studio => ({ post, source, tweets: studio.tweets, designUrl: studio.imageUrl, concept: studio.chosenConcept })),
+        }).then(studio => ({ post, source, tweets: studio.tweets, designUrl: studio.imageUrl, concept: studio.chosenConcept, hostedSource: studio.sourceImages[0] ?? (post.imageUrl as string) })),
       ),
     )
     const results: ProcessedItem[] = []
@@ -185,7 +185,7 @@ async function handle(request: NextRequest) {
       category: r.post.categoryNames[0] ?? null,
       source: r.source,
       source_content: r.post.content,
-      source_image_url: r.post.imageUrl,
+      source_image_url: r.hostedSource,
       design_image_url: r.designUrl,
       tweets: r.tweets,
       chosen_concept: r.concept,
@@ -230,6 +230,7 @@ interface ProcessedItem {
   tweets: string
   designUrl: string
   concept: string
+  hostedSource: string
 }
 
 function escapeHtml(s: string): string {

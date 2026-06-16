@@ -182,9 +182,27 @@ export async function generateDesign(
  * ("400 Timeout while downloading ..."). برفعها إلى Supabase (CDN) تصبح سريعة وموثوقة.
  */
 export async function rehostImage(url: string): Promise<string> {
+  // إن كانت الصورة أصلاً على تخزيننا، لا داعي لإعادة الجلب من مصدر خارجي.
   const service = await createServiceRoleClient()
-  const resp = await fetch(url)
-  if (!resp.ok) throw new Error(`تعذّر تحميل صورة المصدر (${resp.status})`)
+
+  // إعادة محاولة للتعامل مع تقطّع المصدر (خاصة first1saudi.net).
+  let resp: Response | null = null
+  let lastErr = ''
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const ctrl = new AbortController()
+      const to = setTimeout(() => ctrl.abort(), 20000)
+      resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: ctrl.signal })
+      clearTimeout(to)
+      if (resp.ok) break
+      lastErr = `${resp.status}`
+      resp = null
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : 'خطأ شبكة'
+      resp = null
+    }
+  }
+  if (!resp) throw new Error(`تعذّر تحميل صورة المصدر — قد يكون الموقع المصدر غير متاح مؤقتاً (${lastErr})`)
   const mime = resp.headers.get('content-type') || 'image/jpeg'
   const buf = Buffer.from(await resp.arrayBuffer())
   const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg'
@@ -201,6 +219,7 @@ export interface StudioResult {
   chosenConcept: string
   imageUrl: string
   prompt: string
+  sourceImages: string[] // صور المصدر بعد إعادة استضافتها على Supabase (روابط دائمة)
 }
 
 /**
@@ -237,5 +256,5 @@ export async function runStudioPipeline(input: {
     extra: EVERGREEN_NOTE,
   })
 
-  return { analysis, tweets, concepts, chosenConcept, imageUrl, prompt }
+  return { analysis, tweets, concepts, chosenConcept, imageUrl, prompt, sourceImages }
 }

@@ -75,9 +75,9 @@ export async function POST(request: Request) {
         design_image_url: studio.imageUrl,
         tweets: studio.tweets,
         chosen_concept: studio.chosenConcept,
-        // نخزّن المحتوى إن لم يكن مخزّناً (للمرات القادمة)
+        // نخزّن المحتوى وصورة المصدر الدائمة (Supabase) للمرات القادمة
         source_content: content,
-        source_image_url: sourceImage,
+        source_image_url: studio.sourceImages[0] ?? sourceImage,
       })
       .eq('id', id)
 
