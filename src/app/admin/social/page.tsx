@@ -131,7 +131,7 @@ export default function AdminSocialPage() {
                   <div className="p-4 flex flex-col gap-3 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className={`text-xs font-bold rounded-full px-2.5 py-0.5 ${item.source === 'manhom' ? 'bg-purple-100 text-purple-700' : 'bg-teal-100 text-teal-700'}`}>
-                        {item.source === 'manhom' ? 'من هم' : 'first1saudi'}
+                        {item.source === 'manhom' ? 'السعوديات الأوائل' : 'first1saudi'}
                       </span>
                       {item.category && (
                         <span className="text-xs bg-gold/15 text-dark font-bold rounded-full px-2.5 py-0.5">{item.category}</span>
@@ -141,9 +141,13 @@ export default function AdminSocialPage() {
                       )}
                     </div>
 
-                    <a href={item.post_url} target="_blank" rel="noreferrer" className="font-bold text-dark text-sm leading-snug hover:text-green transition">
-                      {item.post_title}
-                    </a>
+                    {item.post_url ? (
+                      <a href={item.post_url} target="_blank" rel="noreferrer" className="font-bold text-dark text-sm leading-snug hover:text-green transition">
+                        {item.post_title}
+                      </a>
+                    ) : (
+                      <span className="font-bold text-dark text-sm leading-snug">{item.post_title}</span>
+                    )}
 
                     {item.tweets && (
                       <div className="bg-cream rounded-xl p-3 mt-auto">
@@ -158,7 +162,9 @@ export default function AdminSocialPage() {
                     )}
 
                     <div className="flex items-center gap-3 text-xs text-muted pt-1">
-                      <a href={item.post_url} target="_blank" rel="noreferrer" className="hover:text-green">🔗 الخبر الأصلي</a>
+                      {item.post_url && (
+                        <a href={item.post_url} target="_blank" rel="noreferrer" className="hover:text-green">🔗 الخبر الأصلي</a>
+                      )}
                       {item.design_image_url && (
                         <a href={item.design_image_url} target="_blank" rel="noreferrer" className="hover:text-green">🖼️ التصميم</a>
                       )}

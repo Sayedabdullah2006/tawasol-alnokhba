@@ -248,15 +248,20 @@ function buildDigestEmail(items: ProcessedItem[], date: string): string {
   const blocks = items
     .map((r, i) => {
       const tweetsHtml = escapeHtml(r.tweets).replace(/\n/g, '<br>')
+      const hasUrl = !!r.post.url
+      const titleHtml = hasUrl
+        ? `<a href="${escapeHtml(r.post.url)}" style="color:#0D3D47;font-size:18px;font-weight:bold;text-decoration:none">${escapeHtml(r.post.title)}</a>`
+        : `<span style="color:#0D3D47;font-size:18px;font-weight:bold">${escapeHtml(r.post.title)}</span>`
+      const sourceLink = hasUrl
+        ? `🔗 <a href="${escapeHtml(r.post.url)}" style="color:#1A8B9F">الخبر الأصلي</a> &nbsp;|&nbsp; `
+        : ''
       return `
       <div style="border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;margin:0 0 28px;background:#fff">
         <div style="background:#0A2D35;color:#FFD700;padding:12px 18px;font-weight:bold;font-size:16px">
           منشور ${i + 1} — ${escapeHtml(r.post.categoryNames[0] ?? 'منوّع')}
         </div>
         <div style="padding:18px">
-          <a href="${escapeHtml(r.post.url)}" style="color:#0D3D47;font-size:18px;font-weight:bold;text-decoration:none">
-            ${escapeHtml(r.post.title)}
-          </a>
+          ${titleHtml}
           <div style="margin:16px 0">
             <img src="${escapeHtml(r.designUrl)}" alt="التصميم" style="width:100%;max-width:480px;border-radius:10px;display:block" />
           </div>
@@ -265,9 +270,7 @@ function buildDigestEmail(items: ProcessedItem[], date: string): string {
             <div style="color:#1e293b;font-size:15px;line-height:2">${tweetsHtml}</div>
           </div>
           <div style="margin-top:12px;font-size:13px;color:#64748b">
-            🔗 <a href="${escapeHtml(r.post.url)}" style="color:#1A8B9F">الخبر الأصلي</a>
-            &nbsp;|&nbsp;
-            🖼️ <a href="${escapeHtml(r.designUrl)}" style="color:#1A8B9F">تحميل التصميم</a>
+            ${sourceLink}🖼️ <a href="${escapeHtml(r.designUrl)}" style="color:#1A8B9F">تحميل التصميم</a>
           </div>
         </div>
       </div>`

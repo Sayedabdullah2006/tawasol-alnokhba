@@ -10,18 +10,17 @@
 import { createServiceRoleClient } from './supabase-server'
 import type { NewsPost } from './first1-news'
 
-const LIST_URL = 'https://manhom.com/قوائم-من-هم/السعوديات-الأوائل'
-
 export async function fetchManhomCandidates(): Promise<NewsPost[]> {
   const sc = await createServiceRoleClient()
   const { data } = await sc
     .from('manhom_people')
-    .select('id, name, position, image_url, profile_url')
+    .select('id, name, position, image_url')
     .eq('is_active', true)
   if (!data) return []
+  // مهم: لا نعرض أي رابط للمصدر — المحتوى يُعاد نشره تحت هوية First1Saudi.
   return data.map(p => ({
     id: Number(p.id),
-    url: p.profile_url || LIST_URL,
+    url: '',
     title: p.name as string,
     content: p.position as string,
     categoryIds: [],
