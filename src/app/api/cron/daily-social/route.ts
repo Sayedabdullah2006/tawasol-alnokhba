@@ -14,8 +14,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { fetchCategories, fetchPostsByCategory, fetchCandidatePosts, resolveImageUrl, type NewsPost } from '@/lib/first1-news'
+import { fetchManhomCandidates } from '@/lib/manhom-news'
 import { runStudioPipeline } from '@/lib/ai-studio'
 import { sendEmail } from '@/lib/email'
+
+type SourceKind = 'first1saudi' | 'manhom'
+interface SelectedItem { post: NewsPost; source: SourceKind }
+
+// توجيه إضافي للاستوديو عند معالجة سيدة من قائمة "السعوديات الأوائل"
+// (المحتوى = الاسم + المنصب فقط، فنوجّه النموذج لإبراز الريادة).
+const MANHOM_NOTE =
+  'هذه إحدى "السعوديات الأوائل" — سيدة سعودية رائدة في مجالها. المعطى هو اسمها ومنصبها الحالي؛ ' +
+  'أبرِز ريادتها وتميّزها وكونها من الأوائل، واجعل سطر الإنجاز معبّراً عن منصبها/دورها دون اختلاق تفاصيل غير واردة.'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -71,66 +81,94 @@ async function handle(request: NextRequest) {
       }
     }
 
-    // ── 1) منع التكرار: الأخبار المنشورة خلال آخر N يوماً ──
+    // ── 1) منع التكرار (لكل مصدر على حدة) خلال آخر N يوماً ──
     const since = new Date(Date.now() - DEDUP_WINDOW_DAYS * 86400000).toISOString().slice(0, 10)
     const { data: recent } = await sc
       .from('social_schedule')
-      .select('wp_post_id')
+      .select('wp_post_id, source')
       .gte('batch_date', since)
-    const usedIds = new Set<number>((recent ?? []).map(r => Number(r.wp_post_id)))
+    const usedFirst1 = new Set<number>()
+    const usedManhom = new Set<number>()
+    for (const r of recent ?? []) {
+      if (r.source === 'manhom') usedManhom.add(Number(r.wp_post_id))
+      else usedFirst1.add(Number(r.wp_post_id))
+    }
 
-    // ── 2) اختيار أقسام مختلفة فعلاً، وخبر واحد حديث غير مكرّر من كل قسم ──
-    const sections = (await fetchCategories()).filter(
-      c => c.count >= MIN_SECTION_POSTS && !EXCLUDED_SECTIONS.has(c.name),
-    )
-    const shuffledSections = [...sections].sort(() => Math.random() - 0.5)
+    // كم عنصراً من كل مصدر — افتراضياً ~2 first1saudi + 1 manhom لكل 3.
+    const sourceParam = request.nextUrl.searchParams.get('source')
+    let manhomTarget =
+      sourceParam === 'manhom' ? count : sourceParam === 'first1saudi' ? 0 : Math.max(1, Math.round(count / 3))
+    if (manhomTarget > count) manhomTarget = count
+    const first1Target = count - manhomTarget
 
-    const selected: NewsPost[] = []
-    let attempts = 0
-    for (const sec of shuffledSections) {
-      if (selected.length >= count) break
-      if (attempts++ >= count * 4) break // حدّ أمان لزمن الجلب
-      const posts = await fetchPostsByCategory(sec.id, 12)
-      const fresh = posts.filter(p => !usedIds.has(p.id) && !selected.some(s => s.id === p.id))
-      // نحلّ الصورة لأحدث القليل فقط، ونأخذ أول خبر تتوفر له صورة
-      for (const cand of fresh.slice(0, 6)) {
-        const img = await resolveImageUrl(cand)
-        if (!img) continue
-        cand.categoryNames = [sec.name] // علّمه بالقسم المختار (للتنويع/التقويم)
-        selected.push(cand)
-        break
+    const selected: SelectedItem[] = []
+    const countBySource = (s: SourceKind) => selected.filter(x => x.source === s).length
+
+    // ── 2) اختيار من first1saudi: أقسام مختلفة، خبر حديث غير مكرّر من كل قسم ──
+    if (first1Target > 0) {
+      const sections = (await fetchCategories()).filter(
+        c => c.count >= MIN_SECTION_POSTS && !EXCLUDED_SECTIONS.has(c.name),
+      )
+      const shuffledSections = [...sections].sort(() => Math.random() - 0.5)
+      let attempts = 0
+      for (const sec of shuffledSections) {
+        if (countBySource('first1saudi') >= first1Target) break
+        if (attempts++ >= first1Target * 4 + 4) break // حدّ أمان لزمن الجلب
+        const posts = await fetchPostsByCategory(sec.id, 12)
+        const fresh = posts.filter(p => !usedFirst1.has(p.id) && !selected.some(s => s.post.id === p.id))
+        for (const cand of fresh.slice(0, 6)) {
+          const img = await resolveImageUrl(cand)
+          if (!img) continue
+          cand.categoryNames = [sec.name]
+          selected.push({ post: cand, source: 'first1saudi' })
+          break
+        }
+      }
+      // احتياطي: إكمال نصيب first1saudi من أحدث الأخبار
+      if (countBySource('first1saudi') < first1Target) {
+        const pool = await fetchCandidatePosts({ perPage: 40, pages: 1 })
+        for (const p of pool) {
+          if (countBySource('first1saudi') >= first1Target) break
+          if (usedFirst1.has(p.id) || selected.some(s => s.post.id === p.id)) continue
+          const img = await resolveImageUrl(p)
+          if (!img) continue
+          selected.push({ post: p, source: 'first1saudi' })
+        }
       }
     }
 
-    // ── 3) احتياطي: إن لم تكتمل (نفاد الأقسام/التكرار) نكمل من أحدث الأخبار ──
-    if (selected.length < count) {
-      const pool = await fetchCandidatePosts({ perPage: 40, pages: 1 })
-      for (const p of pool) {
-        if (selected.length >= count) break
-        if (usedIds.has(p.id) || selected.some(s => s.id === p.id)) continue
-        const img = await resolveImageUrl(p)
-        if (!img) continue
-        selected.push(p)
+    // ── 3) اختيار من manhom (السعوديات الأوائل): سيدات رائدات غير مكرّرات ──
+    if (manhomTarget > 0) {
+      const candidates = (await fetchManhomCandidates()).filter(p => !usedManhom.has(p.id))
+      const shuffled = candidates.sort(() => Math.random() - 0.5)
+      for (const p of shuffled) {
+        if (countBySource('manhom') >= manhomTarget) break
+        if (!p.imageUrl) continue
+        selected.push({ post: p, source: 'manhom' })
       }
     }
 
     if (selected.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'لا توجد أخبار صالحة (بصورة) من المصدر' },
+        { success: false, error: 'لا توجد عناصر صالحة من المصادر' },
         { status: 502 },
       )
     }
 
-    // ── 4) تمرير كل خبر في الاستوديو (بالتوازي للبقاء ضمن حد المهلة) ──
+    // ── 4) تمرير كل عنصر في الاستوديو (بالتوازي للبقاء ضمن حد المهلة) ──
     const settled = await Promise.allSettled(
-      selected.map(post =>
-        runStudioPipeline({ title: post.title, content: post.content, sourceImages: [post.imageUrl as string] })
-          .then(studio => ({ post, tweets: studio.tweets, designUrl: studio.imageUrl, concept: studio.chosenConcept })),
+      selected.map(({ post, source }) =>
+        runStudioPipeline({
+          title: post.title,
+          content: post.content,
+          sourceImages: [post.imageUrl as string],
+          extraInfo: source === 'manhom' ? MANHOM_NOTE : undefined,
+        }).then(studio => ({ post, source, tweets: studio.tweets, designUrl: studio.imageUrl, concept: studio.chosenConcept })),
       ),
     )
     const results: ProcessedItem[] = []
     const errors: { title: string; error: string }[] = []
-    selected.forEach((post, i) => {
+    selected.forEach(({ post }, i) => {
       const r = settled[i]
       if (r.status === 'fulfilled') results.push(r.value)
       else errors.push({ title: post.title, error: r.reason instanceof Error ? r.reason.message : 'خطأ غير معروف' })
@@ -149,6 +187,7 @@ async function handle(request: NextRequest) {
       post_url: r.post.url,
       post_title: r.post.title,
       category: r.post.categoryNames[0] ?? null,
+      source: r.source,
       source_image_url: r.post.imageUrl,
       design_image_url: r.designUrl,
       tweets: r.tweets,
@@ -190,6 +229,7 @@ async function handle(request: NextRequest) {
 
 interface ProcessedItem {
   post: NewsPost
+  source: SourceKind
   tweets: string
   designUrl: string
   concept: string

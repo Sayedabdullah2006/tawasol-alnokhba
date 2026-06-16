@@ -18,7 +18,7 @@ export async function GET() {
   const { data, error } = await sc
     .from('social_schedule')
     .select(
-      'id, wp_post_id, post_url, post_title, category, source_image_url, design_image_url, tweets, batch_date, status, email_sent, created_at',
+      'id, wp_post_id, post_url, post_title, category, source, source_image_url, design_image_url, tweets, batch_date, status, email_sent, created_at',
     )
     .order('batch_date', { ascending: false })
     .order('created_at', { ascending: false })

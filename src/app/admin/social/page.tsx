@@ -11,6 +11,7 @@ interface ScheduleItem {
   post_url: string
   post_title: string
   category: string | null
+  source: string | null
   source_image_url: string | null
   design_image_url: string | null
   tweets: string | null
@@ -129,6 +130,9 @@ export default function AdminSocialPage() {
 
                   <div className="p-4 flex flex-col gap-3 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-xs font-bold rounded-full px-2.5 py-0.5 ${item.source === 'manhom' ? 'bg-purple-100 text-purple-700' : 'bg-teal-100 text-teal-700'}`}>
+                        {item.source === 'manhom' ? 'من هم' : 'first1saudi'}
+                      </span>
                       {item.category && (
                         <span className="text-xs bg-gold/15 text-dark font-bold rounded-full px-2.5 py-0.5">{item.category}</span>
                       )}
