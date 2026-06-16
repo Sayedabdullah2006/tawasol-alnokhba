@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { fetchCategories, fetchPostsByCategory, fetchCandidatePosts, resolveImageUrl, type NewsPost } from '@/lib/first1-news'
-import { fetchManhomCandidates } from '@/lib/manhom-news'
+import { fetchManhomCandidates, ensureColorImage } from '@/lib/manhom-news'
 import { runStudioPipeline } from '@/lib/ai-studio'
 import { sendEmail } from '@/lib/email'
 
@@ -147,6 +147,8 @@ async function handle(request: NextRequest) {
       for (const p of shuffled) {
         if (countBySource('manhom') >= manhomTarget) break
         if (!p.imageUrl) continue
+        // صور المصدر رمادية — نضمن نسخة ملوّنة (تُلوَّن مرة وتُخزَّن).
+        p.imageUrl = await ensureColorImage(p.id, p.imageUrl)
         selected.push({ post: p, source: 'manhom' })
       }
     }
