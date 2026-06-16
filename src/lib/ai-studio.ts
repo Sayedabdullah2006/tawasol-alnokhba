@@ -16,6 +16,17 @@ import { createServiceRoleClient } from './supabase-server'
 export const OPENAI_MODEL = 'gpt-5.5'
 
 /**
+ * قفل الوجه — تعليمة قصوى تُحاط بموجّه Gemini لتقليل إعادة رسمه للوجه.
+ * مكتوبة بالعربية والإنجليزية لأقصى التزام من النموذج.
+ */
+export const FACE_LOCK =
+  '‼️🔒 ABSOLUTE TOP RULE (overrides everything): This is a PHOTO EDIT of the attached real photograph. ' +
+  'COPY THE PERSON’S FACE FROM THE ATTACHED PHOTO EXACTLY, pixel-for-pixel — same bone structure, same eyes, nose, mouth, beard/eyebrows, skin tone, age and expression. ' +
+  'DO NOT redraw, regenerate, beautify, age, slim, swap or replace the face. If you cannot preserve the exact face, output the original photo unchanged. ' +
+  'Generating a new or different-looking person is STRICTLY FORBIDDEN. ' +
+  'بالعربية: انسخ وجه الشخص من الصورة المرفقة كما هو حرفياً دون أي تغيير أو إعادة رسم؛ ممنوع توليد وجه/شخص مختلف منعاً باتاً.'
+
+/**
  * توجيه "الصياغة الدائمة" — يُحقَن في الأتمتة (إعادة نشر الأرشيف) فقط.
  * يمنع أي إيحاء بأن الخبر حدثٌ آنيّ/عاجل، لأن الخبر قد يكون قديماً.
  */
@@ -145,7 +156,9 @@ export async function generateDesign(
   })
   const designPrompt = promptCompletion.choices[0]?.message?.content ?? ''
 
-  const { b64 } = await generateImageWithGemini(designPrompt, sourceImages)
+  // قفل الوجه: يُحاط به موجّه Gemini من الطرفين (بداية ونهاية) لتقليل إعادة رسم الوجه.
+  const geminiPrompt = `${FACE_LOCK}\n\n${designPrompt}\n\n${FACE_LOCK}`
+  const { b64 } = await generateImageWithGemini(geminiPrompt, sourceImages)
   const rawImage = Buffer.from(b64, 'base64')
   const posterBase = await resizeToPoster(rawImage)
   const { buffer: finalImage, mimeType } = logoUrl
