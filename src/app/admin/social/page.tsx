@@ -35,6 +35,9 @@ export default function AdminSocialPage() {
   const [items, setItems] = useState<ScheduleItem[]>([])
   const [error, setError] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [note, setNote] = useState('')
+  const [busyId, setBusyId] = useState<string | null>(null)
 
   const load = async () => {
     setError(null)
@@ -67,6 +70,28 @@ export default function AdminSocialPage() {
       setCopiedId(item.id)
       setTimeout(() => setCopiedId(null), 1500)
     } catch { /* ignore */ }
+  }
+
+  const regenerate = async (item: ScheduleItem) => {
+    setBusyId(item.id)
+    try {
+      const res = await fetch('/api/admin/social-schedule/regenerate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, note }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json.error || 'فشل إعادة التوليد')
+      setItems(prev => prev.map(it =>
+        it.id === item.id ? { ...it, design_image_url: json.design_image_url, tweets: json.tweets } : it,
+      ))
+      setOpenId(null)
+      setNote('')
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'فشل إعادة التوليد')
+    } finally {
+      setBusyId(null)
+    }
   }
 
   if (loading) return <LoadingSpinner size="lg" />
@@ -169,6 +194,44 @@ export default function AdminSocialPage() {
                         <a href={item.design_image_url} target="_blank" rel="noreferrer" className="hover:text-green">🖼️ التصميم</a>
                       )}
                     </div>
+
+                    {/* إعادة التوليد */}
+                    {openId === item.id ? (
+                      <div className="mt-2 space-y-2 bg-cream rounded-xl p-3">
+                        <textarea
+                          value={note}
+                          onChange={e => setNote(e.target.value)}
+                          placeholder="ملاحظة أو توجيه للتصميم (اختياري) — مثل: كبّر الصورة، غيّر الخلفية، أبرز جائزة معينة..."
+                          rows={3}
+                          disabled={busyId === item.id}
+                          className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-card text-dark resize-none"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => regenerate(item)}
+                            disabled={busyId === item.id}
+                            className="bg-green text-white text-sm font-bold rounded-lg px-4 py-2 hover:opacity-90 transition disabled:opacity-60"
+                          >
+                            {busyId === item.id ? '⏳ جارٍ التوليد… (قد يستغرق دقيقتين)' : '✨ توليد'}
+                          </button>
+                          {busyId !== item.id && (
+                            <button
+                              onClick={() => { setOpenId(null); setNote('') }}
+                              className="text-sm text-muted hover:text-dark px-3 py-2"
+                            >
+                              إلغاء
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setOpenId(item.id); setNote('') }}
+                        className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-green border border-green/30 rounded-lg px-3 py-1.5 hover:bg-green/5 transition self-start"
+                      >
+                        🔄 إعادة توليد التصميم
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

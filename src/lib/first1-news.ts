@@ -158,6 +158,13 @@ export async function fetchCategories(): Promise<NewsCategory[]> {
     .map(c => ({ id: c.id as number, name: c.name as string, count: c.count ?? 0 }))
 }
 
+/** يجلب خبراً واحداً بمعرّفه (لإعادة توليد التصميم). */
+export async function fetchPostById(id: number): Promise<NewsPost | null> {
+  const data = await wpFetchJson(`${WP_BASE}/posts/${id}?_fields=${POST_FIELDS}`)
+  if (!data || typeof data !== 'object') return null
+  return normalizeLite(data as WPPostLite)
+}
+
 /** يجلب أحدث منشورات قسم معيّن (خفيف، بلا صور بعد). */
 export async function fetchPostsByCategory(categoryId: number, perPage = 12): Promise<NewsPost[]> {
   const data = await wpFetchJson(

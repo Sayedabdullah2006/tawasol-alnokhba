@@ -14,21 +14,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { fetchCategories, fetchPostsByCategory, fetchCandidatePosts, resolveImageUrl, type NewsPost } from '@/lib/first1-news'
-import { fetchManhomCandidates, ensureColorImage } from '@/lib/manhom-news'
+import { fetchManhomCandidates, ensureColorImage, MANHOM_NOTE } from '@/lib/manhom-news'
 import { runStudioPipeline } from '@/lib/ai-studio'
 import { sendEmail } from '@/lib/email'
 
 type SourceKind = 'first1saudi' | 'manhom'
 interface SelectedItem { post: NewsPost; source: SourceKind }
-
-// توجيه إضافي للاستوديو عند معالجة سيدة سعودية رائدة.
-// الهدف: نفس أسلوب منشورات الإنجازات تماماً — لا بطاقة تعريف بحقول.
-const MANHOM_NOTE =
-  'عامِل هذا كخبر إنجاز عن سيدة سعودية رائدة، بنفس أسلوب وتخطيط بقية منشورات الإنجازات حرفياً (لِيبل علوي + اسم كبير + سطر إنجاز + نقاط حقائق بأيقونات). ' +
-  'استخرج إنجازاتها الواردة (الجوائز، الأرقام، كونها "أول"، المناصب المرموقة) واجعلها نقاط key_facts الحقيقية. ' +
-  '‼️ ممنوع منعاً باتاً: لا تُصمّم "بطاقة تعريف" بحقول، ولا تكتب أي مسمّى حقل مثل ("الاسم الوارد"، "الاسم"، "المنصب الحالي"، "المنصب"، "الجهة"، "النبذة")، ' +
-  'ولا تكتب أي عبارة تشير إلى قائمة أو مصدر مثل ("تُعرض ضمن السعوديات الأوائل" أو "ضمن قائمة" أو "من قائمة"). ' +
-  'النص المرئي فقط: اللِّيبل (جهتها/مجالها) + الاسم + سطر الإنجاز + نقاط الإنجازات — لا شيء غير ذلك.'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -193,6 +184,7 @@ async function handle(request: NextRequest) {
       post_title: r.post.title,
       category: r.post.categoryNames[0] ?? null,
       source: r.source,
+      source_content: r.post.content,
       source_image_url: r.post.imageUrl,
       design_image_url: r.designUrl,
       tweets: r.tweets,
