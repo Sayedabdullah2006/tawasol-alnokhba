@@ -51,10 +51,25 @@ async function handle(request: NextRequest) {
   }
 
   const count = Math.max(1, Math.min(5, Number(request.nextUrl.searchParams.get('count')) || DEFAULT_COUNT))
+  const force = request.nextUrl.searchParams.get('force') === '1'
   const today = new Date().toISOString().slice(0, 10)
 
   try {
     const sc = await createServiceRoleClient()
+
+    // ── 0) حماية عدم التكرار: إن نجحت دفعة اليوم وأُرسلت بالإيميل، نتخطّى. ──
+    // يسمح بجدولة عدة محاولات صباحاً (تحسّباً لتعطّل المصدر مؤقتاً) بإيميل واحد فقط.
+    if (!force) {
+      const { data: doneToday } = await sc
+        .from('social_schedule')
+        .select('id')
+        .eq('batch_date', today)
+        .eq('email_sent', true)
+        .limit(1)
+      if (doneToday && doneToday.length) {
+        return NextResponse.json({ skipped: true, reason: 'تم توليد دفعة اليوم مسبقاً', date: today })
+      }
+    }
 
     // ── 1) منع التكرار: الأخبار المنشورة خلال آخر N يوماً ──
     const since = new Date(Date.now() - DEDUP_WINDOW_DAYS * 86400000).toISOString().slice(0, 10)
