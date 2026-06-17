@@ -5,6 +5,12 @@ import { notifyNewRequestToAdmin, notifyRequestReceivedToClient, notifyQuoteAppr
 import { CATEGORIES, PACKAGES } from '@/lib/constants'
 import { calculateAutoQuote, calculateCampaignQuote, CAMPAIGN_DISCOUNT_PCT } from '@/lib/auto-quote'
 
+// الحالات التي تُعدّ «طلباً قائماً» يمنع رفع طلب جديد (قبل الدفع/الاكتمال).
+// بعد الدفع (paid وما بعده) أو الإغلاق (مرفوض/مغلق/مكتمل) يُسمح بطلب جديد.
+const OPEN_BLOCKING_STATUSES = [
+  'pending', 'quoted', 'negotiation', 'approved', 'payment_review', 'info_requested',
+] as const
+
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -48,19 +54,19 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── منع تقديم طلب جديد عند وجود عرض بانتظار موافقة العميل ──────
-    // لا يحق للعميل رفع طلب جديد ما دام لديه عرض قائم لم يتّخذ بشأنه إجراءً (موافقة/رفض/تفاوض)
+    // ── منع تقديم طلب جديد ما دام للعميل طلب قائم لم يُدفع ولم يكتمل ──────
+    // لا يحق للعميل رفع أكثر من طلب واحد في الحالات التالية (قبل الدفع/الاكتمال).
     if (userId) {
-      const { data: pending } = await serviceClient
+      const { data: openReq } = await serviceClient
         .from('publish_requests')
-        .select('id')
+        .select('id, status')
         .eq('user_id', userId)
-        .eq('status', 'quoted')
+        .in('status', OPEN_BLOCKING_STATUSES)
         .limit(1)
-      if (pending && pending.length > 0) {
+      if (openReq && openReq.length > 0) {
         return NextResponse.json({
-          error: 'لديك عرض قائم بانتظار موافقتك. يُرجى اتخاذ إجراء بشأنه — بالموافقة أو الرفض أو طلب التفاوض — قبل تقديم طلب جديد.',
-          code: 'PENDING_QUOTE',
+          error: 'لديك طلب قائم لم يكتمل بعد. يُرجى إكمال دفعه أو انتظار اكتماله قبل تقديم طلب جديد.',
+          code: 'OPEN_REQUEST_EXISTS',
         }, { status: 409 })
       }
     }
