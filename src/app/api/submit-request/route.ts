@@ -286,28 +286,20 @@ export async function POST(request: Request) {
 
       const requestNumber = generateRequestNumber(data.request_number)
 
-      notifyNewRequestToAdmin({
-        requestNumber,
-        clientName:  body.client_name,
-        clientEmail: body.client_email,
-        clientPhone: body.client_phone,
-        category:    `حملة (${campaignPostsRaw.length} منشورات)`,
-        title:       `حملة: ${firstPost.title}`,
-        content:     firstPost.content,
-        channels,
-      }).catch(e => console.error('Admin campaign email failed:', e))
+      // الأفراد: لا إيميل قبل الدفع (الأدمن يُنبَّه بعد الدفع عبر CC تأكيد الدفع). الجهات تُراجَع.
+      if (!isIndividual) {
+        notifyNewRequestToAdmin({
+          requestNumber,
+          clientName:  body.client_name,
+          clientEmail: body.client_email,
+          clientPhone: body.client_phone,
+          category:    `حملة (${campaignPostsRaw.length} منشورات)`,
+          title:       `حملة: ${firstPost.title}`,
+          content:     firstPost.content,
+          channels,
+        }).catch(e => console.error('Admin campaign email failed:', e))
 
-      if (body.client_email) {
-        if (isIndividual) {
-          // الحملة معتمدة مباشرةً — بانتظار الدفع
-          notifyQuoteApprovedAwaitingPaymentToClient({
-            email:        body.client_email,
-            requestNumber,
-            clientName:   body.client_name ?? 'عزيزنا',
-            total:        campaignFinalPrice,
-            requestId:    data.id,
-          }).catch(e => console.error('Campaign awaiting-payment email failed:', e))
-        } else {
+        if (body.client_email) {
           notifyRequestReceivedToClient({
             clientEmail: body.client_email,
             requestNumber,
@@ -487,28 +479,21 @@ export async function POST(request: Request) {
     const cat       = CATEGORIES.find(c => c.id === body.category)
     const catNameAr = cat?.nameAr ?? body.category
 
-    notifyNewRequestToAdmin({
-      requestNumber,
-      clientName:  body.client_name,
-      clientEmail: body.client_email,
-      clientPhone: body.client_phone,
-      category:    catNameAr,
-      title:       body.title,
-      content:     body.content,
-      channels:    effectiveChannels,
-    }).catch(e => console.error('Admin email failed:', e))
+    // الأفراد (تسعير فوري → دفع): لا نُرسل أي إيميل قبل الدفع — لا للأدمن ولا للعميل.
+    // الأدمن يُنبَّه بعد الدفع عبر نسخة (CC) من إيميل تأكيد الدفع. الجهات فقط تُراجَع يدوياً.
+    if (!isIndividual) {
+      notifyNewRequestToAdmin({
+        requestNumber,
+        clientName:  body.client_name,
+        clientEmail: body.client_email,
+        clientPhone: body.client_phone,
+        category:    catNameAr,
+        title:       body.title,
+        content:     body.content,
+        channels:    effectiveChannels,
+      }).catch(e => console.error('Admin email failed:', e))
 
-    if (body.client_email) {
-      if (isIndividual) {
-        // معتمد مباشرةً — بانتظار الدفع (مطابق لتدفّق الحملة)
-        notifyQuoteApprovedAwaitingPaymentToClient({
-          email:        body.client_email,
-          requestNumber,
-          clientName:   body.client_name ?? 'عزيزنا',
-          total:        singleFinalPrice,
-          requestId:    data.id,
-        }).catch(e => console.error('Awaiting-payment email failed:', e))
-      } else {
+      if (body.client_email) {
         notifyRequestReceivedToClient({
           clientEmail: body.client_email,
           requestNumber,
