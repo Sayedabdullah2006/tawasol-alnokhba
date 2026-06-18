@@ -37,7 +37,7 @@ export default function HomePage() {
               اترك أثراً <span className="text-gold">دائماً</span>
             </h1>
             <div className="flex flex-wrap gap-3 justify-center">
-              <Link href="/request"
+              <Link href="/start"
                 className="px-8 py-4 bg-gold text-dark rounded-xl text-base font-black hover:bg-gold/90 transition-all active:scale-[0.98] shadow-lg shadow-gold/20">
                 ابدأ طلبك الآن
               </Link>
@@ -125,7 +125,7 @@ export default function HomePage() {
           <p className="text-cream/70 text-base mb-8">
             انضم لمئات العملاء الذين اختاروا تواصل النخبة لنشر إنجازاتهم
           </p>
-          <Link href="/request"
+          <Link href="/start"
             className="inline-block px-10 py-4 bg-gold text-dark rounded-xl text-lg font-black hover:bg-gold/90 transition-all active:scale-[0.98] shadow-xl shadow-gold/20">
             قدّم طلبك الآن
           </Link>

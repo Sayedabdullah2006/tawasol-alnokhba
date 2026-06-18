@@ -72,7 +72,7 @@ export default function ServicesPage() {
             </div>
 
             <div className="mt-12 text-center">
-              <Link href="/request"
+              <Link href="/start"
                 className="inline-block px-8 py-4 bg-green text-white rounded-xl text-lg font-bold hover:bg-green/90 transition-all">
                 ابدأ طلبك الآن
               </Link>
