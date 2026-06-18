@@ -34,7 +34,6 @@ async function run() {
     { id: 'bilingual', name_ar: 'صياغة المحتوى باللغتين', icon: '✍️', default_price: 300, sort_order: 1 },
     { id: 'mention', name_ar: 'منشن في القناة', icon: '🔔', default_price: 200, sort_order: 2 },
     { id: 'story', name_ar: 'ستوري في القناة', icon: '📱', default_price: 150, sort_order: 3 },
-    { id: 'encyclopedia', name_ar: 'إضافة للموسوعة الرقمية', icon: '📖', default_price: 500, sort_order: 4 },
     { id: 'pin6', name_ar: 'تثبيت 6 أشهر', icon: '📌', default_price: 100, sort_order: 5 },
     { id: 'pin12', name_ar: 'تثبيت 12 شهر', icon: '📍', default_price: 200, sort_order: 6 },
     { id: 'repost', name_ar: 'إعادة نشر', icon: '🔄', default_price: 150, sort_order: 7 },

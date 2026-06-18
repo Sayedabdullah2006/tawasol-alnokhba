@@ -791,7 +791,7 @@ export default function RequestWizard() {
                   🚀 الباقة المختارة تنطبق على كل أخبار الحملة ({campaignPosts.length} منشورات) — السعر يشمل خصم الحملة {CAMPAIGN_DISCOUNT}%.
                 </p>
               )}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {PACKAGES.map(pkg => {
                   const isSelected = selectedPackage === pkg.id
                   // السعر: المفرد = سعر الخبر × معامل الباقة ؛ الحملة = مجموع الأخبار × معامل الباقة − خصم الحملة

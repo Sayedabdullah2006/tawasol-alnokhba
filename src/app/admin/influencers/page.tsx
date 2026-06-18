@@ -44,10 +44,10 @@ const defaultPricing: PricingData = {
     charity: { inventions: 1500, competitions: 1500, books: 600, events: 1200, certs: 400, graduation: 300, appointment: 800, award: 1000, cv: 500, product: 1200, research: 250, charity: 400 }
   },
   extras_prices: {
-    individual: { bilingual: 300, mention: 200, story: 150, encyclopedia: 500, pin6: 100, pin12: 200, repost: 150, campaign: 1000, video: 400, report: 800, plan: 1500, website: 5000, media: 10000, infographic: 300 },
-    business: { bilingual: 450, mention: 300, story: 250, encyclopedia: 750, pin6: 150, pin12: 300, repost: 250, campaign: 1500, video: 600, report: 1200, plan: 2500, website: 8000, media: 15000, infographic: 500 },
-    government: { bilingual: 600, mention: 400, story: 350, encyclopedia: 1000, pin6: 200, pin12: 400, repost: 350, campaign: 2000, video: 800, report: 1600, plan: 3500, website: 12000, media: 20000, infographic: 700 },
-    charity: { bilingual: 150, mention: 100, story: 75, encyclopedia: 250, pin6: 50, pin12: 100, repost: 75, campaign: 500, video: 200, report: 400, plan: 750, website: 2500, media: 5000, infographic: 150 }
+    individual: { bilingual: 300, mention: 200, story: 150, pin6: 100, pin12: 200, repost: 150, campaign: 1000, video: 400, report: 800, plan: 1500, website: 5000, media: 10000, infographic: 300 },
+    business: { bilingual: 450, mention: 300, story: 250, pin6: 150, pin12: 300, repost: 250, campaign: 1500, video: 600, report: 1200, plan: 2500, website: 8000, media: 15000, infographic: 500 },
+    government: { bilingual: 600, mention: 400, story: 350, pin6: 200, pin12: 400, repost: 350, campaign: 2000, video: 800, report: 1600, plan: 3500, website: 12000, media: 20000, infographic: 700 },
+    charity: { bilingual: 150, mention: 100, story: 75, pin6: 50, pin12: 100, repost: 75, campaign: 500, video: 200, report: 400, plan: 750, website: 2500, media: 5000, infographic: 150 }
   },
   scope_multipliers: { single: 1.0, all: 1.5 },
   image_multipliers: { one: 1.0, multi: 1.2 },

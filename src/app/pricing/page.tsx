@@ -35,8 +35,19 @@ const tiers = [
     features: [
       'حملة متكاملة على جميع القنوات',
       'محتوى مرئي + انفوجرافيك',
-      'تثبيت طويل + موسوعة رقمية',
+      'تثبيت طويل + إعادة نشر',
       'تقرير أداء تفصيلي',
+    ],
+  },
+  {
+    name: 'باقة الصدارة',
+    startsFrom: 3500,
+    blurb: 'أوسع وصول وأكبر ظهور لخبرك',
+    features: [
+      'كل مزايا الباقة المتقدمة',
+      'منشور إعلاني مموّل يصل لجمهور جديد خارج متابعي الشبكة',
+      'تثبيت طويل + إعادة نشر',
+      'أولوية في التنفيذ',
     ],
   },
 ]
@@ -55,7 +66,7 @@ export default function PricingPage() {
 
         <section className="py-16">
           <div className="max-w-6xl mx-auto px-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               {tiers.map(t => (
                 <div key={t.name}
                   className={`rounded-2xl p-6 border-2 transition-all ${

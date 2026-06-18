@@ -29,7 +29,6 @@ export const AQ_EXTRAS_NAMES: Record<string, string> = {
   bilingual:    'صياغة المحتوى باللغتين',
   mention:      'منشن لحساب المستخدم',
   story:        'ستوري انستغرام وتيك توك',
-  encyclopedia: 'إضافة لقاعدة بيانات أول سعودي First1saudi.net',
   pin6:         'تثبيت 6 ساعات في X و LinkedIn',
   pin12:        'تثبيت 12 ساعة في X و LinkedIn',
   repost:       'رتويت للمنشور بعد يوم أو يومين',
@@ -43,7 +42,6 @@ export const AQ_EXTRAS_ICONS: Record<string, string> = {
   bilingual:    '✍️',
   mention:      '🔔',
   story:        '📱',
-  encyclopedia: '📖',
   pin6:         '📌',
   pin12:        '📍',
   repost:       '🔄',
@@ -57,7 +55,7 @@ export const AQ_EXTRAS_ICONS: Record<string, string> = {
 export const AQ_EXTRAS_LIST = [
   'bilingual', 'mention', 'story', 'repost',
   'video', 'infographic', 'campaign',
-  'pin6', 'pin12', 'encyclopedia', 'report',
+  'pin6', 'pin12', 'report',
 ]
 
 // ─── جدول الأسعار الأساسية (بدون VAT) ───

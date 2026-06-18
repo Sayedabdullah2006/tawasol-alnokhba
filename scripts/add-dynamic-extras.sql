@@ -19,7 +19,6 @@ INSERT INTO extras (id, name_ar, icon, default_price, category_only, sort_order)
 ('bilingual', 'صياغة المحتوى باللغتين', '✍️', 300, null, 1),
 ('mention', 'منشن في القناة', '🔔', 200, null, 2),
 ('story', 'ستوري في القناة', '📱', 150, null, 3),
-('encyclopedia', 'إضافة للموسوعة الرقمية', '📖', 500, null, 4),
 ('pin6', 'تثبيت 6 أشهر', '📌', 100, null, 5),
 ('pin12', 'تثبيت 12 شهر', '📍', 200, null, 6),
 ('repost', 'إعادة نشر', '🔄', 150, null, 7),

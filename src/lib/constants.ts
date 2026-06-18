@@ -113,7 +113,6 @@ export const EXTRAS = [
   { id: 'bilingual', nameAr: 'صياغة المحتوى باللغتين', icon: '✍️', price: 300 },
   { id: 'mention', nameAr: 'منشن لحساب المستخدم', icon: '🔔', price: 200 },
   { id: 'story', nameAr: 'ستوري انستغرام وتيك توك', icon: '📱', price: 150 },
-  { id: 'encyclopedia', nameAr: 'إضافة لقاعدة بيانات أول سعودي First1saudi.net', icon: '📖', price: 500 },
   { id: 'pin6', nameAr: 'تثبيت 6 ساعات في X و LinkedIn', icon: '📌', price: 100 },
   { id: 'pin12', nameAr: 'تثبيت 12 ساعة في X و LinkedIn', icon: '📍', price: 200 },
   { id: 'repost', nameAr: 'رتويت للمنشور بعد يوم أو يومين', icon: '🔄', price: 150 },
@@ -129,7 +128,7 @@ export const EXTRAS = [
 // ─── Packages (الباقات) — للأفراد + المنشور الواحد فقط ───
 // السعر = سعر الباقة الأساسية (الديناميكي حسب نوع الخبر لقناة واحدة) × priceMultiplier
 export interface Package {
-  id: 'basic' | 'pro' | 'elite'
+  id: 'basic' | 'pro' | 'elite' | 'prime'
   name: string
   priceMultiplier: number
   blurb: string
@@ -180,11 +179,28 @@ export const PACKAGES: Package[] = [
       'صياغة الخبر',
       'تصميم خاص',
       'عمل منشن/تاق لحساب المستخدم',
-      'التوثيق في موسوعة أول سعودي First1saudi.net',
       'التثبيت 6 ساعات في X',
       'رتويت بعد يوم/يومين',
     ],
-    includedExtras: ['mention', 'encyclopedia', 'pin6', 'repost'],
+    includedExtras: ['mention', 'pin6', 'repost'],
+    allChannels: true,
+    badge: 'تمارا · ادفع على 3 أقساط',
+  },
+  {
+    id: 'prime',
+    name: 'باقة الصدارة',
+    priceMultiplier: 1.85,
+    blurb: 'أوسع وصول وأكبر ظهور لخبرك',
+    features: [
+      'النشر في جميع القنوات (X, LinkedIn, Instagram, TikTok)',
+      'صياغة الخبر',
+      'تصميم خاص',
+      'عمل منشن/تاق لحساب المستخدم',
+      'التثبيت 6 ساعات في X',
+      'رتويت بعد يوم/يومين',
+      'منشور إعلاني مموّل يصل بخبرك إلى جمهور جديد خارج متابعي الشبكة',
+    ],
+    includedExtras: ['mention', 'pin6', 'repost'],
     allChannels: true,
     badge: 'تمارا · ادفع على 3 أقساط',
   },

@@ -29,5 +29,5 @@ CREATE POLICY "admin_update_pricing" ON pricing_config
 INSERT INTO pricing_config (id, base_prices, extras_prices) VALUES (
   'default',
   '{"inventions":3000,"competitions":3000,"books":1200,"events":2500,"certs":800,"graduation":600,"appointment":1500,"award":2000,"cv":900,"product":3000,"research":500,"charity":400,"government":4500}',
-  '{"bilingual":300,"mention":200,"story":150,"encyclopedia":500,"pin6":100,"pin12":200,"repost":150,"campaign":1000,"video":400,"report":800,"plan":1500,"website":5000,"media":10000,"infographic":300}'
+  '{"bilingual":300,"mention":200,"story":150,"pin6":100,"pin12":200,"repost":150,"campaign":1000,"video":400,"report":800,"plan":1500,"website":5000,"media":10000,"infographic":300}'
 ) ON CONFLICT (id) DO NOTHING;
