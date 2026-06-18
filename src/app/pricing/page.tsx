@@ -90,12 +90,22 @@ export default function PricingPage() {
                     <div className="text-xs text-muted">شامل ضريبة القيمة المضافة</div>
                   </div>
                   <ul className="space-y-2 mb-6 text-sm text-dark">
-                    {t.features.map(f => (
-                      <li key={f} className="flex items-start gap-2">
-                        <span className="text-green mt-0.5">✓</span>
-                        <span>{f}</span>
-                      </li>
-                    ))}
+                    {t.features.map(f => {
+                      const isSponsored = f.includes('مموّل')
+                      return (
+                        <li
+                          key={f}
+                          className={
+                            isSponsored
+                              ? 'flex items-start gap-2 font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-2 py-1.5'
+                              : 'flex items-start gap-2'
+                          }
+                        >
+                          <span className={isSponsored ? 'mt-0.5' : 'text-green mt-0.5'}>{isSponsored ? '📣' : '✓'}</span>
+                          <span>{f}</span>
+                        </li>
+                      )
+                    })}
                   </ul>
                   <Link href="/request"
                     className={`block text-center py-3 rounded-xl font-bold text-sm transition-all ${

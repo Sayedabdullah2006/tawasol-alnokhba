@@ -841,12 +841,24 @@ export default function RequestWizard() {
                         </span>
                       )}
                       <ul className="space-y-1.5 mt-auto">
-                        {pkg.features.map((f, i) => (
-                          <li key={i} className="flex items-start gap-1.5 text-xs text-dark">
-                            <span className="text-green flex-shrink-0">✓</span>
-                            <span>{f}</span>
-                          </li>
-                        ))}
+                        {pkg.features.map((f, i) => {
+                          const isSponsored = f.includes('مموّل')
+                          return (
+                            <li
+                              key={i}
+                              className={
+                                isSponsored
+                                  ? 'flex items-start gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded-md px-1.5 py-1'
+                                  : 'flex items-start gap-1.5 text-xs text-dark'
+                              }
+                            >
+                              <span className={isSponsored ? 'flex-shrink-0' : 'text-green flex-shrink-0'}>
+                                {isSponsored ? '📣' : '✓'}
+                              </span>
+                              <span>{f}</span>
+                            </li>
+                          )
+                        })}
                       </ul>
                     </button>
                   )
