@@ -1,6 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
+
+// المسارات التي لا نُظهر فيها نافذة الخصم — لأنها تعترض رحلة العميل بدل أن تجذبه إليها
+const SUPPRESS_ON = ['/request', '/payment', '/auth', '/dashboard', '/admin']
 
 interface ActiveDiscount {
   id: string
@@ -39,11 +43,14 @@ function daysLeft(iso: string): number {
 }
 
 export default function DiscountPopup() {
+  const pathname = usePathname()
+  const suppressed = SUPPRESS_ON.some(p => pathname?.startsWith(p))
   const [discount, setDiscount] = useState<ActiveDiscount | null>(null)
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
+    if (suppressed) return
     let cancelled = false
     fetch('/api/active-discount')
       .then(r => r.json())
@@ -56,13 +63,13 @@ export default function DiscountPopup() {
       })
       .catch(() => { /* تجاهل بهدوء */ })
     return () => { cancelled = true }
-  }, [])
+  }, [suppressed])
 
   useEffect(() => {
-    if (open) document.body.style.overflow = 'hidden'
-    else document.body.style.overflow = ''
+    // قفل تمرير الصفحة فقط عند ظهور النافذة فعلاً (وليس على مسارات الرحلة)
+    document.body.style.overflow = open && !suppressed ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
-  }, [open])
+  }, [open, suppressed])
 
   const handleClose = () => {
     if (discount) {
@@ -85,7 +92,7 @@ export default function DiscountPopup() {
     } catch { /* المتصفح لا يدعم النسخ التلقائي */ }
   }
 
-  if (!open || !discount) return null
+  if (suppressed || !open || !discount) return null
 
   const remaining = daysLeft(discount.expires_at)
 
