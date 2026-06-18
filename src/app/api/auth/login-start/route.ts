@@ -25,20 +25,21 @@ export async function POST(request: Request) {
     const normalizedEmail = String(email).trim().toLowerCase()
     const supabase = await createServiceRoleClient()
 
-    // نولّد الرمز فقط لمستخدم موجود، ونعيد رسالة موحّدة لتجنّب كشف البريد.
-    const { data: users } = await supabase.auth.admin.listUsers()
-    const target = users?.users?.find(u => u.email?.toLowerCase() === normalizedEmail)
+    // نتحقق أولاً من وجود الحساب عبر دالة آمنة مفهرسة (auth.users) — وليس مسح
+    // قائمة المستخدمين (المحدودة بـ50). مهم: generateLink لنوع magiclink يُنشئ
+    // حساباً جديداً لأي بريد غير موجود، فلا نستدعيه إلا لمستخدم مؤكَّد.
+    const { data: existingId } = await supabase.rpc('auth_user_id_by_email', { p_email: normalizedEmail })
 
-    if (target) {
+    if (existingId) {
       const { data: link, error: linkErr } = await supabase.auth.admin.generateLink({
         type: 'magiclink',
         email: normalizedEmail,
       })
       const otp = (link as { properties?: { email_otp?: string } } | null)?.properties?.email_otp
       if (!linkErr && otp) {
-        sendLoginCode({ email: normalizedEmail, code: otp, ttlMinutes: 60 })
-          .then(ok => console.log(`Login code for ${normalizedEmail}: ${ok ? 'SENT' : 'FAILED'}`))
-          .catch(e => console.error('Login code email failed:', e))
+        // ننتظر الإرسال حتى يكتمل (الخادم دائم على Railway) ونسجّل النتيجة.
+        const ok = await sendLoginCode({ email: normalizedEmail, code: otp, ttlMinutes: 60 })
+        console.log(`Login code for ${normalizedEmail}: ${ok ? 'SENT' : 'FAILED'}`)
       } else if (linkErr) {
         console.error('generateLink error:', linkErr)
       }
