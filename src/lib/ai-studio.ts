@@ -27,6 +27,20 @@ export const FACE_LOCK =
   'بالعربية: انسخ وجه الشخص من الصورة المرفقة كما هو حرفياً دون أي تغيير أو إعادة رسم؛ ممنوع توليد وجه/شخص مختلف منعاً باتاً.'
 
 /**
+ * توجيه تخطيط الفيديو — يُلحق فقط عند تفعيل "الخبر يتضمّن فيديو" في الاستوديو.
+ * يُعيد هيكلة التصميم: مساحة فيديو أفقية كبيرة فارغة + صورة الشخص في إطار احترافي.
+ */
+export const VIDEO_LAYOUT =
+  '=== 🎬 VIDEO LAYOUT OVERRIDE (أولوية قصوى — يُعيد هيكلة التخطيط) ===\n' +
+  'هذا المنشور يتضمّن فيديو. أعِد هيكلة التكوين على النحو التالي مع الحفاظ على هوية First1Saudi والمقاس 1080×1350 (4:5):\n' +
+  '1) خصّص «مساحة فيديو» مستطيلة أفقية كبيرة بنسبة 16:9 تمتد بعرض التصميم بالكامل في الجزء العلوي (تشغل تقريباً النصف العلوي). ' +
+  'اتركها فارغة تماماً كحاوية انتظار: مستطيل بزوايا دائرية بلون تيل عميق (#0A2D35) بإطار ذهبي رفيع (#FFD700) وأيقونة تشغيل (مثلث Play) شفافة في وسطه. ' +
+  '⛔ لا تضع أي صورة أو شخص أو نص داخل مساحة الفيديو — ستُملأ بفيديو لاحقاً. اجعلها عريضة وواضحة وبارزة.\n' +
+  '2) ضع صورة الشخص الحقيقية (من الصورة المرفقة) في «إطار احترافي» أصغر (إطار بزوايا دائرية بحدود ذهبية رفيعة وظل ناعم) أسفل مساحة الفيديو أو إلى جانبها، مع الحفاظ على الوجه كما هو تماماً.\n' +
+  '3) أسفل ذلك: الاسم وسطر الإنجاز ونقاط الحقائق + الفوتر المنحني مع @First1Saudi، كالمعتاد.\n' +
+  'الأولوية للوضوح: مساحة الفيديو هي العنصر الأبرز، وصورة الشخص في إطار ثانوي.'
+
+/**
  * توجيه "الصياغة الدائمة" — يُحقَن في الأتمتة (إعادة نشر الأرشيف) فقط.
  * يمنع أي إيحاء بأن الخبر حدثٌ آنيّ/عاجل، لأن الخبر قد يكون قديماً.
  */
@@ -125,9 +139,9 @@ export function conceptToString(c: Concept | undefined): string {
 /** الخطوة 4 — توليد التصميم عبر Gemini + تركيب اللوقو + الرفع إلى التخزين. */
 export async function generateDesign(
   openai: OpenAI,
-  args: { analysis: unknown; chosenConcept: string; sourceImages: string[]; note?: string; extra?: string },
+  args: { analysis: unknown; chosenConcept: string; sourceImages: string[]; note?: string; extra?: string; hasVideo?: boolean },
 ): Promise<{ imageUrl: string; prompt: string }> {
-  const { analysis, chosenConcept, sourceImages, note, extra } = args
+  const { analysis, chosenConcept, sourceImages, note, extra, hasVideo } = args
   const primarySource = sourceImages[0] ?? null
 
   const service = await createServiceRoleClient()
@@ -147,6 +161,9 @@ export async function generateDesign(
             ? `الصور الحقيقية المرفقة (${sourceImages.length}) على الروابط التالية — ادمجها جميعاً بتكوين متناسق داخل التصميم الواحد مع الحفاظ على واقعيتها:\n${sourceImages.map((u, i) => `${i + 1}. ${u}`).join('\n')}\n`
             : `الصورة الحقيقية المرفقة هي على الرابط: ${primarySource}\n`) +
           `اترك مساحة فارغة أسفل يمين الفوتر للوقو (سيُضاف لاحقاً برمجياً) ولا ترسم أي شعار هناك.\n` +
+          (hasVideo
+            ? `\n‼️ هذا الخبر يتضمّن فيديو: صمّم التخطيط حول «مساحة فيديو أفقية كبيرة فارغة» (نسبة 16:9) في الجزء العلوي تُملأ لاحقاً، وضع صورة الشخص في «إطار احترافي» أصغر تحتها أو بجانبها. اترك مساحة الفيديو فارغة تماماً دون أي صورة بداخلها.\n`
+            : '') +
           (note && note.trim()
             ? `\n‼️ ملاحظات الأدمن على التصميم (طبّقها بدقّة مع الحفاظ على ثوابت الهوية والصورة الحقيقية): ${note.trim()}\n`
             : '') +
@@ -157,7 +174,10 @@ export async function generateDesign(
   const designPrompt = promptCompletion.choices[0]?.message?.content ?? ''
 
   // قفل الوجه: يُحاط به موجّه Gemini من الطرفين (بداية ونهاية) لتقليل إعادة رسم الوجه.
-  const geminiPrompt = `${FACE_LOCK}\n\n${designPrompt}\n\n${FACE_LOCK}`
+  // عند وجود فيديو: نُلحق توجيه تخطيط الفيديو في النهاية (أولوية قصوى).
+  const geminiPrompt = hasVideo
+    ? `${FACE_LOCK}\n\n${designPrompt}\n\n${VIDEO_LAYOUT}\n\n${FACE_LOCK}`
+    : `${FACE_LOCK}\n\n${designPrompt}\n\n${FACE_LOCK}`
   const { b64 } = await generateImageWithGemini(geminiPrompt, sourceImages)
   const rawImage = Buffer.from(b64, 'base64')
   const posterBase = await resizeToPoster(rawImage)

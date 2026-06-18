@@ -38,10 +38,11 @@ export async function POST(req: Request) {
     analysis?: unknown
     chosenConcept?: string
     note?: string
+    hasVideo?: boolean
   }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 }) }
 
-  const { step, title, content, sourceImage, analysis, chosenConcept, note, extraInfo } = body
+  const { step, title, content, sourceImage, analysis, chosenConcept, note, extraInfo, hasVideo } = body
   if (!step) return NextResponse.json({ error: 'الخطوة مطلوبة' }, { status: 400 })
 
   // دعم اختيار أكثر من صورة مصدر (مع التوافق الخلفي لصورة مفردة).
@@ -86,7 +87,7 @@ export async function POST(req: Request) {
       if (!chosenConcept) return NextResponse.json({ error: 'اختر اتجاه التصميم أولاً' }, { status: 400 })
       if (!sourceImages.length) return NextResponse.json({ error: 'ارفع صورة المصدر أولاً' }, { status: 400 })
 
-      const { imageUrl, prompt } = await generateDesign(openai, { analysis, chosenConcept, sourceImages, note })
+      const { imageUrl, prompt } = await generateDesign(openai, { analysis, chosenConcept, sourceImages, note, hasVideo })
       return NextResponse.json({ imageUrl, prompt })
     }
 

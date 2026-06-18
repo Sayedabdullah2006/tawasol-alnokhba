@@ -23,6 +23,7 @@ export default function StandaloneStudio() {
   const [images, setImages] = useState<string[]>([])
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [extraInfo, setExtraInfo] = useState('')
+  const [hasVideo, setHasVideo] = useState(false)
   const [uploading, setUploading] = useState(false)
 
   const toggleImage = (url: string) =>
@@ -80,7 +81,7 @@ export default function StandaloneStudio() {
     if (!content.trim()) { showToast('أدخل نص الخبر أولاً', 'error'); return }
     setLoadingStep(step)
     try {
-      const data = await post({ step, title, content, sourceImages: selectedImages, extraInfo, analysis, chosenConcept: step === 'image' ? chosenConcept : undefined })
+      const data = await post({ step, title, content, sourceImages: selectedImages, extraInfo, analysis, chosenConcept: step === 'image' ? chosenConcept : undefined, hasVideo })
       if (!data) return
       if (step === 'analyze') { setAnalysis(data.analysis); showToast('تم التحليل', 'success') }
       else if (step === 'tweets') { setTweets(data.tweets); setSelectedTweet(data.tweets); showToast('تم توليد التغريدات', 'success') }
@@ -93,7 +94,7 @@ export default function StandaloneStudio() {
   }
 
   const genOne = async (brief: string, note?: string): Promise<string | null> => {
-    const data = await post({ step: 'image', title, content, sourceImages: selectedImages, extraInfo, analysis, chosenConcept: brief, note })
+    const data = await post({ step: 'image', title, content, sourceImages: selectedImages, extraInfo, analysis, chosenConcept: brief, note, hasVideo })
     return data?.imageUrl ?? null
   }
 
@@ -162,6 +163,14 @@ export default function StandaloneStudio() {
         {/* معلومات إضافية قبل التحليل */}
         <textarea value={extraInfo} onChange={e => setExtraInfo(e.target.value)} placeholder="معلومات إضافية (اختياري) — تُراعى في التحليل والاتجاهات والتصميم..."
           className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[70px] resize-y" />
+        {/* خيار الفيديو — يولّد تصميماً بمساحة فيديو عريضة فارغة + صورة الشخص في إطار */}
+        <label className={`flex items-start gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition ${hasVideo ? 'border-amber-400 bg-amber-50' : 'border-border bg-white hover:border-amber-300'}`}>
+          <input type="checkbox" checked={hasVideo} onChange={e => setHasVideo(e.target.checked)} className="mt-0.5 w-4 h-4 accent-amber-500" />
+          <span className="text-sm">
+            <span className="font-bold text-dark">🎬 الخبر يتضمّن فيديو</span>
+            <span className="block text-[11px] text-muted mt-0.5">يولّد التصميم بمساحة فيديو عريضة فارغة (تضيف الفيديو لاحقاً) + صورة الشخص في إطار احترافي.</span>
+          </span>
+        </label>
       </div>
 
       {/* 1 تحليل */}
