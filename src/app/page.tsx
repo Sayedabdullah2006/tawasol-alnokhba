@@ -17,19 +17,13 @@ const values = [
   { icon: '🔒', title: 'تعامل موثوق', desc: 'رُقيّ واحترافية من أول رسالة حتى نشر إنجازك بأبهى صورة.' },
 ]
 
-const steps = [
-  { num: '١', title: 'قدّم طلبك', desc: 'أدخل خبرك واختر باقتك — ويظهر سعرك فوراً.' },
-  { num: '٢', title: 'اعتمد وادفع', desc: 'تعتمد المحتوى وتدفع بسهولة (إلكتروني · تمارا · تحويل).' },
-  { num: '٣', title: 'ننشر بعد موافقتك', desc: 'نصمّم وننشر خبرك على أوسع نطاق — بعد اعتمادك.' },
-]
-
 const testimonials = [
-  { name: 'أحمد', role: 'رائد أعمال', quote: 'وصل خبري لآلاف خلال يوم واحد — احترافية من أول رسالة.' },
-  { name: 'نورة', role: 'أكاديمية', quote: 'التصميم فاق توقعاتي والتفاعل كان لافتاً جداً.' },
-  { name: 'خالد', role: 'مهندس', quote: 'راقني أنني أعتمد المحتوى قبل النشر — ثقة كاملة.' },
-  { name: 'ريم', role: 'صاحبة مشروع', quote: 'أبرزوا إنجازي بأسلوب يليق به فعلاً.' },
-  { name: 'فهد', role: 'مستثمر', quote: 'أسرع وأرقى خدمة جرّبتها لإيصال خبري.' },
-  { name: 'سارة', role: 'مختصة تسويق', quote: 'خدمة منظّمة وسريعة، والنتيجة تستحق كل ريال.' },
+  { name: 'أحمد', role: 'رائد أعمال', quote: 'وصل خبري لآلاف خلال يوم واحد — احترافية من أول رسالة.', img: 'https://api.dicebear.com/9.x/micah/svg?seed=Ahmed&backgroundColor=1b3d85' },
+  { name: 'نورة', role: 'أكاديمية', quote: 'التصميم فاق توقعاتي والتفاعل كان لافتاً جداً.', img: 'https://api.dicebear.com/9.x/micah/svg?seed=Noura&backgroundColor=b6804a' },
+  { name: 'خالد', role: 'مهندس', quote: 'راقني أنني أعتمد المحتوى قبل النشر — ثقة كاملة.', img: 'https://api.dicebear.com/9.x/micah/svg?seed=Khalid&backgroundColor=2f5e3f' },
+  { name: 'ريم', role: 'صاحبة مشروع', quote: 'أبرزوا إنجازي بأسلوب يليق به فعلاً.', img: 'https://api.dicebear.com/9.x/micah/svg?seed=Reem&backgroundColor=8a5a83' },
+  { name: 'فهد', role: 'مستثمر', quote: 'أسرع وأرقى خدمة جرّبتها لإيصال خبري.', img: 'https://api.dicebear.com/9.x/micah/svg?seed=Fahad&backgroundColor=1b3d85' },
+  { name: 'سارة', role: 'مختصة تسويق', quote: 'خدمة منظّمة وسريعة، والنتيجة تستحق كل ريال.', img: 'https://api.dicebear.com/9.x/micah/svg?seed=Sara&backgroundColor=b6804a' },
 ]
 
 const faqs = [
@@ -54,7 +48,6 @@ export default function HomePage() {
       <div className="relative">
         {/* البطل */}
         <section className="max-w-5xl mx-auto px-4 pt-20 md:pt-28 pb-8 text-center">
-          <p className="text-gold/80 text-xs md:text-sm font-bold tracking-[0.35em] mb-5">تواصل النخبة</p>
           <h1 className="text-4xl md:text-7xl font-black text-cream leading-[1.18] mb-6">
             إنجازك يستحق أن <span className="text-gold">يراه الجميع</span>
           </h1>
@@ -65,7 +58,6 @@ export default function HomePage() {
             className="inline-block px-12 py-4 bg-gold text-dark rounded-2xl text-lg font-black hover:bg-gold/90 transition-all active:scale-[0.98] shadow-2xl shadow-gold/20">
             ابدأ طلبك الآن
           </Link>
-          <p className="text-cream/50 text-xs md:text-sm mt-5">لا يُنشر إلا بموافقتك · تسعير فوري · تقسيط تمارا</p>
         </section>
 
         {/* المعرض الحي — قلب الصفحة، ينساب من البطل */}
@@ -103,25 +95,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* كيف نعمل — خطوات منسابة */}
-        <section className="max-w-4xl mx-auto px-4 py-14">
-          <h2 className="text-center text-2xl md:text-4xl font-black text-cream mb-12">كيف نعمل؟</h2>
-          <div className="grid md:grid-cols-3 gap-10 md:gap-6">
-            {steps.map((s, i) => (
-              <div key={s.num} className="relative text-center">
-                <div className="w-14 h-14 mx-auto mb-4 rounded-full border-2 border-gold/40 text-gold flex items-center justify-center text-2xl font-black">
-                  {s.num}
-                </div>
-                <h3 className="text-cream font-black text-lg mb-1.5">{s.title}</h3>
-                <p className="text-cream/60 text-sm leading-relaxed max-w-xs mx-auto">{s.desc}</p>
-                {i < steps.length - 1 && (
-                  <div className="hidden md:block absolute top-7 left-0 -translate-x-1/2 text-gold/30 text-2xl">←</div>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-
         {/* آراء — اقتباسات منسابة بلا بطاقات ثقيلة */}
         <section className="max-w-5xl mx-auto px-4 py-14">
           <h2 className="text-center text-2xl md:text-4xl font-black text-cream mb-12">ماذا قالوا عنا؟</h2>
@@ -130,9 +103,14 @@ export default function HomePage() {
               <div key={t.name + t.quote} className="border-t border-cream/15 pt-5">
                 <div className="text-gold text-4xl leading-none mb-2">“</div>
                 <p className="text-cream/85 text-sm leading-relaxed mb-4">{t.quote}</p>
-                <div className="text-sm">
-                  <span className="text-gold font-black">{t.name}</span>
-                  <span className="text-cream/50"> — {t.role}</span>
+                <div className="flex items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={t.img} alt={t.name} loading="lazy"
+                    className="w-11 h-11 rounded-full object-cover ring-2 ring-gold/30 bg-cream/10 shrink-0" />
+                  <div className="text-sm leading-tight">
+                    <div className="text-gold font-black">{t.name}</div>
+                    <div className="text-cream/50">{t.role}</div>
+                  </div>
                 </div>
               </div>
             ))}
