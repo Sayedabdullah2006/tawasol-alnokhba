@@ -107,7 +107,7 @@ export default function PricingPage() {
                       )
                     })}
                   </ul>
-                  <Link href="/start"
+                  <Link href="/request"
                     className={`block text-center py-3 rounded-xl font-bold text-sm transition-all ${
                       t.highlighted
                         ? 'bg-green text-white hover:bg-green/90'
@@ -126,7 +126,7 @@ export default function PricingPage() {
                 بعد إرسال طلبك، يقوم فريق تواصل النخبة بمراجعة المحتوى وإرسال عرض سعر مخصص يناسب طبيعة المحتوى والقنوات المختارة.
                 يمكنك بعدها إضافة الخدمات الاختيارية لرفع مستوى الحملة، وكل خدمة تضاف يظهر أمامك أثرها على السعر والوصول المتوقع.
               </p>
-              <Link href="/start"
+              <Link href="/request"
                 className="inline-block mt-4 px-6 py-3 bg-green text-white rounded-xl text-sm font-bold hover:bg-green/90 transition-all">
                 ابدأ طلبك الآن
               </Link>
