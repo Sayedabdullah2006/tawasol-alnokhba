@@ -117,6 +117,13 @@ export async function sendRegistrationCode(args: {
   return sendEmail(args.email, t.subject, t.html)
 }
 
+export async function sendLoginCode(args: {
+  email: string; code: string; ttlMinutes: number
+}) {
+  const t = templates.loginCodeToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
 export async function sendWelcomeEmail(args: {
   email: string; clientName: string
 }) {

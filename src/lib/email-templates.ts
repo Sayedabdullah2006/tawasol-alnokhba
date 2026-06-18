@@ -557,6 +557,28 @@ export function resetPasswordCodeToClient(d: {
   }
 }
 
+// 7b. Login code (passwordless) — to client
+export function loginCodeToClient(d: {
+  code: string
+  ttlMinutes: number
+}) {
+  return {
+    subject: `رمز الدخول · تواصل النخبة`,
+    html: wrap(`
+      <p style="margin:0 0 16px 0; font-size:15px;">🔑 <strong>رمز تسجيل الدخول</strong></p>
+      <p style="margin:0 0 18px 0; font-size:13px; line-height:1.8;">
+        استخدم الرمز التالي لتسجيل الدخول إلى حسابك في تواصل النخبة:
+      </p>
+      <div style="background:#F7F4ED; border-radius:12px; padding:18px; margin:0 0 16px 0; text-align:center;">
+        <p style="margin:0; font-size:34px; font-weight:900; letter-spacing:8px; color:${BRAND_NAVY}; font-family:monospace;">${escapeHtml(d.code)}</p>
+      </div>
+      <p style="margin:0; font-size:12px; color:#9CA3AF; text-align:center;">
+        ينتهي الرمز خلال ${d.ttlMinutes} دقيقة. إن لم تطلب الدخول، تجاهل هذه الرسالة.
+      </p>
+    `),
+  }
+}
+
 // 8. Rejected — to client
 export function rejectedToClient(d: {
   requestNumber: string
