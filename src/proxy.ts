@@ -28,8 +28,9 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const pathname = request.nextUrl.pathname
 
-  // Protected routes — require login
-  if (pathname.startsWith('/dashboard') || pathname.startsWith('/admin') || pathname.startsWith('/request')) {
+  // Protected routes — require login.
+  // ملاحظة: /request مفتوح للزوار (يُنشأ الحساب تلقائياً عند الإرسال) لتقليل الاحتكاك.
+  if (pathname.startsWith('/dashboard') || pathname.startsWith('/admin')) {
     if (!user) {
       const url = request.nextUrl.clone()
       url.pathname = '/auth/login'
@@ -41,5 +42,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/admin/:path*', '/request/:path*'],
+  matcher: ['/dashboard/:path*', '/admin/:path*'],
 }

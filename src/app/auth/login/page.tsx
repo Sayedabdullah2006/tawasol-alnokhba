@@ -48,10 +48,14 @@ export default function LoginPage() {
       .eq('id', authData.user.id)
       .single()
 
+    // وجهة العودة بعد الدخول (مثل الدفع بعد إنشاء طلب كزائر له حساب)
+    const nextParam = new URLSearchParams(window.location.search).get('next')
+    const safeNext = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : null
+
     if (profile?.role === 'admin') {
       router.push('/admin')
     } else {
-      router.push('/dashboard')
+      router.push(safeNext ?? '/dashboard')
     }
     router.refresh()
   }

@@ -18,10 +18,14 @@ export async function POST(request: Request) {
 
     // ── تحديد المستخدم ───────────────────────────────────────────
     let userId: string | null = null
+    let wasLoggedIn = false
+    // بيانات تسجيل دخول الضيف الجديد (تُعاد للواجهة لتسجيله تلقائياً)، أو إشارة لحساب موجود.
+    let newUserCreds: { email: string; password: string } | null = null
+    let existingGuestAccount = false
     try {
       const userClient = await createServerSupabaseClient()
       const { data: { user } } = await userClient.auth.getUser()
-      if (user) userId = user.id
+      if (user) { userId = user.id; wasLoggedIn = true }
     } catch { /* not logged in */ }
 
     if (!userId) {
@@ -30,6 +34,7 @@ export async function POST(request: Request) {
         const existing = users?.users?.find(u => u.email === body.client_email)
         if (existing) {
           userId = existing.id
+          existingGuestAccount = true
         } else {
           const tempPassword = Math.random().toString(36).slice(-10) + 'A1!'
           const { data: newUser } = await serviceClient.auth.admin.createUser({
@@ -40,6 +45,7 @@ export async function POST(request: Request) {
           })
           if (newUser?.user) {
             userId = newUser.user.id
+            newUserCreds = { email: body.client_email, password: tempPassword }
             await serviceClient.from('profiles').upsert({
               id:        newUser.user.id,
               full_name: body.client_name,
@@ -53,6 +59,11 @@ export async function POST(request: Request) {
         console.error('User lookup/creation error:', e)
       }
     }
+
+    // حمولة الجلسة المُعادة للواجهة: تسجيل تلقائي للضيف الجديد، أو طلب دخول لحساب موجود.
+    const sessionPayload: { autoLogin?: { email: string; password: string }; existingAccount?: boolean } =
+      newUserCreds ? { autoLogin: newUserCreds }
+      : (!wasLoggedIn && existingGuestAccount ? { existingAccount: true } : {})
 
     // ── منع تقديم طلب جديد ما دام للعميل طلب قائم لم يُدفع ولم يكتمل ──────
     // لا يحق للعميل رفع أكثر من طلب واحد في الحالات التالية (قبل الدفع/الاكتمال).
@@ -294,6 +305,7 @@ export async function POST(request: Request) {
             requestNumber,
             clientName:   body.client_name ?? 'عزيزنا',
             total:        campaignFinalPrice,
+            requestId:    data.id,
           }).catch(e => console.error('Campaign awaiting-payment email failed:', e))
         } else {
           notifyRequestReceivedToClient({
@@ -304,6 +316,7 @@ export async function POST(request: Request) {
             title:       firstPost.title,
             content:     firstPost.content,
             channels,
+            requestId:   data.id,
           }).catch(e => console.error('Campaign received email failed:', e))
         }
       }
@@ -313,6 +326,7 @@ export async function POST(request: Request) {
         id: data.id,
         quotedTotal: isIndividual ? campaignFinalPrice : null,
         readyForPayment: isIndividual,
+        ...sessionPayload,
       })
     }
 
@@ -492,6 +506,7 @@ export async function POST(request: Request) {
           requestNumber,
           clientName:   body.client_name ?? 'عزيزنا',
           total:        singleFinalPrice,
+          requestId:    data.id,
         }).catch(e => console.error('Awaiting-payment email failed:', e))
       } else {
         notifyRequestReceivedToClient({
@@ -502,6 +517,7 @@ export async function POST(request: Request) {
           title:       body.title,
           content:     body.content,
           channels:    effectiveChannels,
+          requestId:   data.id,
         }).catch(e => console.error('Received email failed:', e))
       }
     }
@@ -511,6 +527,7 @@ export async function POST(request: Request) {
       id: data.id,
       quotedTotal: isIndividual ? singleFinalPrice : null,
       readyForPayment: isIndividual,
+      ...sessionPayload,
     })
 
   } catch (err) {

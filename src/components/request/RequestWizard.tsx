@@ -456,10 +456,29 @@ export default function RequestWizard() {
 
       try { localStorage.removeItem(DRAFT_KEY) } catch { /* تجاهل */ }
 
-      // الحملة (فرد): معتمدة مباشرةً — تحويل العميل لصفحة الدفع دون عرض/تفاوض
+      // ── تسجيل دخول تلقائي للضيف الجديد حتى يتابع طلبه ويدفع بلا حاجز ──
+      let signedIn = false
+      if (data.autoLogin?.email && data.autoLogin?.password) {
+        const supabase = createClient()
+        const { error: siErr } = await supabase.auth.signInWithPassword({
+          email: data.autoLogin.email,
+          password: data.autoLogin.password,
+        })
+        signedIn = !siErr
+        if (signedIn) router.refresh()
+      }
+      // جلسة متاحة؟ (سجّلناه الآن، أو كان مسجّلاً مسبقاً). الحساب الموجود لزائر غير مسجّل يحتاج دخولاً.
+      const hasSession = signedIn || (!data.autoLogin && !data.existingAccount)
+
+      // فرد معتمد مباشرةً — تحويله للدفع (بجلسة إن وُجدت، أو عبر الدخول إن كان له حساب)
       if (data.readyForPayment && data.id) {
-        showToast('تم إنشاء حملتك — أكمل الدفع')
-        router.push(`/payment/${data.id}`)
+        if (hasSession) {
+          showToast('تم إنشاء طلبك — أكمل الدفع')
+          router.push(`/payment/${data.id}`)
+        } else {
+          showToast('لديك حساب — سجّل دخولك لإكمال الدفع ومتابعة طلبك')
+          router.push(`/auth/login?next=${encodeURIComponent(`/payment/${data.id}`)}`)
+        }
         return
       }
 

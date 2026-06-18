@@ -83,7 +83,7 @@ export async function notifyFreeApprovedToClient(args: {
 }
 
 export async function notifyQuoteApprovedAwaitingPaymentToClient(args: {
-  email: string; requestNumber: string; clientName: string; total: number
+  email: string; requestNumber: string; clientName: string; total: number; requestId?: string
 }) {
   const t = templates.quoteApprovedAwaitingPaymentToClient(args)
   return sendEmail(args.email, t.subject, t.html)

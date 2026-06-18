@@ -134,6 +134,7 @@ export interface ClientRequestData {
   channels: string[]
   clientEmail?: string
   clientPhone?: string
+  requestId?: string // معرّف الطلب — لرابط متابعة مباشر في الإيميل
 }
 
 const CHANNEL_LABELS: Record<string, string> = {
@@ -155,8 +156,8 @@ export function requestReceivedToClient(d: ClientRequestData) {
         <li>عرض مخصص لطلبك</li>
         <li>خيارات الخدمات الإضافية المتاحة</li>
       </ul>
-      <p style="margin:0 0 20px 0; font-size:13px;">📋 يمكنك متابعة حالة طلبك في لوحة التحكم.</p>
-      <p style="margin:0; text-align:center;">${button('عرض الطلب', `${SITE_URL}/dashboard`)}</p>
+      <p style="margin:0 0 20px 0; font-size:13px;">📋 يمكنك متابعة حالة طلبك في أي وقت من الزر أدناه.</p>
+      <p style="margin:0; text-align:center;">${button('تابع طلبك', d.requestId ? `${SITE_URL}/dashboard/${d.requestId}` : `${SITE_URL}/dashboard`)}</p>
     `),
   }
 }
@@ -268,6 +269,7 @@ export function quoteApprovedAwaitingPaymentToClient(d: {
   requestNumber: string
   clientName: string
   total: number
+  requestId?: string
 }) {
   return {
     subject: `📋 اعتمدت عرض طلبك · ${d.requestNumber} · بانتظار الدفع`,
@@ -290,7 +292,7 @@ export function quoteApprovedAwaitingPaymentToClient(d: {
         <p style="margin:0 0 4px 0; font-size:13px; font-weight:bold; color:#6d28d9;">🛍️ هل تريد تقسيط المبلغ؟ ادفع عبر تمارا على 3 أقساط بدون فوائد</p>
         <p style="margin:0; font-size:11px; color:#7c3aed;">القسط الأول الآن · الثاني بعد شهر · الثالث بعد شهرين · بدون رسوم</p>
       </div>
-      <p style="margin:0; text-align:center;">${button('الانتقال للدفع', `${SITE_URL}/dashboard`)}</p>
+      <p style="margin:0; text-align:center;">${button('أكمل الدفع الآن', d.requestId ? `${SITE_URL}/payment/${d.requestId}` : `${SITE_URL}/dashboard`)}</p>
     `),
   }
 }
