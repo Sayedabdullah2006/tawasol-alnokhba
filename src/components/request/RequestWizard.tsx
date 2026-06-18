@@ -146,6 +146,7 @@ export default function RequestWizard() {
   // الخدمات الإضافية لم تَعُد تُختار أثناء الإرسال — تُعرض على العميل بعد وصول العرض
   const selectedExtras: string[] = []
   const [contact, setContact]           = useState<ContactData>({ fullName: '', phone: '', email: '', city: '', xHandle: '' })
+  const [isLoggedIn, setIsLoggedIn]     = useState(false)
   const [orgInfo, setOrgInfo]           = useState({ name: '', representative: '', license: '' })
   // الموافقة على الشروط ضمنية بالضغط على «إرسال الطلب» — مع رابط لعرضها في نافذة منبثقة
   const [showTerms, setShowTerms] = useState(false)
@@ -200,6 +201,7 @@ export default function RequestWizard() {
     })
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
+        setIsLoggedIn(true)
         supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data: profile }) => {
           if (profile) {
             setContact(prev => ({
@@ -355,7 +357,15 @@ export default function RequestWizard() {
     }
   })()
 
-  const sectionComplete = [aboutComplete, contentComplete, packagesComplete]
+  // بيانات تواصل الضيف (الزائر غير المسجَّل) — إلزامية لإنشاء حسابه ومتابعة طلبه.
+  const emailValid = /^\S+@\S+\.\S+$/.test(contact.email.trim())
+  const contactComplete = isLoggedIn || (
+    contact.fullName.trim().length >= 3 &&
+    contact.phone.trim().replace(/\D/g, '').length >= 9 &&
+    emailValid
+  )
+
+  const sectionComplete = [aboutComplete, contentComplete, packagesComplete, contactComplete]
   const canSubmit = sectionComplete.every(Boolean)
 
   // أول متطلب ناقص — يُعرض كتلميح فوق زر الإرسال
@@ -374,6 +384,11 @@ export default function RequestWizard() {
     }
     if (showPackages && !selectedPackage) return 'اختر الباقة المناسبة'
     if (basicNeedsChannel && !basicChannel) return 'اختر قناة النشر للباقة الأساسية'
+    if (!isLoggedIn) {
+      if (contact.fullName.trim().length < 3) return 'أدخل اسمك الكامل'
+      if (contact.phone.trim().replace(/\D/g, '').length < 9) return 'أدخل رقم جوالك'
+      if (!emailValid) return 'أدخل بريداً إلكترونياً صحيحاً'
+    }
     return null
   }
 
@@ -925,6 +940,23 @@ export default function RequestWizard() {
                 </Button>
               </div>
             </FormSection>
+          )}
+
+          {/* بيانات التواصل — للزائر غير المسجَّل فقط (يُنشأ حسابه تلقائياً عند الإرسال) */}
+          {!isLoggedIn && (
+            <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
+              <h3 className="font-bold text-dark">👤 بياناتك للتواصل</h3>
+              <p className="text-xs text-muted -mt-1">يُنشأ حسابك تلقائياً بهذه البيانات لمتابعة طلبك وإشعارك بالعرض والدفع.</p>
+              <input value={contact.fullName} onChange={e => setContact(p => ({ ...p, fullName: e.target.value }))}
+                placeholder="الاسم الكامل *" className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm" />
+              <input value={contact.phone} onChange={e => setContact(p => ({ ...p, phone: e.target.value }))}
+                placeholder="رقم الجوال *" inputMode="tel" className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm" />
+              <input value={contact.email} onChange={e => setContact(p => ({ ...p, email: e.target.value }))}
+                placeholder="البريد الإلكتروني *" type="email" inputMode="email"
+                className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm" />
+              <input value={contact.city} onChange={e => setContact(p => ({ ...p, city: e.target.value }))}
+                placeholder="المدينة (اختياري)" className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm" />
+            </div>
           )}
 
         </div>
