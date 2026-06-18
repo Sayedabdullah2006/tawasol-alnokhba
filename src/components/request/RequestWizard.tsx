@@ -33,17 +33,17 @@ const SITE_CONTENT_FALLBACK: SiteContent = {
 }
 
 // ─── خيارات القوائم المنسدلة ───────────────────────────────────────
-const REQUEST_TYPE_OPTIONS: { id: RequestType; label: string }[] = [
-  { id: 'single',   label: '📄 منشور واحد' },
-  { id: 'campaign', label: '🚀 حملة متعددة المنشورات' },
+const REQUEST_TYPE_OPTIONS: { id: RequestType; icon: string; label: string; desc: string }[] = [
+  { id: 'single',   icon: '📄', label: 'منشور واحد',   desc: 'خبر واحد يُنشر مرة' },
+  { id: 'campaign', icon: '🚀', label: 'حملة متعددة',  desc: 'عدة منشورات بخصم' },
 ]
 
-const CLIENT_TYPE_OPTIONS: { id: ClientType; label: string }[] = [
-  { id: 'individual', label: '👤 فرد' },
-  { id: 'business',   label: '🏢 شركة / مؤسسة' },
-  { id: 'government', label: '🏛️ جهة حكومية' },
-  { id: 'charity',    label: '❤️ جمعية خيرية' },
-  { id: 'agency',     label: '📣 وكالة دعاية وإعلان' },
+const CLIENT_TYPE_OPTIONS: { id: ClientType; icon: string; label: string }[] = [
+  { id: 'individual', icon: '👤', label: 'فرد' },
+  { id: 'business',   icon: '🏢', label: 'شركة / مؤسسة' },
+  { id: 'government', icon: '🏛️', label: 'جهة حكومية' },
+  { id: 'charity',    icon: '❤️', label: 'جمعية خيرية' },
+  { id: 'agency',     icon: '📣', label: 'وكالة دعاية' },
 ]
 
 // تسميات قنوات النشر (لاختيار قناة الباقة الأساسية)
@@ -548,13 +548,49 @@ export default function RequestWizard() {
     ? getCompetitionPositions(competitionSelection.subcategory)
     : []
 
+  // اختيار نوع الطلب / الصفة عبر البطاقات — بنفس آثار القوائم المنسدلة السابقة
+  const selectRequestType = (v: RequestType) => {
+    setRequestType(v)
+    if (v === 'campaign') { setCategory(null); setSubOption(null); setCompetitionSelection(null) }
+  }
+  const selectClientType = (v: ClientType) => {
+    if (clientType !== v) {
+      setCategory(null); setSubOption(null); setCompetitionSelection(null)
+      setCampaignPosts(prev => prev.map(p => ({ ...p, category: '', subOption: null })))
+    }
+    setClientType(v)
+  }
+
+  // تقدّم التعبئة — للأقسام الفعّالة فقط (الباقة للأفراد، التواصل للزائر)
+  const progressSteps = [
+    aboutComplete, contentComplete,
+    ...(showPackages ? [packagesComplete] : []),
+    ...(!isLoggedIn ? [contactComplete] : []),
+  ]
+  const progressDone = progressSteps.filter(Boolean).length
+  const progressPct = Math.round((progressDone / progressSteps.length) * 100)
+
   // ── العرض ───────────────────────────────────────────────────────
   return (
     <div className="bg-cream min-h-screen pb-28">
       <div className="max-w-2xl mx-auto w-full px-4 pt-6">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl md:text-3xl font-black text-dark mb-1">📋 طلب نشر جديد</h1>
-          <p className="text-sm text-muted">عبّئ النموذج دفعة واحدة — وبمجرد الإرسال يصلك العرض</p>
+        <div className="text-center mb-5">
+          <h1 className="text-2xl md:text-3xl font-black text-dark mb-1">طلب نشر جديد</h1>
+          <p className="text-sm text-muted">عبّئ بياناتك بسرعة — وبمجرد الإرسال يظهر سعرك ويصلك العرض</p>
+        </div>
+
+        {/* شريط التقدّم */}
+        <div className="mb-5">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs font-bold text-dark">{progressDone} من {progressSteps.length} مكتمل</span>
+            <span className="text-xs font-black text-green">{progressPct}%</span>
+          </div>
+          <div className="h-2 rounded-full bg-muted/15 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-l from-green to-green/70 transition-all duration-500 ease-out"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -571,49 +607,53 @@ export default function RequestWizard() {
             <div className="space-y-4">
               <div>
                 <label className={fieldLabel}>نوع الطلب *</label>
-                <select
-                  value={requestType ?? ''}
-                  onChange={e => {
-                    const v = (e.target.value || null) as RequestType | null
-                    setRequestType(v)
-                    if (v === 'campaign') {
-                      setCategory(null); setSubOption(null); setCompetitionSelection(null)
-                    }
-                  }}
-                  className={selectCls}
-                >
-                  <option value="">— اختر النوع —</option>
-                  {REQUEST_TYPE_OPTIONS.map(o => (
-                    <option key={o.id} value={o.id}>{o.label}</option>
-                  ))}
-                </select>
+                <div className="grid grid-cols-2 gap-3">
+                  {REQUEST_TYPE_OPTIONS.map(o => {
+                    const active = requestType === o.id
+                    return (
+                      <button
+                        type="button"
+                        key={o.id}
+                        onClick={() => selectRequestType(o.id)}
+                        className={cn(
+                          'rounded-2xl border-2 p-4 text-center transition-all active:scale-[0.98]',
+                          active ? 'border-green bg-green/5 ring-2 ring-green/20' : 'border-border bg-white hover:border-green/40',
+                        )}
+                      >
+                        <div className="text-3xl mb-1.5">{o.icon}</div>
+                        <div className="font-black text-dark text-sm">{o.label}</div>
+                        <div className="text-[11px] text-muted mt-0.5">{o.desc}</div>
+                      </button>
+                    )
+                  })}
+                </div>
                 {requestType === 'campaign' && (
-                  <p className="text-xs text-green-700 mt-1.5">🎉 الحملة المتعددة تمنحك خصماً على الإجمالي</p>
+                  <p className="text-xs text-green-700 mt-2">🎉 الحملة المتعددة تمنحك خصماً على الإجمالي</p>
                 )}
               </div>
 
               <div>
                 <label className={fieldLabel}>صفة مقدّم الطلب *</label>
-                <select
-                  value={clientType ?? ''}
-                  onChange={e => {
-                    const v = (e.target.value || null) as ClientType | null
-                    if (clientType !== v) {
-                      setCategory(null)
-                      setSubOption(null)
-                      setCompetitionSelection(null)
-                      setCampaignPosts(prev => prev.map(p => ({ ...p, category: '', subOption: null })))
-                    }
-                    setClientType(v)
-                  }}
-                  className={selectCls}
-                >
-                  <option value="">— اختر الصفة —</option>
-                  {CLIENT_TYPE_OPTIONS.map(o => (
-                    <option key={o.id} value={o.id}>{o.label}</option>
-                  ))}
-                </select>
-                <p className="text-xs text-amber-600 mt-1.5">⚠️ يجب اختيار الصفة الصحيحة تجنباً لإلغاء الطلب</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {CLIENT_TYPE_OPTIONS.map(o => {
+                    const active = clientType === o.id
+                    return (
+                      <button
+                        type="button"
+                        key={o.id}
+                        onClick={() => selectClientType(o.id)}
+                        className={cn(
+                          'flex items-center gap-2 rounded-xl border-2 px-3 py-2.5 text-sm font-bold transition-all active:scale-[0.98]',
+                          active ? 'border-green bg-green/5 text-dark ring-2 ring-green/20' : 'border-border bg-white text-muted hover:border-green/40',
+                        )}
+                      >
+                        <span className="text-lg leading-none">{o.icon}</span>
+                        <span className="leading-tight text-right">{o.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="text-xs text-amber-600 mt-2">⚠️ يجب اختيار الصفة الصحيحة تجنباً لإلغاء الطلب</p>
               </div>
 
               {/* بيانات الجهة — لغير الأفراد (شركة / حكومة / جمعية / وكالة) */}
