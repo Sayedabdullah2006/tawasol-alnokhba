@@ -470,16 +470,21 @@ export default function RequestWizard() {
       // جلسة متاحة؟ (سجّلناه الآن، أو كان مسجّلاً مسبقاً). الحساب الموجود لزائر غير مسجّل يحتاج دخولاً.
       const hasSession = signedIn || (!data.autoLogin && !data.existingAccount)
 
-      // فرد معتمد مباشرةً — تحويله للدفع (بجلسة إن وُجدت، أو عبر الدخول إن كان له حساب)
+      // فرد معتمد مباشرةً — تحويله للدفع
       if (data.readyForPayment && data.id) {
         if (hasSession) {
+          // جلسة جاهزة (سجّلناه الآن أو كان مسجّلاً) → للدفع مباشرة
           showToast('تم إنشاء طلبك — أكمل الدفع')
           router.push(`/payment/${data.id}`)
-        } else {
+          return
+        }
+        if (data.existingAccount) {
+          // حساب موجود لزائر غير مسجّل → دخول ثم عودة للدفع
           showToast('لديك حساب — سجّل دخولك لإكمال الدفع ومتابعة طلبك')
           router.push(`/auth/login?next=${encodeURIComponent(`/payment/${data.id}`)}`)
+          return
         }
-        return
+        // ضيف جديد تعذّر تسجيله تلقائياً (نادر) → شاشة نجاح + رابط المتابعة في الإيميل
       }
 
       setRequestNumber(data.requestNumber)
