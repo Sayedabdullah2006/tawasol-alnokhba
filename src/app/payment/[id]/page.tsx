@@ -213,37 +213,8 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                 <span className="font-bold text-green">{formatNumberShort(request.estimated_reach)} متابع</span>
               </div>
             )}
-            <p className="text-xs text-muted text-center pt-2">
-              لتعديل الخدمات الإضافية, عُد لصفحة الطلب
-            </p>
           </div>
 
-          {/* إشارات الثقة */}
-          {!isPaid && (
-            <div className="rounded-xl border border-green/20 bg-green/5 p-4">
-              <div className="grid grid-cols-2 gap-3 text-xs text-dark">
-                <div className="flex items-start gap-2">
-                  <span className="text-base">🔒</span>
-                  <span>دفع آمن ومشفّر عبر بوابات موثوقة</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-base">👁️</span>
-                  <span>تراجع المحتوى والتصميم قبل النشر</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-base">✍️</span>
-                  <span>صياغة وتصميم احترافي على يد فريق متخصّص</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-base">💬</span>
-                  <span>دعم يرافقك خطوة بخطوة حتى النشر</span>
-                </div>
-              </div>
-              <p className="text-[11px] text-muted text-center mt-3 pt-2 border-t border-green/20">
-                🤝 لا يُنشر أي محتوى إلا بعد اعتمادك — ثقتك أمانة لدينا
-              </p>
-            </div>
-          )}
           {isPaid ? (
             <div className="bg-green/5 border border-green/20 rounded-xl p-4 text-center">
               <div className="text-3xl mb-2">✅</div>
