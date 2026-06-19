@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -22,6 +22,14 @@ export default function LoginPage() {
   const captchaOn = turnstileEnabled()
   const router = useRouter()
   const supabase = createClient()
+
+  // تمرير وجهة العودة (?next=) إلى رابط إنشاء الحساب حتى يعود العميل لطلبه
+  const [nextParam, setNextParam] = useState('')
+  useEffect(() => {
+    const n = new URLSearchParams(window.location.search).get('next')
+    if (n && n.startsWith('/') && !n.startsWith('//')) setNextParam(n)
+  }, [])
+  const registerHref = nextParam ? `/auth/register?next=${encodeURIComponent(nextParam)}` : '/auth/register'
 
   const finishLogin = async (userId: string) => {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).single()
@@ -144,7 +152,7 @@ export default function LoginPage() {
 
           <div className="flex justify-between text-sm pt-1">
             <Link href="/auth/forgot-password" className="text-green hover:underline">نسيت كلمة المرور؟</Link>
-            <Link href="/auth/register" className="text-green hover:underline">إنشاء حساب جديد</Link>
+            <Link href={registerHref} className="text-green hover:underline">إنشاء حساب جديد</Link>
           </div>
         </div>
       </div>

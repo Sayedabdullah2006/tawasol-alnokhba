@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -25,6 +25,14 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const captchaOn = turnstileEnabled()
+
+  // وجهة العودة بعد التسجيل (مثلاً /request) — تُقرأ من ?next=
+  const [nextParam, setNextParam] = useState('')
+  useEffect(() => {
+    const n = new URLSearchParams(window.location.search).get('next')
+    if (n && n.startsWith('/') && !n.startsWith('//')) setNextParam(n)
+  }, [])
+  const loginHref = nextParam ? `/auth/login?next=${encodeURIComponent(nextParam)}` : '/auth/login'
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -53,9 +61,9 @@ export default function RegisterPage() {
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'تعذّر إنشاء الحساب'); setLoading(false); return }
 
-      // Auto-login then go to the dashboard
+      // Auto-login then return to the intended destination (e.g. /request) or dashboard
       await supabase.auth.signInWithPassword({ email, password })
-      router.push('/dashboard')
+      router.push(nextParam || '/dashboard')
       router.refresh()
     } catch {
       setError('حدث خطأ، حاول مرة أخرى')
@@ -113,7 +121,7 @@ export default function RegisterPage() {
 
           <p className="text-center text-sm text-muted">
             لديك حساب؟{' '}
-            <Link href="/auth/login" className="text-green hover:underline">تسجيل الدخول</Link>
+            <Link href={loginHref} className="text-green hover:underline">تسجيل الدخول</Link>
           </p>
         </form>
       </div>

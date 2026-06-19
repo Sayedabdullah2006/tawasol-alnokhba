@@ -29,18 +29,31 @@ export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   // Protected routes — require login.
-  // ملاحظة: /request مفتوح للزوار (يُنشأ الحساب تلقائياً عند الإرسال) لتقليل الاحتكاك.
-  if (pathname.startsWith('/dashboard') || pathname.startsWith('/admin')) {
-    if (!user) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/auth/login'
-      return NextResponse.redirect(url)
-    }
+  // تقديم الطلب والدفع يتطلّبان تسجيل الدخول (لتعزيز الثقة وربط الطلب بحساب موثّق).
+  const protectedPath =
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/request') ||
+    pathname.startsWith('/payment')
+
+  if (protectedPath && !user) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/auth/login'
+    // إعادة العميل إلى وجهته بعد تسجيل الدخول
+    url.search = ''
+    url.searchParams.set('next', pathname + request.nextUrl.search)
+    return NextResponse.redirect(url)
   }
 
   return supabaseResponse
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/admin/:path*'],
+  matcher: [
+    '/dashboard/:path*',
+    '/admin/:path*',
+    '/request',
+    '/request/:path*',
+    '/payment/:path*',
+  ],
 }
