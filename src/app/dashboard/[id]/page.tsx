@@ -12,6 +12,7 @@ import QuoteApproval from '@/components/dashboard/QuoteApproval'
 import EditableExtras from '@/components/dashboard/EditableExtras'
 import PostReviews from '@/components/dashboard/PostReviews'
 import RequestInfoEditor from '@/components/dashboard/RequestInfoEditor'
+import RequestManageActions from '@/components/dashboard/RequestManageActions'
 import CampaignPostStatusList from '@/components/dashboard/CampaignPostStatusList'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -447,6 +448,9 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
             <p className="text-sm text-blue-600">{request.admin_notes}</p>
           </div>
         )}
+
+        {/* تعديل/إلغاء الطلب — للطلبات غير المدفوعة فقط (يمنع النهاية المسدودة) */}
+        <RequestManageActions request={request} className="mt-4" />
 
           </div> {/* End العمود الأيمن */}
 

@@ -67,6 +67,11 @@ export const CLIENT_STATUS_LABELS: Record<RequestStatus, { label: string; color:
     label: 'أُغلق تلقائياً',
     color: 'gray',
     description: 'أُغلق الطلب تلقائياً بعد أسبوع دون معالجة — يمكنك رفع طلب جديد'
+  },
+  cancelled: {
+    label: 'ملغى',
+    color: 'gray',
+    description: 'ألغيت هذا الطلب — يمكنك تقديم طلب جديد في أي وقت'
   }
 }
 
@@ -136,6 +141,11 @@ export const ADMIN_STATUS_LABELS: Record<RequestStatus, { label: string; color: 
     label: 'أُغلق تلقائياً',
     color: 'gray',
     description: 'أُغلق الطلب تلقائياً بعد أسبوع في المراجعة دون معالجة'
+  },
+  cancelled: {
+    label: 'ألغاه العميل',
+    color: 'gray',
+    description: 'ألغى العميل الطلب قبل الدفع'
   }
 }
 
@@ -170,7 +180,7 @@ export function isWaitingStatus(status: RequestStatus): boolean {
 }
 
 export function isFinalStatus(status: RequestStatus): boolean {
-  return ['completed', 'rejected', 'client_rejected', 'auto_closed'].includes(status)
+  return ['completed', 'rejected', 'client_rejected', 'auto_closed', 'cancelled'].includes(status)
 }
 
 // أولويات المهام للإدارة

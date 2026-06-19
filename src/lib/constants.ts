@@ -236,6 +236,7 @@ export const REQUEST_STATUSES = {
   completed: { label: 'مكتمل', color: 'green' },
   rejected: { label: 'مرفوض', color: 'red' },
   auto_closed: { label: 'أُغلق تلقائياً', color: 'gray' },
+  cancelled: { label: 'ملغى', color: 'gray' },
 } as const
 
 export type RequestStatus = keyof typeof REQUEST_STATUSES

@@ -17,6 +17,8 @@ import RStepCampaignPosts, { type CampaignPostData, makeEmptyPost, isPostComplet
 import SuccessScreen from './SuccessScreen'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
+import RequestManageActions from '@/components/dashboard/RequestManageActions'
+import { getStatusLabel } from '@/lib/status-labels'
 import { COMPETITION_SUBCATEGORIES, getCompetitionPositions, PACKAGES, CATEGORY_CONDITIONS } from '@/lib/constants'
 import { calculateAutoQuote } from '@/lib/auto-quote'
 
@@ -123,8 +125,8 @@ export default function RequestWizard() {
   const [loading, setLoading] = useState(true)
   const [hydrated, setHydrated] = useState(false)
   const draftRestored = useRef(false)
-  // طلب قائم بانتظار موافقة العميل — يمنع تقديم طلب جديد
-  const [pendingQuote, setPendingQuote] = useState<{ id: string } | null>(null)
+  // طلب قائم (قبل الدفع/الاكتمال) — يمنع تقديم طلب جديد. نحمل الصف كاملاً لإتاحة التعديل/الإلغاء.
+  const [pendingQuote, setPendingQuote] = useState<any | null>(null)
 
   // القسم المفتوح حالياً (أكورديون أحادي الفتح)
   const [openSection, setOpenSection] = useState(0)
@@ -211,16 +213,16 @@ export default function RequestWizard() {
             }))
           }
         })
-        // فحص وجود عرض قائم بانتظار موافقة العميل
+        // فحص وجود طلب قائم (أي حالة تمنع طلباً جديداً) — لعرض خيارات المراجعة/التعديل/الإلغاء
         supabase
           .from('publish_requests')
-          .select('id')
+          .select('*')
           .eq('user_id', user.id)
-          .eq('status', 'quoted')
+          .in('status', ['pending', 'quoted', 'negotiation', 'approved', 'payment_review', 'info_requested'])
           .order('created_at', { ascending: false })
           .limit(1)
           .then(({ data }) => {
-            if (data && data.length > 0) setPendingQuote({ id: data[0].id })
+            if (data && data.length > 0) setPendingQuote(data[0])
           })
       }
     })
@@ -516,27 +518,34 @@ export default function RequestWizard() {
 
   // طلب قائم بانتظار الموافقة — يُمنع تقديم طلب جديد حتى اتخاذ إجراء
   if (pendingQuote) {
+    const statusInfo = getStatusLabel(pendingQuote.status, 'client')
     return (
       <div className="bg-cream min-h-screen flex items-center justify-center px-4 py-12">
-        <div className="max-w-md w-full bg-card rounded-2xl border-2 border-amber-200 p-7 text-center shadow-sm">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-50 flex items-center justify-center text-3xl">
-            ⏳
+        <div className="max-w-md w-full space-y-4">
+          <div className="bg-card rounded-2xl border-2 border-amber-200 p-7 text-center shadow-sm">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-50 flex items-center justify-center text-3xl">
+              ⏳
+            </div>
+            <h2 className="text-xl font-black text-dark mb-2">لديك طلب قائم</h2>
+            <p className="text-sm text-muted leading-relaxed mb-1">
+              لا يمكنك تقديم طلب جديد قبل إنهاء طلبك الحالي
+              {' '}(الحالة: <span className="font-bold text-dark">{statusInfo.label}</span>).
+            </p>
+            <p className="text-sm text-muted leading-relaxed mb-6">
+              راجع طلبك واتخذ الإجراء المناسب — أو <span className="font-bold text-dark">عدّله</span> أو <span className="font-bold text-dark">ألغِه</span> لتتمكن من تقديم طلب جديد.
+            </p>
+            <div className="flex flex-col gap-3">
+              <Button onClick={() => router.push(`/dashboard/${pendingQuote.id}`)} className="w-full" size="lg">
+                مراجعة الطلب القائم
+              </Button>
+              <Button variant="outline" onClick={() => router.push('/dashboard')} className="w-full">
+                الذهاب إلى لوحة التحكم
+              </Button>
+            </div>
           </div>
-          <h2 className="text-xl font-black text-dark mb-2">لديك عرض بانتظار موافقتك</h2>
-          <p className="text-sm text-muted leading-relaxed mb-1">
-            لا يمكنك تقديم طلب جديد ولديك عرض قائم لم يُتّخذ بشأنه إجراء بعد.
-          </p>
-          <p className="text-sm text-muted leading-relaxed mb-6">
-            يُرجى مراجعة عرضك الحالي واتخاذ الإجراء المناسب — بالموافقة أو الرفض أو طلب التفاوض — ثم يمكنك تقديم طلب جديد.
-          </p>
-          <div className="flex flex-col gap-3">
-            <Button onClick={() => router.push(`/dashboard/${pendingQuote.id}`)} className="w-full" size="lg">
-              مراجعة العرض القائم
-            </Button>
-            <Button variant="outline" onClick={() => router.push('/dashboard')} className="w-full">
-              الذهاب إلى لوحة التحكم
-            </Button>
-          </div>
+
+          {/* تعديل/إلغاء — يظهر للطلبات غير المدفوعة فقط، ويحرّر العميل لتقديم طلب جديد */}
+          <RequestManageActions request={pendingQuote} onCancelled={() => setPendingQuote(null)} />
         </div>
       </div>
     )
