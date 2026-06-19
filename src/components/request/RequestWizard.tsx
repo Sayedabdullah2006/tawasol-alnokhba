@@ -856,9 +856,15 @@ export default function RequestWizard() {
             )}
 
             <div className="flex justify-end pt-4">
-              <Button size="sm" onClick={() => setOpenSection(showPackages ? 2 : 3)} disabled={!contentComplete}>
-                التالي ←
-              </Button>
+              {showPackages ? (
+                <Button size="sm" onClick={() => setOpenSection(2)} disabled={!contentComplete}>
+                  التالي ←
+                </Button>
+              ) : (
+                <Button size="sm" onClick={handleSubmit} loading={submitting} disabled={!canSubmit || submitting}>
+                  إرسال الطلب للمراجعة
+                </Button>
+              )}
             </div>
           </FormSection>
 
@@ -982,8 +988,8 @@ export default function RequestWizard() {
               )}
 
               <div className="flex justify-end pt-4">
-                <Button size="sm" onClick={() => setOpenSection(3)} disabled={!packagesComplete}>
-                  التالي ←
+                <Button size="sm" onClick={handleSubmit} loading={submitting} disabled={!canSubmit || submitting}>
+                  {clientType === 'individual' ? '💳 المتابعة إلى الدفع' : 'إرسال الطلب'}
                 </Button>
               </div>
             </FormSection>
