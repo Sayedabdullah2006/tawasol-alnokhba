@@ -95,13 +95,9 @@ export function getWebhookUrl(): string {
  * Disables Apple Pay until properly configured with merchant validation
  */
 export function getPaymentMethods(): string[] {
-  // Only enable credit card for now - Apple Pay needs additional merchant configuration
-  return ['creditcard'];
-
-  // TODO: Enable Apple Pay after setting up:
-  // 1. Merchant validation URL in Moyasar dashboard
-  // 2. Apple Developer account verification
-  // 3. Country and currency settings
-  // return ['creditcard', 'applepay'];
+  // البطاقة + Apple Pay. يتطلّب Apple Pay استضافة ملف ربط النطاق على
+  // /.well-known/apple-developer-merchantid-domain-association وتفعيل النطاق
+  // (nukhba.media) في لوحة Moyasar. يظهر زر Apple Pay فقط على أجهزة/متصفّحات Apple.
+  return ['creditcard', 'applepay'];
 }
 
