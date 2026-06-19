@@ -42,7 +42,6 @@ const CLIENT_TYPE_OPTIONS: { id: ClientType; icon: string; label: string }[] = [
   { id: 'individual', icon: '👤', label: 'فرد' },
   { id: 'business',   icon: '🏢', label: 'شركة / مؤسسة' },
   { id: 'government', icon: '🏛️', label: 'جهة حكومية' },
-  { id: 'charity',    icon: '❤️', label: 'جمعية خيرية' },
 ]
 
 // تسميات قنوات النشر (لاختيار قناة الباقة الأساسية)
