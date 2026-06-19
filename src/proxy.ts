@@ -1,7 +1,16 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { APPLE_PAY_DOMAIN_ASSOCIATION } from '@/lib/apple-pay-domain'
 
 export async function proxy(request: NextRequest) {
+  // ملف ربط نطاق Apple Pay — يُخدَم هنا لأن هذا البناء لا يخدم public/.well-known
+  if (request.nextUrl.pathname === '/.well-known/apple-developer-merchantid-domain-association') {
+    return new NextResponse(APPLE_PAY_DOMAIN_ASSOCIATION, {
+      status: 200,
+      headers: { 'content-type': 'text/plain; charset=utf-8' },
+    })
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -55,5 +64,6 @@ export const config = {
     '/request',
     '/request/:path*',
     '/payment/:path*',
+    '/.well-known/apple-developer-merchantid-domain-association',
   ],
 }
