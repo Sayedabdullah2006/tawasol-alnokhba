@@ -82,17 +82,6 @@ export default function PaymentForm({
   // Payment form
   return (
     <div className={`bg-card rounded-xl border border-border overflow-hidden ${className}`}>
-      {/* Header */}
-      <div className="bg-green/5 border-b border-green/20 p-4 text-center">
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <span className="text-lg">🔒</span>
-          <span className="font-bold text-green text-sm">دفع آمن ومشفر</span>
-        </div>
-        <p className="text-xs text-muted">
-          مدعوم من Moyasar • بوابة الدفع المعتمدة من البنك المركزي السعودي
-        </p>
-      </div>
-
       {/* Payment Methods Info */}
       <div className="p-4 bg-cream/50 border-b border-border">
         <div className="flex items-center justify-center gap-4 text-xs text-muted">
@@ -126,15 +115,6 @@ export default function PaymentForm({
           <p className="text-xs text-muted mt-2">{description}</p>
         </div>
 
-        {/* Security notice */}
-        <div className="mt-4 text-center">
-          <p className="text-xs text-muted">
-            🛡️ بياناتك محمية بأعلى معايير الأمان والتشفير العالمية
-          </p>
-          <p className="text-xs text-muted mt-1">
-            لن يتم حفظ أو مشاركة معلومات بطاقتك مع أي جهة
-          </p>
-        </div>
       </div>
     </div>
   );
