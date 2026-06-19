@@ -95,9 +95,9 @@ export function getWebhookUrl(): string {
  * Disables Apple Pay until properly configured with merchant validation
  */
 export function getPaymentMethods(): string[] {
-  // البطاقة + Apple Pay. يتطلّب Apple Pay استضافة ملف ربط النطاق على
-  // /.well-known/apple-developer-merchantid-domain-association وتفعيل النطاق
-  // (nukhba.media) في لوحة Moyasar. يظهر زر Apple Pay فقط على أجهزة/متصفّحات Apple.
-  return ['creditcard', 'applepay'];
+  // البطاقة فقط حالياً. Apple Pay مُعطّل مؤقتاً لعدم توفّر حساب Apple Developer
+  // (شهادة معالجة الدفع). النطاق مُفعّل في Moyasar وملف الربط مستضاف، فمتى توفّر
+  // الحساب والشهادة يكفي إرجاع القيمة إلى ['creditcard', 'applepay'] لإعادة تفعيله.
+  return ['creditcard'];
 }
 
