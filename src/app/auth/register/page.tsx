@@ -82,18 +82,18 @@ export default function RegisterPage() {
         </div>
 
         <form onSubmit={handleRegister} className="bg-card rounded-2xl p-6 md:p-8 border border-border space-y-4">
-          <Input id="fullName" label="الاسم الكامل" placeholder="أدخل اسمك الكامل"
+          <Input id="fullName" label="الاسم الكامل *" placeholder="أدخل اسمك الكامل"
             value={fullName} onChange={e => setFullName(e.target.value)} required />
-          <Input id="email" label="البريد الإلكتروني" type="email" dir="ltr"
+          <Input id="email" label="البريد الإلكتروني *" type="email" dir="ltr"
             placeholder="email@example.com" value={email}
             onChange={e => setEmail(e.target.value)} required />
-          <Input id="phone" label="رقم الجوال" type="tel" dir="ltr"
+          <Input id="phone" label="رقم الجوال *" type="tel" dir="ltr"
             placeholder="05XXXXXXXX" value={phone}
             onChange={e => setPhone(e.target.value)} required />
-          <Input id="password" label="كلمة المرور" type="password" dir="ltr"
+          <Input id="password" label="كلمة المرور *" type="password" dir="ltr"
             placeholder="6 أحرف على الأقل" value={password}
             onChange={e => setPassword(e.target.value)} required />
-          <Input id="confirmPassword" label="تأكيد كلمة المرور" type="password" dir="ltr"
+          <Input id="confirmPassword" label="تأكيد كلمة المرور *" type="password" dir="ltr"
             placeholder="أعد كتابة كلمة المرور" value={confirmPassword}
             onChange={e => setConfirmPassword(e.target.value)} required />
 

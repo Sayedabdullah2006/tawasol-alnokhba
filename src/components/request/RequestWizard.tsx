@@ -981,23 +981,6 @@ export default function RequestWizard() {
             </FormSection>
           )}
 
-          {/* بيانات التواصل — للزائر غير المسجَّل فقط (يُنشأ حسابه تلقائياً عند الإرسال) */}
-          {!isLoggedIn && (
-            <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
-              <h3 className="font-bold text-dark">👤 بياناتك للتواصل</h3>
-              <p className="text-xs text-muted -mt-1">يُنشأ حسابك تلقائياً بهذه البيانات لمتابعة طلبك وإشعارك بالعرض والدفع.</p>
-              <input value={contact.fullName} onChange={e => setContact(p => ({ ...p, fullName: e.target.value }))}
-                placeholder="الاسم الكامل *" className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm" />
-              <input value={contact.phone} onChange={e => setContact(p => ({ ...p, phone: e.target.value }))}
-                placeholder="رقم الجوال *" inputMode="tel" className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm" />
-              <input value={contact.email} onChange={e => setContact(p => ({ ...p, email: e.target.value }))}
-                placeholder="البريد الإلكتروني *" type="email" inputMode="email"
-                className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm" />
-              <input value={contact.city} onChange={e => setContact(p => ({ ...p, city: e.target.value }))}
-                placeholder="المدينة (اختياري)" className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm" />
-            </div>
-          )}
-
         </div>
       </div>
 
