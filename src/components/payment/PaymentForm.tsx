@@ -28,27 +28,28 @@ export default function PaymentForm({
   className = '',
 }: PaymentFormProps) {
   const { isLoaded, isLoading, error, initPayment } = useMoyasar();
-  const hasInitialized = useRef(false);
+  // نتذكّر المبلغ الذي هُيِّئ به الفورم — فلا نُعيد بناءه إلا إذا تغيّر المبلغ فعلاً
+  // (مثل تطبيق خصم)، وليس عند كل إعادة عرض أو تبديل وسيلة الدفع.
+  const initedAmountRef = useRef<number | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Initialize payment form when Moyasar is loaded
-    if (isLoaded && !hasInitialized.current && amount > 0 && formRef.current) {
-      hasInitialized.current = true;
+    if (!isLoaded || amount <= 0 || !formRef.current) return;
+    if (initedAmountRef.current === amount) return; // مُهيّأ بالفعل لهذا المبلغ
+    initedAmountRef.current = amount;
 
-      // تنظيف أي محتوى سابق
-      formRef.current.innerHTML = '';
+    const el = formRef.current;
+    el.innerHTML = ''; // تنظيف أي محتوى سابق
 
-      // تأخير قصير لضمان تحديث DOM
-      setTimeout(() => {
-        if (formRef.current) {
-          initPayment(amount, description, metadata, formRef.current).catch((err) => {
-            console.error('Failed to initialize payment:', err);
-            hasInitialized.current = false; // Allow retry
-          });
-        }
-      }, 200);
-    }
+    // تأخير قصير لضمان تحديث DOM قبل تهيئة Moyasar
+    const timer = setTimeout(() => {
+      initPayment(amount, description, metadata, el).catch((err) => {
+        console.error('Failed to initialize payment:', err);
+        initedAmountRef.current = null; // السماح بإعادة المحاولة
+      });
+    }, 200);
+
+    return () => clearTimeout(timer);
   }, [isLoaded, amount, description, metadata, initPayment]);
 
   // Loading state

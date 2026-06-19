@@ -312,7 +312,9 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                 </div>
               )}
 
-              {method === 'online' && (
+              {/* يبقى فورم Moyasar مُهيّأً دائماً ويُخفى فقط عند اختيار وسيلة أخرى،
+                  حتى لا يُعاد بناؤه فيتغيّر تصميم/حدود الحقول عند التبديل بين الخيارات */}
+              <div className={method === 'online' ? '' : 'hidden'}>
                 <PaymentForm
                   amount={totalDue}
                   description={`دفع طلب ${generateRequestNumber(request.request_number)} - ${cat?.nameAr}`}
@@ -323,7 +325,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                     category: cat?.nameAr,
                   }}
                 />
-              )}
+              </div>
 
               {method === 'tamara' && (
                 <div className="bg-card rounded-xl border border-[#3D1152]/20 p-5 space-y-4">
