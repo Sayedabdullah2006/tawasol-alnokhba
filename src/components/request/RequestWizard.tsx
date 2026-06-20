@@ -23,14 +23,11 @@ import { COMPETITION_SUBCATEGORIES, getCompetitionPositions, PACKAGES, CATEGORY_
 import { calculateAutoQuote } from '@/lib/auto-quote'
 
 // القيم الافتراضية لمحتوى الموقع (تُستخدم حتى يصل المحتوى المعدَّل من القاعدة)
+// الشروط العامة محذوفة — يُكتفى بشروط القبول بحسب الفئة.
 const SITE_CONTENT_FALLBACK: SiteContent = {
   terms_text: TERMS_TEXT,
-  news_conditions_general: [
-    'أن يتضمّن الخبر إنجازاً واقعياً مع إرفاق كل الإثباتات.',
-    'إن ذُكرت «أوّلية» (الأول/الأولى) فيلزم إرفاق ما يُثبتها (إيميل أو خطاب أو مراسلة رسمية).',
-    'إن ذُكرت جهة فيلزم إرفاق موافقتها على النشر.',
-  ],
-  news_conditions_footer: 'عدم الالتزام بذلك سيؤدي إلى إلغاء الخبر.',
+  news_conditions_general: [],
+  news_conditions_footer: '',
   category_conditions: CATEGORY_CONDITIONS,
 }
 
@@ -825,21 +822,32 @@ export default function RequestWizard() {
             open={openSection === 1}
             onToggle={() => setOpenSection(openSection === 1 ? -1 : 1)}
           >
-            {/* شروط قبول الخبر — قاعدة عامة + شرط الفئة (للمنشور المفرد) — تُدار من لوحة الأدمن */}
-            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-[11px] leading-6 text-red-600">
-              <p className="font-bold mb-1">⚠️ شروط قبول الخبر:</p>
-              <ul className="list-disc pr-4 space-y-0.5">
-                {siteContent.news_conditions_general.map((line, i) => (
-                  <li key={i}>{line}</li>
-                ))}
-                {requestType === 'single' && category && siteContent.category_conditions[category] && (
-                  <li><span className="font-bold">حسب الفئة:</span> {siteContent.category_conditions[category]}</li>
-                )}
-              </ul>
-              {siteContent.news_conditions_footer && (
-                <p className="font-bold mt-1">{siteContent.news_conditions_footer}</p>
-              )}
-            </div>
+            {/* شروط قبول الخبر — شرط الفئة (للمنشور المفرد) + أي بنود عامة إن وُجدت — تُدار من لوحة الأدمن */}
+            {(() => {
+              const singleCondition =
+                requestType === 'single' && category ? siteContent.category_conditions[category] : ''
+              const hasContent =
+                siteContent.news_conditions_general.length > 0 ||
+                !!singleCondition ||
+                !!siteContent.news_conditions_footer
+              if (!hasContent) return null
+              return (
+                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-[11px] leading-6 text-red-600">
+                  <p className="font-bold mb-1">⚠️ شروط قبول الخبر:</p>
+                  <ul className="list-disc pr-4 space-y-0.5">
+                    {siteContent.news_conditions_general.map((line, i) => (
+                      <li key={i}>{line}</li>
+                    ))}
+                    {singleCondition && (
+                      <li><span className="font-bold">حسب الفئة:</span> {singleCondition}</li>
+                    )}
+                  </ul>
+                  {siteContent.news_conditions_footer && (
+                    <p className="font-bold mt-1">{siteContent.news_conditions_footer}</p>
+                  )}
+                </div>
+              )
+            })()}
 
             {!requestType ? (
               <p className="text-sm text-muted text-center py-4">اختر نوع الطلب في القسم السابق أولاً</p>
