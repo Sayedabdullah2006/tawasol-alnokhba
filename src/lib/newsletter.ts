@@ -5,7 +5,89 @@
  * السعودية (UTC+3) — أي الجمعة 10:00 UTC. تُجمَع العناصر من خطة النشر اليومية
  * (social_schedule) التي تملك تصميماً، وتُرتَّب بتنويع الأقسام والأحدث.
  */
+import sharp from 'sharp'
 import { createServiceRoleClient } from '@/lib/supabase-server'
+import { generateImageWithGemini } from '@/lib/gemini'
+
+// مقاس بوستر النشرة (عمودي صحفي)
+const NL_WIDTH = 1080
+const NL_HEIGHT = 1920
+
+// اتجاهات تصميم متنوّعة — يُختار واحد كل أسبوع (بذرة أسبوعية) فيتجدّد الشكل.
+export const NEWSLETTER_DIRECTIONS: string[] = [
+  'صحيفة كلاسيكية أنيقة بأعمدة وفواصل رفيعة',
+  'مجلة عصرية بشبكة Bento غير متساوية',
+  'موزاييك متداخل انسيابي بأحجام متفاوتة',
+  'بطل علوي كبير + شبكة أخبار أسفله',
+  'إنفوجرافيك تحريري بخطوط وأيقونات',
+  'كولاج صحفي ديناميكي بزوايا وميلان خفيف',
+  'تصميم مينمال فاخر بمساحات بيضاء وتايبوغرافي قوي',
+  'طبقات عمق وتدرّجات سينمائية',
+]
+
+// بذرة أسبوعية ثابتة (عدد الأسابيع منذ حقبة) لاختيار اتجاه مختلف كل جمعة.
+function weeklySeed(window: WeeklyWindow): number {
+  const t = new Date(window.endUtc).getTime()
+  return Math.floor(t / (7 * 86400000))
+}
+
+function buildNewsletterPrompt(window: WeeklyWindow, items: NewsletterItem[], direction: string): string {
+  const list = items
+    .map(it => `${it.index}. العنوان: "${it.title}"${it.blurb ? ` — نبذة: "${it.blurb}"` : ''} [القسم: ${it.category}]`)
+    .join('\n')
+  return [
+    `DESIGN TASK — create ONE vertical WEEKLY NEWSPAPER/MAGAZINE digest poster (an editorial composition, NOT editing a single photo).`,
+    `OUTPUT SIZE: vertical poster ${NL_WIDTH}×${NL_HEIGHT} (9:16), ultra-HD.`,
+    ``,
+    `MASTHEAD (top): large bold Arabic title "النخبة في ٧" + small subtitle "نشرة أسبوعية" + date range "${window.label}". Add the FIRST1SAUDI logo space top corner.`,
+    ``,
+    `LAYOUT — اجعلها انسيابية كصحيفة حقيقية وفق هذا الاتجاه لهذا الأسبوع: «${direction}». أحجام متفاوتة، تدفّق تحريري، لا أقسام متساوية جامدة.`,
+    `رتّب ${items.length} أخبار، لكل خبر: استخدم إحدى الصور الحقيقية المرفقة كصورة الخبر، مع عنوانه العربي حرفياً ونبذته المختصرة. اربط كل صورة بخبر مناسب.`,
+    ``,
+    `الأخبار (اكتب نصوصها العربية حرفياً بين علامتي اقتباس كما هي):`,
+    list,
+    ``,
+    `🔒 BRAND IDENTITY (FIRST1SAUDI): Deep teal #0A2D35–#0D3D47 · Saudi green #2D8B3F–#3A9B4F · gold #FFD700 · white. خلفية داكنة راقية.`,
+    `🔒 احتفظ بالأشخاص في الصور الحقيقية كما هم تماماً (لا تشويه للوجوه/الملامح).`,
+    `FOOTER: شريط منحنٍ داكن فيه أيقونات سوشال + "@First1Saudi".`,
+    ``,
+    `قواعد: كل النصوص العربية حادّة ومتّصلة وصحيحة الاتجاه (RTL) وحرفية كما وردت. لا تختلق نصاً. لا نِسب مئوية. لا إيموجي داخل التصميم.`,
+  ].join('\n')
+}
+
+/** يولّد بوستر نشرة الأسبوع عبر Gemini (باتجاه مختلف كل أسبوع) ويخزّنه. */
+export async function generateNewsletterPoster(opts?: { limit?: number; ref?: Date }): Promise<{
+  imageUrl: string; window: WeeklyWindow; items: NewsletterItem[]; direction: string
+}> {
+  const { window, items } = await getWeeklyItems(opts?.limit ?? 7, opts?.ref)
+  if (!items.length) throw new Error('لا توجد أخبار ضمن نافذة هذا الأسبوع')
+
+  const direction = NEWSLETTER_DIRECTIONS[weeklySeed(window) % NEWSLETTER_DIRECTIONS.length]
+  const prompt = buildNewsletterPrompt(window, items, direction)
+  // نمرّر الصور الحقيقية (المصدر) كمراجع، وإلا التصاميم
+  const refs = items.map(i => i.sourceImage || i.image).filter((u): u is string => !!u).slice(0, 8)
+
+  const { b64 } = await generateImageWithGemini(prompt, refs)
+  const raw = Buffer.from(b64, 'base64')
+  const poster = await sharp(raw).resize(NL_WIDTH, NL_HEIGHT, { fit: 'cover', position: 'top' }).png().toBuffer()
+
+  const service = await createServiceRoleClient()
+  const path = `newsletter-${Date.now()}.png`
+  const { error: upErr } = await service.storage.from('content-images').upload(path, poster, { contentType: 'image/png' })
+  if (upErr) throw new Error(`فشل رفع البوستر: ${upErr.message}`)
+  const { data: pub } = service.storage.from('content-images').getPublicUrl(path)
+
+  await service.from('newsletters').insert({
+    label: window.label,
+    start_utc: window.startUtc,
+    end_utc: window.endUtc,
+    direction,
+    image_url: pub.publicUrl,
+    items: items as unknown as object,
+  })
+
+  return { imageUrl: pub.publicUrl, window, items, direction }
+}
 
 export interface NewsletterItem {
   index: number          // ترتيب العرض (1..N)
