@@ -143,13 +143,19 @@ export async function uploadMediaFromUrl(imageUrl: string): Promise<unknown> {
   if (!urlRes.ok) throw new Error(`فشل طلب رابط الرفع: ${urlRes.status} ${await urlRes.text()}`)
   const presign = await urlRes.json() as { key: string; url: string; headers?: Record<string, string> }
 
-  // 3) رفع البايتات (PUT) إلى الرابط الموقّع
+  // 3) رفع البايتات (PUT) إلى الرابط الموقّع.
+  // نرسل الترويسات التي أعادها الـ API حرفياً (هي الموقّع عليها)؛ وإن لم تُعِد أيّاً
+  // نكتفي بـ Content-Type المطابق لما طلبنا به الرابط.
+  const putHeaders =
+    presign.headers && Object.keys(presign.headers).length
+      ? presign.headers
+      : { 'Content-Type': contentType }
   const putRes = await fetch(presign.url, {
     method: 'PUT',
-    headers: { 'Content-Type': contentType, ...(presign.headers ?? {}) },
+    headers: putHeaders,
     body: bytes,
   })
-  if (!putRes.ok) throw new Error(`فشل رفع الملف: ${putRes.status}`)
+  if (!putRes.ok) throw new Error(`فشل رفع الملف: ${putRes.status} ${await putRes.text().catch(() => '')}`)
 
   // 4) تأكيد الرفع
   const confirmRes = await fetch(`${API_BASE}/v1/media/upload/confirm`, {
