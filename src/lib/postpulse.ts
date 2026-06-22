@@ -200,10 +200,37 @@ export async function uploadMediaFromUrl(imageUrl: string): Promise<{ path: stri
   return { path: extractMediaPath(confirmData, presign.key), raw: confirmData ?? { key: presign.key } }
 }
 
+// إعدادات المنصّة المطلوبة لكل قناة (لكل منصّة حقول إلزامية مختلفة).
+// للصورة الواحدة: Instagram = منشور FEED. TikTok يتطلّب مستوى خصوصية.
+function platformSettingsFor(platform: string): Record<string, unknown> {
+  switch ((platform || '').toUpperCase()) {
+    case 'INSTAGRAM':
+      return { type: 'INSTAGRAM', publicationType: 'FEED' }
+    case 'TIKTOK':
+      return {
+        type: 'TIKTOK',
+        privacyLevel: 'PUBLIC_TO_EVERYONE',
+        disableComments: false,
+        disableDuet: false,
+        disableStitch: false,
+      }
+    case 'X_TWITTER':
+      return { type: 'X_TWITTER' }
+    case 'LINKEDIN':
+      return { type: 'LINKEDIN' }
+    case 'FACEBOOK':
+      return { type: 'FACEBOOK' }
+    case 'YOUTUBE':
+      return { type: 'YOUTUBE' }
+    default:
+      return { type: platform }
+  }
+}
+
 /**
  * نشر فوري للنص + التصميم إلى الحسابات المربوطة عبر /v1/posts/schedule
  * (scheduledTime=الآن، isDraft=false). إن لم تُحدَّد accountIds يُنشر لكل الحسابات.
- * يعيد { result, accountIds, scheduleId }.
+ * يبني platformSettings المناسبة لكل منصّة. يعيد { result, accountIds, scheduleId }.
  */
 export async function publishNow(args: {
   content: string
@@ -212,16 +239,15 @@ export async function publishNow(args: {
 }): Promise<{ result: unknown; accountIds: number[]; scheduleId: string | null }> {
   const token = await getValidAccessToken()
 
-  // تحديد الحسابات: المحددة أو كل الحسابات المربوطة
-  let accountIds = args.accountIds ?? []
-  if (!accountIds.length) {
-    const accounts = await listAccounts()
-    const arr = Array.isArray(accounts) ? accounts : []
-    accountIds = arr
-      .map((a) => (a && typeof a === 'object' ? Number((a as Record<string, unknown>).id) : NaN))
-      .filter((n) => Number.isFinite(n))
+  // نحتاج كائنات الحسابات كاملة (id + platform) لبناء إعدادات كل منصّة
+  const accountsRaw = await listAccounts()
+  const all = Array.isArray(accountsRaw) ? (accountsRaw as Array<Record<string, unknown>>) : []
+  let targets = all.filter((a) => a && Number.isFinite(Number(a.id)))
+  if (args.accountIds && args.accountIds.length) {
+    const set = new Set(args.accountIds.map(Number))
+    targets = targets.filter((a) => set.has(Number(a.id)))
   }
-  if (!accountIds.length) throw new Error('لا توجد حسابات مربوطة في Post-Pulse')
+  if (!targets.length) throw new Error('لا توجد حسابات مربوطة في Post-Pulse')
 
   const post: Record<string, unknown> = { content: args.content }
   if (args.attachmentPaths && args.attachmentPaths.length) post.attachmentPaths = args.attachmentPaths
@@ -232,9 +258,9 @@ export async function publishNow(args: {
     body: JSON.stringify({
       scheduledTime: new Date().toISOString(), // الآن = نشر فوري
       isDraft: false,
-      publications: accountIds.map((id) => ({
-        socialMediaAccountId: id,
-        platformSettings: {},
+      publications: targets.map((a) => ({
+        socialMediaAccountId: Number(a.id),
+        platformSettings: platformSettingsFor(String(a.platform ?? '')),
         posts: [post],
       })),
     }),
@@ -244,11 +270,12 @@ export async function publishNow(args: {
   let result: unknown = null
   try { result = text ? JSON.parse(text) : { ok: true } } catch { result = { raw: text } }
 
+  const accountIds = targets.map((a) => Number(a.id))
   // محاولة استخراج معرّف الجدولة لمطابقة الـ webhook لاحقاً
   let scheduleId: string | null = null
   if (result && typeof result === 'object') {
     const o = result as Record<string, unknown>
-    const cand = o.scheduleId ?? o.id ?? (Array.isArray(o.publications) ? undefined : undefined)
+    const cand = o.scheduleId ?? o.id
     if (cand != null) scheduleId = String(cand)
   }
   return { result, accountIds, scheduleId }
