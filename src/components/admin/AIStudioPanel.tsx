@@ -140,6 +140,9 @@ export default function AIStudioPanel({
   const [imagePrompt, setImagePrompt] = useState<string>(saved.imagePrompt ?? '')
 
   const [loadingStep, setLoadingStep] = useState<StepKey | null>(null)
+  // التوليد التلقائي المتسلسل لكل الخطوات
+  const [autoRunning, setAutoRunning] = useState(false)
+  const [autoStage, setAutoStage] = useState('')
 
   // توليد الاتجاهات الثلاثة دفعة واحدة + الاختيار منها للإرسال
   // تُعاد تهيئتها من الحالة المحفوظة (saved.designs) فتبقى بعد إعادة التحميل
@@ -175,7 +178,7 @@ export default function AIStudioPanel({
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         showToast(data.error ?? 'فشل الطلب', 'error')
-        return
+        return null
       }
 
       if (step === 'analyze') {
@@ -204,8 +207,10 @@ export default function AIStudioPanel({
         })
         showToast('تم توليد التصميم', 'success')
       }
+      return data
     } catch {
       showToast('حدث خطأ في الاتصال', 'error')
+      return null
     } finally {
       setLoadingStep(null)
     }
@@ -232,6 +237,51 @@ export default function AIStudioPanel({
       return null
     }
     return data.imageUrl as string
+  }
+
+  // ⚡ التوليد التلقائي: ينفّذ الخطوات تباعاً (تحليل → تغريدات → اتجاهات → تصميم كل الاتجاهات)
+  const autoRunAll = async () => {
+    if (autoRunning || loadingStep || batchLoading) return
+    if (!selectedImages.length) {
+      showToast('اختر صورة المصدر أولاً', 'error')
+      return
+    }
+    setAutoRunning(true)
+    try {
+      // 1) تحليل الخبر
+      setAutoStage('١/٤ — تحليل الخبر…')
+      if (!(await callStep('analyze'))) return
+      // 2) التغريدات
+      setAutoStage('٢/٤ — كتابة التغريدات…')
+      if (!(await callStep('tweets'))) return
+      // 3) اتجاهات التصميم
+      setAutoStage('٣/٤ — اقتراح الاتجاهات…')
+      const c = await callStep('concepts')
+      const concepts: ConceptItem[] = Array.isArray(c?.concepts) ? c.concepts : []
+      if (!concepts.length) {
+        showToast('لم تُقترح اتجاهات — أعد المحاولة', 'error')
+        return
+      }
+      // 4) توليد تصميم لكل اتجاه
+      setBatchResults([])
+      setSelectedBatch(new Set())
+      const results: { title: string; imageUrl: string; brief: string }[] = []
+      for (let i = 0; i < concepts.length; i++) {
+        setAutoStage(`٤/٤ — توليد التصميم ${i + 1}/${concepts.length}…`)
+        const brief = concepts[i].brief ?? concepts[i].title ?? ''
+        const url = await generateOneDesign(brief)
+        if (url) results.push({ title: concepts[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief })
+      }
+      setBatchResults(results)
+      setSelectedBatch(new Set(results.map((_, i) => i)))
+      persistStudioState({ designs: results })
+      if (results.length) showToast(`اكتمل التوليد التلقائي — ${results.length} تصاميم جاهزة`, 'success')
+    } catch {
+      showToast('تعذّر إكمال التوليد التلقائي', 'error')
+    } finally {
+      setAutoRunning(false)
+      setAutoStage('')
+    }
   }
 
   // يولّد تصميماً لكل اتجاه من الاتجاهات الثلاثة ثم يعرضها للاختيار
@@ -387,6 +437,35 @@ export default function AIStudioPanel({
             className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[70px] resize-y"
           />
         </div>
+      </div>
+
+      {/* ── ⚡ التوليد التلقائي لكل الخطوات ── */}
+      <div className={cardCls}>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h4 className="font-bold text-dark">⚡ توليد تلقائي لكل الخطوات</h4>
+            <p className="text-xs text-muted mt-0.5">
+              ينفّذ الخطوات تباعاً: تحليل ← تغريدات ← اتجاهات ← تصميم كل الاتجاهات.
+            </p>
+          </div>
+          <Button
+            onClick={autoRunAll}
+            loading={autoRunning}
+            disabled={autoRunning || loadingStep !== null || batchLoading || !selectedImages.length}
+            size="sm"
+          >
+            ⚡ توليد تلقائي
+          </Button>
+        </div>
+        {autoRunning && (
+          <div className="flex items-center gap-2 text-sm text-muted">
+            <LoadingSpinner size="sm" />
+            <span>{autoStage || 'جارٍ التنفيذ…'}</span>
+          </div>
+        )}
+        {!selectedImages.length && (
+          <p className="text-[11px] text-amber-600">اختر صورة المصدر أولاً لتفعيل التوليد التلقائي.</p>
+        )}
       </div>
 
       {/* ── الخطوة 1 — تحليل الخبر ── */}
