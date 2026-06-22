@@ -22,9 +22,18 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // وضع تجربة آمن: يولّد المعاينة دون نشر (?dryRun=1 أو ?publish=0)
+  const dryRun =
+    request.nextUrl.searchParams.get('dryRun') === '1' ||
+    request.nextUrl.searchParams.get('publish') === '0'
+
   try {
     // 1) توليد بوستر الأسبوع
     const { imageUrl, window, items, direction } = await generateNewsletterPoster()
+
+    if (dryRun) {
+      return NextResponse.json({ success: true, dryRun: true, label: window.label, direction, count: items.length, imageUrl })
+    }
 
     // 2) رفع البوستر إلى Post-Pulse ثم النشر لكل القنوات المربوطة
     const caption = `🗞️ النخبة في ٧ — ${window.label}\nأبرز إنجازات الأسبوع.\n#أول_سعودي #First1Saudi`

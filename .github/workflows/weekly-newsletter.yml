@@ -1,0 +1,43 @@
+# نشرة «النخبة في ٧» الأسبوعية — تُولَّد وتُنشر تلقائياً كل جمعة
+name: Weekly Newsletter
+
+on:
+  schedule:
+    # كل جمعة 10:05 UTC (= 1:05م بتوقيت السعودية). day-of-week: 5 = الجمعة
+    - cron: '5 10 * * 5'
+
+  # تشغيل يدوي — افتراضياً وضع تجربة (لا ينشر)
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "وضع تجربة (يولّد المعاينة دون نشر)"
+        type: boolean
+        default: true
+
+jobs:
+  weekly-newsletter:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger weekly newsletter
+        run: |
+          # التشغيل المجدول (جمعة) = نشر فعلي. التشغيل اليدوي = حسب dry_run (افتراضي تجربة).
+          DRY="0"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            DRY="1"
+          fi
+          echo "🚀 Weekly newsletter (dryRun=$DRY)..."
+
+          response=$(curl -s -X POST \
+            "${{ secrets.APP_BASE_URL }}/api/cron/weekly-newsletter?dryRun=$DRY" \
+            -H "x-api-key: ${{ secrets.CRON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            --max-time 290)
+
+          echo "📊 Response: $response"
+
+          if echo "$response" | grep -q '"success":true'; then
+            echo "✅ Weekly newsletter job succeeded"
+          else
+            echo "❌ Weekly newsletter job failed"
+            exit 1
+          fi
