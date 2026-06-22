@@ -16,9 +16,12 @@ function IntegrationsInner() {
   const [loading, setLoading] = useState(true)
   const [connected, setConnected] = useState<boolean | null>(null)
   const [accounts, setAccounts] = useState<unknown>(null)
-  const [busy, setBusy] = useState<'accounts' | 'upload' | null>(null)
+  const [busy, setBusy] = useState<'accounts' | 'upload' | 'schedule' | null>(null)
   const [testImageUrl, setTestImageUrl] = useState('')
   const [uploadResult, setUploadResult] = useState<unknown>(null)
+  const [schedAccountId, setSchedAccountId] = useState('')
+  const [schedContent, setSchedContent] = useState('اختبار جدولة من تواصل النخبة — يُحذف لاحقاً.')
+  const [schedResult, setSchedResult] = useState<unknown>(null)
 
   const checkAccounts = useCallback(async () => {
     setBusy('accounts')
@@ -69,6 +72,21 @@ function IntegrationsInner() {
       const data = await res.json().catch(() => ({}))
       if (res.ok) { setUploadResult(data.media); showToast('تم رفع الصورة بنجاح ✅', 'success') }
       else showToast(data.error ?? 'فشل الرفع', 'error')
+    } finally { setBusy(null) }
+  }
+
+  const testSchedule = async () => {
+    if (!schedAccountId.trim()) { showToast('أدخل معرّف الحساب (accountId)', 'error'); return }
+    setBusy('schedule'); setSchedResult(null)
+    try {
+      const res = await fetch('/api/postpulse/test-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId: Number(schedAccountId.trim()), content: schedContent }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) { setSchedResult(data); showToast('تمت الجدولة (مستقبلية — لا تُنشر الآن) ✅', 'success') }
+      else showToast(data.error ?? 'فشل الجدولة', 'error')
     } finally { setBusy(null) }
   }
 
@@ -134,6 +152,36 @@ function IntegrationsInner() {
         {uploadResult != null && (
           <pre dir="ltr" className="bg-cream rounded-xl p-3 text-xs whitespace-pre-wrap max-h-60 overflow-auto border border-border">
             {JSON.stringify(uploadResult, null, 2)}
+          </pre>
+        )}
+      </div>
+
+      {/* اختبار جدولة (إكمال onboarding بلا نشر الآن) */}
+      <div className={card}>
+        <h2 className="font-bold text-dark">اختبار جدولة منشور (لإكمال الإعداد — لا يُنشر الآن)</h2>
+        <p className="text-xs text-muted">
+          يجدول منشوراً بتاريخ بعد سنة من الآن، فلن يُنشر شيء حالياً. خذ <b>accountId</b> من نتيجة «عرض الحسابات» أعلاه.
+          بعد نجاح الإعداد يمكنك حذف هذا المنشور المجدول من لوحة Post‑Pulse.
+        </p>
+        <input
+          value={schedAccountId}
+          onChange={e => setSchedAccountId(e.target.value)}
+          placeholder="accountId (رقم) — مثال: 1751"
+          dir="ltr"
+          className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm"
+        />
+        <textarea
+          value={schedContent}
+          onChange={e => setSchedContent(e.target.value)}
+          className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[60px] resize-y"
+        />
+        <Button onClick={testSchedule} loading={busy === 'schedule'} disabled={busy !== null || !connected} size="sm">
+          🗓️ جدولة اختبارية (بعد سنة)
+        </Button>
+        {!connected && <p className="text-[11px] text-amber-600">اربط الحساب أولاً.</p>}
+        {schedResult != null && (
+          <pre dir="ltr" className="bg-cream rounded-xl p-3 text-xs whitespace-pre-wrap max-h-60 overflow-auto border border-border">
+            {JSON.stringify(schedResult, null, 2)}
           </pre>
         )}
       </div>

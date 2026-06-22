@@ -11,7 +11,7 @@ const AUTH_BASE = 'https://auth.post-pulse.com'
 const API_BASE = 'https://api.post-pulse.com'
 const AUDIENCE = 'https://api.post-pulse.com'
 export const POSTPULSE_SCOPES =
-  'postpulse-api/accounts.read postpulse-api/posts.write postpulse-api/media.write'
+  'postpulse-api/accounts.read postpulse-api/api postpulse-api/media.write postpulse-api/posts.read postpulse-api/posts.write postpulse-api/webhooks.write'
 
 // client_id عام (غير سرّي) — يُفضّل ضبطه عبر البيئة؛ القيمة الافتراضية هي المُعطاة.
 export const PP_CLIENT_ID = process.env.POSTPULSE_CLIENT_ID || 'Hy7O3XYqaScIwZ7txytwUJIP0OhBeBTN'
@@ -187,4 +187,30 @@ export async function uploadMediaFromUrl(imageUrl: string): Promise<unknown> {
     try { confirmData = JSON.parse(confirmText) } catch { confirmData = { raw: confirmText } }
   }
   return confirmData ?? { ok: true, key: presign.key }
+}
+
+/**
+ * يجدول منشوراً عبر /v1/posts/schedule. يُستخدم لإكمال الـ onboarding بجدولة
+ * منشور بتاريخ مستقبلي بعيد (لا يُنشر الآن). يعيد رد الـ API (يحوي معرّف المنشور).
+ */
+export async function schedulePost(args: {
+  accountId: number
+  content: string
+  attachmentPaths?: string[]
+  scheduledTime: string
+}): Promise<unknown> {
+  const token = await getValidAccessToken()
+  const post: Record<string, unknown> = { content: args.content }
+  if (args.attachmentPaths && args.attachmentPaths.length) post.attachmentPaths = args.attachmentPaths
+  const res = await fetch(`${API_BASE}/v1/posts/schedule`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      scheduledTime: args.scheduledTime,
+      publications: [{ accountId: args.accountId, posts: [post] }],
+    }),
+  })
+  const text = await res.text().catch(() => '')
+  if (!res.ok) throw new Error(`فشل جدولة المنشور: ${res.status} ${text}`)
+  try { return text ? JSON.parse(text) : { ok: true } } catch { return { raw: text } }
 }
