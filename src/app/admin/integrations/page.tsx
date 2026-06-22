@@ -1,0 +1,142 @@
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { createClient } from '@/lib/supabase'
+import { useToast } from '@/components/ui/Toast'
+import Button from '@/components/ui/Button'
+import LoadingSpinner from '@/components/ui/LoadingSpinner'
+
+export default function AdminIntegrationsPage() {
+  const router = useRouter()
+  const supabase = createClient()
+  const { showToast } = useToast()
+  const params = useSearchParams()
+
+  const [loading, setLoading] = useState(true)
+  const [connected, setConnected] = useState<boolean | null>(null)
+  const [accounts, setAccounts] = useState<unknown>(null)
+  const [busy, setBusy] = useState<'accounts' | 'upload' | null>(null)
+  const [testImageUrl, setTestImageUrl] = useState('')
+  const [uploadResult, setUploadResult] = useState<unknown>(null)
+
+  const checkAccounts = useCallback(async () => {
+    setBusy('accounts')
+    try {
+      const res = await fetch('/api/postpulse/accounts')
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setConnected(true)
+        setAccounts(data.accounts ?? null)
+        showToast('الاتصال يعمل ✅', 'success')
+      } else {
+        setConnected(false)
+        if (data.error && res.status !== 409) showToast(data.error, 'error')
+      }
+    } finally { setBusy(null) }
+  }, [showToast])
+
+  useEffect(() => {
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/auth/login'); return }
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      if (profile?.role !== 'admin') { router.push('/dashboard'); return }
+      // حالة الربط الأولية
+      const res = await fetch('/api/postpulse/accounts')
+      setConnected(res.ok)
+      if (res.ok) { const d = await res.json().catch(() => ({})); setAccounts(d.accounts ?? null) }
+      setLoading(false)
+    }
+    init()
+  }, [supabase, router])
+
+  useEffect(() => {
+    if (params.get('connected') === '1') showToast('تم ربط Post-Pulse بنجاح ✅', 'success')
+    const err = params.get('error')
+    if (err) showToast(`تعذّر الربط: ${err}`, 'error')
+  }, [params, showToast])
+
+  const testUpload = async () => {
+    if (!testImageUrl.trim()) { showToast('ألصق رابط صورة تصميم للاختبار', 'error'); return }
+    setBusy('upload'); setUploadResult(null)
+    try {
+      const res = await fetch('/api/postpulse/test-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: testImageUrl.trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) { setUploadResult(data.media); showToast('تم رفع الصورة بنجاح ✅', 'success') }
+      else showToast(data.error ?? 'فشل الرفع', 'error')
+    } finally { setBusy(null) }
+  }
+
+  if (loading) return <div className="p-6 flex justify-center"><LoadingSpinner /></div>
+
+  const card = 'bg-card rounded-2xl border border-border p-5 space-y-3'
+
+  return (
+    <div className="p-4 md:p-6 max-w-2xl space-y-5" dir="rtl">
+      <div>
+        <h1 className="text-2xl font-black text-dark">🔗 التكامل — النشر للقنوات (Post-Pulse)</h1>
+        <p className="text-sm text-muted mt-1">اربط الحساب واختبر الاتصال ورفع الصور. لا يُنشر أي منشور في هذه الصفحة.</p>
+      </div>
+
+      {/* حالة الربط */}
+      <div className={card}>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="font-bold text-dark">حالة الربط</h2>
+            <p className={`text-sm font-bold ${connected ? 'text-green' : 'text-amber-600'}`}>
+              {connected ? '✅ مربوط' : '⚠️ غير مربوط'}
+            </p>
+          </div>
+          <a href="/api/postpulse/authorize">
+            <Button size="sm" variant={connected ? 'outline' : 'primary'}>
+              {connected ? '🔄 إعادة الربط' : '🔗 ربط Post-Pulse'}
+            </Button>
+          </a>
+        </div>
+        <p className="text-[11px] text-muted">
+          يتطلب ضبط متغيّرات البيئة: POSTPULSE_CLIENT_ID و POSTPULSE_CLIENT_SECRET و POSTPULSE_REDIRECT_URI.
+        </p>
+      </div>
+
+      {/* اختبار الحسابات */}
+      <div className={card}>
+        <h2 className="font-bold text-dark">اختبار الاتصال — الحسابات</h2>
+        <Button onClick={checkAccounts} loading={busy === 'accounts'} disabled={busy !== null} size="sm">
+          عرض الحسابات المربوطة
+        </Button>
+        {accounts != null && (
+          <pre dir="ltr" className="bg-cream rounded-xl p-3 text-xs whitespace-pre-wrap max-h-72 overflow-auto border border-border">
+            {JSON.stringify(accounts, null, 2)}
+          </pre>
+        )}
+      </div>
+
+      {/* اختبار رفع صورة */}
+      <div className={card}>
+        <h2 className="font-bold text-dark">اختبار رفع صورة (بدون نشر)</h2>
+        <p className="text-xs text-muted">ألصق رابط أي تصميم مولّد (من تخزيننا) لرفعه إلى Post-Pulse كاختبار.</p>
+        <input
+          value={testImageUrl}
+          onChange={e => setTestImageUrl(e.target.value)}
+          placeholder="https://…/ai-….png"
+          dir="ltr"
+          className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm"
+        />
+        <Button onClick={testUpload} loading={busy === 'upload'} disabled={busy !== null || !connected} size="sm">
+          ⬆️ ارفع للاختبار
+        </Button>
+        {!connected && <p className="text-[11px] text-amber-600">اربط الحساب أولاً.</p>}
+        {uploadResult != null && (
+          <pre dir="ltr" className="bg-cream rounded-xl p-3 text-xs whitespace-pre-wrap max-h-60 overflow-auto border border-border">
+            {JSON.stringify(uploadResult, null, 2)}
+          </pre>
+        )}
+      </div>
+    </div>
+  )
+}

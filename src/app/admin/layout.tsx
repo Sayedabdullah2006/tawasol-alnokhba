@@ -13,6 +13,7 @@ const adminNav = [
   { href: '/admin/users', label: 'المستخدمون', icon: '👤' },
   { href: '/admin/brand', label: 'شعار التصاميم', icon: '🎨' },
   { href: '/admin/site-content', label: 'محتوى النموذج', icon: '📄' },
+  { href: '/admin/integrations', label: 'النشر للقنوات', icon: '🔗' },
   { href: '/showcase', label: 'مجلة المبدعين', icon: '🎬' },
 ]
 
