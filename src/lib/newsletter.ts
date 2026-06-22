@@ -43,6 +43,18 @@ interface DesignRow {
 const AR_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
 const toArabicDigits = (n: number) => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[Number(d)])
 
+/** يبني نطاق الأسبوع المنتهي بلحظة جمعة النشر (endUtc). */
+export function windowForEnd(endUtc: Date): WeeklyWindow {
+  const startUtc = new Date(endUtc.getTime() - 7 * 86400000)
+  const s = new Date(startUtc.getTime() + 3 * 3600 * 1000)
+  const e = new Date(endUtc.getTime() + 3 * 3600 * 1000)
+  const sameMonth = s.getUTCMonth() === e.getUTCMonth()
+  const label = sameMonth
+    ? `${toArabicDigits(s.getUTCDate())} – ${toArabicDigits(e.getUTCDate())} ${AR_MONTHS[e.getUTCMonth()]} ${toArabicDigits(e.getUTCFullYear())}`
+    : `${toArabicDigits(s.getUTCDate())} ${AR_MONTHS[s.getUTCMonth()]} – ${toArabicDigits(e.getUTCDate())} ${AR_MONTHS[e.getUTCMonth()]} ${toArabicDigits(e.getUTCFullYear())}`
+  return { startUtc: startUtc.toISOString(), endUtc: endUtc.toISOString(), label }
+}
+
 /** أحدث «جمعة 1:00م بتوقيت السعودية» (= جمعة 10:00 UTC) ماضية أو حالية + نطاق الأسبوع. */
 export function getWeeklyWindow(ref: Date = new Date()): WeeklyWindow {
   const ksa = new Date(ref.getTime() + 3 * 3600 * 1000)
@@ -53,15 +65,26 @@ export function getWeeklyWindow(ref: Date = new Date()): WeeklyWindow {
   candidate.setUTCHours(13, 0, 0, 0)
   if (candidate.getTime() > ksa.getTime()) candidate.setUTCDate(candidate.getUTCDate() - 7)
   const endUtc = new Date(candidate.getTime() - 3 * 3600 * 1000)
-  const startUtc = new Date(endUtc.getTime() - 7 * 86400000)
+  return windowForEnd(endUtc)
+}
 
-  const s = new Date(startUtc.getTime() + 3 * 3600 * 1000)
-  const e = new Date(endUtc.getTime() + 3 * 3600 * 1000)
-  const sameMonth = s.getUTCMonth() === e.getUTCMonth()
-  const label = sameMonth
-    ? `${toArabicDigits(s.getUTCDate())} – ${toArabicDigits(e.getUTCDate())} ${AR_MONTHS[e.getUTCMonth()]} ${toArabicDigits(e.getUTCFullYear())}`
-    : `${toArabicDigits(s.getUTCDate())} ${AR_MONTHS[s.getUTCMonth()]} – ${toArabicDigits(e.getUTCDate())} ${AR_MONTHS[e.getUTCMonth()]} ${toArabicDigits(e.getUTCFullYear())}`
-  return { startUtc: startUtc.toISOString(), endUtc: endUtc.toISOString(), label }
+/** قائمة جُمَع النشر القادمة (لحظات جمعة 1م KSA) بدءاً من الأقرب. */
+export function upcomingFridays(count = 3, ref: Date = new Date()): { endUtc: string; label: string }[] {
+  const ksa = new Date(ref.getTime() + 3 * 3600 * 1000)
+  const day = ksa.getUTCDay()
+  const diff = (5 - day + 7) % 7
+  const first = new Date(ksa)
+  first.setUTCDate(ksa.getUTCDate() + diff)
+  first.setUTCHours(13, 0, 0, 0)
+  if (first.getTime() < ksa.getTime()) first.setUTCDate(first.getUTCDate() + 7) // مرّت 1م اليوم
+  const out: { endUtc: string; label: string }[] = []
+  for (let i = 0; i < count; i++) {
+    const fridayKsa = new Date(first)
+    fridayKsa.setUTCDate(first.getUTCDate() + i * 7)
+    const endUtc = new Date(fridayKsa.getTime() - 3 * 3600 * 1000)
+    out.push({ endUtc: endUtc.toISOString(), label: windowForEnd(endUtc).label })
+  }
+  return out
 }
 
 /** ملخّص مختصر متناسق: أول جملة، أو قصّ عند حدّ كلمة — بلا نقاط «...». */
@@ -243,11 +266,37 @@ async function generateCaption(window: WeeklyWindow, items: NewsletterItem[]): P
   }
 }
 
-/** يولّد بوستر نشرة الأسبوع عبر Gemini (باتجاه مختلف كل أسبوع) ويخزّنه. */
-export async function generateNewsletterPoster(opts?: { limit?: number; ref?: Date }): Promise<{
-  imageUrl: string; window: WeeklyWindow; items: NewsletterItem[]; direction: string; caption: string
+/** يجلب عناصر النشرة من معرّفات تصاميم محددة (بترتيب الاختيار). */
+export async function getItemsByIds(ids: string[]): Promise<NewsletterItem[]> {
+  if (!ids.length) return []
+  const sc = await createServiceRoleClient()
+  const { data } = await sc.from('generated_designs').select(SELECT_COLS).in('id', ids)
+  const map = new Map(((data ?? []) as DesignRow[]).map(r => [r.id, r]))
+  const rows = ids.map(id => map.get(id)).filter((r): r is DesignRow => !!r)
+  return rows.map((r, i) => ({
+    index: i + 1,
+    title: (r.title ?? '').trim() || 'إنجاز سعودي',
+    blurb: shortSummary(r.content),
+    category: (r.category && String(r.category).trim()) || 'منوّعات',
+    image: r.image_url,
+    sourceImage: r.source_image_url ?? null,
+  }))
+}
+
+/**
+ * يولّد بوستر نشرة الأسبوع عبر Gemini ويخزّنه كصف في newsletters.
+ * opts.ids: تصاميم مختارة يدوياً (من البوب-أب). opts.endUtc: جمعة النشر المستهدفة.
+ * opts.status: 'draft' (معاينة) أو 'scheduled'.
+ */
+export async function generateNewsletterPoster(opts?: {
+  limit?: number; ref?: Date; ids?: string[]; endUtc?: string; status?: 'draft' | 'scheduled'
+}): Promise<{
+  id: string; imageUrl: string; window: WeeklyWindow; items: NewsletterItem[]; direction: string; caption: string
 }> {
-  const { window, items } = await getWeeklyItems(opts?.limit ?? 7, opts?.ref)
+  const window = opts?.endUtc ? windowForEnd(new Date(opts.endUtc)) : getWeeklyWindow(opts?.ref)
+  const items = opts?.ids?.length
+    ? await getItemsByIds(opts.ids)
+    : (await getWeeklyItems(opts?.limit ?? 7, opts?.ref)).items
   if (!items.length) throw new Error('لا توجد أخبار/تصاميم متاحة لهذا الأسبوع')
 
   const direction = NEWSLETTER_DIRECTIONS[weeklySeed(window) % NEWSLETTER_DIRECTIONS.length]
@@ -268,17 +317,19 @@ export async function generateNewsletterPoster(opts?: { limit?: number; ref?: Da
   if (upErr) throw new Error(`فشل رفع البوستر: ${upErr.message}`)
   const { data: pub } = service.storage.from('content-images').getPublicUrl(path)
 
-  await service.from('newsletters').insert({
+  const { data: inserted } = await service.from('newsletters').insert({
     label: window.label,
     start_utc: window.startUtc,
     end_utc: window.endUtc,
+    scheduled_for: window.endUtc,
+    status: opts?.status ?? 'draft',
     direction,
     image_url: pub.publicUrl,
     caption,
     items: items as unknown as object,
-  })
+  }).select('id').single()
 
-  return { imageUrl: pub.publicUrl, window, items, direction, caption }
+  return { id: inserted?.id ?? '', imageUrl: pub.publicUrl, window, items, direction, caption }
 }
 
 /** يسجّل تصميماً مولّداً في السجلّ الموحّد (يُستدعى من المصادر الثلاثة). */

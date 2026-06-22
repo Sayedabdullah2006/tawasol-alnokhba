@@ -5,7 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
-import { generateNewsletterPoster } from '@/lib/newsletter'
+import { generateNewsletterPoster, getWeeklyWindow } from '@/lib/newsletter'
 import { uploadMediaFromUrl, publishNow } from '@/lib/postpulse'
 
 export const dynamic = 'force-dynamic'
@@ -28,11 +28,40 @@ async function handle(request: NextRequest) {
     request.nextUrl.searchParams.get('publish') === '0'
 
   try {
-    // 1) توليد بوستر الأسبوع + النص المرافق
-    const { imageUrl, window, items, direction, caption } = await generateNewsletterPoster()
+    const sc = await createServiceRoleClient()
+    const window = getWeeklyWindow()
+
+    // 1) استخدم النشرة المعتمدة المجدولة لهذا الأسبوع إن وُجدت، وإلا ولّد تلقائياً
+    let imageUrl: string
+    let caption: string
+    let label = window.label
+    let newsletterId: string | null = null
+
+    const { data: scheduled } = await sc
+      .from('newsletters')
+      .select('id, image_url, caption, label, scheduled_for, status')
+      .eq('status', 'scheduled')
+      .gte('scheduled_for', new Date(new Date(window.endUtc).getTime() - 3600 * 1000).toISOString())
+      .lte('scheduled_for', new Date(new Date(window.endUtc).getTime() + 3600 * 1000).toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (scheduled) {
+      imageUrl = scheduled.image_url
+      caption = scheduled.caption || `النخبة في ٧ — ${scheduled.label}`
+      label = scheduled.label
+      newsletterId = scheduled.id
+    } else {
+      const gen = await generateNewsletterPoster()
+      imageUrl = gen.imageUrl
+      caption = gen.caption
+      label = gen.window.label
+      newsletterId = gen.id
+    }
 
     if (dryRun) {
-      return NextResponse.json({ success: true, dryRun: true, label: window.label, direction, count: items.length, imageUrl, caption })
+      return NextResponse.json({ success: true, dryRun: true, label, imageUrl, caption, usedScheduled: !!scheduled })
     }
 
     // 2) رفع البوستر إلى Post-Pulse ثم النشر لكل القنوات المربوطة
@@ -43,10 +72,11 @@ async function handle(request: NextRequest) {
     })
 
     // 3) تعليم النشرة كمنشورة + تسجيل المنشور
-    const sc = await createServiceRoleClient()
-    await sc.from('newsletters')
-      .update({ published: true, published_at: new Date().toISOString() })
-      .eq('image_url', imageUrl)
+    if (newsletterId) {
+      await sc.from('newsletters')
+        .update({ published: true, status: 'published', published_at: new Date().toISOString() })
+        .eq('id', newsletterId)
+    }
     try {
       await sc.from('postpulse_posts').insert({
         schedule_id: scheduleId,
@@ -58,7 +88,7 @@ async function handle(request: NextRequest) {
       })
     } catch { /* تجاهل */ }
 
-    return NextResponse.json({ success: true, label: window.label, direction, count: items.length, channels: accountIds.length })
+    return NextResponse.json({ success: true, label, channels: accountIds.length, usedScheduled: !!scheduled })
   } catch (err) {
     return NextResponse.json(
       { success: false, error: err instanceof Error ? err.message : 'خطأ غير معروف' },
