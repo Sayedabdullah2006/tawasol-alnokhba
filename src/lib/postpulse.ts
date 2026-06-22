@@ -190,14 +190,17 @@ export async function uploadMediaFromUrl(imageUrl: string): Promise<unknown> {
 }
 
 /**
- * يجدول منشوراً عبر /v1/posts/schedule. يُستخدم لإكمال الـ onboarding بجدولة
- * منشور بتاريخ مستقبلي بعيد (لا يُنشر الآن). يعيد رد الـ API (يحوي معرّف المنشور).
+ * يجدول/يحفظ منشوراً عبر /v1/posts/schedule. لإكمال الـ onboarding بأمان نستخدم
+ * isDraft=true افتراضياً (يُحفظ كمسودة ولا يُنشر إطلاقاً). البنية الصحيحة:
+ * publications[].socialMediaAccountId + posts[].content + platformSettings.
  */
 export async function schedulePost(args: {
-  accountId: number
+  socialMediaAccountId: number
   content: string
   attachmentPaths?: string[]
   scheduledTime: string
+  isDraft?: boolean
+  platformSettings?: Record<string, unknown>
 }): Promise<unknown> {
   const token = await getValidAccessToken()
   const post: Record<string, unknown> = { content: args.content }
@@ -207,7 +210,12 @@ export async function schedulePost(args: {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       scheduledTime: args.scheduledTime,
-      publications: [{ accountId: args.accountId, posts: [post] }],
+      isDraft: args.isDraft ?? true,
+      publications: [{
+        socialMediaAccountId: args.socialMediaAccountId,
+        platformSettings: args.platformSettings ?? {},
+        posts: [post],
+      }],
     }),
   })
   const text = await res.text().catch(() => '')

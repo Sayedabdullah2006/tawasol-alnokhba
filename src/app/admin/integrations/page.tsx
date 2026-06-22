@@ -21,6 +21,7 @@ function IntegrationsInner() {
   const [uploadResult, setUploadResult] = useState<unknown>(null)
   const [schedAccountId, setSchedAccountId] = useState('')
   const [schedContent, setSchedContent] = useState('اختبار جدولة من تواصل النخبة — يُحذف لاحقاً.')
+  const [schedDraft, setSchedDraft] = useState(true)
   const [schedResult, setSchedResult] = useState<unknown>(null)
 
   const checkAccounts = useCallback(async () => {
@@ -82,7 +83,7 @@ function IntegrationsInner() {
       const res = await fetch('/api/postpulse/test-schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId: Number(schedAccountId.trim()), content: schedContent }),
+        body: JSON.stringify({ accountId: Number(schedAccountId.trim()), content: schedContent, isDraft: schedDraft }),
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok) { setSchedResult(data); showToast('تمت الجدولة (مستقبلية — لا تُنشر الآن) ✅', 'success') }
@@ -160,13 +161,13 @@ function IntegrationsInner() {
       <div className={card}>
         <h2 className="font-bold text-dark">اختبار جدولة منشور (لإكمال الإعداد — لا يُنشر الآن)</h2>
         <p className="text-xs text-muted">
-          يجدول منشوراً بتاريخ بعد سنة من الآن، فلن يُنشر شيء حالياً. خذ <b>accountId</b> من نتيجة «عرض الحسابات» أعلاه.
-          بعد نجاح الإعداد يمكنك حذف هذا المنشور المجدول من لوحة Post‑Pulse.
+          خذ قيمة <b>id</b> (وليس accountId) من نتيجة «عرض الحسابات» أعلاه — مثال: 1751.
+          الافتراضي: <b>مسودة</b> + تاريخ بعد سنة، فلا يُنشر شيء الآن. يمكنك حذف المنشور من لوحة Post‑Pulse بعد الإعداد.
         </p>
         <input
           value={schedAccountId}
           onChange={e => setSchedAccountId(e.target.value)}
-          placeholder="accountId (رقم) — مثال: 1751"
+          placeholder="id الحساب (رقم) — مثال: 1751"
           dir="ltr"
           className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm"
         />
@@ -175,8 +176,12 @@ function IntegrationsInner() {
           onChange={e => setSchedContent(e.target.value)}
           className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[60px] resize-y"
         />
+        <label className="flex items-center gap-2 text-sm text-dark">
+          <input type="checkbox" checked={schedDraft} onChange={e => setSchedDraft(e.target.checked)} className="w-4 h-4 accent-green" />
+          حفظ كمسودة (لا يُنشر إطلاقاً) — موصى به
+        </label>
         <Button onClick={testSchedule} loading={busy === 'schedule'} disabled={busy !== null || !connected} size="sm">
-          🗓️ جدولة اختبارية (بعد سنة)
+          🗓️ {schedDraft ? 'حفظ مسودة اختبارية' : 'جدولة اختبارية (بعد سنة)'}
         </Button>
         {!connected && <p className="text-[11px] text-amber-600">اربط الحساب أولاً.</p>}
         {schedResult != null && (
