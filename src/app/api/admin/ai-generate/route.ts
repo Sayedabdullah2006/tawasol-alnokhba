@@ -259,7 +259,6 @@ export async function POST(req: Request) {
       const completion = await openai.chat.completions.create({
         model: OPENAI_MODEL,
         response_format: { type: 'json_object' },
-        temperature: 0.9, // حرارة أعلى لخطوة الاتجاهات فقط لزيادة التنوّع
         messages: [
           { role: 'system', content: SYS_CONCEPTS },
           { role: 'user', content: conceptUserContent },
