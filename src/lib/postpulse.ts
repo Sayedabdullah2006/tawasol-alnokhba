@@ -150,9 +150,14 @@ export async function uploadMediaFromUrl(imageUrl: string): Promise<unknown> {
   const signedHeaders = (new URL(presign.url).searchParams.get('X-Amz-SignedHeaders') || '').toLowerCase()
   let putHeaders: Record<string, string>
   if (presign.headers && Object.keys(presign.headers).length) {
-    putHeaders = presign.headers
+    // توحيد أسماء الترويسات لحروف صغيرة وإزالة التكرار (الـ API يعيد content-type و Content-Type
+    // معاً، فيدمجهما fetch ويُفسد القيمة ⇒ SignatureDoesNotMatch).
+    putHeaders = {}
+    for (const [k, v] of Object.entries(presign.headers)) {
+      putHeaders[k.toLowerCase()] = String(v)
+    }
   } else if (signedHeaders.includes('content-type')) {
-    putHeaders = { 'Content-Type': contentType }
+    putHeaders = { 'content-type': contentType }
   } else {
     putHeaders = {}
   }
