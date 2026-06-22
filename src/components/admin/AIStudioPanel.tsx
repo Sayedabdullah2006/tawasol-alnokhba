@@ -146,6 +146,37 @@ export default function AIStudioPanel({
   // تضمين تصميم واحد مميّز في «مجلة المبدعين» (تصميم واحد لكل طلب)
   const [featuredCover, setFeaturedCover] = useState<string | null>(null)
   const [featuringCover, setFeaturingCover] = useState<string | null>(null)
+  // النشر عبر القنوات (Post-Pulse)
+  const [publishingCover, setPublishingCover] = useState<string | null>(null)
+  const [publishedCover, setPublishedCover] = useState<string | null>(null)
+
+  // ينشر النص (التغريدة المختارة) + التصميم في كل القنوات المربوطة عبر Post-Pulse.
+  const publishToChannels = async (cover: string) => {
+    if (!selectedTweet.trim()) { showToast('لا يوجد نص للنشر — ولّد/اختر تغريدة أولاً', 'error'); return }
+    if (!window.confirm('سيُنشر النص والتصميم فوراً في كل القنوات المربوطة في Post‑Pulse. متابعة؟')) return
+    setPublishingCover(cover)
+    try {
+      const res = await fetch('/api/postpulse/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: selectedTweet,
+          imageUrl: cover,
+          requestId: request.id,
+          postIndex: isPost ? postIndex : undefined,
+        }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { showToast(d.error ?? 'فشل النشر', 'error'); return }
+      setPublishedCover(cover)
+      const n = Array.isArray(d.accountIds) ? d.accountIds.length : 0
+      showToast(`تم النشر في ${n} قناة 📣`, 'success')
+    } catch {
+      showToast('حدث خطأ أثناء النشر', 'error')
+    } finally {
+      setPublishingCover(null)
+    }
+  }
 
   const featureInMagazine = async (cover: string) => {
     setFeaturingCover(cover)
@@ -678,6 +709,15 @@ export default function AIStudioPanel({
                             >
                               {featuredCover === r.imageUrl ? '⭐ مميّز في المجلة' : '⭐ ضمّن في المجلة'}
                             </Button>
+                            <Button
+                              onClick={() => publishToChannels(r.imageUrl)}
+                              loading={publishingCover === r.imageUrl}
+                              disabled={publishingCover !== null}
+                              variant={publishedCover === r.imageUrl ? 'secondary' : 'outline'}
+                              size="sm"
+                            >
+                              {publishedCover === r.imageUrl ? '✅ نُشر' : '📣 انشر عبر القنوات'}
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -774,6 +814,15 @@ export default function AIStudioPanel({
                   size="sm"
                 >
                   {featuredCover === imageUrl ? '⭐ مميّز في المجلة' : '⭐ ضمّن في المجلة'}
+                </Button>
+                <Button
+                  onClick={() => publishToChannels(imageUrl)}
+                  loading={publishingCover === imageUrl}
+                  disabled={publishingCover !== null}
+                  variant={publishedCover === imageUrl ? 'secondary' : 'outline'}
+                  size="sm"
+                >
+                  {publishedCover === imageUrl ? '✅ نُشر' : '📣 انشر عبر القنوات'}
                 </Button>
               </div>
             </div>

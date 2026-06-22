@@ -119,11 +119,22 @@ export async function listAccounts(): Promise<unknown> {
   return res.json()
 }
 
+// يستخرج مسار الوسائط من ناتج confirm (يُستخدم في attachmentPaths عند النشر).
+function extractMediaPath(confirm: unknown, fallbackKey: string): string {
+  if (confirm && typeof confirm === 'object') {
+    const o = confirm as Record<string, unknown>
+    for (const k of ['path', 'mediaPath', 'media_path', 'media', 'key', 'attachmentPath']) {
+      if (typeof o[k] === 'string' && o[k]) return o[k] as string
+    }
+  }
+  return fallbackKey
+}
+
 /**
  * يرفع صورة إلى Post-Pulse عبر الرابط (presign → PUT → confirm). لا ينشر شيئاً.
- * يعيد ناتج confirm (يحوي مسار الوسائط المستخدم لاحقاً في attachmentPaths).
+ * يعيد { path, raw }: path هو مسار الوسائط المستخدم في attachmentPaths.
  */
-export async function uploadMediaFromUrl(imageUrl: string): Promise<unknown> {
+export async function uploadMediaFromUrl(imageUrl: string): Promise<{ path: string; raw: unknown }> {
   const token = await getValidAccessToken()
 
   // 1) جلب بايتات الصورة من تخزيننا
@@ -186,7 +197,61 @@ export async function uploadMediaFromUrl(imageUrl: string): Promise<unknown> {
   if (confirmText) {
     try { confirmData = JSON.parse(confirmText) } catch { confirmData = { raw: confirmText } }
   }
-  return confirmData ?? { ok: true, key: presign.key }
+  return { path: extractMediaPath(confirmData, presign.key), raw: confirmData ?? { key: presign.key } }
+}
+
+/**
+ * نشر فوري للنص + التصميم إلى الحسابات المربوطة عبر /v1/posts/schedule
+ * (scheduledTime=الآن، isDraft=false). إن لم تُحدَّد accountIds يُنشر لكل الحسابات.
+ * يعيد { result, accountIds, scheduleId }.
+ */
+export async function publishNow(args: {
+  content: string
+  attachmentPaths?: string[]
+  accountIds?: number[]
+}): Promise<{ result: unknown; accountIds: number[]; scheduleId: string | null }> {
+  const token = await getValidAccessToken()
+
+  // تحديد الحسابات: المحددة أو كل الحسابات المربوطة
+  let accountIds = args.accountIds ?? []
+  if (!accountIds.length) {
+    const accounts = await listAccounts()
+    const arr = Array.isArray(accounts) ? accounts : []
+    accountIds = arr
+      .map((a) => (a && typeof a === 'object' ? Number((a as Record<string, unknown>).id) : NaN))
+      .filter((n) => Number.isFinite(n))
+  }
+  if (!accountIds.length) throw new Error('لا توجد حسابات مربوطة في Post-Pulse')
+
+  const post: Record<string, unknown> = { content: args.content }
+  if (args.attachmentPaths && args.attachmentPaths.length) post.attachmentPaths = args.attachmentPaths
+
+  const res = await fetch(`${API_BASE}/v1/posts/schedule`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      scheduledTime: new Date().toISOString(), // الآن = نشر فوري
+      isDraft: false,
+      publications: accountIds.map((id) => ({
+        socialMediaAccountId: id,
+        platformSettings: {},
+        posts: [post],
+      })),
+    }),
+  })
+  const text = await res.text().catch(() => '')
+  if (!res.ok) throw new Error(`فشل النشر: ${res.status} ${text}`)
+  let result: unknown = null
+  try { result = text ? JSON.parse(text) : { ok: true } } catch { result = { raw: text } }
+
+  // محاولة استخراج معرّف الجدولة لمطابقة الـ webhook لاحقاً
+  let scheduleId: string | null = null
+  if (result && typeof result === 'object') {
+    const o = result as Record<string, unknown>
+    const cand = o.scheduleId ?? o.id ?? (Array.isArray(o.publications) ? undefined : undefined)
+    if (cand != null) scheduleId = String(cand)
+  }
+  return { result, accountIds, scheduleId }
 }
 
 /**
