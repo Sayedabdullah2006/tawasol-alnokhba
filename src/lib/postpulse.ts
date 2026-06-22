@@ -179,6 +179,12 @@ export async function uploadMediaFromUrl(imageUrl: string): Promise<unknown> {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ key: presign.key }),
   })
-  if (!confirmRes.ok) throw new Error(`فشل تأكيد الرفع: ${confirmRes.status} ${await confirmRes.text()}`)
-  return confirmRes.json()
+  const confirmText = await confirmRes.text().catch(() => '')
+  if (!confirmRes.ok) throw new Error(`فشل تأكيد الرفع: ${confirmRes.status} ${confirmText}`)
+  // قد يعيد التأكيد جسماً فارغاً عند النجاح — نتعامل معه بأمان بدل تعطّل JSON.
+  let confirmData: unknown = null
+  if (confirmText) {
+    try { confirmData = JSON.parse(confirmText) } catch { confirmData = { raw: confirmText } }
+  }
+  return confirmData ?? { ok: true, key: presign.key }
 }
