@@ -33,7 +33,7 @@ export default function ShowcasePage() {
   const [error, setError] = useState(false)
   const [showSplash, setShowSplash] = useState(true)
   const [selected, setSelected] = useState<ShowcaseItem | null>(null)
-  const rowRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const rowRefs = useRef<Record<string, HTMLElement | null>>({})
 
   useEffect(() => {
     fetch('/api/showcase')
