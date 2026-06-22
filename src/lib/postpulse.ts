@@ -144,18 +144,29 @@ export async function uploadMediaFromUrl(imageUrl: string): Promise<unknown> {
   const presign = await urlRes.json() as { key: string; url: string; headers?: Record<string, string> }
 
   // 3) رفع البايتات (PUT) إلى الرابط الموقّع.
-  // نرسل الترويسات التي أعادها الـ API حرفياً (هي الموقّع عليها)؛ وإن لم تُعِد أيّاً
-  // نكتفي بـ Content-Type المطابق لما طلبنا به الرابط.
-  const putHeaders =
-    presign.headers && Object.keys(presign.headers).length
-      ? presign.headers
-      : { 'Content-Type': contentType }
+  // SigV4: نرسل فقط الترويسات الموقّع عليها. نقرأ X-Amz-SignedHeaders من الرابط:
+  // - إن أعاد الـ API ترويسات صريحة نستخدمها كما هي.
+  // - وإلا: نرسل Content-Type فقط إن كان ضمن الترويسات الموقّعة، وإلا لا نرسل شيئاً.
+  const signedHeaders = (new URL(presign.url).searchParams.get('X-Amz-SignedHeaders') || '').toLowerCase()
+  let putHeaders: Record<string, string>
+  if (presign.headers && Object.keys(presign.headers).length) {
+    putHeaders = presign.headers
+  } else if (signedHeaders.includes('content-type')) {
+    putHeaders = { 'Content-Type': contentType }
+  } else {
+    putHeaders = {}
+  }
   const putRes = await fetch(presign.url, {
     method: 'PUT',
     headers: putHeaders,
     body: bytes,
   })
-  if (!putRes.ok) throw new Error(`فشل رفع الملف: ${putRes.status} ${await putRes.text().catch(() => '')}`)
+  if (!putRes.ok) {
+    const errBody = await putRes.text().catch(() => '')
+    throw new Error(
+      `فشل رفع الملف: ${putRes.status} | SignedHeaders=[${signedHeaders || 'none'}] | أرسلنا=[${Object.keys(putHeaders).join(',') || 'none'}] | ${errBody}`,
+    )
+  }
 
   // 4) تأكيد الرفع
   const confirmRes = await fetch(`${API_BASE}/v1/media/upload/confirm`, {
