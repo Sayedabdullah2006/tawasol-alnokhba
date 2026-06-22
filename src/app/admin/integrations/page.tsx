@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
-export default function AdminIntegrationsPage() {
+function IntegrationsInner() {
   const router = useRouter()
   const supabase = createClient()
   const { showToast } = useToast()
@@ -138,5 +138,13 @@ export default function AdminIntegrationsPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function AdminIntegrationsPage() {
+  return (
+    <Suspense fallback={<div className="p-6 flex justify-center"><LoadingSpinner /></div>}>
+      <IntegrationsInner />
+    </Suspense>
   )
 }
