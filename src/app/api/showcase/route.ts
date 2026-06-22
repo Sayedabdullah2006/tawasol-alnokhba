@@ -70,13 +70,13 @@ export async function GET() {
   }
 
   // ── المصدر 2: التصاميم المميّزة المختارة (تصميم واحد لكل عنصر) ──
-  const { data: featured } = await sc
+  const { data: featuredRows } = await sc
     .from('showcase_designs')
     .select('id, name, title, category, story, cover, tweets, created_at')
     .order('created_at', { ascending: false })
     .limit(300)
 
-  for (const r of featured ?? []) {
+  for (const r of featuredRows ?? []) {
     const cover = (r.cover as string) || ''
     if (!cover) continue
     const category = (r.category && String(r.category).trim()) || 'منوّعات'
