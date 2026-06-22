@@ -149,18 +149,28 @@ export default function AIStudioPanel({
   // النشر عبر القنوات (Post-Pulse)
   const [publishingCover, setPublishingCover] = useState<string | null>(null)
   const [publishedCover, setPublishedCover] = useState<string | null>(null)
+  // نافذة معاينة/تعديل قبل النشر
+  const [publishCover, setPublishCover] = useState<string | null>(null)
+  const [publishText, setPublishText] = useState('')
 
-  // ينشر النص (التغريدة المختارة) + التصميم في كل القنوات المربوطة عبر Post-Pulse.
-  const publishToChannels = async (cover: string) => {
-    if (!selectedTweet.trim()) { showToast('لا يوجد نص للنشر — ولّد/اختر تغريدة أولاً', 'error'); return }
-    if (!window.confirm('سيُنشر النص والتصميم فوراً في كل القنوات المربوطة في Post‑Pulse. متابعة؟')) return
+  // يفتح نافذة المعاينة: التصميم + النص القابل للتعديل قبل النشر.
+  const openPublish = (cover: string) => {
+    setPublishText(selectedTweet || '')
+    setPublishCover(cover)
+  }
+
+  // ينفّذ النشر الفعلي بالنص المعروض (بعد التعديل) إلى كل القنوات المربوطة.
+  const confirmPublish = async () => {
+    const cover = publishCover
+    if (!cover) return
+    if (!publishText.trim()) { showToast('اكتب نص المنشور أولاً', 'error'); return }
     setPublishingCover(cover)
     try {
       const res = await fetch('/api/postpulse/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: selectedTweet,
+          content: publishText,
           imageUrl: cover,
           requestId: request.id,
           postIndex: isPost ? postIndex : undefined,
@@ -169,6 +179,7 @@ export default function AIStudioPanel({
       const d = await res.json().catch(() => ({}))
       if (!res.ok) { showToast(d.error ?? 'فشل النشر', 'error'); return }
       setPublishedCover(cover)
+      setPublishCover(null)
       const n = Array.isArray(d.accountIds) ? d.accountIds.length : 0
       showToast(`تم النشر في ${n} قناة 📣`, 'success')
     } catch {
@@ -710,7 +721,7 @@ export default function AIStudioPanel({
                               {featuredCover === r.imageUrl ? '⭐ مميّز في المجلة' : '⭐ ضمّن في المجلة'}
                             </Button>
                             <Button
-                              onClick={() => publishToChannels(r.imageUrl)}
+                              onClick={() => openPublish(r.imageUrl)}
                               loading={publishingCover === r.imageUrl}
                               disabled={publishingCover !== null}
                               variant={publishedCover === r.imageUrl ? 'secondary' : 'outline'}
@@ -816,7 +827,7 @@ export default function AIStudioPanel({
                   {featuredCover === imageUrl ? '⭐ مميّز في المجلة' : '⭐ ضمّن في المجلة'}
                 </Button>
                 <Button
-                  onClick={() => publishToChannels(imageUrl)}
+                  onClick={() => openPublish(imageUrl)}
                   loading={publishingCover === imageUrl}
                   disabled={publishingCover !== null}
                   variant={publishedCover === imageUrl ? 'secondary' : 'outline'}
@@ -831,6 +842,43 @@ export default function AIStudioPanel({
       </div>
 
       <ImageLightbox src={lightbox} onClose={() => setLightbox(null)} />
+
+      {/* نافذة معاينة/تعديل قبل النشر عبر القنوات */}
+      {publishCover && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => publishingCover ? null : setPublishCover(null)}
+        >
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-border">
+              <h3 className="font-black text-dark text-base">📣 النشر عبر القنوات</h3>
+              <p className="text-xs text-muted mt-0.5">سيُنشر النص أدناه مع التصميم في <b>كل القنوات المربوطة</b> في Post‑Pulse فوراً.</p>
+            </div>
+            <div className="px-5 py-4 overflow-y-auto space-y-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={publishCover} alt="التصميم" className="w-32 mx-auto aspect-[4/5] object-cover rounded-xl border border-border" />
+              <div>
+                <label className="block text-xs font-bold text-dark mb-1">نص المنشور (عدّله قبل النشر):</label>
+                <textarea
+                  value={publishText}
+                  onChange={e => setPublishText(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[140px] resize-y"
+                  placeholder="اكتب نص المنشور..."
+                />
+                <p className="text-[11px] text-muted mt-1">{publishText.length} حرف</p>
+              </div>
+            </div>
+            <div className="px-5 py-3 border-t border-border flex gap-2">
+              <Button onClick={confirmPublish} loading={publishingCover === publishCover} disabled={!!publishingCover || !publishText.trim()} className="flex-1">
+                🚀 انشر الآن
+              </Button>
+              <Button variant="outline" onClick={() => setPublishCover(null)} disabled={!!publishingCover}>
+                إلغاء
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
