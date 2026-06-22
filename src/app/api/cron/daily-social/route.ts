@@ -196,6 +196,18 @@ async function handle(request: NextRequest) {
     const { data: inserted } = await sc.from('social_schedule').insert(rows).select('id')
     const insertedIds = (inserted ?? []).map(r => r.id)
 
+    // تسجيل تصاميم اليوم في السجلّ الموحّد (مرشّحي نشرة «النخبة في ٧»)
+    try {
+      await sc.from('generated_designs').insert(results.map(r => ({
+        source: 'daily',
+        title: r.post.title,
+        content: r.post.content,
+        category: r.post.categoryNames[0] ?? null,
+        image_url: r.designUrl,
+        source_image_url: r.hostedSource,
+      })))
+    } catch { /* تجاهل أخطاء التسجيل */ }
+
     // ── 6) إرسال الإيميل (تصاميم + تغريدات) ──
     const html = buildDigestEmail(results, today)
     const subject = `📌 خطة النشر اليومية — ${results.length} منشورات مقترحة (${today})`

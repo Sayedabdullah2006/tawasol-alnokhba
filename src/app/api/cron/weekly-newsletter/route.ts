@@ -28,15 +28,14 @@ async function handle(request: NextRequest) {
     request.nextUrl.searchParams.get('publish') === '0'
 
   try {
-    // 1) توليد بوستر الأسبوع
-    const { imageUrl, window, items, direction } = await generateNewsletterPoster()
+    // 1) توليد بوستر الأسبوع + النص المرافق
+    const { imageUrl, window, items, direction, caption } = await generateNewsletterPoster()
 
     if (dryRun) {
-      return NextResponse.json({ success: true, dryRun: true, label: window.label, direction, count: items.length, imageUrl })
+      return NextResponse.json({ success: true, dryRun: true, label: window.label, direction, count: items.length, imageUrl, caption })
     }
 
     // 2) رفع البوستر إلى Post-Pulse ثم النشر لكل القنوات المربوطة
-    const caption = `🗞️ النخبة في ٧ — ${window.label}\nأبرز إنجازات الأسبوع.\n#أول_سعودي #First1Saudi`
     const media = await uploadMediaFromUrl(imageUrl)
     const { accountIds, scheduleId, result } = await publishNow({
       content: caption,

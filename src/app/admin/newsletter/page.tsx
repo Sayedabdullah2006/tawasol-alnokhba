@@ -9,13 +9,16 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 interface Candidate {
   id: string
-  post_title: string | null
+  source: string
+  title: string | null
   category: string | null
-  design_image_url: string
+  image_url: string
   in_newsletter: boolean
   newsletter_rank: number | null
 }
-interface Latest { label: string; image_url: string; direction: string | null; published: boolean; created_at: string }
+interface Latest { label: string; image_url: string; direction: string | null; caption: string | null; published: boolean; created_at: string }
+
+const SOURCE_LABEL: Record<string, string> = { daily: 'خطة النشر', standalone: 'استوديو مستقل', request: 'طلب' }
 
 export default function AdminNewsletterPage() {
   const router = useRouter()
@@ -94,9 +97,15 @@ export default function AdminNewsletterPage() {
           <div className="flex gap-4 flex-wrap items-start">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={latest.image_url} alt="النشرة" className="w-48 rounded-xl border border-border" />
-            <div className="text-sm text-muted space-y-1">
+            <div className="text-sm text-muted space-y-1 flex-1 min-w-[200px]">
               <div>الاتجاه: <b className="text-dark">{latest.direction ?? '—'}</b></div>
               <div>الحالة: {latest.published ? '✅ نُشرت' : '🕓 لم تُنشر بعد'}</div>
+              {latest.caption && (
+                <div className="bg-cream rounded-lg p-2 text-xs text-dark whitespace-pre-wrap leading-relaxed border border-border">
+                  <span className="font-bold">النص المرافق:</span>
+                  <br />{latest.caption}
+                </div>
+              )}
               <a href={latest.image_url} target="_blank" rel="noopener noreferrer" className="text-green hover:underline inline-block">فتح بالحجم الكامل ↗</a>
             </div>
           </div>
@@ -114,10 +123,11 @@ export default function AdminNewsletterPage() {
               <button key={c.id} type="button" onClick={() => togglePick(c)}
                 className={`relative text-right rounded-xl overflow-hidden border-2 transition-all ${c.in_newsletter ? 'border-green ring-2 ring-green/30' : 'border-border'}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={c.design_image_url} alt={c.post_title ?? ''} className="w-full aspect-[4/5] object-cover" />
+                <img src={c.image_url} alt={c.title ?? ''} className="w-full aspect-[4/5] object-cover" />
                 {c.in_newsletter && <span className="absolute top-1 left-1 bg-green text-white text-[10px] font-bold rounded-full px-2 py-0.5">⭐ مثبّت</span>}
+                <span className="absolute top-1 right-1 bg-black/60 text-white text-[9px] rounded px-1.5 py-0.5">{SOURCE_LABEL[c.source] ?? c.source}</span>
                 <div className="p-2">
-                  <div className="text-[11px] font-bold text-dark line-clamp-2">{c.post_title}</div>
+                  <div className="text-[11px] font-bold text-dark line-clamp-2">{c.title}</div>
                   <div className="text-[10px] text-muted">{c.category}</div>
                 </div>
               </button>

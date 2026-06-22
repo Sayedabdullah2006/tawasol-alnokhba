@@ -17,7 +17,7 @@ export async function POST(req: Request) {
 
   const sc = await createServiceRoleClient()
   const { error } = await sc
-    .from('social_schedule')
+    .from('generated_designs')
     .update({
       in_newsletter: !!body.include,
       newsletter_rank: typeof body.rank === 'number' ? body.rank : null,

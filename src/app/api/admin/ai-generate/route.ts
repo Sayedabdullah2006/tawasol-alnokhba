@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { getOpenAI, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives } from '@/lib/openai'
+import { logGeneratedDesign } from '@/lib/newsletter'
 import { generateImageWithGemini } from '@/lib/gemini'
 import { compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
 
@@ -369,6 +370,20 @@ export async function POST(req: Request) {
       reqRow.proposed_images = [...existing, imageUrl]
 
       await saveStep({ generatedAt: new Date().toISOString(), imageUrl })
+
+      // تسجيل التصميم في السجلّ الموحّد (مرشّحي نشرة «النخبة في ٧»)
+      {
+        const post = isCampaignPost ? (Array.isArray(reqRow.campaign_posts) ? reqRow.campaign_posts[postIndex as number] : null) : null
+        await logGeneratedDesign({
+          source: 'request',
+          title: post?.title ?? reqRow.title ?? null,
+          content: post?.content ?? reqRow.content ?? null,
+          category: reqRow.category ?? null,
+          imageUrl,
+          sourceImageUrl: primarySource,
+          requestId,
+        })
+      }
 
       return NextResponse.json({ imageUrl, prompt: designPrompt })
     }

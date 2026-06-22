@@ -1,7 +1,7 @@
 /** بيانات لوحة نشرة «النخبة في ٧»: نافذة الأسبوع + مرشّحوها + آخر نشرة مولّدة. أدمن فقط. */
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
-import { getWeeklyWindow } from '@/lib/newsletter'
+import { getWeeklyWindow, getCandidates } from '@/lib/newsletter'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,24 +13,16 @@ export async function GET() {
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
 
   const window = getWeeklyWindow()
+  // كل التصاميم المولّدة (يومية + مستقل + طلبات) الأحدث أولاً
+  const candidates = await getCandidates(21)
+
   const sc = await createServiceRoleClient()
-
-  const { data: candidates } = await sc
-    .from('social_schedule')
-    .select('id, post_title, category, design_image_url, in_newsletter, newsletter_rank, created_at')
-    .not('design_image_url', 'is', null)
-    .gte('created_at', window.startUtc)
-    .lte('created_at', window.endUtc)
-    .order('in_newsletter', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(80)
-
   const { data: latest } = await sc
     .from('newsletters')
-    .select('id, label, image_url, direction, published, published_at, created_at')
+    .select('id, label, image_url, direction, caption, published, published_at, created_at')
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
-  return NextResponse.json({ window, candidates: candidates ?? [], latest: latest ?? null })
+  return NextResponse.json({ window, candidates, latest: latest ?? null })
 }

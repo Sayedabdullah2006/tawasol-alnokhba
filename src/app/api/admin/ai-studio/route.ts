@@ -9,6 +9,7 @@ import {
   generateConcepts,
   generateDesign,
 } from '@/lib/ai-studio'
+import { logGeneratedDesign } from '@/lib/newsletter'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -90,6 +91,15 @@ export async function POST(req: Request) {
       if (!sourceImages.length) return NextResponse.json({ error: 'ارفع صورة المصدر أولاً' }, { status: 400 })
 
       const { imageUrl, prompt } = await generateDesign(openai, { analysis, chosenConcept, sourceImages, note, hasVideo })
+      // تسجيل التصميم في السجلّ الموحّد (مرشّحي نشرة «النخبة في ٧»)
+      await logGeneratedDesign({
+        source: 'standalone',
+        title: title ?? null,
+        content: content ?? null,
+        category: null,
+        imageUrl,
+        sourceImageUrl: sourceImages[0] ?? null,
+      })
       return NextResponse.json({ imageUrl, prompt })
     }
 
