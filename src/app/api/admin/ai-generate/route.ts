@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
-import { getOpenAI, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE } from '@/lib/openai'
+import { getOpenAI, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives } from '@/lib/openai'
 import { generateImageWithGemini } from '@/lib/gemini'
 import { compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
 
@@ -236,10 +236,20 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 })
       }
 
-      // نمرّر الصورة المختارة (إن وُجدت) ليُراعي الاتجاهات تكوين الصورة ومزاجها،
-      // فتتغيّر الاتجاهات وفق تحليل الخبر + صورته فعلاً لا قوالب ثابتة.
+      // استبعاد الاتجاهات المقترحة سابقاً لنفس الخبر (لإعادة توليد مختلفة)
+      const prevConceptsSrc = isCampaignPost
+        ? reqRow.ai_posts?.[postIndex as number]?.design_concepts
+        : reqRow.ai_design_concepts
+      const prevTitles: string[] = Array.isArray(prevConceptsSrc?.items)
+        ? prevConceptsSrc.items.map((x: { title?: string }) => x?.title ?? '').filter(Boolean)
+        : []
+      // توجيهات التنويع: مجموعة عشوائية من عائلات الاتجاه + محاور التنويع + الاستبعاد
+      const directives = buildConceptDirectives({ exclude: prevTitles })
+
+      // نمرّر الصور المختارة ليُراعي الاتجاهات تكوينها ومزاجها،
+      // فتتغيّر الاتجاهات وفق تحليل الخبر + صوره فعلاً لا قوالب ثابتة.
       const conceptUserContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
-        { type: 'text', text: `${JSON.stringify(priorAnalysis)}\n\n${withContext(newsText)}` },
+        { type: 'text', text: `${JSON.stringify(priorAnalysis)}\n\n${withContext(newsText)}\n\n${directives}` },
       ]
       // نمرّر جميع الصور المختارة لتُراعي الاتجاهات تكوين كل الصور ومزاجها.
       for (const img of sourceImages) {
@@ -249,6 +259,7 @@ export async function POST(req: Request) {
       const completion = await openai.chat.completions.create({
         model: OPENAI_MODEL,
         response_format: { type: 'json_object' },
+        temperature: 0.9, // حرارة أعلى لخطوة الاتجاهات فقط لزيادة التنوّع
         messages: [
           { role: 'system', content: SYS_CONCEPTS },
           { role: 'user', content: conceptUserContent },

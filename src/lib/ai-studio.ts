@@ -8,7 +8,7 @@
  * نفس البرومبتات (SYS_*) ونفس النماذج — لا يوجد سلوك مختلف عن الواجهة.
  */
 import OpenAI from 'openai'
-import { getOpenAI, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE } from './openai'
+import { getOpenAI, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives } from './openai'
 import { generateImageWithGemini } from './gemini'
 import { compositeLogoBottomRight, resizeToPoster } from './logo-overlay'
 import { createServiceRoleClient } from './supabase-server'
@@ -110,15 +110,18 @@ export async function generateTweets(
 /** الخطوة 3 — اقتراح 3 اتجاهات تصميم. */
 export async function generateConcepts(
   openai: OpenAI,
-  args: { analysis: unknown; newsText: string; sourceImages: string[] },
+  args: { analysis: unknown; newsText: string; sourceImages: string[]; excludeTitles?: string[] },
 ): Promise<Concept[]> {
+  // توجيهات التنويع: مجموعة عشوائية من عائلات الاتجاه + محاور التنويع + استبعاد السابق
+  const directives = buildConceptDirectives({ exclude: args.excludeTitles })
   const conceptContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
-    { type: 'text', text: `${JSON.stringify(args.analysis)}\n\n${args.newsText}` },
+    { type: 'text', text: `${JSON.stringify(args.analysis)}\n\n${args.newsText}\n\n${directives}` },
   ]
   for (const img of args.sourceImages) conceptContent.push({ type: 'image_url', image_url: { url: img } })
   const completion = await openai.chat.completions.create({
     model: OPENAI_MODEL,
     response_format: { type: 'json_object' },
+    temperature: 0.9, // حرارة أعلى لخطوة الاتجاهات فقط لزيادة التنوّع
     messages: [{ role: 'system', content: SYS_CONCEPTS }, { role: 'user', content: conceptContent }],
   })
   const raw = completion.choices[0]?.message?.content ?? '{}'

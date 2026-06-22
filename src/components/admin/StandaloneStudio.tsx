@@ -81,7 +81,13 @@ export default function StandaloneStudio() {
     if (!content.trim()) { showToast('أدخل نص الخبر أولاً', 'error'); return }
     setLoadingStep(step)
     try {
-      const data = await post({ step, title, content, sourceImages: selectedImages, extraInfo, analysis, chosenConcept: step === 'image' ? chosenConcept : undefined, hasVideo })
+      const data = await post({
+        step, title, content, sourceImages: selectedImages, extraInfo, analysis,
+        chosenConcept: step === 'image' ? chosenConcept : undefined,
+        hasVideo,
+        // عند إعادة اقتراح الاتجاهات: استبعد الحالية لتأتي بدائل مختلفة
+        previousConcepts: step === 'concepts' ? conceptItems.map(c => c.title ?? '').filter(Boolean) : undefined,
+      })
       if (!data) return
       if (step === 'analyze') { setAnalysis(data.analysis); showToast('تم التحليل', 'success') }
       else if (step === 'tweets') { setTweets(data.tweets); setSelectedTweet(data.tweets); showToast('تم توليد التغريدات', 'success') }

@@ -39,6 +39,7 @@ export async function POST(req: Request) {
     chosenConcept?: string
     note?: string
     hasVideo?: boolean
+    previousConcepts?: string[]
   }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 }) }
 
@@ -77,7 +78,8 @@ export async function POST(req: Request) {
     // ── concepts ──
     if (step === 'concepts') {
       if (!analysis) return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 })
-      const items = await generateConcepts(openai, { analysis, newsText, sourceImages })
+      const excludeTitles = Array.isArray(body.previousConcepts) ? body.previousConcepts : []
+      const items = await generateConcepts(openai, { analysis, newsText, sourceImages, excludeTitles })
       return NextResponse.json({ concepts: items })
     }
 
