@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 // ─── الأنواع (مطابقة لمخرجات /api/showcase) ───
 interface ShowcaseItem {
   id: string
-  source: 'daily' | 'client'
+  source: 'daily' | 'featured'
   name: string
   title: string
   category: string

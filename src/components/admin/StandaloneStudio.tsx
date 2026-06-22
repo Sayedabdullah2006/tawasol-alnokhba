@@ -25,6 +25,10 @@ export default function StandaloneStudio() {
   const [extraInfo, setExtraInfo] = useState('')
   const [hasVideo, setHasVideo] = useState(false)
   const [uploading, setUploading] = useState(false)
+  // تضمين تصميم مميّز في «مجلة المبدعين»
+  const [magazineCategory, setMagazineCategory] = useState('')
+  const [featuredCover, setFeaturedCover] = useState<string | null>(null)
+  const [featuringCover, setFeaturingCover] = useState<string | null>(null)
 
   const toggleImage = (url: string) =>
     setSelectedImages(prev => (prev.includes(url) ? prev.filter(u => u !== url) : [...prev, url]))
@@ -129,6 +133,35 @@ export default function StandaloneStudio() {
       const url = await genOne(r.brief, note)
       if (url) { setBatchResults(prev => prev.map((x, idx) => idx === i ? { ...x, imageUrl: url } : x)); showToast('تم إعادة التوليد', 'success') }
     } finally { setRegenIndex(null) }
+  }
+
+  // تضمين تصميم واحد مميّز في «مجلة المبدعين»
+  const featureInMagazine = async (cover: string) => {
+    if (!title.trim()) { showToast('أدخل عنوان/اسم الخبر أولاً', 'error'); return }
+    setFeaturingCover(cover)
+    try {
+      const res = await fetch('/api/admin/showcase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: 'standalone',
+          cover,
+          name: title,
+          title,
+          category: magazineCategory,
+          story: content,
+          tweets: selectedTweet,
+        }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { showToast(d.error ?? 'تعذّر التضمين في المجلة', 'error'); return }
+      setFeaturedCover(cover)
+      showToast('تم تضمين التصميم في مجلة المبدعين ⭐', 'success')
+    } catch {
+      showToast('حدث خطأ أثناء التضمين', 'error')
+    } finally {
+      setFeaturingCover(null)
+    }
   }
 
   const card = 'bg-card rounded-2xl border border-border p-5 space-y-3'
@@ -247,14 +280,24 @@ export default function StandaloneStudio() {
                   <div className="font-bold text-dark text-xs">{r.title}</div>
                   <textarea value={noteByIndex[i] ?? ''} onChange={e => setNoteByIndex(p => ({ ...p, [i]: e.target.value }))}
                     placeholder="ملاحظة لإعادة التوليد..." className="w-full px-2 py-1.5 rounded-lg border border-border bg-white text-xs min-h-[48px] resize-y" />
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button onClick={() => regenerate(i)} loading={regenIndex === i} disabled={regenIndex !== null || !(noteByIndex[i] ?? '').trim()} variant="outline" size="sm">🔄 إعادة التوليد</Button>
+                    <Button onClick={() => featureInMagazine(r.imageUrl)} loading={featuringCover === r.imageUrl} disabled={featuringCover !== null} variant={featuredCover === r.imageUrl ? 'secondary' : 'outline'} size="sm">
+                      {featuredCover === r.imageUrl ? '⭐ مميّز في المجلة' : '⭐ ضمّن في المجلة'}
+                    </Button>
                     <a href={r.imageUrl} target="_blank" rel="noopener noreferrer" download
                       className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-green/10 text-green hover:bg-green/20">⬇️ تنزيل</a>
                   </div>
                 </div>
               </div>
             ))}
+            {/* تصنيف المجلة (يُستخدم عند تضمين التصميم في «مجلة المبدعين») */}
+            <div className="border-t border-border pt-3">
+              <label className="block text-xs font-medium text-dark mb-1">تصنيف المجلة (المجال) عند التضمين:</label>
+              <input value={magazineCategory} onChange={e => setMagazineCategory(e.target.value)}
+                placeholder="مثال: اختراعات سعودية، فنون، عمارة… (يُترك فارغاً = منوّعات)"
+                className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm" />
+            </div>
           </div>
         )}
       </div>

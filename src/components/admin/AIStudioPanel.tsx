@@ -143,6 +143,33 @@ export default function AIStudioPanel({
   // التوليد التلقائي المتسلسل لكل الخطوات
   const [autoRunning, setAutoRunning] = useState(false)
   const [autoStage, setAutoStage] = useState('')
+  // تضمين تصميم واحد مميّز في «مجلة المبدعين» (تصميم واحد لكل طلب)
+  const [featuredCover, setFeaturedCover] = useState<string | null>(null)
+  const [featuringCover, setFeaturingCover] = useState<string | null>(null)
+
+  const featureInMagazine = async (cover: string) => {
+    setFeaturingCover(cover)
+    try {
+      const res = await fetch('/api/admin/showcase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: 'request',
+          requestId: request.id,
+          postIndex: isPost ? postIndex : undefined,
+          cover,
+        }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { showToast(d.error ?? 'تعذّر التضمين في المجلة', 'error'); return }
+      setFeaturedCover(cover) // تصميم واحد مميّز فقط — يستبدل السابق
+      showToast('تم تضمين التصميم في مجلة المبدعين ⭐', 'success')
+    } catch {
+      showToast('حدث خطأ أثناء التضمين', 'error')
+    } finally {
+      setFeaturingCover(null)
+    }
+  }
 
   // توليد الاتجاهات الثلاثة دفعة واحدة + الاختيار منها للإرسال
   // تُعاد تهيئتها من الحالة المحفوظة (saved.designs) فتبقى بعد إعادة التحميل
@@ -632,15 +659,26 @@ export default function AIStudioPanel({
                             placeholder="ملاحظة لإعادة التوليد (مثال: اجعل الخلفية أغمق، كبّر الاسم، خفّف الزخارف...)"
                             className="w-full px-2 py-1.5 rounded-lg border border-border bg-white text-xs min-h-[52px] resize-y"
                           />
-                          <Button
-                            onClick={() => regenerateBatchDesign(i)}
-                            loading={regenerating}
-                            disabled={regenIndex !== null || batchLoading || !(noteByIndex[i] ?? '').trim()}
-                            variant="outline"
-                            size="sm"
-                          >
-                            🔄 إعادة التوليد بالملاحظة
-                          </Button>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              onClick={() => regenerateBatchDesign(i)}
+                              loading={regenerating}
+                              disabled={regenIndex !== null || batchLoading || !(noteByIndex[i] ?? '').trim()}
+                              variant="outline"
+                              size="sm"
+                            >
+                              🔄 إعادة التوليد بالملاحظة
+                            </Button>
+                            <Button
+                              onClick={() => featureInMagazine(r.imageUrl)}
+                              loading={featuringCover === r.imageUrl}
+                              disabled={featuringCover !== null}
+                              variant={featuredCover === r.imageUrl ? 'secondary' : 'outline'}
+                              size="sm"
+                            >
+                              {featuredCover === r.imageUrl ? '⭐ مميّز في المجلة' : '⭐ ضمّن في المجلة'}
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -720,13 +758,24 @@ export default function AIStudioPanel({
                   🔄 إعادة التوليد بالملاحظة
                 </Button>
               </div>
-              <Button
-                onClick={() => onUsedContent(selectedTweet, [imageUrl], isPost ? (postIndex as number) : 0)}
-                variant="secondary"
-                size="sm"
-              >
-                استخدم هذا التصميم والتغريدة
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={() => onUsedContent(selectedTweet, [imageUrl], isPost ? (postIndex as number) : 0)}
+                  variant="secondary"
+                  size="sm"
+                >
+                  استخدم هذا التصميم والتغريدة
+                </Button>
+                <Button
+                  onClick={() => featureInMagazine(imageUrl)}
+                  loading={featuringCover === imageUrl}
+                  disabled={featuringCover !== null}
+                  variant={featuredCover === imageUrl ? 'secondary' : 'outline'}
+                  size="sm"
+                >
+                  {featuredCover === imageUrl ? '⭐ مميّز في المجلة' : '⭐ ضمّن في المجلة'}
+                </Button>
+              </div>
             </div>
           )}
         </div>
