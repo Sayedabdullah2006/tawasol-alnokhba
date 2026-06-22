@@ -23,12 +23,25 @@ export async function POST(request: Request) {
     const supabase = await createServiceRoleClient()
     const { data: req } = await supabase
       .from('publish_requests')
-      .select('id, user_id, status, receipt_url')
+      .select('id, user_id, status, receipt_url, payment_status, paid_at, tamara_order_id, moyasar_payment_id')
       .eq('id', requestId)
       .single()
 
     if (!req || req.user_id !== user.id) {
       return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 })
+    }
+    // ‼️ حماية الطلب المدفوع: لا يُلغى/يُعدّل ذاتياً مهما كانت حالته الظاهرة.
+    // (يمنع سباق تأكيد الدفع: قد تبقى الحالة "approved" لحظات بعد دفع تمارا/ميسر.)
+    const isPaid =
+      req.payment_status === 'paid' ||
+      !!req.paid_at ||
+      !!req.tamara_order_id ||
+      !!req.moyasar_payment_id
+    if (isPaid) {
+      return NextResponse.json(
+        { error: 'هذا الطلب مدفوع بالفعل — للتعديل أو الإلغاء تواصل مع الدعم' },
+        { status: 409 }
+      )
     }
     if (!CANCELLABLE_STATUSES.includes(req.status)) {
       return NextResponse.json({ error: 'لا يمكن إلغاء هذا الطلب في حالته الحالية' }, { status: 409 })

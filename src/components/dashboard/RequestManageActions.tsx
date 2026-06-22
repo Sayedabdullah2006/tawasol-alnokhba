@@ -25,8 +25,14 @@ export default function RequestManageActions({
   const [busy, setBusy] = useState<'edit' | 'cancel' | null>(null)
   const [confirming, setConfirming] = useState(false)
 
-  // إيصال تحويل مرفوع = الدفع قيد التحقق → لا نعرض الإلغاء/التعديل
-  if (!request || !CANCELLABLE.includes(request.status) || request.receipt_url) return null
+  // لا نعرض الإلغاء/التعديل إذا كان الطلب مدفوعاً (تمارا/ميسر/تحويل) أو حالته غير قابلة للإلغاء.
+  // فحص الدفع يمنع سباق تأكيد الدفع حيث قد تبقى الحالة "approved" لحظات بعد الدفع.
+  const isPaid =
+    request?.payment_status === 'paid' ||
+    !!request?.paid_at ||
+    !!request?.tamara_order_id ||
+    !!request?.moyasar_payment_id
+  if (!request || isPaid || !CANCELLABLE.includes(request.status) || request.receipt_url) return null
 
   const callCancel = async () => {
     const res = await fetch('/api/request/cancel', {
