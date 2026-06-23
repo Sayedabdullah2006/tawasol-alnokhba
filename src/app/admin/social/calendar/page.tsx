@@ -84,14 +84,33 @@ export default function ScheduleCalendarPage() {
     const t = ksa(it.when)
     const st = STATUS[it.status] ?? { t: it.status, c: 'bg-gray-100 text-gray-600' }
     return (
-      <div className="flex items-center gap-1.5 rounded-md bg-cream px-1.5 py-1 text-[10px]">
-        {it.designUrl
-          // eslint-disable-next-line @next/next/no-img-element
-          ? <img src={it.designUrl} alt="" className="w-5 h-6 object-cover rounded" />
-          : null}
-        <span className="font-bold text-dark">{t.hh}:{t.mm}</span>
-        <span className={`px-1 rounded ${st.c}`}>{st.t}</span>
-        <span className="text-dark/70 truncate flex-1">{(it.content ?? '').slice(0, 24)}</span>
+      <div className="relative group/chip">
+        <div className="flex items-center gap-1.5 rounded-md bg-cream px-1.5 py-1 text-[10px] cursor-default">
+          {it.designUrl
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={it.designUrl} alt="" className="w-5 h-6 object-cover rounded" />
+            : null}
+          <span className="font-bold text-dark">{t.hh}:{t.mm}</span>
+          <span className={`px-1 rounded ${st.c}`}>{st.t}</span>
+          <span className="text-dark/70 truncate flex-1">{(it.content ?? '').slice(0, 24)}</span>
+        </div>
+        {/* معاينة عند المرور: التصميم + الوقت + التغريدة */}
+        <div className="hidden group-hover/chip:block absolute z-50 top-full right-0 mt-1 w-64 rounded-xl border border-border bg-white shadow-xl p-2 text-right" dir="rtl">
+          {it.designUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={it.designUrl} alt="التصميم" className="w-full rounded-lg border border-border mb-2 max-h-72 object-contain bg-cream" />
+          ) : (
+            <div className="w-full h-24 rounded-lg bg-cream flex items-center justify-center text-[11px] text-muted mb-2">لا توجد معاينة للتصميم</div>
+          )}
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[11px] font-bold text-dark">🕐 {t.hh}:{t.mm}</span>
+            <span className={`text-[10px] px-1.5 rounded ${st.c}`}>{st.t}</span>
+            {it.channels > 0 && <span className="text-[10px] text-muted">· {it.channels} قناة</span>}
+          </div>
+          <p className="text-[11px] text-dark/80 whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto">
+            {it.content || '—'}
+          </p>
+        </div>
       </div>
     )
   }
