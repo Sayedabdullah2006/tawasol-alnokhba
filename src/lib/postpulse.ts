@@ -201,14 +201,15 @@ export async function uploadMediaFromUrl(imageUrl: string): Promise<{ path: stri
 }
 
 // إعدادات المنصّة المطلوبة لكل قناة (لكل منصّة حقول إلزامية مختلفة).
-// للصورة الواحدة: Instagram = منشور FEED. TikTok يتطلّب مستوى خصوصية.
-function platformSettingsFor(platform: string): Record<string, unknown> {
+// title يُمرَّر لمنصّات تتطلّبه (TikTok/YouTube) حيث يكون content وصفاً.
+function platformSettingsFor(platform: string, title: string): Record<string, unknown> {
   switch ((platform || '').toUpperCase()) {
     case 'INSTAGRAM':
       return { type: 'INSTAGRAM', publicationType: 'FEED' }
     case 'TIKTOK':
       return {
         type: 'TIKTOK',
+        title,
         privacyLevel: 'PUBLIC_TO_EVERYONE',
         disableComments: false,
         disableDuet: false,
@@ -221,10 +222,20 @@ function platformSettingsFor(platform: string): Record<string, unknown> {
     case 'FACEBOOK':
       return { type: 'FACEBOOK' }
     case 'YOUTUBE':
-      return { type: 'YOUTUBE' }
+      return { type: 'YOUTUBE', title }
     default:
       return { type: platform }
   }
+}
+
+// عنوان مختصر من نص المنشور (أول سطر فعلي بلا هاشتاقات) — لمنصّات تتطلّب title.
+function deriveTitle(content: string): string {
+  const line = content
+    .split('\n')
+    .map(l => l.trim())
+    .find(l => l && !l.startsWith('#')) || content.trim()
+  const t = line.replace(/\s+/g, ' ').trim()
+  return (t.length > 90 ? t.slice(0, 90).trim() : t) || 'منشور'
 }
 
 /**
@@ -251,6 +262,7 @@ export async function publishNow(args: {
 
   const post: Record<string, unknown> = { content: args.content }
   if (args.attachmentPaths && args.attachmentPaths.length) post.attachmentPaths = args.attachmentPaths
+  const title = deriveTitle(args.content)
 
   const res = await fetch(`${API_BASE}/v1/posts/schedule`, {
     method: 'POST',
@@ -260,7 +272,7 @@ export async function publishNow(args: {
       isDraft: false,
       publications: targets.map((a) => ({
         socialMediaAccountId: Number(a.id),
-        platformSettings: platformSettingsFor(String(a.platform ?? '')),
+        platformSettings: platformSettingsFor(String(a.platform ?? ''), title),
         posts: [post],
       })),
     }),
