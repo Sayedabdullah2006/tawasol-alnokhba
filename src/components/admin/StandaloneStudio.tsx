@@ -41,7 +41,7 @@ export default function StandaloneStudio() {
   const [people, setPeople] = useState<{ imageUrl: string; name: string; blurb: string }[]>([{ imageUrl: '', name: '', blurb: '' }])
   const [personUploading, setPersonUploading] = useState<number | null>(null)
   const [infoBusy, setInfoBusy] = useState(false)
-  const [infoResult, setInfoResult] = useState<string | null>(null)
+  const [infoResults, setInfoResults] = useState<{ imageUrl: string; direction: string }[]>([])
 
   const updatePerson = (i: number, patch: Partial<{ imageUrl: string; name: string; blurb: string }>) =>
     setPeople(prev => prev.map((p, idx) => (idx === i ? { ...p, ...patch } : p)))
@@ -69,14 +69,14 @@ export default function StandaloneStudio() {
   const genInfographic = async () => {
     const valid = people.filter(p => p.imageUrl && p.name.trim())
     if (!valid.length) { showToast('أضِف صورة شخص واحدة على الأقل مع اسمه', 'error'); return }
-    setInfoBusy(true); setInfoResult(null)
+    setInfoBusy(true); setInfoResults([])
     try {
       const res = await fetch('/api/admin/ai-studio/infographic', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: infoTitle, extraInfo: infoExtra, people: valid }),
       })
       const d = await res.json().catch(() => ({}))
-      if (res.ok) { setInfoResult(d.imageUrl); showToast('تم توليد الإنفوجرافيك ✅', 'success') }
+      if (res.ok) { setInfoResults(Array.isArray(d.images) ? d.images : []); showToast('تم توليد الاتجاهات ✅', 'success') }
       else showToast(d.error ?? 'فشل التوليد', 'error')
     } finally { setInfoBusy(false) }
   }
@@ -295,20 +295,27 @@ export default function StandaloneStudio() {
             </div>
             <textarea value={infoExtra} onChange={e => setInfoExtra(e.target.value)} placeholder="معلومات إضافية (اختياري) تُراعى في التصميم"
               className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[60px] resize-y" />
-            <Button onClick={genInfographic} loading={infoBusy} disabled={infoBusy} size="sm">🎨 توليد الإنفوجرافيك</Button>
-            {infoBusy && <div className="flex items-center gap-2 text-sm text-muted"><LoadingSpinner size="sm" /><span>جارٍ التوليد… قد يستغرق دقيقة</span></div>}
+            <Button onClick={genInfographic} loading={infoBusy} disabled={infoBusy} size="sm">🎨 توليد ٣ اتجاهات</Button>
+            {infoBusy && <div className="flex items-center gap-2 text-sm text-muted"><LoadingSpinner size="sm" /><span>جارٍ توليد ٣ اتجاهات… قد يستغرق دقيقتين</span></div>}
           </div>
 
-          {infoResult && (
+          {infoResults.length > 0 && (
             <div className={card}>
-              <h4 className="font-bold text-dark">النتيجة</h4>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={infoResult} alt="الإنفوجرافيك" onClick={() => setLightbox(infoResult)} className="max-w-xs rounded-xl border border-border cursor-zoom-in" />
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={() => openPublish(infoResult)} loading={publishingCover === infoResult} disabled={publishingCover !== null} variant={publishedCover === infoResult ? 'secondary' : 'outline'} size="sm">
-                  {publishedCover === infoResult ? '✅ أُرسل' : '📣 انشر عبر القنوات'}
-                </Button>
-                <a href={infoResult} target="_blank" rel="noopener noreferrer" download className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-green/10 text-green hover:bg-green/20">⬇️ تنزيل</a>
+              <h4 className="font-bold text-dark">الاتجاهات ({infoResults.length}) — اختر تصميماً</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {infoResults.map((r, i) => (
+                  <div key={i} className="rounded-xl border border-border p-2 space-y-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={r.imageUrl} alt={r.direction} onClick={() => setLightbox(r.imageUrl)} className="w-full aspect-[4/5] object-cover rounded-lg border border-border cursor-zoom-in" />
+                    <p className="text-[10px] text-muted line-clamp-1">{r.direction}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Button onClick={() => openPublish(r.imageUrl)} loading={publishingCover === r.imageUrl} disabled={publishingCover !== null} variant={publishedCover === r.imageUrl ? 'secondary' : 'outline'} size="sm">
+                        {publishedCover === r.imageUrl ? '✅ أُرسل' : '📣 نشر'}
+                      </Button>
+                      <a href={r.imageUrl} target="_blank" rel="noopener noreferrer" download className="inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-bold bg-green/10 text-green hover:bg-green/20">⬇️</a>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}

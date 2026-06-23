@@ -10,7 +10,7 @@
 // أقوى بكثير في رسم النص العربي مقارنة بـ nano-banana العادي (gemini-2.5-flash-image)
 const GEMINI_IMAGE_MODEL = 'gemini-3-pro-image-preview'
 
-interface RefImage {
+export interface RefImage {
   mimeType: string
   data: string // base64 (بدون data: prefix)
 }
@@ -35,6 +35,20 @@ export async function generateImageWithGemini(
   referenceImageUrls: string[],
   opts: { aspectRatio?: string } = {},
 ): Promise<{ b64: string; mimeType: string }> {
+  const refs: RefImage[] = []
+  for (const url of referenceImageUrls) {
+    if (!url) continue
+    refs.push(await fetchImageAsBase64(url))
+  }
+  return generateImageFromParts(promptText, refs, opts)
+}
+
+/** نفس التوليد لكن بصور مرجعية مُجهّزة (base64) — لمعالجة الصور قبل الإرسال. */
+export async function generateImageFromParts(
+  promptText: string,
+  refs: RefImage[],
+  opts: { aspectRatio?: string } = {},
+): Promise<{ b64: string; mimeType: string }> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
     throw new Error('مفتاح Gemini غير مهيّأ — أضِف GEMINI_API_KEY في إعدادات الخادم')
@@ -42,9 +56,7 @@ export async function generateImageWithGemini(
 
   // أجزاء الرسالة: النص أولاً ثم الصور المرجعية
   const parts: any[] = [{ text: promptText }]
-  for (const url of referenceImageUrls) {
-    if (!url) continue
-    const img = await fetchImageAsBase64(url)
+  for (const img of refs) {
     parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } })
   }
 

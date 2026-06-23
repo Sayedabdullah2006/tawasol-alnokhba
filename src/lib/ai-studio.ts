@@ -9,7 +9,7 @@
  */
 import OpenAI from 'openai'
 import { getOpenAI, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives } from './openai'
-import { generateImageWithGemini } from './gemini'
+import { generateImageWithGemini, generateImageFromParts } from './gemini'
 import { compositeLogoBottomRight, resizeToPoster } from './logo-overlay'
 import { createServiceRoleClient } from './supabase-server'
 
@@ -198,43 +198,70 @@ export async function generateDesign(
 
 export interface InfographicPerson { imageUrl: string; name: string; blurb: string }
 
+export const INFOGRAPHIC_DIRECTIONS = [
+  'شبكة بطاقات أنيقة بحواف ناعمة وظلال خفيفة',
+  'أعمدة عمودية متناسقة بفواصل ذهبية',
+  'تصميم دائري/مموّج عصري بعمق وتدرّجات',
+]
+
+/** يضيف رقماً دائرياً على زاوية صورة الشخص — مرساة ربط بصرية موثوقة للنموذج. */
+async function badgePerson(url: string, n: number): Promise<{ mimeType: string; data: string }> {
+  const resp = await fetch(url)
+  if (!resp.ok) throw new Error(`تعذّر تحميل صورة الشخص ${n}`)
+  const base = await sharp(Buffer.from(await resp.arrayBuffer())).resize(560, 560, { fit: 'cover' }).png().toBuffer()
+  const badge = Buffer.from(
+    `<svg width="560" height="560" xmlns="http://www.w3.org/2000/svg">
+       <circle cx="70" cy="70" r="46" fill="#2D8B3F" stroke="#FFD700" stroke-width="5"/>
+       <text x="70" y="70" font-size="56" font-family="Arial" font-weight="bold" fill="#ffffff"
+             text-anchor="middle" dominant-baseline="central">${n}</text>
+     </svg>`,
+  )
+  const out = await sharp(base).composite([{ input: badge, top: 0, left: 0 }]).png().toBuffer()
+  return { mimeType: 'image/png', data: out.toString('base64') }
+}
+
 /**
  * يولّد إنفوجرافيك يعرض عدة أشخاص، كل شخص بصورته الحقيقية + اسمه ونبذته حرفياً.
- * الالتزام صارم: الصورة رقم N تخصّ الشخص رقم N باسمه ونبذته كما وردا.
+ * ربط موثوق: كل صورة تحمل رقماً، والشخص رقم N يُكتب اسمه ونبذته بجانب الصورة ذات الرقم N.
  */
 export async function generateInfographic(
-  args: { title: string; people: InfographicPerson[]; extraInfo?: string },
+  args: { title: string; people: InfographicPerson[]; extraInfo?: string; direction?: string },
 ): Promise<{ imageUrl: string; prompt: string }> {
   const { title, people, extraInfo } = args
-  const refs = people.map(p => p.imageUrl).filter(Boolean)
-  if (!refs.length) throw new Error('أضِف صورة شخص واحدة على الأقل')
+  if (!people.length) throw new Error('أضِف صورة شخص واحدة على الأقل')
+  const direction = args.direction || INFOGRAPHIC_DIRECTIONS[0]
 
   const service = await createServiceRoleClient()
   const { data: brand } = await service.from('brand_settings').select('first1saudi_logo_url').eq('id', 1).single()
   const logoUrl: string | null = brand?.first1saudi_logo_url ?? null
 
+  // صور مرقّمة كمرساة ربط
+  const refs = await Promise.all(people.map((p, i) => badgePerson(p.imageUrl, i + 1)))
+
   const peopleList = people
-    .map((p, i) => `الشخص ${i + 1} (صورته = الصورة المرفقة رقم ${i + 1}): الاسم "${p.name}" — النبذة "${p.blurb}"`)
+    .map((p, i) => `• الشخص رقم ${i + 1} (الصورة التي تحمل الرقم ${i + 1}): الاسم "${p.name}" — النبذة "${p.blurb}"`)
     .join('\n')
 
   const prompt = [
-    `صمّم إنفوجرافيك عمودي احترافي وأنيق بهوية First1Saudi يعرض ${people.length} أشخاص في بطاقات/أعمدة متناسقة.`,
+    `صمّم إنفوجرافيك عمودي احترافي بهوية First1Saudi يعرض ${people.length} أشخاص — الاتجاه الإبداعي لهذا التصميم: «${direction}».`,
     `العنوان الرئيسي أعلى التصميم: "${title || 'إنفوجرافيك'}".`,
-    `لكل شخص بطاقة تحوي: صورته الحقيقية المرفقة + اسمه + نبذته.`,
-    `‼️ التزام صارم بالربط: الصورة المرفقة رقم N تخصّ الشخص رقم N حصراً. اكتب اسم كل شخص ونبذته **حرفياً كما وردا بين علامتي الاقتباس** أسفل/أمام صورته. لا تخلط الأسماء أو الصور، ولا تنسب صورة لاسم خاطئ.`,
-    `⛔ استخدم الصور الحقيقية كما هي (نفس الوجه/الملامح). لا تُولّد ولا تختلق أي وجه/شخص، ولا تُجمّل، ولا تكتب نصاً غير الوارد أدناه.`,
+    ``,
+    `‼️ ربط إلزامي عبر الأرقام: كل صورة مرفقة عليها **رقم دائري** في زاويتها. ضع اسم ونبذة الشخص رقم N **بجانب/أسفل الصورة التي تحمل الرقم N نفسه حصراً**. لا تخلط بين الصور والأسماء إطلاقاً.`,
+    `اكتب اسم كل شخص ونبذته **حرفياً كما وردا** بين علامتي الاقتباس.`,
+    `⛔ استخدم الصور الحقيقية كما هي (نفس الوجه/الملامح)؛ لا تُولّد ولا تختلق وجوهاً، ولا تكتب نصاً غير الوارد أدناه.`,
+    `‼️ لا تُظهر الأرقام الدائرية في التصميم النهائي — هي للربط فقط؛ أزِلها/أخفِها أو غطّها بالتصميم.`,
     ``,
     `الأشخاص:`,
     peopleList,
     ``,
-    `الهوية: تيل عميق #0A2D35–#0D3D47 · أخضر سعودي #2D8B3F–#3A9B4F · ذهبي #FFD700 · أبيض. خلفية راقية متّسقة. فوتر فيه أيقونات سوشال و"@First1Saudi".`,
-    `اترك مساحة فارغة أسفل يمين الفوتر للوقو (يُضاف لاحقاً برمجياً) ولا ترسم أي شعار هناك.`,
-    `OUTPUT: عمودي 1080×1350، ultra-HD، نصوص عربية حادّة ومتّصلة وصحيحة الاتجاه (RTL)، بلا اختلاق نص ولا إيموجي.`,
+    `الهوية: تيل عميق #0A2D35–#0D3D47 · أخضر سعودي #2D8B3F–#3A9B4F · ذهبي #FFD700 · أبيض. فوتر فيه أيقونات سوشال و"@First1Saudi".`,
+    `اترك مساحة فارغة أسفل يمين الفوتر للوقو (يُضاف برمجياً) ولا ترسم شعاراً.`,
+    `OUTPUT: عمودي 1080×1350، ultra-HD، نصوص عربية حادّة صحيحة الاتجاه (RTL)، بلا اختلاق نص ولا إيموجي.`,
     extraInfo && extraInfo.trim() ? `\nمعلومات إضافية تُراعى: ${extraInfo.trim()}` : '',
   ].filter(Boolean).join('\n')
 
   const geminiPrompt = `${FACE_LOCK}\n\n${prompt}\n\n${FACE_LOCK}`
-  const { b64 } = await generateImageWithGemini(geminiPrompt, refs)
+  const { b64 } = await generateImageFromParts(geminiPrompt, refs)
   const rawImage = Buffer.from(b64, 'base64')
   const posterBase = await resizeToPoster(rawImage)
   const { buffer: finalImage, mimeType } = logoUrl

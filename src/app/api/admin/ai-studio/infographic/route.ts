@@ -4,7 +4,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { generateInfographic, type InfographicPerson } from '@/lib/ai-studio'
+import { generateInfographic, INFOGRAPHIC_DIRECTIONS, type InfographicPerson } from '@/lib/ai-studio'
 import { logGeneratedDesign } from '@/lib/newsletter'
 
 export const dynamic = 'force-dynamic'
@@ -25,19 +25,32 @@ export async function POST(req: Request) {
     .filter(p => p.imageUrl && p.name)
   if (!people.length) return NextResponse.json({ error: 'أضِف صورة شخص واحدة على الأقل مع اسمه' }, { status: 400 })
 
-  try {
-    const { imageUrl } = await generateInfographic({ title: body.title ?? '', people, extraInfo: body.extraInfo })
-    // تسجيل في السجلّ الموحّد (مرشّحي النشرة/المجلة)
+  const title = (body.title ?? '').trim()
+  // توليد 3 اتجاهات إبداعية بالتوازي
+  const settled = await Promise.allSettled(
+    INFOGRAPHIC_DIRECTIONS.map(direction =>
+      generateInfographic({ title, people, extraInfo: body.extraInfo, direction }),
+    ),
+  )
+  const images: { imageUrl: string; direction: string }[] = []
+  settled.forEach((r, i) => { if (r.status === 'fulfilled') images.push({ imageUrl: r.value.imageUrl, direction: INFOGRAPHIC_DIRECTIONS[i] }) })
+
+  if (!images.length) {
+    const err = settled.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined
+    return NextResponse.json({ error: err?.reason instanceof Error ? err.reason.message : 'فشل التوليد' }, { status: 500 })
+  }
+
+  // تسجيل التصاميم في السجلّ الموحّد (مرشّحي النشرة/المجلة)
+  for (const im of images) {
     await logGeneratedDesign({
       source: 'standalone',
-      title: (body.title ?? '').trim() || people.map(p => p.name).join('، '),
+      title: title || people.map(p => p.name).join('، '),
       content: people.map(p => `${p.name}: ${p.blurb}`).join('\n'),
       category: 'إنفوجرافيك',
-      imageUrl,
+      imageUrl: im.imageUrl,
       sourceImageUrl: people[0].imageUrl,
     })
-    return NextResponse.json({ ok: true, imageUrl })
-  } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'فشل التوليد' }, { status: 500 })
   }
+
+  return NextResponse.json({ ok: true, images })
 }
