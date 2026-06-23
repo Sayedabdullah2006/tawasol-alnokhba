@@ -413,9 +413,9 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
 
         {/* ════════ تبويب: المحتوى والتصاميم ════════ */}
         <div className={activeTab === 'content' ? 'space-y-5' : 'hidden'}>
-          {request.status === 'in_progress' ? (
+          {request.status === 'in_progress' || request.status === 'completed' ? (
             <>
-              {/* استوديو الذكاء الاصطناعي — متاح دائماً في مرحلة التنفيذ (يشمل أثناء التعديل) */}
+              {/* استوديو الذكاء الاصطناعي — متاح في التنفيذ وبعد الاكتمال (لاختيار تصميم المجلة) */}
               <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
                   <Button variant="outline" onClick={() => setShowAIStudio(v => !v)} className="w-full">
                     🤖 {showAIStudio ? 'إخفاء استوديو الذكاء الاصطناعي' : 'استوديو الذكاء الاصطناعي'}

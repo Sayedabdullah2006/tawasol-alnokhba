@@ -29,6 +29,11 @@ export default function StandaloneStudio() {
   const [magazineCategory, setMagazineCategory] = useState('')
   const [featuredCover, setFeaturedCover] = useState<string | null>(null)
   const [featuringCover, setFeaturingCover] = useState<string | null>(null)
+  // النشر عبر القنوات
+  const [publishCover, setPublishCover] = useState<string | null>(null)
+  const [publishText, setPublishText] = useState('')
+  const [publishingCover, setPublishingCover] = useState<string | null>(null)
+  const [publishedCover, setPublishedCover] = useState<string | null>(null)
 
   const toggleImage = (url: string) =>
     setSelectedImages(prev => (prev.includes(url) ? prev.filter(u => u !== url) : [...prev, url]))
@@ -164,6 +169,32 @@ export default function StandaloneStudio() {
     }
   }
 
+  // النشر عبر القنوات (Post-Pulse) — مع معاينة/تعديل قبل النشر
+  const openPublish = (cover: string) => { setPublishText(selectedTweet || ''); setPublishCover(cover) }
+  const confirmPublish = async () => {
+    const cover = publishCover
+    if (!cover) return
+    if (!publishText.trim()) { showToast('اكتب نص المنشور أولاً', 'error'); return }
+    setPublishingCover(cover)
+    try {
+      const res = await fetch('/api/postpulse/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: publishText, imageUrl: cover }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { showToast(d.error ?? 'فشل النشر', 'error'); return }
+      setPublishedCover(cover)
+      setPublishCover(null)
+      const n = Array.isArray(d.accountIds) ? d.accountIds.length : 0
+      showToast(`أُرسل إلى ${n} قناة — تابع الحالة في Post‑Pulse 📣`, 'success')
+    } catch {
+      showToast('حدث خطأ أثناء النشر', 'error')
+    } finally {
+      setPublishingCover(null)
+    }
+  }
+
   const card = 'bg-card rounded-2xl border border-border p-5 space-y-3'
 
   return (
@@ -285,6 +316,9 @@ export default function StandaloneStudio() {
                     <Button onClick={() => featureInMagazine(r.imageUrl)} loading={featuringCover === r.imageUrl} disabled={featuringCover !== null} variant={featuredCover === r.imageUrl ? 'secondary' : 'outline'} size="sm">
                       {featuredCover === r.imageUrl ? '⭐ مميّز في المجلة' : '⭐ ضمّن في المجلة'}
                     </Button>
+                    <Button onClick={() => openPublish(r.imageUrl)} loading={publishingCover === r.imageUrl} disabled={publishingCover !== null} variant={publishedCover === r.imageUrl ? 'secondary' : 'outline'} size="sm">
+                      {publishedCover === r.imageUrl ? '✅ أُرسل' : '📣 انشر عبر القنوات'}
+                    </Button>
                     <a href={r.imageUrl} target="_blank" rel="noopener noreferrer" download
                       className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-green/10 text-green hover:bg-green/20">⬇️ تنزيل</a>
                   </div>
@@ -301,6 +335,34 @@ export default function StandaloneStudio() {
           </div>
         )}
       </div>
+
+      {/* نافذة معاينة/تعديل قبل النشر عبر القنوات */}
+      {publishCover && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => publishingCover ? null : setPublishCover(null)}>
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-border">
+              <h3 className="font-black text-dark text-base">📣 النشر عبر القنوات</h3>
+              <p className="text-xs text-muted mt-0.5">سيُنشر النص أدناه مع التصميم في كل القنوات المربوطة فوراً.</p>
+            </div>
+            <div className="px-5 py-4 overflow-y-auto space-y-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={publishCover} alt="التصميم" className="w-32 mx-auto aspect-[4/5] object-cover rounded-xl border border-border" />
+              <div>
+                <label className="block text-xs font-bold text-dark mb-1">نص المنشور (عدّله قبل النشر):</label>
+                <textarea value={publishText} onChange={e => setPublishText(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[140px] resize-y"
+                  placeholder="اكتب نص المنشور..." />
+                <p className="text-[11px] text-muted mt-1">{publishText.length} حرف</p>
+              </div>
+            </div>
+            <div className="px-5 py-3 border-t border-border flex gap-2">
+              <Button onClick={confirmPublish} loading={publishingCover === publishCover} disabled={!!publishingCover || !publishText.trim()} className="flex-1">🚀 انشر الآن</Button>
+              <Button variant="outline" onClick={() => setPublishCover(null)} disabled={!!publishingCover}>إلغاء</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ImageLightbox src={lightbox} onClose={() => setLightbox(null)} />
     </div>
