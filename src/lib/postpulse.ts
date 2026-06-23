@@ -11,7 +11,7 @@ const AUTH_BASE = 'https://auth.post-pulse.com'
 const API_BASE = 'https://api.post-pulse.com'
 const AUDIENCE = 'https://api.post-pulse.com'
 export const POSTPULSE_SCOPES =
-  'postpulse-api/accounts.read postpulse-api/api postpulse-api/media.write postpulse-api/posts.read postpulse-api/posts.write postpulse-api/webhooks.write'
+  'postpulse-api/accounts.read postpulse-api/api postpulse-api/media.write postpulse-api/posts.read postpulse-api/posts.write postpulse-api/webhooks.write offline_access'
 
 // client_id عام (غير سرّي) — يُفضّل ضبطه عبر البيئة؛ القيمة الافتراضية هي المُعطاة.
 export const PP_CLIENT_ID = process.env.POSTPULSE_CLIENT_ID || 'Hy7O3XYqaScIwZ7txytwUJIP0OhBeBTN'
@@ -29,6 +29,7 @@ export function buildAuthorizeUrl(state: string): string {
     redirect_uri: PP_REDIRECT_URI,
     scope: POSTPULSE_SCOPES,
     audience: AUDIENCE,
+    prompt: 'consent', // يفرض موافقة جديدة لإعادة إصدار refresh_token
     state,
   })
   return `${AUTH_BASE}/authorize?${p.toString()}`
