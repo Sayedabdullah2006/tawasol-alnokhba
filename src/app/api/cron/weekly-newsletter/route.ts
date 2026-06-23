@@ -31,47 +31,40 @@ async function handle(request: NextRequest) {
     const sc = await createServiceRoleClient()
     const window = getWeeklyWindow()
 
-    // 1) استخدم النشرة المعتمدة المجدولة لهذا الأسبوع إن وُجدت، وإلا ولّد تلقائياً
-    let imageUrl: string
-    let caption: string
-    let label = window.label
-    let newsletterId: string | null = null
-
-    const { data: scheduled } = await sc
+    // إن وُجدت نشرة معتمدة/منشورة لهذا الأسبوع فهي مجدولة أصلاً في Post-Pulse (عبر الاعتماد)
+    // — نتخطّى تماماً لتجنّب ازدواج النشر. الكرون يتدخّل فقط حين لا توجد نشرة.
+    const { data: existing } = await sc
       .from('newsletters')
-      .select('id, image_url, caption, label, scheduled_for, status')
-      .eq('status', 'scheduled')
+      .select('id, status, scheduled_for')
+      .in('status', ['scheduled', 'published'])
       .gte('scheduled_for', new Date(new Date(window.endUtc).getTime() - 3600 * 1000).toISOString())
       .lte('scheduled_for', new Date(new Date(window.endUtc).getTime() + 3600 * 1000).toISOString())
-      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-
-    if (scheduled) {
-      imageUrl = scheduled.image_url
-      caption = scheduled.caption || `النخبة في ٧ — ${scheduled.label}`
-      label = scheduled.label
-      newsletterId = scheduled.id
-    } else {
-      const gen = await generateNewsletterPoster()
-      imageUrl = gen.imageUrl
-      caption = gen.caption
-      label = gen.window.label
-      newsletterId = gen.id
+    if (existing) {
+      return NextResponse.json({ success: true, skipped: true, reason: 'النشرة معتمدة/مجدولة مسبقاً لهذا الأسبوع' })
     }
+
+    // لا توجد نشرة معتمدة: ولّد ونشر تلقائياً على X فقط
+    const gen = await generateNewsletterPoster()
+    const imageUrl = gen.imageUrl
+    const caption = gen.caption
+    const label = gen.window.label
+    const newsletterId = gen.id
 
     if (dryRun) {
-      return NextResponse.json({ success: true, dryRun: true, label, imageUrl, caption, usedScheduled: !!scheduled })
+      return NextResponse.json({ success: true, dryRun: true, label, imageUrl, caption })
     }
 
-    // 2) رفع البوستر إلى Post-Pulse ثم النشر لكل القنوات المربوطة
+    // رفع البوستر إلى Post-Pulse ثم النشر على X فقط
     const media = await uploadMediaFromUrl(imageUrl)
     const { accountIds, scheduleId, result } = await publishNow({
       content: caption,
       attachmentPaths: media.path ? [media.path] : undefined,
+      platforms: ['X_TWITTER'],
     })
 
-    // 3) تعليم النشرة كمنشورة + تسجيل المنشور
+    // تعليم النشرة كمنشورة + تسجيل المنشور
     if (newsletterId) {
       await sc.from('newsletters')
         .update({ published: true, status: 'published', published_at: new Date().toISOString() })
@@ -89,7 +82,7 @@ async function handle(request: NextRequest) {
       })
     } catch { /* تجاهل */ }
 
-    return NextResponse.json({ success: true, label, channels: accountIds.length, usedScheduled: !!scheduled })
+    return NextResponse.json({ success: true, label, channels: accountIds.length })
   } catch (err) {
     return NextResponse.json(
       { success: false, error: err instanceof Error ? err.message : 'خطأ غير معروف' },

@@ -247,6 +247,7 @@ export async function publishNow(args: {
   content: string
   attachmentPaths?: string[]
   accountIds?: number[]
+  platforms?: string[] // قصر النشر على منصّات بعينها (مثل ['X_TWITTER'])
   scheduledTime?: string // ISO UTC — افتراضياً الآن (نشر فوري)
 }): Promise<{ result: unknown; accountIds: number[]; scheduleId: string | null }> {
   const token = await getValidAccessToken()
@@ -259,7 +260,11 @@ export async function publishNow(args: {
     const set = new Set(args.accountIds.map(Number))
     targets = targets.filter((a) => set.has(Number(a.id)))
   }
-  if (!targets.length) throw new Error('لا توجد حسابات مربوطة في Post-Pulse')
+  if (args.platforms && args.platforms.length) {
+    const set = new Set(args.platforms.map(p => p.toUpperCase()))
+    targets = targets.filter((a) => set.has(String(a.platform ?? '').toUpperCase()))
+  }
+  if (!targets.length) throw new Error('لا توجد حسابات مطابقة في Post-Pulse')
 
   const post: Record<string, unknown> = { content: args.content }
   if (args.attachmentPaths && args.attachmentPaths.length) post.attachmentPaths = args.attachmentPaths
