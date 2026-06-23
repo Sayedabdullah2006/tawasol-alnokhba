@@ -212,8 +212,8 @@ async function badgePerson(url: string, n: number): Promise<{ mimeType: string; 
   const base = await sharp(Buffer.from(await resp.arrayBuffer())).resize(560, 560, { fit: 'cover' }).png().toBuffer()
   const badge = Buffer.from(
     `<svg width="560" height="560" xmlns="http://www.w3.org/2000/svg">
-       <circle cx="70" cy="70" r="46" fill="#2D8B3F" stroke="#FFD700" stroke-width="5"/>
-       <text x="70" y="70" font-size="56" font-family="Arial" font-weight="bold" fill="#ffffff"
+       <circle cx="78" cy="78" r="60" fill="#2D8B3F" stroke="#FFD700" stroke-width="6"/>
+       <text x="78" y="78" font-size="72" font-family="Arial" font-weight="bold" fill="#ffffff"
              text-anchor="middle" dominant-baseline="central">${n}</text>
      </svg>`,
   )
@@ -248,15 +248,16 @@ export async function generateInfographic(
     `العنوان الرئيسي أعلى التصميم: "${title || 'إنفوجرافيك'}".`,
     ``,
     `‼️ ربط إلزامي عبر الأرقام: كل صورة مرفقة عليها **رقم دائري** في زاويتها. ضع اسم ونبذة الشخص رقم N **بجانب/أسفل الصورة التي تحمل الرقم N نفسه حصراً**. لا تخلط بين الصور والأسماء إطلاقاً.`,
+    `‼️ استخدم كل صورة **مرّة واحدة فقط** بعدد ${people.length} بطاقة — لا تكرّر أي شخص أو صورة، ولا تدمج شخصين، ولا تُسقط أحداً. رتّبهم بترتيب الأرقام.`,
     `اكتب اسم كل شخص ونبذته **حرفياً كما وردا** بين علامتي الاقتباس.`,
     `⛔ استخدم الصور الحقيقية كما هي (نفس الوجه/الملامح)؛ لا تُولّد ولا تختلق وجوهاً، ولا تكتب نصاً غير الوارد أدناه.`,
-    `‼️ لا تُظهر الأرقام الدائرية في التصميم النهائي — هي للربط فقط؛ أزِلها/أخفِها أو غطّها بالتصميم.`,
+    `‼️ لا تُظهر الأرقام الدائرية في التصميم النهائي — هي للربط فقط؛ غطِّها بإطار البطاقة أو احذفها.`,
     ``,
     `الأشخاص:`,
     peopleList,
     ``,
     `الهوية: تيل عميق #0A2D35–#0D3D47 · أخضر سعودي #2D8B3F–#3A9B4F · ذهبي #FFD700 · أبيض. فوتر فيه أيقونات سوشال و"@First1Saudi".`,
-    `اترك مساحة فارغة أسفل يمين الفوتر للوقو (يُضاف برمجياً) ولا ترسم شعاراً.`,
+    `‼️ لا ترسم أي مربّع أبيض أو إطار فارغ للشعار في الزوايا — الشعار يُضاف برمجياً فوق التصميم، فاجعل الخلفية ممتدّة بلا فراغات بيضاء.`,
     `OUTPUT: عمودي 1080×1350، ultra-HD، نصوص عربية حادّة صحيحة الاتجاه (RTL)، بلا اختلاق نص ولا إيموجي.`,
     extraInfo && extraInfo.trim() ? `\nمعلومات إضافية تُراعى: ${extraInfo.trim()}` : '',
   ].filter(Boolean).join('\n')

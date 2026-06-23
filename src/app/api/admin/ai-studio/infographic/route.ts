@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { generateInfographic, INFOGRAPHIC_DIRECTIONS, type InfographicPerson } from '@/lib/ai-studio'
+import { getOpenAI, SYS_TWEETS } from '@/lib/openai'
 import { logGeneratedDesign } from '@/lib/newsletter'
 
 export const dynamic = 'force-dynamic'
@@ -52,5 +53,20 @@ export async function POST(req: Request) {
     })
   }
 
-  return NextResponse.json({ ok: true, images })
+  // توليد 3 تغريدات مقترحة عن الإنفوجرافيك (لا يُفشل الطلب إن تعذّر)
+  let tweets = ''
+  try {
+    const openai = getOpenAI()
+    const ctx = `${title}\n${people.map(p => `${p.name}: ${p.blurb}`).join('\n')}`
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-5.5',
+      messages: [
+        { role: 'system', content: SYS_TWEETS },
+        { role: 'user', content: `محتوى إنفوجرافيك جماعي:\n${ctx}` },
+      ],
+    })
+    tweets = completion.choices[0]?.message?.content ?? ''
+  } catch { /* تجاهل */ }
+
+  return NextResponse.json({ ok: true, images, tweets })
 }

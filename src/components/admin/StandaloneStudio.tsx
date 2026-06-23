@@ -42,6 +42,7 @@ export default function StandaloneStudio() {
   const [personUploading, setPersonUploading] = useState<number | null>(null)
   const [infoBusy, setInfoBusy] = useState(false)
   const [infoResults, setInfoResults] = useState<{ imageUrl: string; direction: string }[]>([])
+  const [infoTweets, setInfoTweets] = useState('')
 
   const updatePerson = (i: number, patch: Partial<{ imageUrl: string; name: string; blurb: string }>) =>
     setPeople(prev => prev.map((p, idx) => (idx === i ? { ...p, ...patch } : p)))
@@ -69,14 +70,14 @@ export default function StandaloneStudio() {
   const genInfographic = async () => {
     const valid = people.filter(p => p.imageUrl && p.name.trim())
     if (!valid.length) { showToast('أضِف صورة شخص واحدة على الأقل مع اسمه', 'error'); return }
-    setInfoBusy(true); setInfoResults([])
+    setInfoBusy(true); setInfoResults([]); setInfoTweets('')
     try {
       const res = await fetch('/api/admin/ai-studio/infographic', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: infoTitle, extraInfo: infoExtra, people: valid }),
       })
       const d = await res.json().catch(() => ({}))
-      if (res.ok) { setInfoResults(Array.isArray(d.images) ? d.images : []); showToast('تم توليد الاتجاهات ✅', 'success') }
+      if (res.ok) { setInfoResults(Array.isArray(d.images) ? d.images : []); setInfoTweets(d.tweets ?? ''); showToast('تم توليد الاتجاهات ✅', 'success') }
       else showToast(d.error ?? 'فشل التوليد', 'error')
     } finally { setInfoBusy(false) }
   }
@@ -317,6 +318,15 @@ export default function StandaloneStudio() {
                   </div>
                 ))}
               </div>
+              {infoTweets && (
+                <div className="bg-cream rounded-xl p-3 mt-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-green">٣ تغريدات مقترحة</span>
+                    <button onClick={() => { navigator.clipboard?.writeText(infoTweets); showToast('تم النسخ') }} className="text-xs text-green font-bold hover:underline">نسخ</button>
+                  </div>
+                  <p className="text-xs text-dark/80 whitespace-pre-wrap leading-relaxed">{infoTweets}</p>
+                </div>
+              )}
             </div>
           )}
         </div>
