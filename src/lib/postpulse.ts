@@ -326,3 +326,16 @@ export async function schedulePost(args: {
   if (!res.ok) throw new Error(`فشل جدولة المنشور: ${res.status} ${text}`)
   try { return text ? JSON.parse(text) : { ok: true } } catch { return { raw: text } }
 }
+
+/** يجلب تفاصيل جدولة لمعرفة حالة كل منصّة (يجرّب المسارات المحتملة). */
+export async function getScheduleStatus(id: string): Promise<{ path: string; data: unknown }> {
+  const token = await getValidAccessToken()
+  const paths = [`/v1/posts/${id}`, `/v1/schedules/${id}`, `/v1/posts/schedule/${id}`]
+  let lastStatus = 0
+  for (const p of paths) {
+    const r = await fetch(`${API_BASE}${p}`, { headers: { Authorization: `Bearer ${token}` } })
+    if (r.ok) return { path: p, data: await r.json().catch(() => null) }
+    lastStatus = r.status
+  }
+  throw new Error(`تعذّر جلب حالة الجدولة (آخر رمز: ${lastStatus})`)
+}

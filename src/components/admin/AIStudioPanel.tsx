@@ -181,7 +181,7 @@ export default function AIStudioPanel({
       setPublishedCover(cover)
       setPublishCover(null)
       const n = Array.isArray(d.accountIds) ? d.accountIds.length : 0
-      showToast(`تم النشر في ${n} قناة 📣`, 'success')
+      showToast(`أُرسل إلى ${n} قناة — تابع الحالة في Post‑Pulse 📣`, 'success')
     } catch {
       showToast('حدث خطأ أثناء النشر', 'error')
     } finally {
