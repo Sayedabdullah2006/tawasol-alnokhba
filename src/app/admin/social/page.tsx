@@ -38,6 +38,32 @@ export default function AdminSocialPage() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [note, setNote] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
+  // جدولة النشر
+  const [schedId, setSchedId] = useState<string | null>(null)
+  const [schedWhen, setSchedWhen] = useState('')
+  const [schedText, setSchedText] = useState('')
+  const [schedBusy, setSchedBusy] = useState(false)
+
+  const submitSchedule = async (item: ScheduleItem) => {
+    if (!schedWhen) { alert('حدّد تاريخ ووقت الجدولة'); return }
+    setSchedBusy(true)
+    try {
+      const res = await fetch('/api/postpulse/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: schedText, imageUrl: item.design_image_url, scheduledLocal: schedWhen }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'فشل الجدولة')
+      const n = Array.isArray(json.accountIds) ? json.accountIds.length : 0
+      alert(`تمت الجدولة في ${n} قناة بتوقيت السعودية ✅`)
+      setSchedId(null); setSchedWhen(''); setSchedText('')
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'فشل الجدولة')
+    } finally {
+      setSchedBusy(false)
+    }
+  }
 
   const load = async () => {
     setError(null)
@@ -230,6 +256,49 @@ export default function AdminSocialPage() {
                         className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-green border border-green/30 rounded-lg px-3 py-1.5 hover:bg-green/5 transition self-start"
                       >
                         🔄 إعادة توليد التصميم
+                      </button>
+                    )}
+
+                    {/* جدولة النشر بتوقيت السعودية لكل القنوات */}
+                    {schedId === item.id ? (
+                      <div className="mt-1 space-y-2 bg-cream rounded-xl p-3">
+                        <label className="block text-xs font-bold text-dark">موعد النشر (توقيت السعودية)</label>
+                        <input
+                          type="datetime-local"
+                          value={schedWhen}
+                          onChange={e => setSchedWhen(e.target.value)}
+                          disabled={schedBusy}
+                          className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-card text-dark"
+                        />
+                        <label className="block text-xs font-bold text-dark">النص المعتمد</label>
+                        <textarea
+                          value={schedText}
+                          onChange={e => setSchedText(e.target.value)}
+                          rows={4}
+                          disabled={schedBusy}
+                          placeholder="نص المنشور..."
+                          className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-card text-dark resize-none"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => submitSchedule(item)}
+                            disabled={schedBusy}
+                            className="bg-green text-white text-sm font-bold rounded-lg px-4 py-2 hover:opacity-90 transition disabled:opacity-60"
+                          >
+                            {schedBusy ? '⏳ جارٍ الجدولة…' : '🗓️ جدولة النشر'}
+                          </button>
+                          {!schedBusy && (
+                            <button onClick={() => setSchedId(null)} className="text-sm text-muted hover:text-dark px-3 py-2">إلغاء</button>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setSchedId(item.id); setSchedWhen(''); setSchedText(item.tweets ?? '') }}
+                        disabled={!item.design_image_url}
+                        className="mt-1 inline-flex items-center gap-1.5 text-sm font-bold text-dark border border-border rounded-lg px-3 py-1.5 hover:bg-cream transition self-start disabled:opacity-50"
+                      >
+                        🗓️ جدولة النشر عبر القنوات
                       </button>
                     )}
                   </div>

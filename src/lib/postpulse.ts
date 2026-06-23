@@ -247,6 +247,7 @@ export async function publishNow(args: {
   content: string
   attachmentPaths?: string[]
   accountIds?: number[]
+  scheduledTime?: string // ISO UTC — افتراضياً الآن (نشر فوري)
 }): Promise<{ result: unknown; accountIds: number[]; scheduleId: string | null }> {
   const token = await getValidAccessToken()
 
@@ -268,7 +269,7 @@ export async function publishNow(args: {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      scheduledTime: new Date().toISOString(), // الآن = نشر فوري
+      scheduledTime: args.scheduledTime || new Date().toISOString(), // الموعد أو الآن
       isDraft: false,
       publications: targets.map((a) => ({
         socialMediaAccountId: Number(a.id),
