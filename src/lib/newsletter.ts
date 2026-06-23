@@ -120,15 +120,30 @@ function dedupeByTitle(rows: DesignRow[]): DesignRow[] {
 
 const SELECT_COLS = 'id, source, title, content, category, image_url, source_image_url, in_newsletter, newsletter_rank, created_at'
 
-/** مرشّحو النشرة للعرض في اللوحة: أحدث التصاميم المولّدة من كل المصادر (بلا قيد زمني). */
-export async function getCandidates(limit = 150): Promise<DesignRow[]> {
+/**
+ * مرشّحو النشرة للعرض في اللوحة: تصميم **واحد لكل خبر** (الأحدث أولاً).
+ * عند تعدّد تصاميم نفس الخبر يُفضَّل **التصميم المُضمَّن في المجلة** (showcase_designs)،
+ * وإلا يُؤخذ تصميم واحد فقط. المجموعة = العنوان أو صورة المصدر أو الرابط.
+ */
+export async function getCandidates(limit = 200): Promise<DesignRow[]> {
   const sc = await createServiceRoleClient()
-  const { data } = await sc
-    .from('generated_designs')
-    .select(SELECT_COLS)
-    .order('created_at', { ascending: false })
-    .limit(limit)
-  return dedupeByTitle((data ?? []) as DesignRow[])
+  const [{ data }, { data: feat }] = await Promise.all([
+    sc.from('generated_designs').select(SELECT_COLS).order('created_at', { ascending: false }).limit(limit),
+    sc.from('showcase_designs').select('cover'),
+  ])
+  const featured = new Set(((feat ?? []) as { cover: string }[]).map(f => f.cover))
+  const rows = (data ?? []) as DesignRow[]
+
+  const map = new Map<string, DesignRow>()
+  for (const r of rows) {
+    const key = (r.title && r.title.trim()) || r.source_image_url || r.image_url
+    const existing = map.get(key)
+    if (!existing) { map.set(key, r); continue }
+    // فضّل التصميم المُضمَّن في المجلة على الأحدث غير المُضمَّن
+    if (featured.has(r.image_url) && !featured.has(existing.image_url)) map.set(key, r)
+  }
+  // ترتيب الناتج بالأحدث
+  return [...map.values()].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
 }
 
 /** يجمع عناصر النشرة وفق آلية الاختيار. */
