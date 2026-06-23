@@ -8,6 +8,7 @@
  * نفس البرومبتات (SYS_*) ونفس النماذج — لا يوجد سلوك مختلف عن الواجهة.
  */
 import OpenAI from 'openai'
+import sharp from 'sharp'
 import { getOpenAI, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives } from './openai'
 import { generateImageWithGemini, generateImageFromParts } from './gemini'
 import { compositeLogoBottomRight, resizeToPoster } from './logo-overlay'
