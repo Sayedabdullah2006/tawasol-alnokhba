@@ -340,3 +340,50 @@ export async function getScheduleStatus(id: string): Promise<{ path: string; dat
   }
   throw new Error(`تعذّر جلب حالة الجدولة (آخر رمز: ${lastStatus})`)
 }
+
+export interface PPScheduledItem {
+  id: string
+  when: string          // ISO scheduledTime
+  status: string        // overallStatus
+  content: string
+  channels: number
+}
+
+/** يقرأ المنشورات المجدولة من Post-Pulse (مصدر الحقيقة) — يجرّب المسارات المحتملة. */
+export async function listScheduledPosts(): Promise<PPScheduledItem[]> {
+  const token = await getValidAccessToken()
+  const paths = ['/v1/posts', '/v1/posts/schedule', '/v1/schedules']
+  for (const p of paths) {
+    let r: Response
+    try { r = await fetch(`${API_BASE}${p}`, { headers: { Authorization: `Bearer ${token}` } }) } catch { continue }
+    if (!r.ok) continue
+    const data = await r.json().catch(() => null)
+    const arr: unknown[] | null = Array.isArray(data)
+      ? data
+      : Array.isArray((data as Record<string, unknown>)?.items) ? (data as { items: unknown[] }).items
+      : Array.isArray((data as Record<string, unknown>)?.content) ? (data as { content: unknown[] }).content
+      : Array.isArray((data as Record<string, unknown>)?.data) ? (data as { data: unknown[] }).data
+      : null
+    if (!arr) continue
+    const out: PPScheduledItem[] = []
+    for (const s of arr) {
+      if (!s || typeof s !== 'object') continue
+      const o = s as Record<string, unknown>
+      const when = (o.scheduledTime ?? o.scheduled_at ?? o.scheduledAt) as string | undefined
+      if (!when) continue
+      const pubs = Array.isArray(o.publications) ? (o.publications as Record<string, unknown>[]) : []
+      const post0 = pubs[0] && Array.isArray((pubs[0] as Record<string, unknown>).posts)
+        ? ((pubs[0] as { posts: Record<string, unknown>[] }).posts[0] as Record<string, unknown> | undefined)
+        : undefined
+      out.push({
+        id: String(o.id ?? o.scheduleId ?? when),
+        when,
+        status: String(o.overallStatus ?? o.status ?? 'scheduled').toLowerCase(),
+        content: String(post0?.content ?? ''),
+        channels: pubs.length,
+      })
+    }
+    return out
+  }
+  return []
+}
