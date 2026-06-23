@@ -87,11 +87,10 @@ export function upcomingFridays(count = 3, ref: Date = new Date()): { endUtc: st
   return out
 }
 
-/** ملخّص مختصر متناسق: أول جملة، أو قصّ عند حدّ كلمة — بلا نقاط «...». */
+/** ملخّص مختصر متناسق: أول جملة، أو قصّ عند حدّ كلمة — بلا نقاط «...» وبلا منشن. */
 function shortSummary(s: string | null | undefined, max = 95): string {
   if (!s) return ''
-  let t = s.replace(/\s+/g, ' ').trim()
-  // أول جملة (أول نقطة/علامة استفهام/تعجب بعد طول معقول)
+  let t = s.replace(/@\S+/g, '').replace(/#\S+/g, '').replace(/\s+/g, ' ').trim()
   let cut = t.length
   for (const e of ['.', '؟', '!']) {
     const i = t.indexOf(e)
@@ -202,29 +201,44 @@ function buildNewsletterPrompt(window: WeeklyWindow, items: NewsletterItem[], di
     .map(it => `${it.index}. العنوان: "${it.title}"${it.blurb ? ` — نبذة: "${it.blurb}"` : ''} [القسم: ${it.category}]`)
     .join('\n')
   return [
-    `DESIGN TASK — design ONE creative VERTICAL ARABIC NEWSPAPER FRONT PAGE (واجهة صحيفة/جريدة إبداعية) — تحفة تحريرية تشبه صفحة جريدة فاخرة، وليست شبكة بطاقات.`,
+    `DESIGN TASK — صمّم واجهة مجلّة/جريدة عربية عمودية **إبداعية وعصرية** (editorial magazine cover, not a plain classic newspaper). تكوين فنّي جريء وأنيق غير تقليدي.`,
     `OUTPUT SIZE: vertical poster ${NL_WIDTH}×${NL_HEIGHT} (9:16), ultra-HD, print-quality.`,
     ``,
-    `الطابع الصحفي المطلوب: ترويسة جريدة (masthead) + خبر رئيسي بارز (lead story) بمساحة أكبر + بقية الأخبار في أعمدة جريدة متفاوتة العرض مع فواصل رفيعة (column rules)، عناوين بأوزان مختلفة (تسلسل هرمي تحريري)، اقتباسات/ترويسات صغيرة، إحساس "ورق جريدة" راقٍ. تدفّق انسيابي لا شبكة متساوية جامدة.`,
+    `الإبداع المطلوب: تكوين تحريري ديناميكي — خبر رئيسي (hero) بمساحة درامية كبيرة، وبقية الأخبار بأحجام وأعمدة متفاوتة، مع كتل لونية من الهوية، أشكال هندسية/أقواس ناعمة، عمق وطبقات، فواصل ذهبية رفيعة، تايبوغرافي عربي قوي بأوزان متدرّجة. تجنّب الشبكة المتساوية الجامدة تمامًا.`,
     ``,
-    `MASTHEAD (top): large bold Arabic title "النخبة في ٧" + small subtitle "نشرة أسبوعية" + date range "${window.label}" + خط ذهبي فاصل أسفل الترويسة.`,
-    `‼️ اترك الزاوية العليا اليسرى مساحة نظيفة فارغة تماماً (≈ سُدس العرض) للشعار الذي يُضاف لاحقاً برمجياً. لا ترسم أي شعار أو علامة أو كلمة "FIRST1SAUDI" إطلاقاً.`,
+    `MASTHEAD (top): عنوان عربي ضخم "النخبة في ٧" + سطر صغير "نشرة أسبوعية" + نطاق التاريخ "${window.label}" + خط ذهبي فاصل.`,
+    `‼️ اترك الزاوية العليا اليسرى مساحة نظيفة فارغة (≈ سُدس العرض) للشعار (يُضاف برمجياً). لا ترسم أي شعار أو كلمة "FIRST1SAUDI".`,
     ``,
-    `LAYOUT — اتجاه هذا الأسبوع: «${direction}». ${items.length} أخبار، لكل خبر: استخدم إحدى الصور الحقيقية المرفقة كصورة الخبر داخل عمود/قصاصة، مع عنوانه ونبذته. اربط كل صورة بخبر مناسب ولا تكرّر أي خبر.`,
+    `=== 🔒 الصور الحقيقية — قاعدة حديدية (أهم قاعدة) ===`,
+    `⛔ استخدم **حصراً** الصور الحقيقية المرفقة كصور الأخبار. ⛔`,
+    `✗ لا تُولّد ولا تختلق أي شخص أو وجه جديد ✗ لا تستبدل وجهاً ✗ لا تُجمّل/تُعدّل الملامح ✗ لا تستخدم أشخاصاً عشوائيين.`,
+    `كل صورة خبر يجب أن تكون إحدى الصور المرفقة كما هي (نفس الوجه/الملامح). إن لم تكفِ الصور لعدد الأخبار، اترك مكان الصورة كتلة لونية من الهوية (بلا أي شخص مُختلق) بدل توليد وجه.`,
+    `اربط كل صورة بخبرها المناسب ولا تكرّر أي خبر أو صورة.`,
     ``,
     `الأخبار (اكتب نصوصها العربية حرفياً بين علامتي اقتباس كما هي):`,
     list,
     ``,
-    `🔒 BRAND IDENTITY (FIRST1SAUDI): Deep teal #0A2D35–#0D3D47 · Saudi green #2D8B3F–#3A9B4F · gold #FFD700 · white. لوحة راقية متّسقة (يمكن مزج إحساس ورق فاتح مع لمسات الهوية).`,
-    `🔒 احتفظ بالأشخاص في الصور الحقيقية كما هم تماماً (لا تشويه للوجوه).`,
+    `🔒 BRAND IDENTITY (FIRST1SAUDI): Deep teal #0A2D35–#0D3D47 · Saudi green #2D8B3F–#3A9B4F · gold #FFD700 · white.`,
     `FOOTER: شريط فيه أيقونات سوشال + "@First1Saudi".`,
-    `قواعد: نصوص عربية حادّة متّصلة صحيحة الاتجاه (RTL) وحرفية. لا تختلق نصاً. لا نِسب مئوية. لا إيموجي داخل التصميم. لا نقاط «...» في النبذ.`,
+    `قواعد: نصوص عربية حادّة متّصلة صحيحة الاتجاه (RTL) وحرفية. كل نبذة جملة مكتملة المعنى. لا تختلق نصاً. لا نِسب مئوية. لا إيموجي. لا نقاط «...». لا منشن (@) داخل التصميم.`,
   ].join('\n')
 }
 
+/** يزيل الخلفية البيضاء من الشعار (يجعلها شفّافة) فيندمج مع أي تصميم. */
+async function makeLogoTransparent(buf: Buffer, width = 230): Promise<Buffer> {
+  const base = sharp(buf).resize({ width }).ensureAlpha()
+  const { data, info } = await base.raw().toBuffer({ resolveWithObject: true })
+  const ch = info.channels
+  for (let i = 0; i < data.length; i += ch) {
+    const r = data[i], g = data[i + 1], b = data[i + 2]
+    if (r > 236 && g > 236 && b > 236) data[i + 3] = 0 // أبيض ≈ شفاف
+  }
+  return sharp(data, { raw: { width: info.width, height: info.height, channels: ch } }).png().toBuffer()
+}
+
 /**
- * يركّب شعار First1Saudi في بادج أبيض دائري الحواف أعلى يسار البوستر بمكان وحجم
- * ثابتين دائماً — فيبدو عنصراً مقصوداً متّسقاً مهما كان التصميم خلفه.
+ * يركّب شعار First1Saudi (بخلفية شفّافة) أعلى يسار البوستر بمكان وحجم ثابتين دائماً —
+ * فيندمج مع التصميم بلا مربّع أبيض.
  */
 async function compositeBrandLogo(poster: Buffer): Promise<Buffer> {
   try {
@@ -234,28 +248,8 @@ async function compositeBrandLogo(poster: Buffer): Promise<Buffer> {
     if (!url) return poster
     const r = await fetch(url)
     if (!r.ok) return poster
-
-    const logoBuf = Buffer.from(await r.arrayBuffer())
-    const inner = await sharp(logoBuf).resize({ width: 170 }).png().toBuffer()
-    const m = await sharp(inner).metadata()
-    const iw = m.width ?? 170
-    const ih = m.height ?? 170
-    const pad = 22
-    const radius = 28
-    const bw = iw + pad * 2
-    const bh = ih + pad * 2
-    // بادج أبيض دائري الحواف (مع ظل ناعم) كخلفية ثابتة للشعار
-    const badgeBg = Buffer.from(
-      `<svg width="${bw}" height="${bh}" xmlns="http://www.w3.org/2000/svg">
-         <rect x="0" y="0" width="${bw}" height="${bh}" rx="${radius}" ry="${radius}" fill="#ffffff"/>
-       </svg>`,
-    )
-    const badge = await sharp(badgeBg)
-      .composite([{ input: inner, top: pad, left: pad }])
-      .png()
-      .toBuffer()
-
-    return await sharp(poster).composite([{ input: badge, top: 48, left: 48 }]).png().toBuffer()
+    const logo = await makeLogoTransparent(Buffer.from(await r.arrayBuffer()), 230)
+    return await sharp(poster).composite([{ input: logo, top: 54, left: 54 }]).png().toBuffer()
   } catch {
     return poster
   }
@@ -263,6 +257,31 @@ async function compositeBrandLogo(poster: Buffer): Promise<Buffer> {
 
 function defaultCaption(w: WeeklyWindow): string {
   return `🗞️ النخبة في ٧ — ${w.label}\nأبرز إنجازات الأسبوع في لقطة واحدة.\n#أول_سعودي #First1Saudi`
+}
+
+/** يعيد صياغة نبذة كل خبر كجملة عربية مكتملة مختصرة بلا منشن/هاشتاق/نقاط. */
+async function refineBlurbs(items: NewsletterItem[]): Promise<string[]> {
+  try {
+    const openai = getOpenAI()
+    const input = items.map((it, i) => `${i + 1}. العنوان: ${it.title} | المحتوى: ${it.blurb || it.title}`).join('\n')
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-5.5',
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content:
+            'أعد صياغة نبذة كل خبر في **جملة عربية واحدة مكتملة المعنى** (ليست ناقصة ولا مقطوعة)، مختصرة (٨–١٤ كلمة)، واضحة وجذّابة، بلا منشن أو حسابات (@) وبلا هاشتاقات وبلا نقاط حذف «...». أعد JSON بالشكل {"blurbs":["...", ...]} بنفس عدد وترتيب المدخلات حصراً.',
+        },
+        { role: 'user', content: input },
+      ],
+    })
+    const parsed = JSON.parse(completion.choices[0]?.message?.content ?? '{}')
+    if (Array.isArray(parsed?.blurbs) && parsed.blurbs.length === items.length) {
+      return parsed.blurbs.map((b: unknown) => String(b).replace(/@\S+/g, '').replace(/#\S+/g, '').trim())
+    }
+  } catch { /* احتياط: النبذة الأصلية */ }
+  return items.map(it => it.blurb)
 }
 
 /** يولّد نصاً مرافقاً تشويقياً يلخّص النشرة (يُعرض ويُنشر مع البوستر). */
@@ -319,6 +338,10 @@ export async function generateNewsletterPoster(opts?: {
     ? await getItemsByIds(opts.ids)
     : (await getWeeklyItems(opts?.limit ?? 7, opts?.ref)).items
   if (!items.length) throw new Error('لا توجد أخبار/تصاميم متاحة لهذا الأسبوع')
+
+  // إعادة صياغة النبذ كجُمل مكتملة بلا منشن قبل بناء البرومبت
+  const refined = await refineBlurbs(items)
+  refined.forEach((b, i) => { if (b) items[i].blurb = b })
 
   const direction = NEWSLETTER_DIRECTIONS[weeklySeed(window) % NEWSLETTER_DIRECTIONS.length]
   const prompt = buildNewsletterPrompt(window, items, direction)
