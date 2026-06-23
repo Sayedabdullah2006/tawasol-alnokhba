@@ -16,6 +16,7 @@ export interface NewsletterItem {
   index: number
   title: string
   blurb: string
+  fullContent: string   // نص الخبر الأصلي الكامل (لإعادة الصياغة منه مباشرة)
   category: string
   image: string
   sourceImage: string | null
@@ -188,6 +189,7 @@ export async function getWeeklyItems(limit = 7, ref?: Date): Promise<{ window: W
     index: i + 1,
     title: (r.title ?? '').trim() || 'إنجاز سعودي',
     blurb: shortSummary(r.content),
+    fullContent: (r.content ?? '').trim(),
     category: (r.category && String(r.category).trim()) || 'منوّعات',
     image: r.image_url,
     sourceImage: r.source_image_url ?? null,
@@ -221,14 +223,17 @@ function buildNewsletterPrompt(window: WeeklyWindow, items: NewsletterItem[], di
     ``,
     `الإبداع المطلوب: تكوين تحريري ديناميكي — خبر رئيسي (hero) بمساحة درامية كبيرة، وبقية الأخبار بأحجام وأعمدة متفاوتة، مع كتل لونية من الهوية، أشكال هندسية/أقواس ناعمة، عمق وطبقات، فواصل ذهبية رفيعة، تايبوغرافي عربي قوي بأوزان متدرّجة. تجنّب الشبكة المتساوية الجامدة تمامًا.`,
     ``,
-    `MASTHEAD (top): عنوان عربي ضخم "النخبة في ٧" + سطر صغير "نشرة أسبوعية" + نطاق التاريخ "${window.label}" + خط ذهبي فاصل.`,
-    `‼️ الشعار: اترك **الزاوية العليا اليسرى مربعاً صلباً نظيفاً بلون الهوية (تيل غامق) لا يقلّ عن ٢٨٠×٢٨٠ بكسل، خالياً تماماً** من أي أشكال أو نصوص أو صور أو زخارف — مخصّص للشعار الذي يُضاف برمجياً. لا ترسم أي شعار أو كلمة "FIRST1SAUDI".`,
+    `MASTHEAD (top): شريط علوي صلب بلون الهوية بارتفاع ≈ 300 بكسل، فيه عنوان عربي ضخم "النخبة في ٧" + سطر صغير "نشرة أسبوعية" + نطاق التاريخ "${window.label}" + خط ذهبي فاصل أسفله.`,
+    `‼️ الشعار: اترك في **يسار الشريط العلوي مساحة مربّعة نظيفة ≈ ٢٦٠×٢٦٠ بكسل خالية تماماً** (متمركزة رأسياً داخل الشريط) — مخصّصة للشعار الذي يُضاف برمجياً. لا ترسم أي شعار أو كلمة "FIRST1SAUDI".`,
     ``,
     `=== 🔒 الصور الحقيقية — قاعدة حديدية (أهم قاعدة) ===`,
     `⛔ استخدم **حصراً** الصور الحقيقية المرفقة كصور الأخبار. ⛔`,
     `✗ لا تُولّد ولا تختلق أي شخص أو وجه جديد ✗ لا تستبدل وجهاً ✗ لا تُجمّل/تُعدّل الملامح ✗ لا تستخدم أشخاصاً عشوائيين.`,
     `كل صورة خبر يجب أن تكون إحدى الصور المرفقة كما هي (نفس الوجه/الملامح). إن لم تكفِ الصور لعدد الأخبار، اترك مكان الصورة كتلة لونية من الهوية (بلا أي شخص مُختلق) بدل توليد وجه.`,
     `اربط كل صورة بخبرها المناسب ولا تكرّر أي خبر أو صورة.`,
+    ``,
+    `=== ربط الصور ===`,
+    `‼️ الصور المرفقة مرتّبة بترتيب الأخبار تماماً: الصورة رقم N هي صورة الخبر رقم N. التزم بهذا الربط حرفياً ولا تخلط صورة خبر مع خبر آخر.`,
     ``,
     `=== العناوين ===`,
     `‼️ العنوان البارز لكل خبر هو **نص "العنوان البارز" المقتبس أدناه فقط** (وهو يحمل اسم الشخص/الإنجاز). ⛔ لا تعرض اسم القسم أو التصنيف أو أي كلمة مثل (اختراعات/أوائل/بيئة/شهادات/تخرّج/العلوم...) كعنوان أو ترويسة إطلاقاً.`,
@@ -254,7 +259,11 @@ async function compositeBrandLogo(poster: Buffer): Promise<Buffer> {
     const r = await fetch(url)
     if (!r.ok) return poster
     const logo = await sharp(Buffer.from(await r.arrayBuffer())).resize({ width: 200 }).png().toBuffer()
-    return await sharp(poster).composite([{ input: logo, top: 50, left: 50 }]).png().toBuffer()
+    const meta = await sharp(logo).metadata()
+    const h = meta.height ?? 200
+    const BAND = 300 // ارتفاع الشريط العلوي المتّفق عليه في البرومبت
+    const top = Math.max(28, Math.round(BAND / 2 - h / 2)) // توسيط رأسي داخل الشريط
+    return await sharp(poster).composite([{ input: logo, top, left: 60 }]).png().toBuffer()
   } catch {
     return poster
   }
@@ -268,7 +277,10 @@ function defaultCaption(w: WeeklyWindow): string {
 async function refineBlurbs(items: NewsletterItem[]): Promise<string[]> {
   try {
     const openai = getOpenAI()
-    const input = items.map((it, i) => `${i + 1}. العنوان: ${it.title} | المحتوى: ${it.blurb || it.title}`).join('\n')
+    // نمرّر نص الخبر الأصلي الكامل ليُعيد الصياغة منه مباشرة (لا من نص مقتطع/تصميم)
+    const input = items
+      .map((it, i) => `${i + 1}. العنوان: ${it.title}\nنص الخبر الأصلي: ${(it.fullContent || it.blurb || it.title).slice(0, 600)}`)
+      .join('\n\n')
     const completion = await openai.chat.completions.create({
       model: 'gpt-5.5',
       response_format: { type: 'json_object' },
@@ -276,7 +288,7 @@ async function refineBlurbs(items: NewsletterItem[]): Promise<string[]> {
         {
           role: 'system',
           content:
-            'أعد صياغة نبذة كل خبر في **جملة عربية واحدة مكتملة المعنى** (ليست ناقصة ولا مقطوعة)، مختصرة (٨–١٤ كلمة)، واضحة وجذّابة، بلا منشن أو حسابات (@) وبلا هاشتاقات وبلا نقاط حذف «...». أعد JSON بالشكل {"blurbs":["...", ...]} بنفس عدد وترتيب المدخلات حصراً.',
+            'لكل خبر اقرأ «نص الخبر الأصلي» وأعد صياغته في جملة عربية واحدة صحيحة لغوياً ومكتملة المعنى تلخّص جوهر الإنجاز، مختصرة (٨–١٦ كلمة)، واضحة وجذّابة. اعتمد على نص الخبر الأصلي فقط، لا تنسخ نصاً ناقصاً ولا تخترع معلومات. بلا منشن (@) ولا هاشتاقات ولا نقاط حذف. أعد JSON {"blurbs":["...", ...]} بنفس عدد وترتيب المدخلات حصراً.',
         },
         { role: 'user', content: input },
       ],
@@ -322,6 +334,7 @@ export async function getItemsByIds(ids: string[]): Promise<NewsletterItem[]> {
     index: i + 1,
     title: (r.title ?? '').trim() || 'إنجاز سعودي',
     blurb: shortSummary(r.content),
+    fullContent: (r.content ?? '').trim(),
     category: (r.category && String(r.category).trim()) || 'منوّعات',
     image: r.image_url,
     sourceImage: r.source_image_url ?? null,
