@@ -198,7 +198,7 @@ function weeklySeed(window: WeeklyWindow): number {
 
 function buildNewsletterPrompt(window: WeeklyWindow, items: NewsletterItem[], direction: string): string {
   const list = items
-    .map(it => `${it.index}. العنوان: "${it.title}"${it.blurb ? ` — نبذة: "${it.blurb}"` : ''} [القسم: ${it.category}]`)
+    .map(it => `${it.index}. العنوان البارز: "${it.title}"${it.blurb ? ` — النبذة: "${it.blurb}"` : ''}`)
     .join('\n')
   return [
     `DESIGN TASK — صمّم واجهة مجلّة/جريدة عربية عمودية **إبداعية وعصرية** (editorial magazine cover, not a plain classic newspaper). تكوين فنّي جريء وأنيق غير تقليدي.`,
@@ -207,7 +207,7 @@ function buildNewsletterPrompt(window: WeeklyWindow, items: NewsletterItem[], di
     `الإبداع المطلوب: تكوين تحريري ديناميكي — خبر رئيسي (hero) بمساحة درامية كبيرة، وبقية الأخبار بأحجام وأعمدة متفاوتة، مع كتل لونية من الهوية، أشكال هندسية/أقواس ناعمة، عمق وطبقات، فواصل ذهبية رفيعة، تايبوغرافي عربي قوي بأوزان متدرّجة. تجنّب الشبكة المتساوية الجامدة تمامًا.`,
     ``,
     `MASTHEAD (top): عنوان عربي ضخم "النخبة في ٧" + سطر صغير "نشرة أسبوعية" + نطاق التاريخ "${window.label}" + خط ذهبي فاصل.`,
-    `‼️ اترك الزاوية العليا اليسرى مساحة نظيفة فارغة (≈ سُدس العرض) للشعار (يُضاف برمجياً). لا ترسم أي شعار أو كلمة "FIRST1SAUDI".`,
+    `‼️ الشعار: اترك **الزاوية العليا اليسرى مربعاً صلباً نظيفاً بلون الهوية (تيل غامق) لا يقلّ عن ٢٨٠×٢٨٠ بكسل، خالياً تماماً** من أي أشكال أو نصوص أو صور أو زخارف — مخصّص للشعار الذي يُضاف برمجياً. لا ترسم أي شعار أو كلمة "FIRST1SAUDI".`,
     ``,
     `=== 🔒 الصور الحقيقية — قاعدة حديدية (أهم قاعدة) ===`,
     `⛔ استخدم **حصراً** الصور الحقيقية المرفقة كصور الأخبار. ⛔`,
@@ -215,30 +215,20 @@ function buildNewsletterPrompt(window: WeeklyWindow, items: NewsletterItem[], di
     `كل صورة خبر يجب أن تكون إحدى الصور المرفقة كما هي (نفس الوجه/الملامح). إن لم تكفِ الصور لعدد الأخبار، اترك مكان الصورة كتلة لونية من الهوية (بلا أي شخص مُختلق) بدل توليد وجه.`,
     `اربط كل صورة بخبرها المناسب ولا تكرّر أي خبر أو صورة.`,
     ``,
-    `الأخبار (اكتب نصوصها العربية حرفياً بين علامتي اقتباس كما هي):`,
+    `=== العناوين ===`,
+    `‼️ العنوان البارز لكل خبر هو **نص "العنوان البارز" المقتبس أدناه فقط** (وهو يحمل اسم الشخص/الإنجاز). ⛔ لا تعرض اسم القسم أو التصنيف أو أي كلمة مثل (اختراعات/أوائل/بيئة/شهادات/تخرّج/العلوم...) كعنوان أو ترويسة إطلاقاً.`,
+    `اكتب نصوص العناوين والنبذ العربية حرفياً بين علامتي اقتباس كما هي:`,
     list,
     ``,
     `🔒 BRAND IDENTITY (FIRST1SAUDI): Deep teal #0A2D35–#0D3D47 · Saudi green #2D8B3F–#3A9B4F · gold #FFD700 · white.`,
     `FOOTER: شريط فيه أيقونات سوشال + "@First1Saudi".`,
-    `قواعد: نصوص عربية حادّة متّصلة صحيحة الاتجاه (RTL) وحرفية. كل نبذة جملة مكتملة المعنى. لا تختلق نصاً. لا نِسب مئوية. لا إيموجي. لا نقاط «...». لا منشن (@) داخل التصميم.`,
+    `قواعد: نصوص عربية حادّة متّصلة صحيحة الاتجاه (RTL) وحرفية. كل نبذة جملة مكتملة المعنى. لا تختلق نصاً. لا نِسب مئوية. لا إيموجي. لا نقاط «...». لا منشن (@) ولا أسماء أقسام في التصميم.`,
   ].join('\n')
 }
 
-/** يزيل الخلفية البيضاء من الشعار (يجعلها شفّافة) فيندمج مع أي تصميم. */
-async function makeLogoTransparent(buf: Buffer, width = 230): Promise<Buffer> {
-  const base = sharp(buf).resize({ width }).ensureAlpha()
-  const { data, info } = await base.raw().toBuffer({ resolveWithObject: true })
-  const ch = info.channels
-  for (let i = 0; i < data.length; i += ch) {
-    const r = data[i], g = data[i + 1], b = data[i + 2]
-    if (r > 236 && g > 236 && b > 236) data[i + 3] = 0 // أبيض ≈ شفاف
-  }
-  return sharp(data, { raw: { width: info.width, height: info.height, channels: ch } }).png().toBuffer()
-}
-
 /**
- * يركّب شعار First1Saudi (بخلفية شفّافة) أعلى يسار البوستر بمكان وحجم ثابتين دائماً —
- * فيندمج مع التصميم بلا مربّع أبيض.
+ * يركّب شعار First1Saudi **كما هو محفوظ** (بلا أي تفريغ) أعلى يسار البوستر بمكان
+ * وحجم ثابتين دائماً، ضمن الزاوية النظيفة المحجوزة له في التصميم.
  */
 async function compositeBrandLogo(poster: Buffer): Promise<Buffer> {
   try {
@@ -248,8 +238,8 @@ async function compositeBrandLogo(poster: Buffer): Promise<Buffer> {
     if (!url) return poster
     const r = await fetch(url)
     if (!r.ok) return poster
-    const logo = await makeLogoTransparent(Buffer.from(await r.arrayBuffer()), 230)
-    return await sharp(poster).composite([{ input: logo, top: 54, left: 54 }]).png().toBuffer()
+    const logo = await sharp(Buffer.from(await r.arrayBuffer())).resize({ width: 200 }).png().toBuffer()
+    return await sharp(poster).composite([{ input: logo, top: 50, left: 50 }]).png().toBuffer()
   } catch {
     return poster
   }
