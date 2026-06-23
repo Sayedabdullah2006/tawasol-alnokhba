@@ -34,6 +34,52 @@ export default function StandaloneStudio() {
   const [publishText, setPublishText] = useState('')
   const [publishingCover, setPublishingCover] = useState<string | null>(null)
   const [publishedCover, setPublishedCover] = useState<string | null>(null)
+  // تبويب الإنفوجرافيك (عدة أشخاص)
+  const [mode, setMode] = useState<'news' | 'info'>('news')
+  const [infoTitle, setInfoTitle] = useState('')
+  const [infoExtra, setInfoExtra] = useState('')
+  const [people, setPeople] = useState<{ imageUrl: string; name: string; blurb: string }[]>([{ imageUrl: '', name: '', blurb: '' }])
+  const [personUploading, setPersonUploading] = useState<number | null>(null)
+  const [infoBusy, setInfoBusy] = useState(false)
+  const [infoResult, setInfoResult] = useState<string | null>(null)
+
+  const updatePerson = (i: number, patch: Partial<{ imageUrl: string; name: string; blurb: string }>) =>
+    setPeople(prev => prev.map((p, idx) => (idx === i ? { ...p, ...patch } : p)))
+  const addPerson = () => setPeople(prev => [...prev, { imageUrl: '', name: '', blurb: '' }])
+  const removePerson = (i: number) => setPeople(prev => prev.filter((_, idx) => idx !== i))
+
+  const uploadPersonImage = async (i: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(file.type)) { showToast('صيغة غير مدعومة', 'error'); return }
+    if (file.size > 10 * 1024 * 1024) { showToast('الحجم يتجاوز 10MB', 'error'); return }
+    setPersonUploading(i)
+    try {
+      const ext = file.name.split('.').pop()
+      const path = `info-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const { error } = await supabase.storage.from('content-images').upload(path, file)
+      if (error) throw error
+      const { data } = supabase.storage.from('content-images').getPublicUrl(path)
+      updatePerson(i, { imageUrl: data.publicUrl })
+      showToast('تم رفع الصورة', 'success')
+    } catch { showToast('فشل رفع الصورة', 'error') } finally { setPersonUploading(null) }
+  }
+
+  const genInfographic = async () => {
+    const valid = people.filter(p => p.imageUrl && p.name.trim())
+    if (!valid.length) { showToast('أضِف صورة شخص واحدة على الأقل مع اسمه', 'error'); return }
+    setInfoBusy(true); setInfoResult(null)
+    try {
+      const res = await fetch('/api/admin/ai-studio/infographic', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: infoTitle, extraInfo: infoExtra, people: valid }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok) { setInfoResult(d.imageUrl); showToast('تم توليد الإنفوجرافيك ✅', 'success') }
+      else showToast(d.error ?? 'فشل التوليد', 'error')
+    } finally { setInfoBusy(false) }
+  }
 
   const toggleImage = (url: string) =>
     setSelectedImages(prev => (prev.includes(url) ? prev.filter(u => u !== url) : [...prev, url]))
@@ -199,6 +245,77 @@ export default function StandaloneStudio() {
 
   return (
     <div className="space-y-4" dir="rtl">
+      {/* تبويبات الاستوديو المستقل */}
+      <div className="flex rounded-xl border border-border overflow-hidden w-fit">
+        <button onClick={() => setMode('news')} className={`px-4 py-2 text-sm font-bold ${mode === 'news' ? 'bg-green text-white' : 'bg-card text-dark'}`}>📰 تصميم خبر</button>
+        <button onClick={() => setMode('info')} className={`px-4 py-2 text-sm font-bold ${mode === 'info' ? 'bg-green text-white' : 'bg-card text-dark'}`}>📊 إنفوجرافيك</button>
+      </div>
+
+      {mode === 'info' && (
+        <div className="space-y-4">
+          <div className={card}>
+            <h3 className="font-bold text-dark">📊 إنفوجرافيك عدّة أشخاص</h3>
+            <p className="text-xs text-muted">أضِف صورة كل شخص مع اسمه ونبذته — يلتزم التصميم بالصورة والاسم والنبذة لكل شخص بدقّة.</p>
+            <input value={infoTitle} onChange={e => setInfoTitle(e.target.value)} placeholder="عنوان الإنفوجرافيك (مثال: أوائل سعوديون هذا الأسبوع)"
+              className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm font-semibold" />
+            <div className="space-y-3">
+              {people.map((p, i) => (
+                <div key={i} className="rounded-xl border border-border p-3 flex gap-3">
+                  <div className="shrink-0">
+                    {p.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.imageUrl} alt="" className="w-20 aspect-square object-cover rounded-lg border border-border" />
+                    ) : (
+                      <label className="w-20 aspect-square rounded-lg border border-dashed border-border flex items-center justify-center text-[10px] text-muted cursor-pointer text-center px-1 hover:border-green">
+                        <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={e => uploadPersonImage(i, e)} disabled={personUploading === i} className="hidden" />
+                        {personUploading === i ? 'جارٍ…' : '⬆️ صورة'}
+                      </label>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <input value={p.name} onChange={e => updatePerson(i, { name: e.target.value })} placeholder="اسم الشخص"
+                      className="w-full px-2 py-1.5 rounded-lg border border-border bg-white text-sm font-bold" />
+                    <textarea value={p.blurb} onChange={e => updatePerson(i, { blurb: e.target.value })} placeholder="نبذة مختصرة عن الشخص/إنجازه"
+                      className="w-full px-2 py-1.5 rounded-lg border border-border bg-white text-xs min-h-[48px] resize-y" />
+                    <div className="flex gap-2">
+                      {p.imageUrl && (
+                        <label className="text-[11px] text-green cursor-pointer hover:underline">
+                          <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={e => uploadPersonImage(i, e)} className="hidden" />
+                          تغيير الصورة
+                        </label>
+                      )}
+                      {people.length > 1 && (
+                        <button onClick={() => removePerson(i)} className="text-[11px] text-red-600 hover:underline">حذف</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <button onClick={addPerson} className="text-sm font-bold text-green border border-green/30 rounded-lg px-3 py-1.5 hover:bg-green/5">➕ إضافة شخص</button>
+            </div>
+            <textarea value={infoExtra} onChange={e => setInfoExtra(e.target.value)} placeholder="معلومات إضافية (اختياري) تُراعى في التصميم"
+              className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[60px] resize-y" />
+            <Button onClick={genInfographic} loading={infoBusy} disabled={infoBusy} size="sm">🎨 توليد الإنفوجرافيك</Button>
+            {infoBusy && <div className="flex items-center gap-2 text-sm text-muted"><LoadingSpinner size="sm" /><span>جارٍ التوليد… قد يستغرق دقيقة</span></div>}
+          </div>
+
+          {infoResult && (
+            <div className={card}>
+              <h4 className="font-bold text-dark">النتيجة</h4>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={infoResult} alt="الإنفوجرافيك" onClick={() => setLightbox(infoResult)} className="max-w-xs rounded-xl border border-border cursor-zoom-in" />
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => openPublish(infoResult)} loading={publishingCover === infoResult} disabled={publishingCover !== null} variant={publishedCover === infoResult ? 'secondary' : 'outline'} size="sm">
+                  {publishedCover === infoResult ? '✅ أُرسل' : '📣 انشر عبر القنوات'}
+                </Button>
+                <a href={infoResult} target="_blank" rel="noopener noreferrer" download className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-green/10 text-green hover:bg-green/20">⬇️ تنزيل</a>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {mode === 'news' && (<>
       {/* الخبر */}
       <div className={card}>
         <h3 className="font-bold text-dark">📝 الخبر</h3>
@@ -335,6 +452,7 @@ export default function StandaloneStudio() {
           </div>
         )}
       </div>
+      </>)}
 
       {/* نافذة معاينة/تعديل قبل النشر عبر القنوات */}
       {publishCover && (

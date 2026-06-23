@@ -196,6 +196,60 @@ export async function generateDesign(
   return { imageUrl: pub.publicUrl, prompt: designPrompt }
 }
 
+export interface InfographicPerson { imageUrl: string; name: string; blurb: string }
+
+/**
+ * يولّد إنفوجرافيك يعرض عدة أشخاص، كل شخص بصورته الحقيقية + اسمه ونبذته حرفياً.
+ * الالتزام صارم: الصورة رقم N تخصّ الشخص رقم N باسمه ونبذته كما وردا.
+ */
+export async function generateInfographic(
+  args: { title: string; people: InfographicPerson[]; extraInfo?: string },
+): Promise<{ imageUrl: string; prompt: string }> {
+  const { title, people, extraInfo } = args
+  const refs = people.map(p => p.imageUrl).filter(Boolean)
+  if (!refs.length) throw new Error('أضِف صورة شخص واحدة على الأقل')
+
+  const service = await createServiceRoleClient()
+  const { data: brand } = await service.from('brand_settings').select('first1saudi_logo_url').eq('id', 1).single()
+  const logoUrl: string | null = brand?.first1saudi_logo_url ?? null
+
+  const peopleList = people
+    .map((p, i) => `الشخص ${i + 1} (صورته = الصورة المرفقة رقم ${i + 1}): الاسم "${p.name}" — النبذة "${p.blurb}"`)
+    .join('\n')
+
+  const prompt = [
+    `صمّم إنفوجرافيك عمودي احترافي وأنيق بهوية First1Saudi يعرض ${people.length} أشخاص في بطاقات/أعمدة متناسقة.`,
+    `العنوان الرئيسي أعلى التصميم: "${title || 'إنفوجرافيك'}".`,
+    `لكل شخص بطاقة تحوي: صورته الحقيقية المرفقة + اسمه + نبذته.`,
+    `‼️ التزام صارم بالربط: الصورة المرفقة رقم N تخصّ الشخص رقم N حصراً. اكتب اسم كل شخص ونبذته **حرفياً كما وردا بين علامتي الاقتباس** أسفل/أمام صورته. لا تخلط الأسماء أو الصور، ولا تنسب صورة لاسم خاطئ.`,
+    `⛔ استخدم الصور الحقيقية كما هي (نفس الوجه/الملامح). لا تُولّد ولا تختلق أي وجه/شخص، ولا تُجمّل، ولا تكتب نصاً غير الوارد أدناه.`,
+    ``,
+    `الأشخاص:`,
+    peopleList,
+    ``,
+    `الهوية: تيل عميق #0A2D35–#0D3D47 · أخضر سعودي #2D8B3F–#3A9B4F · ذهبي #FFD700 · أبيض. خلفية راقية متّسقة. فوتر فيه أيقونات سوشال و"@First1Saudi".`,
+    `اترك مساحة فارغة أسفل يمين الفوتر للوقو (يُضاف لاحقاً برمجياً) ولا ترسم أي شعار هناك.`,
+    `OUTPUT: عمودي 1080×1350، ultra-HD، نصوص عربية حادّة ومتّصلة وصحيحة الاتجاه (RTL)، بلا اختلاق نص ولا إيموجي.`,
+    extraInfo && extraInfo.trim() ? `\nمعلومات إضافية تُراعى: ${extraInfo.trim()}` : '',
+  ].filter(Boolean).join('\n')
+
+  const geminiPrompt = `${FACE_LOCK}\n\n${prompt}\n\n${FACE_LOCK}`
+  const { b64 } = await generateImageWithGemini(geminiPrompt, refs)
+  const rawImage = Buffer.from(b64, 'base64')
+  const posterBase = await resizeToPoster(rawImage)
+  const { buffer: finalImage, mimeType } = logoUrl
+    ? await compositeLogoBottomRight(posterBase, logoUrl)
+    : { buffer: posterBase, mimeType: 'image/png' }
+
+  const ext = mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg' : 'png'
+  const path = `infographic-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  const { error: upErr } = await service.storage.from('content-images').upload(path, finalImage, { contentType: mimeType })
+  if (upErr) throw new Error(`فشل رفع الصورة: ${upErr.message}`)
+  const { data: pub } = service.storage.from('content-images').getPublicUrl(path)
+
+  return { imageUrl: pub.publicUrl, prompt }
+}
+
 /**
  * يعيد استضافة صورة مصدر خارجية على تخزين Supabase ويُعيد رابطاً عاماً.
  *
