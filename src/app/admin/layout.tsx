@@ -7,6 +7,7 @@ const adminNav = [
   { href: '/admin', label: 'الإحصائيات', icon: '📊' },
   { href: '/admin/requests', label: 'الطلبات', icon: '📋' },
   { href: '/admin/social', label: 'خطة النشر', icon: '🗓️' },
+  { href: '/admin/social/calendar', label: 'تقويم الجدولة', icon: '📆' },
   { href: '/admin/newsletter', label: 'النخبة في ٧', icon: '🗞️' },
   { href: '/admin/discounts', label: 'أكواد الخصم', icon: '🏷️' },
   { href: '/admin/influencers', label: 'المؤثرون', icon: '👥' },

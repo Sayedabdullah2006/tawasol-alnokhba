@@ -84,6 +84,7 @@ async function handle(request: NextRequest) {
         design_url: imageUrl,
         accounts: accountIds,
         status: 'published',
+        scheduled_for: new Date().toISOString(),
         event_raw: result as object,
       })
     } catch { /* تجاهل */ }

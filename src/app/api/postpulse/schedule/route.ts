@@ -57,6 +57,7 @@ export async function POST(req: Request) {
         design_url: imageUrl || null,
         accounts: accountIds,
         status: 'scheduled',
+        scheduled_for: scheduledTime.toISOString(),
         event_raw: result as object,
       })
     } catch { /* تجاهل */ }

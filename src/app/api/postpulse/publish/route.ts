@@ -52,6 +52,7 @@ export async function POST(req: Request) {
         design_url: imageUrl || null,
         accounts: accountIds,
         status: 'published',
+        scheduled_for: new Date().toISOString(),
         event_raw: result as object,
       })
     } catch { /* تجاهل أخطاء التسجيل */ }
