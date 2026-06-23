@@ -30,7 +30,7 @@ export async function GET() {
   })
 
   // كل التصاميم المولّدة (يومية + مستقل + طلبات) الأحدث أولاً — للبوب-أب
-  const candidates = await getCandidates(21)
+  const candidates = await getCandidates()
 
   return NextResponse.json({ upcoming, history: rows, candidates })
 }

@@ -121,16 +121,14 @@ function dedupeByTitle(rows: DesignRow[]): DesignRow[] {
 
 const SELECT_COLS = 'id, source, title, content, category, image_url, source_image_url, in_newsletter, newsletter_rank, created_at'
 
-/** مرشّحو النشرة للعرض في اللوحة: كل التصاميم المولّدة، الأحدث أولاً. */
-export async function getCandidates(days = 21): Promise<DesignRow[]> {
+/** مرشّحو النشرة للعرض في اللوحة: أحدث التصاميم المولّدة من كل المصادر (بلا قيد زمني). */
+export async function getCandidates(limit = 150): Promise<DesignRow[]> {
   const sc = await createServiceRoleClient()
-  const since = new Date(Date.now() - days * 86400000).toISOString()
   const { data } = await sc
     .from('generated_designs')
     .select(SELECT_COLS)
-    .gte('created_at', since)
     .order('created_at', { ascending: false })
-    .limit(120)
+    .limit(limit)
   return dedupeByTitle((data ?? []) as DesignRow[])
 }
 
@@ -204,26 +202,30 @@ function buildNewsletterPrompt(window: WeeklyWindow, items: NewsletterItem[], di
     .map(it => `${it.index}. العنوان: "${it.title}"${it.blurb ? ` — نبذة: "${it.blurb}"` : ''} [القسم: ${it.category}]`)
     .join('\n')
   return [
-    `DESIGN TASK — create ONE vertical WEEKLY NEWSPAPER/MAGAZINE digest poster (editorial composition, NOT editing a single photo).`,
-    `OUTPUT SIZE: vertical poster ${NL_WIDTH}×${NL_HEIGHT} (9:16), ultra-HD.`,
+    `DESIGN TASK — design ONE creative VERTICAL ARABIC NEWSPAPER FRONT PAGE (واجهة صحيفة/جريدة إبداعية) — تحفة تحريرية تشبه صفحة جريدة فاخرة، وليست شبكة بطاقات.`,
+    `OUTPUT SIZE: vertical poster ${NL_WIDTH}×${NL_HEIGHT} (9:16), ultra-HD, print-quality.`,
     ``,
-    `MASTHEAD (top): large bold Arabic title "النخبة في ٧" + small subtitle "نشرة أسبوعية" + date range "${window.label}".`,
-    `‼️ اترك الزاوية العليا اليسرى فارغة تماماً (سيُضاف الشعار لاحقاً برمجياً). لا ترسم أي شعار أو علامة أو كلمة "FIRST1SAUDI" إطلاقاً.`,
+    `الطابع الصحفي المطلوب: ترويسة جريدة (masthead) + خبر رئيسي بارز (lead story) بمساحة أكبر + بقية الأخبار في أعمدة جريدة متفاوتة العرض مع فواصل رفيعة (column rules)، عناوين بأوزان مختلفة (تسلسل هرمي تحريري)، اقتباسات/ترويسات صغيرة، إحساس "ورق جريدة" راقٍ. تدفّق انسيابي لا شبكة متساوية جامدة.`,
     ``,
-    `LAYOUT — انسيابية كصحيفة حقيقية وفق اتجاه هذا الأسبوع: «${direction}». أحجام متفاوتة، تدفّق تحريري، لا أقسام متساوية جامدة.`,
-    `رتّب ${items.length} أخبار، لكل خبر: استخدم إحدى الصور الحقيقية المرفقة كصورة الخبر، مع عنوانه ونبذته. اربط كل صورة بخبر مناسب ولا تكرّر أي خبر.`,
+    `MASTHEAD (top): large bold Arabic title "النخبة في ٧" + small subtitle "نشرة أسبوعية" + date range "${window.label}" + خط ذهبي فاصل أسفل الترويسة.`,
+    `‼️ اترك الزاوية العليا اليسرى مساحة نظيفة فارغة تماماً (≈ سُدس العرض) للشعار الذي يُضاف لاحقاً برمجياً. لا ترسم أي شعار أو علامة أو كلمة "FIRST1SAUDI" إطلاقاً.`,
+    ``,
+    `LAYOUT — اتجاه هذا الأسبوع: «${direction}». ${items.length} أخبار، لكل خبر: استخدم إحدى الصور الحقيقية المرفقة كصورة الخبر داخل عمود/قصاصة، مع عنوانه ونبذته. اربط كل صورة بخبر مناسب ولا تكرّر أي خبر.`,
     ``,
     `الأخبار (اكتب نصوصها العربية حرفياً بين علامتي اقتباس كما هي):`,
     list,
     ``,
-    `🔒 BRAND IDENTITY (FIRST1SAUDI): Deep teal #0A2D35–#0D3D47 · Saudi green #2D8B3F–#3A9B4F · gold #FFD700 · white. خلفية داكنة راقية.`,
+    `🔒 BRAND IDENTITY (FIRST1SAUDI): Deep teal #0A2D35–#0D3D47 · Saudi green #2D8B3F–#3A9B4F · gold #FFD700 · white. لوحة راقية متّسقة (يمكن مزج إحساس ورق فاتح مع لمسات الهوية).`,
     `🔒 احتفظ بالأشخاص في الصور الحقيقية كما هم تماماً (لا تشويه للوجوه).`,
-    `FOOTER: شريط منحنٍ داكن فيه أيقونات سوشال + "@First1Saudi".`,
+    `FOOTER: شريط فيه أيقونات سوشال + "@First1Saudi".`,
     `قواعد: نصوص عربية حادّة متّصلة صحيحة الاتجاه (RTL) وحرفية. لا تختلق نصاً. لا نِسب مئوية. لا إيموجي داخل التصميم. لا نقاط «...» في النبذ.`,
   ].join('\n')
 }
 
-/** يركّب شعار First1Saudi الحقيقي أعلى يسار البوستر (إن وُجد). */
+/**
+ * يركّب شعار First1Saudi في بادج أبيض دائري الحواف أعلى يسار البوستر بمكان وحجم
+ * ثابتين دائماً — فيبدو عنصراً مقصوداً متّسقاً مهما كان التصميم خلفه.
+ */
 async function compositeBrandLogo(poster: Buffer): Promise<Buffer> {
   try {
     const sc = await createServiceRoleClient()
@@ -232,9 +234,28 @@ async function compositeBrandLogo(poster: Buffer): Promise<Buffer> {
     if (!url) return poster
     const r = await fetch(url)
     if (!r.ok) return poster
+
     const logoBuf = Buffer.from(await r.arrayBuffer())
-    const logo = await sharp(logoBuf).resize({ width: 210 }).png().toBuffer()
-    return await sharp(poster).composite([{ input: logo, top: 56, left: 56 }]).png().toBuffer()
+    const inner = await sharp(logoBuf).resize({ width: 170 }).png().toBuffer()
+    const m = await sharp(inner).metadata()
+    const iw = m.width ?? 170
+    const ih = m.height ?? 170
+    const pad = 22
+    const radius = 28
+    const bw = iw + pad * 2
+    const bh = ih + pad * 2
+    // بادج أبيض دائري الحواف (مع ظل ناعم) كخلفية ثابتة للشعار
+    const badgeBg = Buffer.from(
+      `<svg width="${bw}" height="${bh}" xmlns="http://www.w3.org/2000/svg">
+         <rect x="0" y="0" width="${bw}" height="${bh}" rx="${radius}" ry="${radius}" fill="#ffffff"/>
+       </svg>`,
+    )
+    const badge = await sharp(badgeBg)
+      .composite([{ input: inner, top: pad, left: pad }])
+      .png()
+      .toBuffer()
+
+    return await sharp(poster).composite([{ input: badge, top: 48, left: 48 }]).png().toBuffer()
   } catch {
     return poster
   }
