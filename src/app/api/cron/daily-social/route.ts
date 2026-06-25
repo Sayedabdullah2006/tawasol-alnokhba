@@ -13,12 +13,14 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
-import { fetchCategories, fetchPostsByCategory, fetchCandidatePosts, resolveImageUrl, type NewsPost } from '@/lib/first1-news'
+import { fetchCategories, fetchPostsByCategory, resolveImageUrl, type NewsPost } from '@/lib/first1-news'
 import { fetchManhomCandidates, ensureColorImage, MANHOM_NOTE } from '@/lib/manhom-news'
+import { fetchRssCandidates, RSS_SOURCES } from '@/lib/rss-news'
 import { runStudioPipeline } from '@/lib/ai-studio'
 import { sendEmail } from '@/lib/email'
 
-type SourceKind = 'first1saudi' | 'manhom'
+// المصدر: 'first1saudi' | 'manhom' | مفتاح مصدر RSS (مثل 'alarabiya')
+type SourceKind = string
 interface SelectedItem { post: NewsPost; source: SourceKind }
 
 export const dynamic = 'force-dynamic'
@@ -81,61 +83,78 @@ async function handle(request: NextRequest) {
       .from('social_schedule')
       .select('wp_post_id, source')
       .gte('batch_date', since)
-    const usedFirst1 = new Set<number>()
-    const usedManhom = new Set<number>()
+    // منع التكرار لكل مصدر على حدة (المفتاح = اسم المصدر)
+    const usedByKey = new Map<string, Set<number>>()
     for (const r of recent ?? []) {
-      if (r.source === 'manhom') usedManhom.add(Number(r.wp_post_id))
-      else usedFirst1.add(Number(r.wp_post_id))
+      const k = r.source || 'first1saudi'
+      if (!usedByKey.has(k)) usedByKey.set(k, new Set())
+      usedByKey.get(k)!.add(Number(r.wp_post_id))
     }
+    const usedManhom = usedByKey.get('manhom') ?? new Set<number>()
+    const usedFirst1 = usedByKey.get('first1saudi') ?? new Set<number>()
 
-    // كم عنصراً من كل مصدر — افتراضياً ~2 first1saudi + 1 manhom لكل 3.
+    // كم عنصراً من كل مصدر — افتراضياً ~2 إنجازات + 1 manhom لكل 3.
     const sourceParam = request.nextUrl.searchParams.get('source')
     let manhomTarget =
       sourceParam === 'manhom' ? count : sourceParam === 'first1saudi' ? 0 : Math.max(1, Math.round(count / 3))
     if (manhomTarget > count) manhomTarget = count
-    const first1Target = count - manhomTarget
+    const achTarget = count - manhomTarget
 
     const selected: SelectedItem[] = []
-    const countBySource = (s: SourceKind) => selected.filter(x => x.source === s).length
+    const countBySource = (s: string) => selected.filter(x => x.source === s).length
+    const achCount = () => selected.filter(x => x.source !== 'manhom').length
 
-    // ── 2) اختيار من first1saudi: أقسام مختلفة، خبر حديث غير مكرّر من كل قسم ──
-    if (first1Target > 0) {
-      const sections = (await fetchCategories()).filter(
-        c => c.count >= MIN_SECTION_POSTS && !EXCLUDED_SECTIONS.has(c.name),
-      )
-      const shuffledSections = [...sections].sort(() => Math.random() - 0.5)
-      let attempts = 0
-      for (const sec of shuffledSections) {
-        if (countBySource('first1saudi') >= first1Target) break
-        if (attempts++ >= first1Target * 4 + 4) break // حدّ أمان لزمن الجلب
-        const posts = await fetchPostsByCategory(sec.id, 12)
-        const fresh = posts.filter(p => !usedFirst1.has(p.id) && !selected.some(s => s.post.id === p.id))
-        for (const cand of fresh.slice(0, 6)) {
-          const img = await resolveImageUrl(cand)
-          if (!img) continue
-          cand.categoryNames = [sec.name]
-          selected.push({ post: cand, source: 'first1saudi' })
-          break
+    // ── 2) اختيار «الإنجازات»: تجميع من first1saudi + مصادر RSS ثم اختيار بتنويع المصدر ──
+    if (achTarget > 0 && sourceParam !== 'manhom') {
+      type Cand = { post: NewsPost; key: string }
+      const pool: Cand[] = []
+
+      // first1saudi: أقسام مختلفة
+      try {
+        const sections = (await fetchCategories()).filter(
+          c => c.count >= MIN_SECTION_POSTS && !EXCLUDED_SECTIONS.has(c.name),
+        )
+        let attempts = 0
+        for (const sec of [...sections].sort(() => Math.random() - 0.5)) {
+          if (attempts++ >= 8) break
+          const posts = await fetchPostsByCategory(sec.id, 8)
+          for (const p of posts) {
+            if (usedFirst1.has(p.id)) continue
+            p.categoryNames = [sec.name]
+            pool.push({ post: p, key: 'first1saudi' })
+          }
         }
+      } catch { /* الموقع قد يتعذّر — نكمل من RSS */ }
+
+      // مصادر RSS (العربية…): مفلترة على إنجازات السعوديين
+      for (const src of RSS_SOURCES) {
+        try {
+          const used = usedByKey.get(src.key) ?? new Set<number>()
+          const items = await fetchRssCandidates(src)
+          for (const p of items) { if (!used.has(p.id)) pool.push({ post: p, key: src.key }) }
+        } catch { /* تجاهل مصدراً متعذّراً */ }
       }
-      // احتياطي: إكمال نصيب first1saudi من أحدث الأخبار
-      if (countBySource('first1saudi') < first1Target) {
-        const pool = await fetchCandidatePosts({ perPage: 40, pages: 1 })
-        for (const p of pool) {
-          if (countBySource('first1saudi') >= first1Target) break
-          if (usedFirst1.has(p.id) || selected.some(s => s.post.id === p.id)) continue
-          const img = await resolveImageUrl(p)
+
+      pool.sort(() => Math.random() - 0.5)
+      // تمريرة أولى: مصدر مختلف لكل عنصر (تنويع)؛ ثم تمريرة ثانية للتعبئة.
+      for (const preferDiverse of [true, false]) {
+        const pickedKeys = new Set(selected.filter(s => s.source !== 'manhom').map(s => s.source))
+        for (const c of pool) {
+          if (achCount() >= achTarget) break
+          if (selected.some(s => s.post.id === c.post.id && s.source === c.key)) continue
+          if (preferDiverse && pickedKeys.has(c.key)) continue
+          const img = c.post.imageUrl ?? await resolveImageUrl(c.post)
           if (!img) continue
-          selected.push({ post: p, source: 'first1saudi' })
+          c.post.imageUrl = img
+          pickedKeys.add(c.key)
+          selected.push({ post: c.post, source: c.key })
         }
       }
     }
 
-    // ── 3) اختيار من manhom (السعوديات الأوائل): سيدات رائدات غير مكرّرات ──
-    // تعويض النقص: إن تعذّر مصدر first1saudi (مثلاً الموقع غير متاح) نزيد نصيب manhom
-    // ليبلغ المجموع count بدل إرسال خبر واحد فقط.
+    // ── 3) اختيار من manhom (السعوديات الأوائل) + تعويض أي نقص ليبلغ المجموع count ──
     if (sourceParam !== 'first1saudi') {
-      manhomTarget = Math.max(manhomTarget, count - countBySource('first1saudi'))
+      manhomTarget = Math.max(manhomTarget, count - achCount())
     }
     if (manhomTarget > 0) {
       const candidates = (await fetchManhomCandidates()).filter(p => !usedManhom.has(p.id))
