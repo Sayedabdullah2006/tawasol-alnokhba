@@ -132,6 +132,11 @@ async function handle(request: NextRequest) {
     }
 
     // ── 3) اختيار من manhom (السعوديات الأوائل): سيدات رائدات غير مكرّرات ──
+    // تعويض النقص: إن تعذّر مصدر first1saudi (مثلاً الموقع غير متاح) نزيد نصيب manhom
+    // ليبلغ المجموع count بدل إرسال خبر واحد فقط.
+    if (sourceParam !== 'first1saudi') {
+      manhomTarget = Math.max(manhomTarget, count - countBySource('first1saudi'))
+    }
     if (manhomTarget > 0) {
       const candidates = (await fetchManhomCandidates()).filter(p => !usedManhom.has(p.id))
       const shuffled = candidates.sort(() => Math.random() - 0.5)
