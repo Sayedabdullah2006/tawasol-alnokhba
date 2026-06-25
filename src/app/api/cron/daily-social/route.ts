@@ -16,6 +16,7 @@ import { createServiceRoleClient } from '@/lib/supabase-server'
 import { fetchCategories, fetchPostsByCategory, resolveImageUrl, type NewsPost } from '@/lib/first1-news'
 import { fetchManhomCandidates, ensureColorImage, MANHOM_NOTE } from '@/lib/manhom-news'
 import { fetchRssCandidates, RSS_SOURCES } from '@/lib/rss-news'
+import { fetchSaudipediaCandidates } from '@/lib/saudipedia-news'
 import { runStudioPipeline } from '@/lib/ai-studio'
 import { sendEmail } from '@/lib/email'
 
@@ -134,6 +135,13 @@ async function handle(request: NextRequest) {
           for (const p of items) { if (!used.has(p.id)) pool.push({ post: p, key: src.key }) }
         } catch { /* تجاهل مصدراً متعذّراً */ }
       }
+
+      // سعوديبيديا: إنجازات/أوائل السعوديين (مصدر تدويري دائم الخضرة)
+      try {
+        const used = usedByKey.get('saudipedia') ?? new Set<number>()
+        const items = await fetchSaudipediaCandidates()
+        for (const p of items) { if (!used.has(p.id)) pool.push({ post: p, key: 'saudipedia' }) }
+      } catch { /* تجاهل مصدراً متعذّراً */ }
 
       pool.sort(() => Math.random() - 0.5)
       // تمريرة أولى: مصدر مختلف لكل عنصر (تنويع)؛ ثم تمريرة ثانية للتعبئة.
