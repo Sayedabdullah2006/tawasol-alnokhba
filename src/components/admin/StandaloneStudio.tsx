@@ -98,6 +98,15 @@ export default function StandaloneStudio() {
   const [noteByIndex, setNoteByIndex] = useState<Record<number, string>>({})
   const [regenIndex, setRegenIndex] = useState<number | null>(null)
   const [lightbox, setLightbox] = useState<string | null>(null)
+  // ⚡ التوليد التلقائي لكل الخطوات
+  const [autoBusy, setAutoBusy] = useState(false)
+  const [autoStage, setAutoStage] = useState('')
+  // 🗓️ جدولة المنشور بتوقيت السعودية
+  const [scheduleCover, setScheduleCover] = useState<string | null>(null)
+  const [scheduleText, setScheduleText] = useState('')
+  const [scheduleWhen, setScheduleWhen] = useState('')
+  const [schedulingCover, setSchedulingCover] = useState<string | null>(null)
+  const [scheduledCover, setScheduledCover] = useState<string | null>(null)
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -155,9 +164,52 @@ export default function StandaloneStudio() {
     } finally { setLoadingStep(null) }
   }
 
-  const genOne = async (brief: string, note?: string): Promise<string | null> => {
-    const data = await post({ step: 'image', title, content, sourceImages: selectedImages, extraInfo, analysis, chosenConcept: brief, note, hasVideo })
+  // توليد تصميم واحد بقيمة تحليل صريحة (لاستخدامه في المسار التلقائي قبل تحديث الحالة)
+  const genOneWith = async (brief: string, analysisVal: any, note?: string): Promise<string | null> => {
+    const data = await post({ step: 'image', title, content, sourceImages: selectedImages, extraInfo, analysis: analysisVal, chosenConcept: brief, note, hasVideo })
     return data?.imageUrl ?? null
+  }
+  const genOne = (brief: string, note?: string) => genOneWith(brief, analysis, note)
+
+  // ⚡ التوليد التلقائي لكل الخطوات: تحليل → تغريدات → اتجاهات → تصميم الاتجاهات الثلاثة.
+  // يمرّر التحليل محلياً (لا ينتظر تحديث الحالة) لتسلسل موثوق.
+  const autoRun = async () => {
+    if (!content.trim()) { showToast('أدخل نص الخبر أولاً', 'error'); return }
+    if (!selectedImages.length) { showToast('ارفع صورة المصدر أولاً', 'error'); return }
+    setAutoBusy(true)
+    setBatchResults([]); setNoteByIndex({})
+    setTweets(''); setConceptItems([])
+    try {
+      const base = { title, content, sourceImages: selectedImages, extraInfo, hasVideo }
+
+      setAutoStage('① تحليل الخبر…')
+      const aRes = await post({ step: 'analyze', ...base })
+      if (!aRes) return
+      const a = aRes.analysis
+      setAnalysis(a)
+
+      setAutoStage('② كتابة التغريدات…')
+      const tRes = await post({ step: 'tweets', ...base, analysis: a })
+      if (tRes) { setTweets(tRes.tweets); setSelectedTweet(tRes.tweets) }
+
+      setAutoStage('③ اقتراح الاتجاهات…')
+      const cRes = await post({ step: 'concepts', ...base, analysis: a })
+      const concepts: ConceptItem[] = Array.isArray(cRes?.concepts) ? cRes.concepts : []
+      setConceptItems(concepts)
+      if (!concepts.length) { showToast('تعذّر اقتراح الاتجاهات', 'error'); return }
+
+      const results: { title: string; imageUrl: string; brief: string }[] = []
+      for (let i = 0; i < concepts.length; i++) {
+        setAutoStage(`④ توليد التصميم ${i + 1}/${concepts.length}…`)
+        const brief = concepts[i].brief ?? concepts[i].title ?? ''
+        const url = await genOneWith(brief, a)
+        if (url) results.push({ title: concepts[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief })
+      }
+      setBatchResults(results)
+      showToast(results.length ? `اكتمل التوليد التلقائي — ${results.length} تصاميم ✅` : 'لم يُولَّد أي تصميم', results.length ? 'success' : 'error')
+    } finally {
+      setAutoBusy(false); setAutoStage('')
+    }
   }
 
   const designAll = async () => {
@@ -242,6 +294,33 @@ export default function StandaloneStudio() {
     }
   }
 
+  // جدولة المنشور (Post-Pulse) بموعد محدّد بتوقيت السعودية لكل القنوات
+  const openSchedule = (cover: string) => { setScheduleText(selectedTweet || ''); setScheduleWhen(''); setScheduleCover(cover) }
+  const confirmSchedule = async () => {
+    const cover = scheduleCover
+    if (!cover) return
+    if (!scheduleText.trim()) { showToast('اكتب نص المنشور أولاً', 'error'); return }
+    if (!scheduleWhen) { showToast('حدّد تاريخ ووقت الجدولة', 'error'); return }
+    setSchedulingCover(cover)
+    try {
+      const res = await fetch('/api/postpulse/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: scheduleText, imageUrl: cover, scheduledLocal: scheduleWhen }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { showToast(d.error ?? 'فشل الجدولة', 'error'); return }
+      setScheduledCover(cover)
+      setScheduleCover(null)
+      const n = Array.isArray(d.accountIds) ? d.accountIds.length : 0
+      showToast(`تمت الجدولة في ${n} قناة بتوقيت السعودية 🗓️`, 'success')
+    } catch {
+      showToast('حدث خطأ أثناء الجدولة', 'error')
+    } finally {
+      setSchedulingCover(null)
+    }
+  }
+
   const card = 'bg-card rounded-2xl border border-border p-5 space-y-3'
 
   return (
@@ -313,6 +392,9 @@ export default function StandaloneStudio() {
                       <Button onClick={() => openPublish(r.imageUrl)} loading={publishingCover === r.imageUrl} disabled={publishingCover !== null} variant={publishedCover === r.imageUrl ? 'secondary' : 'outline'} size="sm">
                         {publishedCover === r.imageUrl ? '✅ أُرسل' : '📣 نشر'}
                       </Button>
+                      <Button onClick={() => openSchedule(r.imageUrl)} disabled={schedulingCover !== null} variant={scheduledCover === r.imageUrl ? 'secondary' : 'outline'} size="sm">
+                        {scheduledCover === r.imageUrl ? '🗓️ مجدول' : '🗓️ جدولة'}
+                      </Button>
                       <a href={r.imageUrl} target="_blank" rel="noopener noreferrer" download className="inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-bold bg-green/10 text-green hover:bg-green/20">⬇️</a>
                     </div>
                   </div>
@@ -377,17 +459,32 @@ export default function StandaloneStudio() {
         </label>
       </div>
 
+      {/* ⚡ التوليد التلقائي لكل الخطوات دفعة واحدة */}
+      <div className={`${card} border-green/40 bg-green/5`}>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h4 className="font-bold text-dark">⚡ توليد تلقائي لكل الخطوات</h4>
+            <p className="text-[11px] text-muted mt-0.5">تحليل ← تغريدات ← اتجاهات ← تصميم الاتجاهات الثلاثة، دفعة واحدة.</p>
+          </div>
+          <Button onClick={autoRun} loading={autoBusy} disabled={autoBusy || loadingStep !== null || batchLoading || !content.trim() || !selectedImages.length} size="sm">
+            ⚡ ابدأ التوليد التلقائي
+          </Button>
+        </div>
+        {autoBusy && <div className="flex items-center gap-2 text-sm text-green-700"><LoadingSpinner size="sm" /><span>{autoStage || 'جارٍ التوليد…'}</span></div>}
+        {!content.trim() && <p className="text-[11px] text-amber-600">أدخل نص الخبر وارفع صورة المصدر لتفعيل التوليد التلقائي.</p>}
+      </div>
+
       {/* 1 تحليل */}
       <div className={card}>
         <h4 className="font-bold text-dark">الخطوة 1 — تحليل الخبر</h4>
-        <Button onClick={() => callStep('analyze')} loading={loadingStep === 'analyze'} disabled={loadingStep !== null || !content.trim()} size="sm">حلّل الخبر</Button>
+        <Button onClick={() => callStep('analyze')} loading={loadingStep === 'analyze'} disabled={autoBusy || loadingStep !== null || !content.trim()} size="sm">حلّل الخبر</Button>
         {analysis && <pre dir="rtl" className="bg-cream rounded-xl p-3 text-xs whitespace-pre-wrap max-h-72 overflow-y-auto border border-border">{JSON.stringify(analysis, null, 2)}</pre>}
       </div>
 
       {/* 2 تغريدات */}
       <div className={card}>
         <h4 className="font-bold text-dark">الخطوة 2 — التغريدات</h4>
-        <Button onClick={() => callStep('tweets')} loading={loadingStep === 'tweets'} disabled={loadingStep !== null || !analysis} size="sm">اكتب 3 تغريدات</Button>
+        <Button onClick={() => callStep('tweets')} loading={loadingStep === 'tweets'} disabled={autoBusy || loadingStep !== null || !analysis} size="sm">اكتب 3 تغريدات</Button>
         {tweets && (
           <div className="space-y-2">
             <pre dir="rtl" className="bg-cream rounded-xl p-3 text-xs whitespace-pre-wrap max-h-60 overflow-y-auto border border-border">{tweets}</pre>
@@ -401,7 +498,7 @@ export default function StandaloneStudio() {
       {/* 3 اتجاهات */}
       <div className={card}>
         <h4 className="font-bold text-dark">الخطوة 3 — اتجاهات التصميم</h4>
-        <Button onClick={() => callStep('concepts')} loading={loadingStep === 'concepts'} disabled={loadingStep !== null || !analysis} size="sm">اقترح 3 اتجاهات</Button>
+        <Button onClick={() => callStep('concepts')} loading={loadingStep === 'concepts'} disabled={autoBusy || loadingStep !== null || !analysis} size="sm">اقترح 3 اتجاهات</Button>
         {conceptItems.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {conceptItems.map((c, i) => {
@@ -428,11 +525,11 @@ export default function StandaloneStudio() {
       {/* 4 تصاميم */}
       <div className={card}>
         <h4 className="font-bold text-dark">الخطوة 4 — التصاميم</h4>
-        <Button onClick={designAll} loading={batchLoading} disabled={batchLoading || loadingStep !== null || !analysis || !selectedImages.length || conceptItems.length === 0} size="sm">🎨 صمّم الاتجاهات الثلاثة</Button>
+        <Button onClick={designAll} loading={batchLoading} disabled={autoBusy || batchLoading || loadingStep !== null || !analysis || !selectedImages.length || conceptItems.length === 0} size="sm">🎨 صمّم الاتجاهات الثلاثة</Button>
         {batchLoading && <div className="flex items-center gap-2 text-sm text-muted"><LoadingSpinner size="sm" /><span>{batchProgress || 'جارٍ التوليد…'}</span></div>}
         <div className="border-t border-border pt-3">
           <p className="text-xs text-muted mb-2">أو صمّم الاتجاه المعتمد (تصميم واحد):</p>
-          <Button onClick={() => callStep('image')} loading={loadingStep === 'image'} disabled={loadingStep !== null || batchLoading || !analysis || !selectedImages.length || !chosenConcept.trim()} variant="outline" size="sm">صمّم الصورة (مفرد)</Button>
+          <Button onClick={() => callStep('image')} loading={loadingStep === 'image'} disabled={autoBusy || loadingStep !== null || batchLoading || !analysis || !selectedImages.length || !chosenConcept.trim()} variant="outline" size="sm">صمّم الصورة (مفرد)</Button>
         </div>
 
         {batchResults.length > 0 && (
@@ -452,6 +549,9 @@ export default function StandaloneStudio() {
                     </Button>
                     <Button onClick={() => openPublish(r.imageUrl)} loading={publishingCover === r.imageUrl} disabled={publishingCover !== null} variant={publishedCover === r.imageUrl ? 'secondary' : 'outline'} size="sm">
                       {publishedCover === r.imageUrl ? '✅ أُرسل' : '📣 انشر عبر القنوات'}
+                    </Button>
+                    <Button onClick={() => openSchedule(r.imageUrl)} disabled={schedulingCover !== null} variant={scheduledCover === r.imageUrl ? 'secondary' : 'outline'} size="sm">
+                      {scheduledCover === r.imageUrl ? '🗓️ مجدول' : '🗓️ جدولة'}
                     </Button>
                     <a href={r.imageUrl} target="_blank" rel="noopener noreferrer" download
                       className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-green/10 text-green hover:bg-green/20">⬇️ تنزيل</a>
@@ -494,6 +594,40 @@ export default function StandaloneStudio() {
             <div className="px-5 py-3 border-t border-border flex gap-2">
               <Button onClick={confirmPublish} loading={publishingCover === publishCover} disabled={!!publishingCover || !publishText.trim()} className="flex-1">🚀 انشر الآن</Button>
               <Button variant="outline" onClick={() => setPublishCover(null)} disabled={!!publishingCover}>إلغاء</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة جدولة المنشور بموعد بتوقيت السعودية لكل القنوات */}
+      {scheduleCover && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => schedulingCover ? null : setScheduleCover(null)}>
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-border">
+              <h3 className="font-black text-dark text-base">🗓️ جدولة المنشور</h3>
+              <p className="text-xs text-muted mt-0.5">يُنشر النص مع التصميم في كل القنوات المربوطة في الموعد المحدّد (توقيت السعودية).</p>
+            </div>
+            <div className="px-5 py-4 overflow-y-auto space-y-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={scheduleCover} alt="التصميم" className="w-32 mx-auto aspect-[4/5] object-cover rounded-xl border border-border" />
+              <div>
+                <label className="block text-xs font-bold text-dark mb-1">موعد النشر (توقيت السعودية):</label>
+                <input type="datetime-local" value={scheduleWhen} onChange={e => setScheduleWhen(e.target.value)}
+                  disabled={!!schedulingCover}
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-dark mb-1">نص المنشور (عدّله قبل الجدولة):</label>
+                <textarea value={scheduleText} onChange={e => setScheduleText(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[140px] resize-y"
+                  placeholder="اكتب نص المنشور..." />
+                <p className="text-[11px] text-muted mt-1">{scheduleText.length} حرف</p>
+              </div>
+            </div>
+            <div className="px-5 py-3 border-t border-border flex gap-2">
+              <Button onClick={confirmSchedule} loading={schedulingCover === scheduleCover} disabled={!!schedulingCover || !scheduleText.trim() || !scheduleWhen} className="flex-1">🗓️ جدولة النشر</Button>
+              <Button variant="outline" onClick={() => setScheduleCover(null)} disabled={!!schedulingCover}>إلغاء</Button>
             </div>
           </div>
         </div>
