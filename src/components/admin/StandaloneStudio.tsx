@@ -375,8 +375,12 @@ export default function StandaloneStudio() {
             </div>
             <textarea value={infoExtra} onChange={e => setInfoExtra(e.target.value)} placeholder="معلومات إضافية (اختياري) تُراعى في التصميم"
               className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[60px] resize-y" />
-            <Button onClick={genInfographic} loading={infoBusy} disabled={infoBusy} size="sm">🎨 توليد ٣ اتجاهات</Button>
-            {infoBusy && <div className="flex items-center gap-2 text-sm text-muted"><LoadingSpinner size="sm" /><span>جارٍ توليد ٣ اتجاهات… قد يستغرق دقيقتين</span></div>}
+            {/* ⚡ التوليد التلقائي لكل الخطوات دفعة واحدة (تصميم + تغريدات) */}
+            <div className="rounded-xl border border-green/40 bg-green/5 p-3 space-y-2">
+              <p className="text-[11px] text-muted">⚡ التوليد التلقائي: زر واحد يولّد ٣ اتجاهات تصميم + ٣ تغريدات مقترحة دفعة واحدة.</p>
+              <Button onClick={genInfographic} loading={infoBusy} disabled={infoBusy} size="sm">⚡ توليد تلقائي (٣ اتجاهات + تغريدات)</Button>
+              {infoBusy && <div className="flex items-center gap-2 text-sm text-green-700"><LoadingSpinner size="sm" /><span>جارٍ التوليد التلقائي… قد يستغرق دقيقتين</span></div>}
+            </div>
           </div>
 
           {infoResults.length > 0 && (
