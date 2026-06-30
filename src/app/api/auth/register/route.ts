@@ -12,9 +12,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'جميع الحقول مطلوبة' }, { status: 400 })
     }
 
-    const normalizedPhone = String(phone).replace(/\s+/g, '')
-    if (!/^05\d{8}$/.test(normalizedPhone)) {
-      return NextResponse.json({ error: 'رقم الجوال يجب أن يكون بصيغة 05XXXXXXXX' }, { status: 400 })
+    // يقبل الصيغة الدولية E.164 (+مفتاح الدولة ثم الرقم) أو الصيغة السعودية القديمة (05XXXXXXXX)
+    const normalizedPhone = String(phone).replace(/[\s-]/g, '')
+    const isIntl = /^\+\d{6,15}$/.test(normalizedPhone)
+    const isLegacySaudi = /^05\d{8}$/.test(normalizedPhone)
+    if (!isIntl && !isLegacySaudi) {
+      return NextResponse.json({ error: 'رقم جوال غير صالح' }, { status: 400 })
     }
 
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? undefined

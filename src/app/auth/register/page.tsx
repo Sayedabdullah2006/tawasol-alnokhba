@@ -9,6 +9,7 @@ import Button from '@/components/ui/Button'
 import TurnstileWidget from '@/components/ui/TurnstileWidget'
 import { turnstileEnabled } from '@/lib/turnstile'
 import { validateEmail } from '@/lib/email-validation'
+import { COUNTRIES, countryByCode, flagEmoji } from '@/lib/countries'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -16,6 +17,7 @@ export default function RegisterPage() {
 
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
+  const [countryCode, setCountryCode] = useState('SA') // مفتاح الدولة (افتراضي السعودية)
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -45,8 +47,16 @@ export default function RegisterPage() {
       if (emailCheck.suggestion) setEmailSuggestion(emailCheck.suggestion)
       return
     }
-    const phoneNorm = phone.replace(/\s+/g, '')
-    if (!/^05\d{8}$/.test(phoneNorm)) { setError('رقم الجوال يجب أن يكون بصيغة 05XXXXXXXX'); return }
+    // الرقم الوطني: أرقام فقط مع إزالة الأصفار البادئة (الصفر الجذعي)، ثم نضيف مفتاح الدولة
+    const dial = countryByCode(countryCode).dial
+    const national = phone.replace(/\D/g, '').replace(/^0+/, '')
+    if (!national) { setError('أدخل رقم الجوال'); return }
+    if (countryCode === 'SA') {
+      if (!/^5\d{8}$/.test(national)) { setError('رقم الجوال السعودي يجب أن يكون بصيغة 05XXXXXXXX'); return }
+    } else if (national.length < 4 || national.length > 14) {
+      setError('رقم الجوال غير صحيح'); return
+    }
+    const fullPhone = `+${dial}${national}`
     if (password.length < 6) { setError('كلمة المرور يجب أن تكون 6 أحرف على الأقل'); return }
     if (password !== confirmPassword) { setError('كلمة المرور وتأكيدها غير متطابقتين'); return }
     if (captchaOn && !captchaToken) { setError('يرجى إكمال التحقق الأمني أولاً'); return }
@@ -56,7 +66,7 @@ export default function RegisterPage() {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, fullName, phone: phoneNorm, captchaToken }),
+        body: JSON.stringify({ email, password, fullName, phone: fullPhone, captchaToken }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'تعذّر إنشاء الحساب'); setLoading(false); return }
@@ -87,9 +97,29 @@ export default function RegisterPage() {
           <Input id="email" label="البريد الإلكتروني *" type="email" dir="ltr"
             placeholder="email@example.com" value={email}
             onChange={e => setEmail(e.target.value)} required />
-          <Input id="phone" label="رقم الجوال *" type="tel" dir="ltr"
-            placeholder="05XXXXXXXX" value={phone}
-            onChange={e => setPhone(e.target.value)} required />
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="phone" className="text-sm font-medium text-dark">رقم الجوال *</label>
+            <div className="flex gap-2" dir="ltr">
+              <select
+                aria-label="مفتاح الدولة"
+                value={countryCode}
+                onChange={e => setCountryCode(e.target.value)}
+                className="shrink-0 max-w-[40%] px-2 py-3 rounded-xl border border-border bg-card text-dark text-[14px] min-h-[48px] focus:outline-none focus:ring-2 focus:ring-green/30 focus:border-green"
+              >
+                {COUNTRIES.map(c => (
+                  <option key={c.code} value={c.code}>
+                    {flagEmoji(c.code)} {c.name} (+{c.dial})
+                  </option>
+                ))}
+              </select>
+              <Input id="phone" type="tel" dir="ltr" className="flex-1"
+                placeholder={countryCode === 'SA' ? '05XXXXXXXX' : 'رقم الجوال'} value={phone}
+                onChange={e => setPhone(e.target.value)} required />
+            </div>
+            <p className="text-xs text-muted" dir="ltr">
+              سيُحفظ بصيغة دولية: +{countryByCode(countryCode).dial} {phone.replace(/\D/g, '').replace(/^0+/, '') || '…'}
+            </p>
+          </div>
           <Input id="password" label="كلمة المرور *" type="password" dir="ltr"
             placeholder="6 أحرف على الأقل" value={password}
             onChange={e => setPassword(e.target.value)} required />
