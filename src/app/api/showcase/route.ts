@@ -11,6 +11,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
+import { normalizeSection } from '@/lib/showcase-sections'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,7 +53,7 @@ export async function GET() {
     const cover = (r.design_image_url as string) || ''
     if (!cover) continue
     const gallery = [cover, r.source_image_url as string | null].filter((u): u is string => !!u)
-    const category = (r.category && String(r.category).trim()) || 'منوّعات'
+    const category = normalizeSection(r.category as string | null, r.post_title as string, r.source_content as string)
     items.push({
       id: `daily-${r.id}`,
       source: 'daily',
@@ -79,7 +80,7 @@ export async function GET() {
   for (const r of featuredRows ?? []) {
     const cover = (r.cover as string) || ''
     if (!cover) continue
-    const category = (r.category && String(r.category).trim()) || 'منوّعات'
+    const category = normalizeSection(r.category as string | null, r.name as string, r.story as string)
     items.push({
       id: `featured-${r.id}`,
       source: 'featured',

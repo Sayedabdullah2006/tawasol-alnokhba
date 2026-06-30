@@ -18,6 +18,7 @@ import { fetchManhomCandidates, ensureColorImage, MANHOM_NOTE } from '@/lib/manh
 import { fetchRssCandidates, RSS_SOURCES } from '@/lib/rss-news'
 import { fetchSaudipediaCandidates } from '@/lib/saudipedia-news'
 import { runStudioPipeline, shuffledPosterStyles } from '@/lib/ai-studio'
+import { classifySection } from '@/lib/showcase-sections'
 import { sendEmail } from '@/lib/email'
 
 // المصدر: 'first1saudi' | 'manhom' | مفتاح مصدر RSS (مثل 'alarabiya')
@@ -213,11 +214,15 @@ async function handle(request: NextRequest) {
     }
 
     // ── 5) تسجيل الدفعة في قاعدة البيانات ──
-    const rows = results.map(r => ({
+    // تصنيف تلقائي لقسم مجلة المبدعين (قواعد + ذكاء اصطناعي احتياطي) لكل منشور.
+    const sections = await Promise.all(
+      results.map(r => classifySection({ title: r.post.title, content: r.post.content, raw: r.post.categoryNames[0] })),
+    )
+    const rows = results.map((r, i) => ({
       wp_post_id: r.post.id,
       post_url: r.post.url,
       post_title: r.post.title,
-      category: r.post.categoryNames[0] ?? null,
+      category: sections[i],
       source: r.source,
       source_content: r.post.content,
       source_image_url: r.hostedSource,
@@ -233,11 +238,11 @@ async function handle(request: NextRequest) {
 
     // تسجيل تصاميم اليوم في السجلّ الموحّد (مرشّحي نشرة «النخبة في ٧»)
     try {
-      await sc.from('generated_designs').insert(results.map(r => ({
+      await sc.from('generated_designs').insert(results.map((r, i) => ({
         source: 'daily',
         title: r.post.title,
         content: r.post.content,
-        category: r.post.categoryNames[0] ?? null,
+        category: sections[i],
         image_url: r.designUrl,
         source_image_url: r.hostedSource,
       })))

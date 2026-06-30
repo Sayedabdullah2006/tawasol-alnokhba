@@ -9,6 +9,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { CATEGORIES } from '@/lib/constants'
+import { classifySection, SECTION_NAMES } from '@/lib/showcase-sections'
 
 export const dynamic = 'force-dynamic'
 
@@ -68,7 +69,8 @@ export async function POST(req: Request) {
     const name = (reqRow.client_name as string)?.trim() || (reqRow.title as string) || 'مبدع سعودي'
     const title = post?.title ?? (reqRow.title as string) ?? ''
     const story = post?.content ?? (reqRow.content as string) ?? ''
-    const category = catNameAr(reqRow.category as string)
+    // قسم مجلة المبدعين: تصنيف تلقائي من المحتوى (فئة الخدمة الأصلية مجرّد تلميح)
+    const category = await classifySection({ title, content: story, raw: catNameAr(reqRow.category as string) })
     const tweets =
       (isPost ? tweetsFrom(reqRow.ai_posts?.[body.postIndex as number]?.tweets) : null) ??
       tweetsFrom(reqRow.ai_tweets)
@@ -87,14 +89,21 @@ export async function POST(req: Request) {
   } else {
     // الاستوديو المستقل: تُمرَّر الحقول من الواجهة
     const name = (body.name ?? body.title ?? '').trim() || 'مبدع سعودي'
+    const title = (body.title ?? '').trim() || name
+    const story = (body.story ?? '').trim()
+    // إن اختار الأدمن قسماً معروفاً نعتمده، وإلا (تلقائي/فارغ) نصنّف تلقائياً.
+    const rawCat = (body.category ?? '').trim()
+    const category = rawCat && SECTION_NAMES.includes(rawCat)
+      ? rawCat
+      : await classifySection({ title, content: story })
     row = {
       source: 'standalone',
       request_id: null,
       post_index: null,
       name,
-      title: (body.title ?? '').trim() || name,
-      category: (body.category ?? '').trim() || 'منوّعات',
-      story: (body.story ?? '').trim(),
+      title,
+      category,
+      story,
       cover,
       tweets: (body.tweets ?? '').trim() || null,
     }

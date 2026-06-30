@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ImageLightbox from '@/components/ui/ImageLightbox'
+import { SECTION_NAMES } from '@/lib/showcase-sections'
 
 type StepKey = 'analyze' | 'tweets' | 'concepts' | 'image'
 interface ConceptItem { title?: string; mood?: string; brief?: string }
@@ -565,10 +566,12 @@ export default function StandaloneStudio() {
             ))}
             {/* تصنيف المجلة (يُستخدم عند تضمين التصميم في «مجلة المبدعين») */}
             <div className="border-t border-border pt-3">
-              <label className="block text-xs font-medium text-dark mb-1">تصنيف المجلة (المجال) عند التضمين:</label>
-              <input value={magazineCategory} onChange={e => setMagazineCategory(e.target.value)}
-                placeholder="مثال: اختراعات سعودية، فنون، عمارة… (يُترك فارغاً = منوّعات)"
-                className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm" />
+              <label className="block text-xs font-medium text-dark mb-1">قسم المجلة عند التضمين:</label>
+              <select value={magazineCategory} onChange={e => setMagazineCategory(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm">
+                <option value="">🪄 تلقائي (حسب المحتوى)</option>
+                {SECTION_NAMES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
             </div>
           </div>
         )}
