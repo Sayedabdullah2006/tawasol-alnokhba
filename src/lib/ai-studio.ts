@@ -65,6 +65,26 @@ export interface Concept {
   brief?: string
 }
 
+/**
+ * أنماط تصميم متمايزة — تُوزَّع على منشورات الدفعة اليومية (نمط مختلف لكل منشور)
+ * لضمان تنوّع بصري واضح بدل نمط واحد متكرّر، مع الحفاظ على ثوابت هوية First1Saudi.
+ */
+export const POSTER_STYLES: string[] = [
+  'سينمائي درامي: قصّ بطولي كبير للصورة مع تدرّج معتم وإضاءة جانبية، نص مكثّف أسفل، أجواء فخمة عميقة.',
+  'مينمال تحريري: مساحات تيل/بيضاء هادئة واسعة، تايبوغرافي ضخم، عناصر قليلة أنيقة — فخامة بالبساطة.',
+  'إنفوجرافيك بطاقات: الحقائق كبطاقات جانبية بأيقونات خطّية ذهبية وفواصل، تخطيط منظّم معلوماتي.',
+  'تايبوغرافي عملاق: الاسم/سطر الإنجاز بخط ضخم جداً يملأ التصميم كعنصر بصري رئيسي، الصورة ثانوية متكاملة.',
+  'مجلة/كولاج عصري: تقسيمات قطرية وطبقات وقصاصات بإيقاع بصري ديناميكي بأسلوب أغلفة المجلات.',
+  'هندسي مجرّد: أشكال هندسية وأقواس ودوائر ذهبية/خضراء كزخرفة خلفية منظّمة حول الصورة.',
+  'بورتريه فخم كلاسيكي: إطار راقٍ للصورة، تناظر ووقار، لمسات ذهبية كلاسيكية وهيبة.',
+  'سبوتلايت دراماتيكي: خلفية داكنة جداً وبقعة ضوء على الشخص، تباين عالٍ وتركيز كامل على البطل.',
+]
+
+/** يخلط أنماط التصميم ويعيدها (لتوزيع نمط مختلف على كل منشور في الدفعة). */
+export function shuffledPosterStyles(): string[] {
+  return [...POSTER_STYLES].sort(() => Math.random() - 0.5)
+}
+
 /** يبني نص الخبر الموحّد الذي يُمرَّر لكل الخطوات (مع المعلومات الإضافية إن وُجدت). */
 export function buildNewsText(args: { title?: string; content?: string; extraInfo?: string }): string {
   const extraInfoText =
@@ -337,6 +357,7 @@ export async function runStudioPipeline(input: {
   sourceImages: string[]
   extraInfo?: string
   note?: string
+  styleDirective?: string // نمط تصميم إلزامي لهذا المنشور (لتنويع الدفعة)
 }): Promise<StudioResult> {
   if (!input.sourceImages?.length) throw new Error('لا توجد صورة مصدر للخبر')
   const openai = getOpenAI()
@@ -353,12 +374,17 @@ export async function runStudioPipeline(input: {
   })
   const concepts = await generateConcepts(openai, { analysis, newsText, sourceImages })
   const chosenConcept = conceptToString(concepts[0])
+  // نمط إلزامي لهذا المنشور (إن مُرِّر) — يضمن تمايزاً بصرياً واضحاً بين منشورات الدفعة.
+  const styleNote = input.styleDirective
+    ? `‼️ نمط التصميم الإلزامي لهذا المنشور: ${input.styleDirective}\n` +
+      `اجعل التخطيط والمعالجة البصرية متمايزة بوضوح بهذا النمط تحديداً، مع الحفاظ التام على ثوابت الهوية (الألوان/الفوتر/التايبوغرافي) والصورة الحقيقية.`
+    : ''
   const { imageUrl, prompt } = await generateDesign(openai, {
     analysis,
     chosenConcept,
     sourceImages,
     note: input.note,
-    extra: EVERGREEN_NOTE,
+    extra: [EVERGREEN_NOTE, styleNote].filter(Boolean).join('\n\n'),
   })
 
   return { analysis, tweets, concepts, chosenConcept, imageUrl, prompt, sourceImages }

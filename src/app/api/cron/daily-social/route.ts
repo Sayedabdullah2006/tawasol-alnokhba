@@ -17,7 +17,7 @@ import { fetchCategories, fetchPostsByCategory, resolveImageUrl, type NewsPost }
 import { fetchManhomCandidates, ensureColorImage, MANHOM_NOTE } from '@/lib/manhom-news'
 import { fetchRssCandidates, RSS_SOURCES } from '@/lib/rss-news'
 import { fetchSaudipediaCandidates } from '@/lib/saudipedia-news'
-import { runStudioPipeline } from '@/lib/ai-studio'
+import { runStudioPipeline, shuffledPosterStyles } from '@/lib/ai-studio'
 import { sendEmail } from '@/lib/email'
 
 // المصدر: 'first1saudi' | 'manhom' | مفتاح مصدر RSS (مثل 'alarabiya')
@@ -184,13 +184,16 @@ async function handle(request: NextRequest) {
     }
 
     // ── 4) تمرير كل عنصر في الاستوديو (بالتوازي للبقاء ضمن حد المهلة) ──
+    // نوزّع نمط تصميم مختلفاً على كل منشور لضمان تنوّع بصري (لا نمط واحد متكرّر).
+    const styles = shuffledPosterStyles()
     const settled = await Promise.allSettled(
-      selected.map(({ post, source }) =>
+      selected.map(({ post, source }, i) =>
         runStudioPipeline({
           title: post.title,
           content: post.content,
           sourceImages: [post.imageUrl as string],
           extraInfo: source === 'manhom' ? MANHOM_NOTE : undefined,
+          styleDirective: styles[i % styles.length],
         }).then(studio => ({ post, source, tweets: studio.tweets, designUrl: studio.imageUrl, concept: studio.chosenConcept, hostedSource: studio.sourceImages[0] ?? (post.imageUrl as string) })),
       ),
     )
