@@ -20,10 +20,12 @@ export async function POST(request: Request) {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
 
-  let body: { id?: string; note?: string }
+  let body: { id?: string; note?: string; imageUrl?: string }
   try { body = await request.json() } catch { return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 }) }
   const id = body.id
   const note = (body.note ?? '').toString().trim()
+  // صورة مصدر جديدة (اختيارية) — تُستبدل بها الصورة الحالية مع إبقاء نفس المعلومات
+  const newImage = (body.imageUrl ?? '').toString().trim()
   if (!id) return NextResponse.json({ error: 'المعرّف مطلوب' }, { status: 400 })
 
   const sc = await createServiceRoleClient()
@@ -37,10 +39,10 @@ export async function POST(request: Request) {
   try {
     const isManhom = row.source === 'manhom'
 
-    // المحتوى + صورة المصدر: المخزّن أولاً، وإلا نعيد جلبه من المصدر.
+    // المحتوى + صورة المصدر: الصورة الجديدة (إن رُفعت) أولاً، ثم المخزّنة، وإلا نعيد الجلب.
     let title = row.post_title as string
     let content = (row.source_content as string | null) ?? ''
-    let sourceImage = (row.source_image_url as string | null) ?? ''
+    let sourceImage = newImage || ((row.source_image_url as string | null) ?? '')
 
     if (!content || !sourceImage) {
       if (isManhom) {

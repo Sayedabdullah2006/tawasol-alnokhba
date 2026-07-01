@@ -38,6 +38,26 @@ export default function AdminSocialPage() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [note, setNote] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
+  // استبدال صورة المصدر عند إعادة التوليد
+  const [newImage, setNewImage] = useState('')
+  const [imgUploading, setImgUploading] = useState(false)
+
+  const uploadNewImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(file.type)) { alert('صيغة غير مدعومة (PNG/JPG/WEBP)'); return }
+    if (file.size > 10 * 1024 * 1024) { alert('الحجم يتجاوز 10 ميجابايت'); return }
+    setImgUploading(true)
+    try {
+      const ext = file.name.split('.').pop()
+      const path = `social-src-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const { error } = await supabase.storage.from('content-images').upload(path, file)
+      if (error) throw error
+      const { data } = supabase.storage.from('content-images').getPublicUrl(path)
+      setNewImage(data.publicUrl)
+    } catch { alert('فشل رفع الصورة') } finally { setImgUploading(false) }
+  }
   // جدولة النشر
   const [schedId, setSchedId] = useState<string | null>(null)
   const [schedWhen, setSchedWhen] = useState('')
@@ -127,7 +147,7 @@ export default function AdminSocialPage() {
       const res = await fetch('/api/admin/social-schedule/regenerate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: item.id, note }),
+        body: JSON.stringify({ id: item.id, note, imageUrl: newImage || undefined }),
       })
       const json = await res.json()
       if (!res.ok || !json.success) throw new Error(json.error || 'فشل إعادة التوليد')
@@ -136,6 +156,7 @@ export default function AdminSocialPage() {
       ))
       setOpenId(null)
       setNote('')
+      setNewImage('')
     } catch (e) {
       alert(e instanceof Error ? e.message : 'فشل إعادة التوليد')
     } finally {
@@ -281,6 +302,22 @@ export default function AdminSocialPage() {
                           disabled={busyId === item.id}
                           className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-card text-dark resize-none"
                         />
+                        {/* استبدال صورة المصدر — يُعاد التوليد بنفس المعلومات بالصورة الجديدة */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {newImage ? (
+                            <>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={newImage} alt="صورة جديدة" className="w-12 h-12 rounded-lg object-cover border border-border" />
+                              <span className="text-xs font-bold text-green-700">صورة جديدة ستُستخدم في التصميم</span>
+                              <button onClick={() => setNewImage('')} disabled={busyId === item.id} className="text-xs text-red-600 hover:underline">إزالة</button>
+                            </>
+                          ) : (
+                            <label className="inline-flex items-center gap-1.5 text-xs font-bold text-dark border border-dashed border-border rounded-lg px-3 py-1.5 cursor-pointer hover:border-green hover:text-green transition">
+                              <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={uploadNewImage} disabled={imgUploading || busyId === item.id} className="hidden" />
+                              {imgUploading ? 'جارٍ الرفع…' : '🖼️ إرفاق صورة أخرى (اختياري)'}
+                            </label>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => regenerate(item)}
@@ -291,7 +328,7 @@ export default function AdminSocialPage() {
                           </button>
                           {busyId !== item.id && (
                             <button
-                              onClick={() => { setOpenId(null); setNote('') }}
+                              onClick={() => { setOpenId(null); setNote(''); setNewImage('') }}
                               className="text-sm text-muted hover:text-dark px-3 py-2"
                             >
                               إلغاء
@@ -301,7 +338,7 @@ export default function AdminSocialPage() {
                       </div>
                     ) : (
                       <button
-                        onClick={() => { setOpenId(item.id); setNote('') }}
+                        onClick={() => { setOpenId(item.id); setNote(''); setNewImage('') }}
                         className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-green border border-green/30 rounded-lg px-3 py-1.5 hover:bg-green/5 transition self-start"
                       >
                         🔄 إعادة توليد التصميم
