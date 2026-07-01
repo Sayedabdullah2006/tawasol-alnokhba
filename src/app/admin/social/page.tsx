@@ -43,6 +43,29 @@ export default function AdminSocialPage() {
   const [schedWhen, setSchedWhen] = useState('')
   const [schedText, setSchedText] = useState('')
   const [schedBusy, setSchedBusy] = useState(false)
+  // توليد يدوي لمنشورات إضافية لنفس اليوم
+  const [genBusy, setGenBusy] = useState(false)
+  const [genCount, setGenCount] = useState(3)
+
+  const generateMore = async () => {
+    setGenBusy(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/admin/social/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count: genCount }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json.success === false) throw new Error(json.error || 'فشل التوليد')
+      await load()
+      alert(`تم توليد ${json.generated ?? 0} منشورات إضافية لليوم ✅`)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'فشل التوليد')
+    } finally {
+      setGenBusy(false)
+    }
+  }
 
   const submitSchedule = async (item: ScheduleItem) => {
     if (!schedWhen) { alert('حدّد تاريخ ووقت الجدولة'); return }
@@ -137,13 +160,39 @@ export default function AdminSocialPage() {
           <h1 className="text-2xl font-black text-dark">🗓️ خطة النشر اليومية</h1>
           <p className="text-sm text-muted mt-0.5">الأخبار المولّدة آلياً من first1saudi.net، مرتّبة بتاريخ كل يوم.</p>
         </div>
-        <button
-          onClick={() => { setLoading(true); load().finally(() => setLoading(false)) }}
-          className="shrink-0 bg-green text-white text-sm font-bold rounded-xl px-4 py-2 hover:opacity-90 transition"
-        >
-          تحديث
-        </button>
+        <div className="shrink-0 flex items-center gap-2">
+          {/* توليد يدوي لمنشورات إضافية لنفس اليوم */}
+          <select
+            value={genCount}
+            onChange={e => setGenCount(Number(e.target.value))}
+            disabled={genBusy}
+            aria-label="عدد المنشورات الإضافية"
+            className="rounded-xl border border-border bg-white text-sm font-bold px-2 py-2 disabled:opacity-60"
+          >
+            {[1, 2, 3].map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+          <button
+            onClick={generateMore}
+            disabled={genBusy}
+            className="bg-dark text-white text-sm font-bold rounded-xl px-4 py-2 hover:opacity-90 transition disabled:opacity-60"
+          >
+            {genBusy ? '⏳ جارٍ التوليد…' : '➕ توليد منشورات إضافية'}
+          </button>
+          <button
+            onClick={() => { setLoading(true); load().finally(() => setLoading(false)) }}
+            disabled={genBusy}
+            className="bg-green text-white text-sm font-bold rounded-xl px-4 py-2 hover:opacity-90 transition disabled:opacity-60"
+          >
+            تحديث
+          </button>
+        </div>
       </div>
+      {genBusy && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-3 text-sm flex items-center gap-2">
+          <LoadingSpinner size="sm" />
+          <span>جارٍ توليد {genCount} منشورات جديدة (تحليل + تصميم)… قد يستغرق دقيقتين، لا تغلق الصفحة.</span>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm">{error}</div>

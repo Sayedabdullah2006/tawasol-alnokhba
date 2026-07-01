@@ -60,6 +60,17 @@ async function handle(request: NextRequest) {
 
   const count = Math.max(1, Math.min(5, Number(request.nextUrl.searchParams.get('count')) || DEFAULT_COUNT))
   const force = request.nextUrl.searchParams.get('force') === '1'
+  const sourceParam = request.nextUrl.searchParams.get('source')
+  return runBatch({ count, force, sourceParam })
+}
+
+/**
+ * توليد دفعة منشورات ليوم. تُستدعى من الكرون ومن زر «توليد يدوي» في لوحة الإدارة.
+ * force=true يتخطّى حماية «تم توليد اليوم» فيضيف منشورات جديدة لنفس اليوم (بلا تكرار المصدر).
+ */
+export async function runBatch(
+  { count, force, sourceParam }: { count: number; force: boolean; sourceParam: string | null },
+): Promise<NextResponse> {
   const today = new Date().toISOString().slice(0, 10)
 
   try {
@@ -96,7 +107,6 @@ async function handle(request: NextRequest) {
     const usedFirst1 = usedByKey.get('first1saudi') ?? new Set<number>()
 
     // كم عنصراً من كل مصدر — افتراضياً ~2 إنجازات + 1 manhom لكل 3.
-    const sourceParam = request.nextUrl.searchParams.get('source')
     let manhomTarget =
       sourceParam === 'manhom' ? count : sourceParam === 'first1saudi' ? 0 : Math.max(1, Math.round(count / 3))
     if (manhomTarget > count) manhomTarget = count
