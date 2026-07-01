@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
-import { getOpenAI, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives } from '@/lib/openai'
+import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives } from '@/lib/openai'
 import { logGeneratedDesign } from '@/lib/newsletter'
 import { generateImageWithGemini } from '@/lib/gemini'
 import { compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
@@ -185,7 +185,7 @@ export async function POST(req: Request) {
         userContent.push({ type: 'image_url', image_url: { url: img } })
       }
 
-      const completion = await openai.chat.completions.create({
+      const completion = await chatComplete(openai, {
         model: OPENAI_MODEL,
         response_format: { type: 'json_object' },
         messages: [
@@ -214,7 +214,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 })
       }
 
-      const completion = await openai.chat.completions.create({
+      const completion = await chatComplete(openai, {
         model: OPENAI_MODEL,
         messages: [
           { role: 'system', content: SYS_TWEETS },
@@ -257,7 +257,7 @@ export async function POST(req: Request) {
         conceptUserContent.push({ type: 'image_url', image_url: { url: img } })
       }
 
-      const completion = await openai.chat.completions.create({
+      const completion = await chatComplete(openai, {
         model: OPENAI_MODEL,
         response_format: { type: 'json_object' },
         messages: [
@@ -306,7 +306,7 @@ export async function POST(req: Request) {
       await saveStep({ chosenConcept: { text: chosenConcept } })
 
       // 1) Generate the detailed design prompt.
-      const promptCompletion = await openai.chat.completions.create({
+      const promptCompletion = await chatComplete(openai, {
         model: OPENAI_MODEL,
         messages: [
           { role: 'system', content: SYS_IMAGE },

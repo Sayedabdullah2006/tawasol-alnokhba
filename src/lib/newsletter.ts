@@ -7,7 +7,7 @@
 import sharp from 'sharp'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { generateImageWithGemini } from '@/lib/gemini'
-import { getOpenAI } from '@/lib/openai'
+import { getOpenAI, chatComplete } from '@/lib/openai'
 
 const NL_WIDTH = 1080
 const NL_HEIGHT = 1920
@@ -280,7 +280,7 @@ async function refineBlurbs(items: NewsletterItem[]): Promise<string[]> {
     const input = items
       .map((it, i) => `${i + 1}. العنوان: ${it.title}\nنص الخبر الأصلي: ${(it.fullContent || it.blurb || it.title).slice(0, 600)}`)
       .join('\n\n')
-    const completion = await openai.chat.completions.create({
+    const completion = await chatComplete(openai, {
       model: 'gpt-5.5',
       response_format: { type: 'json_object' },
       messages: [
@@ -305,7 +305,7 @@ async function generateCaption(window: WeeklyWindow, items: NewsletterItem[]): P
   try {
     const openai = getOpenAI()
     const titles = items.map((it, i) => `${i + 1}. ${it.title}`).join('\n')
-    const completion = await openai.chat.completions.create({
+    const completion = await chatComplete(openai, {
       model: 'gpt-5.5',
       messages: [
         {

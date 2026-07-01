@@ -95,10 +95,10 @@ export async function classifySection(args: { title?: string; content?: string; 
 
   // احتياطي: استدعاء واحد للذكاء الاصطناعي (يُستورَد openai ديناميكياً).
   try {
-    const { getOpenAI } = await import('./openai')
+    const { getOpenAI, chatComplete } = await import('./openai')
     const openai = getOpenAI()
     const list = SECTION_NAMES.join('\n')
-    const completion = await openai.chat.completions.create({
+    const completion = await chatComplete(openai, {
       model: 'gpt-5.5',
       messages: [
         {

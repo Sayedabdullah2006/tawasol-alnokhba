@@ -9,7 +9,7 @@
  */
 import OpenAI from 'openai'
 import sharp from 'sharp'
-import { getOpenAI, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives } from './openai'
+import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives } from './openai'
 import { generateImageWithGemini, generateImageFromParts } from './gemini'
 import { compositeLogoBottomRight, resizeToPoster } from './logo-overlay'
 import { createServiceRoleClient } from './supabase-server'
@@ -101,7 +101,7 @@ export async function analyzeNews(
 ): Promise<unknown> {
   const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [{ type: 'text', text: args.newsText }]
   for (const img of args.sourceImages) userContent.push({ type: 'image_url', image_url: { url: img } })
-  const completion = await openai.chat.completions.create({
+  const completion = await chatComplete(openai, {
     model: OPENAI_MODEL,
     response_format: { type: 'json_object' },
     messages: [{ role: 'system', content: SYS_ANALYZE }, { role: 'user', content: userContent }],
@@ -118,7 +118,7 @@ export async function generateTweets(
   const user =
     `${JSON.stringify(args.analysis)}\n\n${args.newsText}` +
     (args.extra ? `\n\n${args.extra}` : '')
-  const completion = await openai.chat.completions.create({
+  const completion = await chatComplete(openai, {
     model: OPENAI_MODEL,
     messages: [
       { role: 'system', content: SYS_TWEETS },
@@ -139,7 +139,7 @@ export async function generateConcepts(
     { type: 'text', text: `${JSON.stringify(args.analysis)}\n\n${args.newsText}\n\n${directives}` },
   ]
   for (const img of args.sourceImages) conceptContent.push({ type: 'image_url', image_url: { url: img } })
-  const completion = await openai.chat.completions.create({
+  const completion = await chatComplete(openai, {
     model: OPENAI_MODEL,
     response_format: { type: 'json_object' },
     messages: [{ role: 'system', content: SYS_CONCEPTS }, { role: 'user', content: conceptContent }],
@@ -171,7 +171,7 @@ export async function generateDesign(
   const { data: brand } = await service.from('brand_settings').select('first1saudi_logo_url').eq('id', 1).single()
   const logoUrl: string | null = brand?.first1saudi_logo_url ?? null
 
-  const promptCompletion = await openai.chat.completions.create({
+  const promptCompletion = await chatComplete(openai, {
     model: OPENAI_MODEL,
     messages: [
       { role: 'system', content: SYS_IMAGE },

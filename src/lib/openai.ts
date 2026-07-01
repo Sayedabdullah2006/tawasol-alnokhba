@@ -10,13 +10,47 @@ export function getOpenAI(): OpenAI {
   if (!apiKey) {
     throw new Error('مفتاح OpenAI غير مهيّأ')
   }
-  // مرونة ضد أخطاء الاتصال العابرة (Premature close / ECONNRESET / 429 / 5xx):
-  // الـ SDK يعيد المحاولة تلقائياً على أخطاء الاتصال والمهلة مع تراجع أُسّي.
+  // maxRetries يغطّي أخطاء الاتصال أثناء fetch، لكن «Premature close» يحدث عند قراءة
+  // جسم الرد (بعد نجاح fetch) فيتخطّى إعادة محاولة الـ SDK — لذا نلفّ الاستدعاء بـ chatComplete.
   return new OpenAI({
     apiKey,
-    maxRetries: 5,      // بدل الافتراضي 2 — يعالج انقطاع الاتصال المتكرّر
-    timeout: 120_000,   // مهلة لكل طلب (يُعاد المحاولة عند تجاوزها بدل التعليق)
+    maxRetries: 5,
+    timeout: 120_000,
   })
+}
+
+// أنماط أخطاء عابرة تستحق إعادة المحاولة (انقطاع اتصال/قراءة جسم/شبكة/مهلة).
+function isTransient(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  const status = (err as { status?: number })?.status ?? 0
+  return (
+    /premature close|terminated|ECONNRESET|socket hang up|network|fetch failed|invalid response body|other side closed|timeout|aborted|EPIPE|ETIMEDOUT|ECONNREFUSED/i.test(msg) ||
+    status === 408 || status === 409 || status === 429 || status >= 500
+  )
+}
+
+/**
+ * يلفّ chat.completions.create بإعادة محاولة على مستوى التطبيق تلتقط أخطاء
+ * قراءة جسم الرد العابرة (مثل «Premature close») التي لا يعيدها الـ SDK محاولةً.
+ */
+export async function chatComplete(
+  openai: OpenAI,
+  params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
+  opts: { retries?: number } = {},
+): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+  const retries = opts.retries ?? 4
+  let lastErr: unknown
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await openai.chat.completions.create(params)
+    } catch (err) {
+      lastErr = err
+      if (attempt === retries || !isTransient(err)) break
+      const waitMs = Math.min(1000 * 2 ** attempt, 8000) + Math.floor(Math.random() * 400)
+      await new Promise(r => setTimeout(r, waitMs))
+    }
+  }
+  throw lastErr
 }
 
 // ── SYSTEM PROMPTS (verbatim Arabic — do not alter) ─────────────────
