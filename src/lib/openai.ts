@@ -10,7 +10,13 @@ export function getOpenAI(): OpenAI {
   if (!apiKey) {
     throw new Error('مفتاح OpenAI غير مهيّأ')
   }
-  return new OpenAI({ apiKey })
+  // مرونة ضد أخطاء الاتصال العابرة (Premature close / ECONNRESET / 429 / 5xx):
+  // الـ SDK يعيد المحاولة تلقائياً على أخطاء الاتصال والمهلة مع تراجع أُسّي.
+  return new OpenAI({
+    apiKey,
+    maxRetries: 5,      // بدل الافتراضي 2 — يعالج انقطاع الاتصال المتكرّر
+    timeout: 120_000,   // مهلة لكل طلب (يُعاد المحاولة عند تجاوزها بدل التعليق)
+  })
 }
 
 // ── SYSTEM PROMPTS (verbatim Arabic — do not alter) ─────────────────
