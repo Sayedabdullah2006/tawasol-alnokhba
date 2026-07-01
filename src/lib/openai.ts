@@ -1,22 +1,21 @@
 import OpenAI from 'openai'
+import https from 'https'
 
 /**
  * Returns a configured OpenAI client.
  * Reads the API key from process.env.OPENAI_API_KEY ONLY.
  * Throws a clear Arabic error if the key is missing.
+ *
+ * ملاحظة: النشر الفعلي لطلبات chat يتم عبر chatComplete (باستخدام وحدة https المدمجة)
+ * لتجاوز علّة undici/fetch على Node 22 («Premature close»). هذا العميل يُستخدم لقراءة
+ * baseURL فقط ولأي استدعاءات SDK أخرى.
  */
 export function getOpenAI(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
     throw new Error('مفتاح OpenAI غير مهيّأ')
   }
-  // maxRetries يغطّي أخطاء الاتصال أثناء fetch، لكن «Premature close» يحدث عند قراءة
-  // جسم الرد (بعد نجاح fetch) فيتخطّى إعادة محاولة الـ SDK — لذا نلفّ الاستدعاء بـ chatComplete.
-  return new OpenAI({
-    apiKey,
-    maxRetries: 5,
-    timeout: 120_000,
-  })
+  return new OpenAI({ apiKey, maxRetries: 3, timeout: 120_000 })
 }
 
 // أنماط أخطاء عابرة تستحق إعادة المحاولة (انقطاع اتصال/قراءة جسم/شبكة/مهلة).
@@ -29,20 +28,87 @@ function isTransient(err: unknown): boolean {
   )
 }
 
+// وكيل بلا keep-alive: اتصال جديد لكل طلب — يزيل إعادة استخدام السوكِت البائت
+// المسبِّبة لـ «Premature close» في undici على Node 22 (نفس مبدأ حلّ axios).
+const OA_AGENT = new https.Agent({ keepAlive: false })
+
+// استدعاء واحد للـ REST مباشرةً عبر وحدة https (لا undici/fetch).
+function postChatOnce(
+  apiKey: string,
+  baseURL: string,
+  params: unknown,
+  timeoutMs: number,
+): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+  return new Promise((resolve, reject) => {
+    const body = Buffer.from(JSON.stringify(params), 'utf8')
+    const url = new URL(`${baseURL.replace(/\/$/, '')}/chat/completions`)
+    const org = process.env.OPENAI_ORG_ID || process.env.OPENAI_ORGANIZATION
+    const project = process.env.OPENAI_PROJECT_ID
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Content-Length': String(body.length),
+      Authorization: `Bearer ${apiKey}`,
+    }
+    if (org) headers['OpenAI-Organization'] = org
+    if (project) headers['OpenAI-Project'] = project
+
+    const req = https.request(
+      {
+        method: 'POST',
+        hostname: url.hostname,
+        port: url.port || 443,
+        path: url.pathname + url.search,
+        agent: OA_AGENT,
+        headers,
+        timeout: timeoutMs,
+      },
+      res => {
+        const chunks: Buffer[] = []
+        res.on('data', c => chunks.push(c as Buffer))
+        res.on('end', () => {
+          const text = Buffer.concat(chunks).toString('utf8')
+          const status = res.statusCode ?? 0
+          if (status < 200 || status >= 300) {
+            const e = new Error(`OpenAI ${status}: ${text.slice(0, 500)}`) as Error & { status?: number }
+            e.status = status
+            return reject(e)
+          }
+          try {
+            resolve(JSON.parse(text) as OpenAI.Chat.Completions.ChatCompletion)
+          } catch {
+            reject(new Error('invalid response body from OpenAI (JSON parse failed)'))
+          }
+        })
+        res.on('error', reject)
+      },
+    )
+    req.on('error', reject)
+    req.on('timeout', () => req.destroy(new Error('OpenAI request timeout')))
+    req.write(body)
+    req.end()
+  })
+}
+
 /**
- * يلفّ chat.completions.create بإعادة محاولة على مستوى التطبيق تلتقط أخطاء
- * قراءة جسم الرد العابرة (مثل «Premature close») التي لا يعيدها الـ SDK محاولةً.
+ * ينفّذ chat.completions عبر https المدمجة (بدل undici/fetch في الـ SDK) مع إعادة
+ * محاولة على الأخطاء العابرة — يعالج «Premature close» على Node 22 نهائياً.
+ * التوقيع نفسه (يستقبل عميل openai لقراءة baseURL) فلا تتغيّر مواضع الاستدعاء.
  */
 export async function chatComplete(
   openai: OpenAI,
   params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
-  opts: { retries?: number } = {},
+  opts: { retries?: number; timeoutMs?: number } = {},
 ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error('مفتاح OpenAI غير مهيّأ')
+  const baseURL = (openai.baseURL || 'https://api.openai.com/v1').toString()
   const retries = opts.retries ?? 4
+  const timeoutMs = opts.timeoutMs ?? 120_000
+
   let lastErr: unknown
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      return await openai.chat.completions.create(params)
+      return await postChatOnce(apiKey, baseURL, params, timeoutMs)
     } catch (err) {
       lastErr = err
       if (attempt === retries || !isTransient(err)) break
