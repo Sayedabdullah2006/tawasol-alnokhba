@@ -91,6 +91,8 @@ export async function POST(request: Request) {
     // الأفراد فقط يحصلون على تسعير تلقائي. الجهات (شركة/حكومة/خيرية/وكالة)
     // تذهب لحالة «بانتظار المراجعة» ليُسعّرها الأدمن يدوياً بعد مراجعة الخبر.
     const isIndividual = (body.client_type ?? 'individual') === 'individual'
+    // فئة «أخرى» (Others) تُعامَل كالجهات: بلا باقات ولا تسعير تلقائي — عرض مالي يدوي من الأدمن.
+    const needsManualQuote = !isIndividual || (body.category ?? '') === 'Others'
 
     // ── تحقق من كود الخصم (إن وُجد) ─────────────────────────────
     let discountRow: any = null
@@ -329,8 +331,8 @@ export async function POST(request: Request) {
         ? body.sub_option
         : (typeof body.sub_option === 'string' ? body.sub_option : null)
 
-    // ── الباقة المختارة (للأفراد + المنشور الواحد فقط) ──────────────
-    const selectedPackage: string | null = body.selected_package ?? null
+    // ── الباقة المختارة (للأفراد + المنشور الواحد فقط، ولا تُطبَّق على «أخرى») ──
+    const selectedPackage: string | null = needsManualQuote ? null : (body.selected_package ?? null)
     const pkg = selectedPackage
       ? PACKAGES.find(p => p.id === selectedPackage) ?? null
       : null
@@ -437,10 +439,10 @@ export async function POST(request: Request) {
         discount_code:    discountRow ? discountRow.code : null,
         discount_code_id: discountRow ? discountRow.id   : null,
         discount_pct:     discountRow ? Number(discountRow.discount_pct) : null,
-        discount_amount:  isIndividual && singleDiscountAmt > 0 ? singleDiscountAmt : null,
+        discount_amount:  !needsManualQuote && singleDiscountAmt > 0 ? singleDiscountAmt : null,
 
-        // الأفراد: اعتماد مباشر للدفع (بلا عرض/تفاوض). الجهات: بانتظار تسعير الإدارة يدوياً.
-        ...(isIndividual
+        // الأفراد: اعتماد مباشر للدفع (بلا عرض/تفاوض). الجهات و«أخرى»: بانتظار تسعير الإدارة يدوياً.
+        ...(!needsManualQuote
           ? {
               admin_quoted_price: singleFinalPrice,
               final_total:        singleFinalPrice,
@@ -480,8 +482,8 @@ export async function POST(request: Request) {
     const catNameAr = cat?.nameAr ?? body.category
 
     // الأفراد (تسعير فوري → دفع): لا نُرسل أي إيميل قبل الدفع — لا للأدمن ولا للعميل.
-    // الأدمن يُنبَّه بعد الدفع عبر نسخة (CC) من إيميل تأكيد الدفع. الجهات فقط تُراجَع يدوياً.
-    if (!isIndividual) {
+    // الأدمن يُنبَّه بعد الدفع عبر نسخة (CC) من إيميل تأكيد الدفع. الجهات و«أخرى» تُراجَع يدوياً.
+    if (needsManualQuote) {
       notifyNewRequestToAdmin({
         requestNumber,
         clientName:  body.client_name,
@@ -510,8 +512,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       requestNumber,
       id: data.id,
-      quotedTotal: isIndividual ? singleFinalPrice : null,
-      readyForPayment: isIndividual,
+      quotedTotal: needsManualQuote ? null : singleFinalPrice,
+      readyForPayment: !needsManualQuote,
       ...sessionPayload,
     })
 

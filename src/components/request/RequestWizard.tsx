@@ -309,8 +309,10 @@ export default function RequestWizard() {
         : false
 
 
-  // ── الباقات تُعرض للأفراد (المنشور الواحد + الحملة) ───────────────
-  const showPackages = clientType === 'individual'
+  // ── الباقات تُعرض للأفراد (المنشور الواحد + الحملة)، ولا تُعرض لفئة «أخرى» ──
+  // فئة «أخرى» تُعامَل كالجهات: عرض مالي يدوي من الأدمن (بلا باقات ولا تسعير تلقائي).
+  const isOtherCategory = category === 'Others'
+  const showPackages = clientType === 'individual' && !isOtherCategory
   // الباقة الأساسية تتطلّب اختيار قناة واحدة للنشر
   const basicNeedsChannel = showPackages && selectedPackage === 'basic'
   const packagesComplete = !showPackages || (!!selectedPackage && (!basicNeedsChannel || !!basicChannel))
