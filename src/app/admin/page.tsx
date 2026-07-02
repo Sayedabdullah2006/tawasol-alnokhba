@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { CATEGORIES } from '@/lib/constants'
@@ -23,6 +23,12 @@ const PAY_METHOD_META: { key: PayMethod; label: string; color: string }[] = [
   { key: 'direct', label: 'التحويل المباشر', color: '#1A8B9F' },
 ]
 
+const PAID_STATUSES = ['paid', 'in_progress', 'content_review', 'completed']
+// طلب مؤكّد دفعه فعلاً (paid_at أو حالة مدفوعة) وبمبلغ > 0
+function isConfirmedPaid(r: any): boolean {
+  return (r.paid_at != null || PAID_STATUSES.includes(r.status)) && (r.final_total ?? 0) > 0
+}
+
 export default function AdminStatsPage() {
   const supabase = createClient()
   const router = useRouter()
@@ -40,8 +46,8 @@ export default function AdminStatsPage() {
     conversionRate: 0,
   })
   const [topCategories, setTopCategories] = useState<{ category: string; nameAr: string; count: number }[]>([])
-  // توزيع مبلغ الشهر على طرق الدفع
-  const [monthByMethod, setMonthByMethod] = useState<{ key: PayMethod; label: string; color: string; amount: number; count: number }[]>([])
+  // كل الطلبات — لحساب إحصاءات الشهر المختار ديناميكياً (تتبع فلتر الشهر)
+  const [allRequests, setAllRequests] = useState<any[]>([])
   const [funnel, setFunnel] = useState<{ label: string; count: number; pctOfPrev: number; pctOfTotal: number }[]>([])
 
   // فلتر الشهر في بطاقة الهدف
@@ -109,19 +115,8 @@ export default function AdminStatsPage() {
         .filter(isConfirmedPaid)
         .reduce((s, r) => s + (r.final_total ?? 0), 0)
 
-      // توزيع مبلغ الشهر (المؤكّد دفعه) على طرق الدفع
-      const monthAgg: Record<PayMethod, { amount: number; count: number }> = {
-        moyasar: { amount: 0, count: 0 },
-        tamara: { amount: 0, count: 0 }, direct: { amount: 0, count: 0 },
-      }
-      for (const r of requests) {
-        if (isConfirmedPaid(r) && r.created_at >= monthStart) {
-          const m = classifyPayMethod(r)
-          monthAgg[m].amount += (r.final_total ?? 0)
-          monthAgg[m].count += 1
-        }
-      }
-      setMonthByMethod(PAY_METHOD_META.map(mm => ({ ...mm, amount: monthAgg[mm.key].amount, count: monthAgg[mm.key].count })))
+      // نحتفظ بكل الطلبات لحساب إحصاءات الشهر المختار ديناميكياً (يتبع فلتر الشهر)
+      setAllRequests(requests)
 
       // إيرادات لكل شهر (YYYY-MM) لاستخدامها في فلتر بطاقة الهدف
       const revenueByMonth: Record<string, number> = {}
@@ -193,6 +188,35 @@ export default function AdminStatsPage() {
     load()
   }, [supabase, router])
 
+  // إحصاءات الشهر المختار (تتبع فلتر «الهدف الشهري»): عدد المدفوعة + الإيراد + توزيع طرق الدفع
+  const monthStats = useMemo(() => {
+    const [y, m] = selectedMonthKey.split('-').map(Number)
+    const start = new Date(y, m - 1, 1)
+    const end = new Date(y, m, 1)
+    const inMonth = (r: any) => {
+      if (!r.created_at) return false
+      const d = new Date(r.created_at)
+      return d >= start && d < end
+    }
+    let count = 0
+    let revenue = 0
+    const agg: Record<PayMethod, { amount: number; count: number }> = {
+      moyasar: { amount: 0, count: 0 }, tamara: { amount: 0, count: 0 }, direct: { amount: 0, count: 0 },
+    }
+    for (const r of allRequests) {
+      if (!inMonth(r)) continue
+      if (PAID_STATUSES.includes(r.status)) count++
+      if (isConfirmedPaid(r)) {
+        revenue += (r.final_total ?? 0)
+        const mm = classifyPayMethod(r)
+        agg[mm].amount += (r.final_total ?? 0)
+        agg[mm].count += 1
+      }
+    }
+    const byMethod = PAY_METHOD_META.map(mm => ({ ...mm, amount: agg[mm.key].amount, count: agg[mm.key].count }))
+    return { count, revenue, byMethod }
+  }, [allRequests, selectedMonthKey])
+
   if (loading) return <LoadingSpinner size="lg" />
 
   // قاعدة الهدف الشهري: 15,000 ر.س في مايو 2026 ويزيد 5% كل شهر
@@ -233,9 +257,7 @@ export default function AdminStatsPage() {
   const ordersNeeded = avgOrderRevenue > 0 ? Math.ceil(remainingRevenue / avgOrderRevenue) : null
   const goalMet = selectedRevenue >= monthlyTarget
 
-  const today = new Date()
   const isCurrentMonth = selectedMonthKey === initialMonthKey
-  const currentMonthName = today.toLocaleString('ar', { month: 'long', calendar: 'gregory' })
 
   const freePercent = stats.total > 0 ? (stats.freeCount / stats.total) * 100 : 0
   const paidPercent = stats.total > 0 ? (stats.paidCount / stats.total) * 100 : 0
@@ -305,22 +327,22 @@ export default function AdminStatsPage() {
         {/* معدل الطلبات المدفوعة هذا الشهر */}
         <div className="bg-card rounded-2xl border border-border p-5">
           <div className="flex items-start justify-between mb-4">
-            <p className="text-sm text-muted leading-tight">معدل الطلبات المدفوعة<br />هذا الشهر</p>
+            <p className="text-sm text-muted leading-tight">الطلبات المدفوعة<br />{isCurrentMonth ? 'هذا الشهر' : selectedMonthName}</p>
             <div className="text-2xl">📅</div>
           </div>
-          <p className="text-4xl font-black text-dark">{stats.monthPaidCount}</p>
-          <p className="text-xs text-muted mt-2">طلب مدفوع في {currentMonthName}</p>
+          <p className="text-4xl font-black text-dark">{monthStats.count}</p>
+          <p className="text-xs text-muted mt-2">طلب مدفوع في {selectedMonthName} {selYear}</p>
 
-          {stats.monthPaidCount > 0 && (
+          {monthStats.count > 0 && (
             <div className="mt-4">
               <div className="h-2 bg-cream rounded-full overflow-hidden">
                 <div
                   className="h-full bg-green rounded-full"
-                  style={{ width: `${Math.min((stats.monthPaidCount / Math.max(stats.paidCount, 1)) * 100, 100)}%` }}
+                  style={{ width: `${Math.min((monthStats.count / Math.max(stats.paidCount, 1)) * 100, 100)}%` }}
                 />
               </div>
               <p className="text-xs text-muted mt-1">
-                {((stats.monthPaidCount / Math.max(stats.paidCount, 1)) * 100).toFixed(0)}% من إجمالي المدفوعة
+                {((monthStats.count / Math.max(stats.paidCount, 1)) * 100).toFixed(0)}% من إجمالي المدفوعة
               </p>
             </div>
           )}
@@ -328,19 +350,19 @@ export default function AdminStatsPage() {
           {/* ── توزيع مبلغ الشهر على طرق الدفع ── */}
           <div className="mt-4 pt-4 border-t border-border">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-bold text-dark">توزيع مبالغ الشهر على طرق الدفع</p>
+              <p className="text-xs font-bold text-dark">توزيع مبالغ {isCurrentMonth ? 'الشهر' : selectedMonthName} على طرق الدفع</p>
               <p className="text-xs font-black text-green">
-                {formatNumber(monthByMethod.reduce((s, m) => s + m.amount, 0))} ر.س
+                {formatNumber(monthStats.byMethod.reduce((s, m) => s + m.amount, 0))} ر.س
               </p>
             </div>
             {(() => {
-              const monthTotal = monthByMethod.reduce((s, m) => s + m.amount, 0)
+              const monthTotal = monthStats.byMethod.reduce((s, m) => s + m.amount, 0)
               if (monthTotal <= 0) {
-                return <p className="text-xs text-muted">لا مدفوعات مؤكّدة هذا الشهر بعد.</p>
+                return <p className="text-xs text-muted">لا مدفوعات مؤكّدة في {selectedMonthName} بعد.</p>
               }
               return (
                 <div className="space-y-2.5">
-                  {monthByMethod.map(m => {
+                  {monthStats.byMethod.map(m => {
                     const pct = (m.amount / monthTotal) * 100
                     return (
                       <div key={m.key}>
@@ -475,7 +497,7 @@ export default function AdminStatsPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'الإيرادات الإجمالية', value: `${formatNumber(stats.revenue)} ر.س`, icon: '💰' },
-          { label: 'إيرادات هذا الشهر', value: `${formatNumber(stats.monthRevenue)} ر.س`, icon: '💵' },
+          { label: `إيرادات ${isCurrentMonth ? 'هذا الشهر' : selectedMonthName}`, value: `${formatNumber(monthStats.revenue)} ر.س`, icon: '💵' },
           { label: 'عروض بانتظار الموافقة', value: `${formatNumber(stats.outstanding)} ر.س`, icon: '🧾' },
           { label: `معدل التحويل (${stats.paidCount}/${stats.total})`, value: `${stats.conversionRate.toFixed(1)}%`, icon: '📈' },
         ].map(s => (
