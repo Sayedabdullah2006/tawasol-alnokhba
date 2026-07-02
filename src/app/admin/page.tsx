@@ -7,6 +7,24 @@ import { CATEGORIES } from '@/lib/constants'
 import { formatNumber } from '@/lib/utils'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
+type PayMethod = 'moyasar' | 'tabby' | 'tamara' | 'direct'
+
+// تصنيف طريقة الدفع من إشارات الطلب (معرّف البوابة أو نص payment_method).
+function classifyPayMethod(r: any): PayMethod {
+  const pm = String(r.payment_method || '')
+  if (r.tamara_order_id || /تمارا|tamara/i.test(pm)) return 'tamara'
+  if (/tabby|تابي/i.test(pm)) return 'tabby'
+  if (r.moyasar_payment_id || /\*\*\*|visa|mada|master|card|بطاقة|amex|apple|stc/i.test(pm)) return 'moyasar'
+  return 'direct' // تحويل بنكي مباشر أكّده الأدمن (بلا معرّف بوابة)
+}
+
+const PAY_METHOD_META: { key: PayMethod; label: string; color: string }[] = [
+  { key: 'moyasar', label: 'مدفوعات ميسر', color: '#2D8B3F' },
+  { key: 'tabby', label: 'مدفوعات تابي', color: '#7C3AED' },
+  { key: 'tamara', label: 'مدفوعات تمارا', color: '#E4A11B' },
+  { key: 'direct', label: 'التحويل المباشر', color: '#1A8B9F' },
+]
+
 export default function AdminStatsPage() {
   const supabase = createClient()
   const router = useRouter()
@@ -24,6 +42,8 @@ export default function AdminStatsPage() {
     conversionRate: 0,
   })
   const [topCategories, setTopCategories] = useState<{ category: string; nameAr: string; count: number }[]>([])
+  // توزيع مبلغ الشهر على طرق الدفع
+  const [monthByMethod, setMonthByMethod] = useState<{ key: PayMethod; label: string; color: string; amount: number; count: number }[]>([])
   const [funnel, setFunnel] = useState<{ label: string; count: number; pctOfPrev: number; pctOfTotal: number }[]>([])
 
   // فلتر الشهر في بطاقة الهدف
@@ -90,6 +110,20 @@ export default function AdminStatsPage() {
       const totalPaidRevenue = requests
         .filter(isConfirmedPaid)
         .reduce((s, r) => s + (r.final_total ?? 0), 0)
+
+      // توزيع مبلغ الشهر (المؤكّد دفعه) على طرق الدفع
+      const monthAgg: Record<PayMethod, { amount: number; count: number }> = {
+        moyasar: { amount: 0, count: 0 }, tabby: { amount: 0, count: 0 },
+        tamara: { amount: 0, count: 0 }, direct: { amount: 0, count: 0 },
+      }
+      for (const r of requests) {
+        if (isConfirmedPaid(r) && r.created_at >= monthStart) {
+          const m = classifyPayMethod(r)
+          monthAgg[m].amount += (r.final_total ?? 0)
+          monthAgg[m].count += 1
+        }
+      }
+      setMonthByMethod(PAY_METHOD_META.map(mm => ({ ...mm, amount: monthAgg[mm.key].amount, count: monthAgg[mm.key].count })))
 
       // إيرادات لكل شهر (YYYY-MM) لاستخدامها في فلتر بطاقة الهدف
       const revenueByMonth: Record<string, number> = {}
@@ -292,6 +326,47 @@ export default function AdminStatsPage() {
               </p>
             </div>
           )}
+
+          {/* ── توزيع مبلغ الشهر على طرق الدفع ── */}
+          <div className="mt-4 pt-4 border-t border-border">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-bold text-dark">توزيع مبالغ الشهر على طرق الدفع</p>
+              <p className="text-xs font-black text-green">
+                {formatNumber(monthByMethod.reduce((s, m) => s + m.amount, 0))} ر.س
+              </p>
+            </div>
+            {(() => {
+              const monthTotal = monthByMethod.reduce((s, m) => s + m.amount, 0)
+              if (monthTotal <= 0) {
+                return <p className="text-xs text-muted">لا مدفوعات مؤكّدة هذا الشهر بعد.</p>
+              }
+              return (
+                <div className="space-y-2.5">
+                  {monthByMethod.map(m => {
+                    const pct = (m.amount / monthTotal) * 100
+                    return (
+                      <div key={m.key}>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="flex items-center gap-1.5 min-w-0">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: m.color }} />
+                            <span className="text-dark font-medium truncate">{m.label}</span>
+                            {m.count > 0 && <span className="text-muted shrink-0">({m.count})</span>}
+                          </span>
+                          <span className="font-bold text-dark shrink-0 ms-2">
+                            {formatNumber(m.amount)} ر.س
+                            <span className="text-muted font-normal"> · {pct.toFixed(0)}%</span>
+                          </span>
+                        </div>
+                        <div className="h-1.5 bg-cream rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: m.color }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+          </div>
         </div>
 
         {/* الهدف الشهري — قاعدة 15,000 ر.س + 5% شهرياً */}
