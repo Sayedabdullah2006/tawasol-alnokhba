@@ -5,7 +5,8 @@ import { validateRequestId, validateUserFeedback, ValidationException, formatVal
 
 /**
  * طلب العميل تعديلات على محتوى/تصميم خبر واحد (postIndex).
- * يُحدّث post_reviews[postIndex] إلى changes_requested مع الملاحظات؛ يبقى الطلب «قيد التنفيذ».
+ * يُحدّث post_reviews[postIndex] إلى changes_requested مع الملاحظات، ويُعيد حالة الطلب
+ * إلى «قيد التنفيذ» ليعود لطاولة الأدمن (يعمل عبر عدة جولات مراجعة).
  */
 export async function POST(request: Request) {
   try {
@@ -64,7 +65,11 @@ export async function POST(request: Request) {
 
     const { error } = await supabase
       .from('publish_requests')
-      .update({ post_reviews: reviews, updated_at: new Date().toISOString() })
+      .update({
+        post_reviews: reviews,
+        status: 'in_progress', // طلب التعديل يُعيد الطلب لطاولة الأدمن
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', requestId)
 
     if (error) {
