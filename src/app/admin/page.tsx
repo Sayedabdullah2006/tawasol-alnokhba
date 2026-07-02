@@ -7,20 +7,18 @@ import { CATEGORIES } from '@/lib/constants'
 import { formatNumber } from '@/lib/utils'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
-type PayMethod = 'moyasar' | 'tabby' | 'tamara' | 'direct'
+type PayMethod = 'moyasar' | 'tamara' | 'direct'
 
 // تصنيف طريقة الدفع من إشارات الطلب (معرّف البوابة أو نص payment_method).
 function classifyPayMethod(r: any): PayMethod {
   const pm = String(r.payment_method || '')
   if (r.tamara_order_id || /تمارا|tamara/i.test(pm)) return 'tamara'
-  if (/tabby|تابي/i.test(pm)) return 'tabby'
   if (r.moyasar_payment_id || /\*\*\*|visa|mada|master|card|بطاقة|amex|apple|stc/i.test(pm)) return 'moyasar'
   return 'direct' // تحويل بنكي مباشر أكّده الأدمن (بلا معرّف بوابة)
 }
 
 const PAY_METHOD_META: { key: PayMethod; label: string; color: string }[] = [
   { key: 'moyasar', label: 'مدفوعات ميسر', color: '#2D8B3F' },
-  { key: 'tabby', label: 'مدفوعات تابي', color: '#7C3AED' },
   { key: 'tamara', label: 'مدفوعات تمارا', color: '#E4A11B' },
   { key: 'direct', label: 'التحويل المباشر', color: '#1A8B9F' },
 ]
@@ -113,7 +111,7 @@ export default function AdminStatsPage() {
 
       // توزيع مبلغ الشهر (المؤكّد دفعه) على طرق الدفع
       const monthAgg: Record<PayMethod, { amount: number; count: number }> = {
-        moyasar: { amount: 0, count: 0 }, tabby: { amount: 0, count: 0 },
+        moyasar: { amount: 0, count: 0 },
         tamara: { amount: 0, count: 0 }, direct: { amount: 0, count: 0 },
       }
       for (const r of requests) {
