@@ -5,8 +5,8 @@ import { validateRequestId, validateContent, ValidationException, formatValidati
 
 /**
  * إرسال محتوى/تصاميم خبر واحد (postIndex) للعميل للمراجعة.
- * يُخزّن في post_reviews[postIndex] ويُبقي حالة الطلب «قيد التنفيذ»،
- * فيمكن مراجعة كل خبر في الحملة على حدة.
+ * يُخزّن في post_reviews[postIndex] ويحوّل حالة الطلب إلى «مراجعة المحتوى».
+ * يظل بالإمكان إرسال/تعديل بقية منشورات الحملة أثناء المراجعة.
  */
 export async function POST(request: Request) {
   try {
@@ -48,7 +48,8 @@ export async function POST(request: Request) {
     if (!existingRequest) {
       return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 })
     }
-    if (existingRequest.status !== 'in_progress') {
+    // يُسمح بالإرسال أثناء التنفيذ أو أثناء المراجعة (لإرسال/تعديل بقية منشورات الحملة)
+    if (existingRequest.status !== 'in_progress' && existingRequest.status !== 'content_review') {
       return NextResponse.json({ error: 'الطلب ليس في مرحلة التنفيذ' }, { status: 400 })
     }
 
@@ -73,7 +74,12 @@ export async function POST(request: Request) {
 
     const { error } = await supabase
       .from('publish_requests')
-      .update({ post_reviews: reviews, updated_at: new Date().toISOString() })
+      .update({
+        post_reviews: reviews,
+        status: 'content_review', // إرسال محتوى للمراجعة يحوّل حالة الطلب إلى «مراجعة المحتوى»
+        content_sent_at: existingRequest.status === 'in_progress' ? new Date().toISOString() : undefined,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', requestId)
 
     if (error) {

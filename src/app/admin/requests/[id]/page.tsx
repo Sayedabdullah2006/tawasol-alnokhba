@@ -413,7 +413,8 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
 
         {/* ════════ تبويب: المحتوى والتصاميم ════════ */}
         <div className={activeTab === 'content' ? 'space-y-5' : 'hidden'}>
-          {request.status === 'in_progress' || request.status === 'completed' ? (
+          {request.status === 'in_progress' || request.status === 'completed' ||
+           (request.status === 'content_review' && request.request_type === 'campaign') ? (
             <>
               {/* استوديو الذكاء الاصطناعي — متاح في التنفيذ وبعد الاكتمال (لاختيار تصميم المجلة) */}
               <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
