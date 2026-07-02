@@ -191,6 +191,10 @@ export async function verifyAndUpdatePayment(paymentId: string, requestId?: stri
     } else {
       console.log(`[MOYASAR_VERIFY] ✅ Request ${targetRequestId} successfully updated to 'in_progress'`);
       console.log(`[MOYASAR_VERIFY] ✅ Rows affected: ${updateData.length}`);
+      // ⚡ توليد تلقائي لاستوديو الطلب في الخلفية (لا يحجب رد الدفع)
+      void import('@/lib/auto-studio')
+        .then(m => m.autoRunRequestStudio(targetRequestId as string))
+        .catch(e => console.error('[MOYASAR_VERIFY] auto-studio trigger failed:', e));
     }
 
     // Step 7: Send payment confirmation email to client (CC to admin is automatic)

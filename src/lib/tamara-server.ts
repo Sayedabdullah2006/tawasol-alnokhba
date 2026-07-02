@@ -308,6 +308,13 @@ export async function handleTamaraOrderApproved(
   const emailRow = (updated && updated.length > 0) ? updated[0] : null
   if (!emailRow && !target) return { success: false, reason: 'order_not_found' }
 
+  // ⚡ توليد تلقائي لاستوديو الطلب في الخلفية عند نجاح الانتقال (لا يحجب رد الدفع)
+  if (emailRow) {
+    void import('@/lib/auto-studio')
+      .then(m => m.autoRunRequestStudio(requestId))
+      .catch(e => console.error('[TAMARA] auto-studio trigger failed:', e))
+  }
+
   // Send confirmation email (non-blocking)
   const emailData = emailRow ?? target
   const clientEmail = (emailData as any)?.client_email
