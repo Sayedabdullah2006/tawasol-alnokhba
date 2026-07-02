@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
-import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives } from '@/lib/openai'
+import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives, buildTweetDirectives } from '@/lib/openai'
 import { logGeneratedDesign } from '@/lib/newsletter'
 import { generateImageWithGemini } from '@/lib/gemini'
 import { compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
@@ -220,7 +220,7 @@ export async function POST(req: Request) {
           { role: 'system', content: SYS_TWEETS },
           {
             role: 'user',
-            content: `${JSON.stringify(priorAnalysis)}\n\n${withContext(newsText)}`,
+            content: `${JSON.stringify(priorAnalysis)}\n\n${withContext(newsText)}\n\n${buildTweetDirectives()}`,
           },
         ],
       })

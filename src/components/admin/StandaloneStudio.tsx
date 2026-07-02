@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ImageLightbox from '@/components/ui/ImageLightbox'
+import { StepHead } from '@/components/admin/StudioStep'
 import { SECTION_NAMES } from '@/lib/showcase-sections'
 
 type StepKey = 'analyze' | 'tweets' | 'concepts' | 'image'
@@ -322,7 +323,7 @@ export default function StandaloneStudio() {
     }
   }
 
-  const card = 'bg-card rounded-2xl border border-border p-5 space-y-3'
+  const card = 'bg-card rounded-2xl border border-border p-5 space-y-3 shadow-sm'
 
   return (
     <div className="space-y-4" dir="rtl">
@@ -481,14 +482,14 @@ export default function StandaloneStudio() {
 
       {/* 1 تحليل */}
       <div className={card}>
-        <h4 className="font-bold text-dark">الخطوة 1 — تحليل الخبر</h4>
+        <StepHead n={1} title="تحليل الخبر" subtitle="استخراج عناصر الخبر لبناء المحتوى" done={!!analysis} />
         <Button onClick={() => callStep('analyze')} loading={loadingStep === 'analyze'} disabled={autoBusy || loadingStep !== null || !content.trim()} size="sm">حلّل الخبر</Button>
         {analysis && <pre dir="rtl" className="bg-cream rounded-xl p-3 text-xs whitespace-pre-wrap max-h-72 overflow-y-auto border border-border">{JSON.stringify(analysis, null, 2)}</pre>}
       </div>
 
       {/* 2 تغريدات */}
       <div className={card}>
-        <h4 className="font-bold text-dark">الخطوة 2 — التغريدات</h4>
+        <StepHead n={2} title="التغريدات" subtitle="٣ تغريدات بزوايا ومطالع متنوّعة" done={!!tweets} />
         <Button onClick={() => callStep('tweets')} loading={loadingStep === 'tweets'} disabled={autoBusy || loadingStep !== null || !analysis} size="sm">اكتب 3 تغريدات</Button>
         {tweets && (
           <div className="space-y-2">
@@ -502,7 +503,7 @@ export default function StandaloneStudio() {
 
       {/* 3 اتجاهات */}
       <div className={card}>
-        <h4 className="font-bold text-dark">الخطوة 3 — اتجاهات التصميم</h4>
+        <StepHead n={3} title="اتجاهات التصميم" subtitle="٣ اتجاهات مختلفة للاختيار منها" done={conceptItems.length > 0} />
         <Button onClick={() => callStep('concepts')} loading={loadingStep === 'concepts'} disabled={autoBusy || loadingStep !== null || !analysis} size="sm">اقترح 3 اتجاهات</Button>
         {conceptItems.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -529,7 +530,7 @@ export default function StandaloneStudio() {
 
       {/* 4 تصاميم */}
       <div className={card}>
-        <h4 className="font-bold text-dark">الخطوة 4 — التصاميم</h4>
+        <StepHead n={4} title="التصاميم" subtitle="صمّم الاتجاهات أو الاتجاه المعتمد" done={batchResults.length > 0} />
         <Button onClick={designAll} loading={batchLoading} disabled={autoBusy || batchLoading || loadingStep !== null || !analysis || !selectedImages.length || conceptItems.length === 0} size="sm">🎨 صمّم الاتجاهات الثلاثة</Button>
         {batchLoading && <div className="flex items-center gap-2 text-sm text-muted"><LoadingSpinner size="sm" /><span>{batchProgress || 'جارٍ التوليد…'}</span></div>}
         <div className="border-t border-border pt-3">

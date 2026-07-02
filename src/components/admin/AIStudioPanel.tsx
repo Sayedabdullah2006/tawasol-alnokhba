@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ImageLightbox from '@/components/ui/ImageLightbox'
+import { StepHead } from '@/components/admin/StudioStep'
 
 interface ConceptItem {
   title?: string
@@ -431,7 +432,7 @@ export default function AIStudioPanel({
     }
   }
 
-  const cardCls = 'bg-card rounded-2xl border border-border p-5 space-y-3'
+  const cardCls = 'bg-card rounded-2xl border border-border p-5 space-y-3 shadow-sm'
 
   return (
     <div className="space-y-4" dir="rtl">
@@ -539,7 +540,7 @@ export default function AIStudioPanel({
 
       {/* ── الخطوة 1 — تحليل الخبر ── */}
       <div className={cardCls}>
-        <h4 className="font-bold text-dark">الخطوة 1 — تحليل الخبر</h4>
+        <StepHead n={1} title="تحليل الخبر" subtitle="استخراج عناصر الخبر لبناء المحتوى" done={!!analysis} />
         <Button
           onClick={() => callStep('analyze')}
           loading={loadingStep === 'analyze'}
@@ -560,7 +561,7 @@ export default function AIStudioPanel({
 
       {/* ── الخطوة 2 — التغريدات ── */}
       <div className={cardCls}>
-        <h4 className="font-bold text-dark">الخطوة 2 — التغريدات</h4>
+        <StepHead n={2} title="التغريدات" subtitle="٣ تغريدات بزوايا ومطالع متنوّعة" done={!!tweets} />
         <Button
           onClick={() => callStep('tweets')}
           loading={loadingStep === 'tweets'}
@@ -591,10 +592,7 @@ export default function AIStudioPanel({
 
       {/* ── الخطوة 3 — اتجاهات التصميم ── */}
       <div className={cardCls}>
-        <h4 className="font-bold text-dark">الخطوة 3 — اتجاهات التصميم</h4>
-        <p className="text-xs text-muted">
-          تُولَّد 3 اتجاهات مختلفة بناءً على تحليل الخبر وصورته المختارة.
-        </p>
+        <StepHead n={3} title="اتجاهات التصميم" subtitle="٣ اتجاهات مختلفة بناءً على الخبر والصورة" done={conceptItems.length > 0} />
         <Button
           onClick={() => callStep('concepts')}
           loading={loadingStep === 'concepts'}
@@ -647,7 +645,7 @@ export default function AIStudioPanel({
 
       {/* ── الخطوة 4 — توليد التصميم ── */}
       <div className={cardCls}>
-        <h4 className="font-bold text-dark">الخطوة 4 — توليد التصميم</h4>
+        <StepHead n={4} title="توليد التصميم" subtitle="صمّم الاتجاهات الثلاثة أو الاتجاه المعتمد" done={batchResults.length > 0 || !!imageUrl} />
 
         {/* توليد الاتجاهات الثلاثة دفعة واحدة */}
         <div className="space-y-2">

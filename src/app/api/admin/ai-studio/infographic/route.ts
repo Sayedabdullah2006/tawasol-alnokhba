@@ -5,7 +5,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { generateInfographic, INFOGRAPHIC_DIRECTIONS, type InfographicPerson } from '@/lib/ai-studio'
-import { getOpenAI, chatComplete, SYS_TWEETS } from '@/lib/openai'
+import { getOpenAI, chatComplete, SYS_TWEETS, buildTweetDirectives } from '@/lib/openai'
 import { logGeneratedDesign } from '@/lib/newsletter'
 
 export const dynamic = 'force-dynamic'
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
       model: 'gpt-5.5',
       messages: [
         { role: 'system', content: SYS_TWEETS },
-        { role: 'user', content: `محتوى إنفوجرافيك جماعي:\n${ctx}` },
+        { role: 'user', content: `محتوى إنفوجرافيك جماعي:\n${ctx}\n\n${buildTweetDirectives()}` },
       ],
     })
     tweets = completion.choices[0]?.message?.content ?? ''

@@ -9,7 +9,7 @@
  */
 import OpenAI from 'openai'
 import sharp from 'sharp'
-import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives } from './openai'
+import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives, buildTweetDirectives } from './openai'
 import { generateImageWithGemini, generateImageFromParts } from './gemini'
 import { compositeLogoBottomRight, resizeToPoster } from './logo-overlay'
 import { createServiceRoleClient } from './supabase-server'
@@ -51,12 +51,11 @@ export const EVERGREEN_NOTE =
   'تجنّب تماماً كلمات الزمن الآني مثل: (اليوم، الآن، للتو، مؤخراً، أمس، هذا الأسبوع، حديثاً، أعلن اليوم، عاجل، خبر عاجل، تزامناً مع). ' +
   'لا تذكر تاريخاً أو فترة توحي بأن الحدث جديد. ركّز على الإنجاز نفسه وقيمته لا على توقيت وقوعه.'
 
-/** إطار الحملة للتغريدات فقط — عبارة افتتاحية ثابتة + هاشتاق ثابت + إيموجي معبّرة. */
+/** إطار الحملة للتغريدات فقط — روح فخر سعودي + هاشتاق ثابت + إيموجي، بمطالع متنوّعة (لا عبارة افتتاح واحدة متكرّرة). */
 export const TWEET_CAMPAIGN_NOTE =
-  'ابدأ كل تغريدة من التغريدات الثلاث بالعبارة الافتتاحية الثابتة في سطرها الأول: «فخرٌ سعودي لا يُنسى» ' +
-  '(يجوز إيموجي واحد لائق قبلها مثل ❤️ أو 🇸🇦). ' +
-  'وأضِف الهاشتاق الثابت #ذاكرة_الإنجاز ضمن هاشتاقات كل تغريدة، إلى جانب #First1Saudi و#اسم_الشخص. ' +
-  '‼️ تجاوز قاعدة «إيموجي واحد كحد أقصى» المذكورة سابقاً: استخدم في كل تغريدة 3 إيموجي معبّرة على الأقل ' +
+  'أضِف روح الفخر السعودي في كل تغريدة لكن بصياغة مختلفة في كل مرة — ‼️ لا تبدأ التغريدات بعبارة افتتاحية واحدة ثابتة تتكرّر (تجنّب تكرار مطلع مثل «فخرٌ سعودي لا يُنسى» في كل توليد). ' +
+  'أدرِج الهاشتاق الثابت #ذاكرة_الإنجاز ضمن هاشتاقات كل تغريدة، إلى جانب #First1Saudi و#اسم_الشخص. ' +
+  '‼️ تجاوز قاعدة «إيموجي واحد كحد أقصى»: استخدم في كل تغريدة 3 إيموجي معبّرة على الأقل ' +
   '(وبحدٍّ أقصى نحو 4) ذات صلة بمضمون الإنجاز وموزّعة بما يخدم المعنى — دون إكثار أو حشو أو تكرار.'
 
 export interface Concept {
@@ -116,7 +115,7 @@ export async function generateTweets(
   args: { analysis: unknown; newsText: string; extra?: string },
 ): Promise<string> {
   const user =
-    `${JSON.stringify(args.analysis)}\n\n${args.newsText}` +
+    `${JSON.stringify(args.analysis)}\n\n${args.newsText}\n\n${buildTweetDirectives()}` +
     (args.extra ? `\n\n${args.extra}` : '')
   const completion = await chatComplete(openai, {
     model: OPENAI_MODEL,
