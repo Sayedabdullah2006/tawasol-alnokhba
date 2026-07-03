@@ -19,6 +19,7 @@ const adminNav: NavEntry[] = [
     label: 'المحتوى والنشر',
     icon: '📣',
     children: [
+      { href: '/admin/studio', label: 'استوديو الذكاء (مستقل)', icon: '🤖' },
       { href: '/admin/social', label: 'خطة النشر اليومية', icon: '🗓️' },
       { href: '/admin/newsletter', label: 'النخبة في ٧', icon: '🗞️' },
       { href: '/admin/social/calendar', label: 'تقويم الجدولة', icon: '📆' },
