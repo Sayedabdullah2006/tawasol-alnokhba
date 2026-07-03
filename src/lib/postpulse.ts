@@ -143,7 +143,7 @@ export async function uploadMediaFromUrl(imageUrl: string): Promise<{ path: stri
   const imgRes = await fetch(imageUrl)
   if (!imgRes.ok) throw new Error(`تعذّر جلب الصورة: ${imgRes.status}`)
   const contentType = imgRes.headers.get('content-type') || 'image/png'
-  let bytes = Buffer.from(await imgRes.arrayBuffer())
+  let bytes: Buffer = Buffer.from(await imgRes.arrayBuffer())
   // بعض المنصّات (تيك توك) ترفض أي صورة يتجاوز أحد أبعادها 1080px.
   // نصغّر أطول ضلع إلى 1080 مع الحفاظ على النسبة (بلا تكبير) لتقبلها كل القنوات.
   try {
