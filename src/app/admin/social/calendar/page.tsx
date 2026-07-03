@@ -50,18 +50,73 @@ export default function ScheduleCalendarPage() {
     return t
   })
 
+  // جدولة منشور مباشرة من التقويم
+  const [compose, setCompose] = useState(false)
+  const [cText, setCText] = useState('')
+  const [cImage, setCImage] = useState('')
+  const [cWhen, setCWhen] = useState('')
+  const [cUploading, setCUploading] = useState(false)
+  const [cBusy, setCBusy] = useState(false)
+
+  const loadItems = async () => {
+    const res = await fetch('/api/admin/schedule')
+    if (res.ok) { const d = await res.json(); setItems(d.items ?? []) }
+  }
+
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/auth/login'); return }
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       if (profile?.role !== 'admin') { router.push('/dashboard'); return }
-      const res = await fetch('/api/admin/schedule')
-      if (res.ok) { const d = await res.json(); setItems(d.items ?? []) }
+      await loadItems()
       setLoading(false)
     }
     init()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, router])
+
+  // فتح نافذة الجدولة مع تعبئة تاريخ اليوم المختار (اختياري)
+  const openCompose = (prefillKey?: string) => {
+    setCText(''); setCImage('')
+    setCWhen(prefillKey ? `${prefillKey}T10:00` : '')
+    setCompose(true)
+  }
+
+  const uploadComposeImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(file.type)) { alert('صيغة غير مدعومة (PNG/JPG/WEBP)'); return }
+    if (file.size > 10 * 1024 * 1024) { alert('الحجم يتجاوز 10 ميجابايت'); return }
+    setCUploading(true)
+    try {
+      const ext = file.name.split('.').pop()
+      const path = `sched-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const { error } = await supabase.storage.from('content-images').upload(path, file)
+      if (error) throw error
+      const { data } = supabase.storage.from('content-images').getPublicUrl(path)
+      setCImage(data.publicUrl)
+    } catch { alert('فشل رفع الصورة') } finally { setCUploading(false) }
+  }
+
+  const submitCompose = async () => {
+    if (!cText.trim() && !cImage) { alert('أضِف نصاً أو صورة'); return }
+    if (!cWhen) { alert('حدّد التاريخ والوقت'); return }
+    setCBusy(true)
+    try {
+      const res = await fetch('/api/postpulse/schedule', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: cText, imageUrl: cImage || undefined, scheduledLocal: cWhen }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { alert(d.error ?? 'فشل الجدولة'); return }
+      const n = Array.isArray(d.accountIds) ? d.accountIds.length : 0
+      alert(`تمت الجدولة في ${n} قناة بتوقيت السعودية 🗓️`)
+      setCompose(false); setCText(''); setCImage(''); setCWhen('')
+      await loadItems()
+    } catch { alert('حدث خطأ أثناء الجدولة') } finally { setCBusy(false) }
+  }
 
   // فهرسة العناصر حسب يوم السعودية
   const byDay = useMemo(() => {
@@ -123,6 +178,9 @@ export default function ScheduleCalendarPage() {
           <p className="text-sm text-muted mt-0.5">المنشورات المجدولة والمنشورة عبر القنوات (بتوقيت السعودية).</p>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={() => openCompose()} className="bg-green text-white text-sm font-bold rounded-xl px-4 py-2 hover:opacity-90 transition">
+            ➕ جدولة منشور
+          </button>
           <Link href="/admin/social" className="text-sm text-green hover:underline">← خطة النشر</Link>
           <div className="flex rounded-xl border border-border overflow-hidden">
             <button onClick={() => setView('month')} className={`px-3 py-1.5 text-sm font-bold ${view === 'month' ? 'bg-green text-white' : 'bg-card text-dark'}`}>شهري</button>
@@ -139,6 +197,53 @@ export default function ScheduleCalendarPage() {
         <WeekView weekStart={weekStart} byDay={byDay} keyOf={keyOf} todayKey={todayKey} PostChip={PostChip}
           onPrev={() => { const t = new Date(weekStart); t.setUTCDate(t.getUTCDate() - 7); setWeekStart(t) }}
           onNext={() => { const t = new Date(weekStart); t.setUTCDate(t.getUTCDate() + 7); setWeekStart(t) }} />
+      )}
+
+      {/* نافذة جدولة منشور مباشرة (صورة + نص + موعد بتوقيت السعودية) */}
+      {compose && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => cBusy ? null : setCompose(false)}>
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-border">
+              <h3 className="font-black text-dark text-base">🗓️ جدولة منشور جديد</h3>
+              <p className="text-xs text-muted mt-0.5">يُنشر النص والصورة في كل القنوات المربوطة في الموعد المحدّد (توقيت السعودية).</p>
+            </div>
+            <div className="px-5 py-4 overflow-y-auto space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-dark mb-1">الموعد (توقيت السعودية):</label>
+                <input type="datetime-local" value={cWhen} onChange={e => setCWhen(e.target.value)} disabled={cBusy}
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-dark mb-1">نص المنشور:</label>
+                <textarea value={cText} onChange={e => setCText(e.target.value)} disabled={cBusy}
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[120px] resize-y" placeholder="اكتب نص المنشور..." />
+                <p className="text-[11px] text-muted mt-1">{cText.length} حرف</p>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-dark mb-1">الصورة (اختياري):</label>
+                {cImage ? (
+                  <div className="flex items-center gap-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={cImage} alt="" className="w-16 h-20 object-cover rounded-lg border border-border" />
+                    <button onClick={() => setCImage('')} disabled={cBusy} className="text-xs text-red-600 hover:underline">إزالة الصورة</button>
+                  </div>
+                ) : (
+                  <label className="inline-flex items-center gap-1.5 text-xs font-bold text-dark border border-dashed border-border rounded-lg px-3 py-2 cursor-pointer hover:border-green hover:text-green transition">
+                    <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={uploadComposeImage} disabled={cUploading || cBusy} className="hidden" />
+                    {cUploading ? 'جارٍ الرفع…' : '⬆️ رفع صورة'}
+                  </label>
+                )}
+              </div>
+            </div>
+            <div className="px-5 py-3 border-t border-border flex gap-2">
+              <button onClick={submitCompose} disabled={cBusy || cUploading || !cWhen || (!cText.trim() && !cImage)}
+                className="flex-1 bg-green text-white text-sm font-bold rounded-xl px-4 py-2 hover:opacity-90 transition disabled:opacity-60">
+                {cBusy ? '⏳ جارٍ الجدولة…' : '🗓️ جدولة المنشور'}
+              </button>
+              <button onClick={() => setCompose(false)} disabled={cBusy} className="text-sm text-muted hover:text-dark px-3 py-2">إلغاء</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
