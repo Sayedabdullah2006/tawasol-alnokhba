@@ -6,6 +6,7 @@
  * الذي يُستدعى يدوياً لاحقاً عند تفعيل زر النشر.
  */
 import { createServiceRoleClient } from '@/lib/supabase-server'
+import sharp from 'sharp'
 
 const AUTH_BASE = 'https://auth.post-pulse.com'
 const API_BASE = 'https://api.post-pulse.com'
@@ -142,7 +143,17 @@ export async function uploadMediaFromUrl(imageUrl: string): Promise<{ path: stri
   const imgRes = await fetch(imageUrl)
   if (!imgRes.ok) throw new Error(`تعذّر جلب الصورة: ${imgRes.status}`)
   const contentType = imgRes.headers.get('content-type') || 'image/png'
-  const bytes = Buffer.from(await imgRes.arrayBuffer())
+  let bytes = Buffer.from(await imgRes.arrayBuffer())
+  // بعض المنصّات (تيك توك) ترفض أي صورة يتجاوز أحد أبعادها 1080px.
+  // نصغّر أطول ضلع إلى 1080 مع الحفاظ على النسبة (بلا تكبير) لتقبلها كل القنوات.
+  try {
+    const meta = await sharp(bytes).metadata()
+    if (Math.max(meta.width ?? 0, meta.height ?? 0) > 1080) {
+      bytes = await sharp(bytes)
+        .resize({ width: 1080, height: 1080, fit: 'inside', withoutEnlargement: true })
+        .toBuffer()
+    }
+  } catch { /* إن تعذّر التصغير نُبقي الصورة الأصلية */ }
   const ext = contentType.includes('jpeg') || contentType.includes('jpg') ? 'jpg' : contentType.includes('webp') ? 'webp' : 'png'
   const filename = `nukhba-${Date.now()}.${ext}`
 
