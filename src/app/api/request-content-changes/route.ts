@@ -60,6 +60,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'فشل تحديث الطلب' }, { status: 500 })
     }
 
+    // ⚡ إعادة توليد التصاميم تلقائياً بملاحظة العميل في الخلفية (تُبقي القديمة + تضيف المعدّلة)
+    void import('@/lib/auto-revise')
+      .then(m => m.autoReviseFromFeedback({ requestId, postIndex: null, feedback: feedback.trim() }))
+      .catch(e => console.error('[CONTENT_CHANGES] auto-revise trigger failed:', e))
+
     // Send notification email to admin
     const requestNumber = `ATH-${String(existingRequest.request_number).padStart(4, '0')}`
     notifyContentChangesRequested({

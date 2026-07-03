@@ -51,6 +51,7 @@ export default function AIStudioPanel({
         imageUrl: '', // المعاينة المفردة للجلسة فقط؛ الحفظ عبر designs
         designs: Array.isArray(savedStudio?.designs) ? savedStudio.designs : [],
         uploadedImages: Array.isArray(savedStudio?.uploaded_images) ? savedStudio.uploaded_images : [],
+        revised: savedStudio?.revised ?? null,
       }
     : {
         analysis: request.ai_analysis ?? null,
@@ -62,6 +63,7 @@ export default function AIStudioPanel({
         imageUrl: '',
         designs: Array.isArray(request.ai_designs) ? request.ai_designs : [],
         uploadedImages: Array.isArray(request.ai_uploaded_images) ? request.ai_uploaded_images : [],
+        revised: request.ai_revised_designs ?? null,
       }
 
   // صور المصدر الأصلية للخبر (حملة: صور المنشور، مفرد: صور الطلب)
@@ -878,6 +880,42 @@ export default function AIStudioPanel({
           )}
         </div>
       </div>
+
+      {/* ── التصاميم المعدّلة تلقائياً حسب ملاحظات العميل (مع الإبقاء على القديمة أعلاه) ── */}
+      {Array.isArray(saved.revised?.designs) && saved.revised.designs.length > 0 && (
+        <div className={`${cardCls} border-amber-300`}>
+          <StepHead n="🔁" title="التصاميم المعدّلة (حسب ملاحظات العميل)" subtitle="أُعيد توليدها آلياً — راجعها وأرسل الأنسب؛ التصاميم القديمة محفوظة أعلاه" tone="gold" />
+          {saved.revised.feedback && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+              <span className="font-bold">✍️ ملاحظة العميل:</span> {saved.revised.feedback}
+            </div>
+          )}
+          <div className="space-y-3">
+            {saved.revised.designs.map((d: { title?: string; imageUrl?: string }, i: number) => {
+              const url = d.imageUrl as string
+              return (
+                <div key={i} className="rounded-xl border-2 border-amber-200 p-2 flex gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt={d.title} onClick={() => setLightbox(url)} className="w-24 flex-shrink-0 aspect-[4/5] object-cover rounded-lg border border-border cursor-zoom-in" />
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <div className="font-bold text-dark text-xs">{d.title ?? `معدّل ${i + 1}`}</div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button onClick={() => onUsedContent(selectedTweet, [url], isPost ? (postIndex as number) : 0)} variant="secondary" size="sm">📤 أرسل هذا للعميل</Button>
+                      <Button onClick={() => openPublish(url)} loading={publishingCover === url} disabled={publishingCover !== null} variant={publishedCover === url ? 'secondary' : 'outline'} size="sm">
+                        {publishedCover === url ? '✅ نُشر' : '📣 انشر'}
+                      </Button>
+                      <Button onClick={() => featureInMagazine(url)} loading={featuringCover === url} disabled={featuringCover !== null} variant={featuredCover === url ? 'secondary' : 'outline'} size="sm">
+                        {featuredCover === url ? '⭐ مميّز' : '⭐ ضمّن'}
+                      </Button>
+                      <a href={url} target="_blank" rel="noopener noreferrer" download className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-green/10 text-green hover:bg-green/20">⬇️ تنزيل</a>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <ImageLightbox src={lightbox} onClose={() => setLightbox(null)} />
 

@@ -225,10 +225,14 @@ export default function PostReviews({ request }: Props) {
                 </div>
               ) : (
                 <div className="bg-white rounded-xl p-3 space-y-2">
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-2.5 text-[11px] text-purple-700 leading-relaxed">
+                    ✍️ لتُنفَّذ ملاحظاتك بدقّة، اكتبها محدّدة وواضحة. مثال:
+                    <span className="block mt-1 text-purple-600">«احذف عبارة (كذا) · أضِف (كذا) أسفل الاسم · كبّر اسم الشخص · اجعل الخلفية أغمق · غيّر لون العنوان».</span>
+                  </div>
                   <textarea
                     value={feedback[item.index] ?? ''}
                     onChange={e => setFeedback(prev => ({ ...prev, [item.index]: e.target.value }))}
-                    placeholder="اكتب ملاحظاتك والتعديلات المطلوبة..."
+                    placeholder="مثال: احذف جملة «...»، أضِف «...» أسفل الاسم، كبّر اسم الشخص، اجعل الخلفية أغمق..."
                     className="w-full px-3 py-2 rounded-lg border border-border text-sm min-h-[90px] resize-y"
                     maxLength={500}
                   />
