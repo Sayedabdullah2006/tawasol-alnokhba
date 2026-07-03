@@ -7,6 +7,7 @@ import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ImageLightbox from '@/components/ui/ImageLightbox'
 import { StepHead } from '@/components/admin/StudioStep'
+import ScheduleSuggestions from '@/components/admin/ScheduleSuggestions'
 import { SECTION_NAMES } from '@/lib/showcase-sections'
 
 type StepKey = 'analyze' | 'tweets' | 'concepts' | 'image'
@@ -655,7 +656,8 @@ export default function StandaloneStudio() {
                 <label className="block text-xs font-bold text-dark mb-1">موعد النشر (توقيت السعودية):</label>
                 <input type="datetime-local" value={scheduleWhen} onChange={e => setScheduleWhen(e.target.value)}
                   disabled={!!schedulingCover}
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm" />
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm mb-2" />
+                <ScheduleSuggestions value={scheduleWhen} onPick={setScheduleWhen} />
               </div>
               <div>
                 <label className="block text-xs font-bold text-dark mb-1">نص المنشور (عدّله قبل الجدولة):</label>

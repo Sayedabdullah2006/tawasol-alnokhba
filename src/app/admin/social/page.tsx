@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import ScheduleSuggestions from '@/components/admin/ScheduleSuggestions'
 
 interface ScheduleItem {
   id: string
@@ -356,6 +357,7 @@ export default function AdminSocialPage() {
                           disabled={schedBusy}
                           className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-card text-dark"
                         />
+                        <ScheduleSuggestions value={schedWhen} onPick={setSchedWhen} />
                         <label className="block text-xs font-bold text-dark">النص المعتمد</label>
                         <textarea
                           value={schedText}

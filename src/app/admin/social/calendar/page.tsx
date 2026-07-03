@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import ScheduleSuggestions from '@/components/admin/ScheduleSuggestions'
 
 interface SchedItem {
   id: string
@@ -211,7 +212,8 @@ export default function ScheduleCalendarPage() {
               <div>
                 <label className="block text-xs font-bold text-dark mb-1">الموعد (توقيت السعودية):</label>
                 <input type="datetime-local" value={cWhen} onChange={e => setCWhen(e.target.value)} disabled={cBusy}
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm" />
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm mb-2" />
+                <ScheduleSuggestions value={cWhen} onPick={setCWhen} />
               </div>
               <div>
                 <label className="block text-xs font-bold text-dark mb-1">نص المنشور:</label>
