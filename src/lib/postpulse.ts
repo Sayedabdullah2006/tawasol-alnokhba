@@ -196,18 +196,32 @@ export async function uploadMediaFromUrl(imageUrl: string): Promise<{ path: stri
     )
   }
 
-  // 4) تأكيد الرفع
-  const confirmRes = await fetch(`${API_BASE}/v1/media/upload/confirm`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key: presign.key }),
-  })
-  const confirmText = await confirmRes.text().catch(() => '')
-  if (!confirmRes.ok) throw new Error(`فشل تأكيد الرفع: ${confirmRes.status} ${confirmText}`)
-  // قد يعيد التأكيد جسماً فارغاً عند النجاح — نتعامل معه بأمان بدل تعطّل JSON.
+  // 4) تأكيد الرفع — اختياري حسب توثيق Post-Pulse (الملف رُفِع فعلاً بنجاح PUT).
+  // أفضل جهد: إعادة محاولة على المهلة/5xx، وإن تعذّر نُكمل بمسار presign.key بدل تعطيل الجدولة.
   let confirmData: unknown = null
-  if (confirmText) {
-    try { confirmData = JSON.parse(confirmText) } catch { confirmData = { raw: confirmText } }
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const ctrl = new AbortController()
+      const to = setTimeout(() => ctrl.abort(), 20000)
+      const confirmRes = await fetch(`${API_BASE}/v1/media/upload/confirm`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: presign.key }),
+        signal: ctrl.signal,
+      })
+      clearTimeout(to)
+      const confirmText = await confirmRes.text().catch(() => '')
+      if (confirmRes.ok) {
+        if (confirmText) { try { confirmData = JSON.parse(confirmText) } catch { confirmData = { raw: confirmText } } }
+        break
+      }
+      // أخطاء العميل (عدا 408/429) لا تُعاد؛ نُكمل بالمفتاح
+      if (confirmRes.status < 500 && confirmRes.status !== 408 && confirmRes.status !== 429) {
+        console.warn(`[POSTPULSE] confirm ${confirmRes.status} — نُكمل بمسار المفتاح`)
+        break
+      }
+    } catch { /* مهلة/شبكة (504/abort) — نعيد المحاولة */ }
+    await new Promise(r => setTimeout(r, 1500 * (attempt + 1)))
   }
   return { path: extractMediaPath(confirmData, presign.key), raw: confirmData ?? { key: presign.key } }
 }
