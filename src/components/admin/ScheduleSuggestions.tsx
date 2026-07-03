@@ -10,15 +10,25 @@ import { useEffect, useState } from 'react'
 
 const AR_DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
-const PREFERRED_HOURS = [10, 13, 19, 21] // أوقات نشر مناسبة (توقيت السعودية)
+// أوقات نشر جيدة على السوشال (توقيت السعودية) — تُخلط لتنويع الأوقات في كل مرة.
+const BEST_HOURS = [11, 13, 16, 19, 20, 21, 22]
+const MAX_PER_DAY = 3 // يُقترح اليوم ما لم يبلغ 3 منشورات مجدولة
 const KSA_MS = 3 * 3600 * 1000
 
 interface Slot { value: string; label: string; note: string; empty: boolean }
 
 const p2 = (n: number) => String(n).padStart(2, '0')
 const hour12 = (h: number) => { const am = h < 12; const hr = h % 12 === 0 ? 12 : h % 12; return `${hr}:00 ${am ? 'ص' : 'م'}` }
+const shuffle = <T,>(a: T[]): T[] => {
+  const r = [...a]
+  for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]] }
+  return r
+}
 
-/** يبني حتى `count` مقترحات: أقرب أيام فارغة/أقل ازدحاماً + أنسب وقت في كل يوم. */
+/**
+ * يبني `count` مقترحات على **أيام مختلفة وأوقات مختلفة**: أقرب الأيام التي فيها أقل
+ * من 3 منشورات، مع وقت مختلف لكل مقترح من مجموعة أفضل أوقات النشر (مخلوطة).
+ */
 function buildSuggestions(existingISO: string[], count = 3): Slot[] {
   const nowMs = Date.now()
   const existingMs = existingISO.map(s => Date.parse(s)).filter(n => !Number.isNaN(n))
@@ -27,29 +37,33 @@ function buildSuggestions(existingISO: string[], count = 3): Slot[] {
   const density: Record<string, number> = {}
   for (const ms of existingMs) { const k = dayKey(ms); density[k] = (density[k] ?? 0) + 1 }
 
+  const pool = shuffle(BEST_HOURS)
+  const usedHours = new Set<number>()
   const todayK = new Date(nowMs + KSA_MS)
-  const out: { ms: number; value: string; label: string; note: string; empty: boolean; dens: number }[] = []
-  for (let off = 0; off < 21; off++) {
+  const out: Slot[] = []
+
+  for (let off = 0; off < 21 && out.length < count; off++) {
     const base = new Date(Date.UTC(todayK.getUTCFullYear(), todayK.getUTCMonth(), todayK.getUTCDate() + off))
     const Y = base.getUTCFullYear(), M = base.getUTCMonth(), D = base.getUTCDate(), wd = base.getUTCDay()
     const dens = density[`${Y}-${p2(M + 1)}-${p2(D)}`] ?? 0
-    for (const h of PREFERRED_HOURS) {
+    if (dens >= MAX_PER_DAY) continue // يوم مزدحم — نتخطّاه
+    // وقت مختلف لكل مقترح: أول ساعة غير مستخدمة، مستقبلية، وغير قريبة من منشور موجود
+    for (const h of pool) {
+      if (usedHours.has(h)) continue
       const utcMs = Date.UTC(Y, M, D, h, 0, 0) - KSA_MS
-      if (utcMs < nowMs + 60 * 60 * 1000) continue // مستقبلي + هامش ساعة
-      if (existingMs.some(ms => Math.abs(ms - utcMs) < 90 * 60 * 1000)) continue // ليس قريباً من منشور
+      if (utcMs < nowMs + 60 * 60 * 1000) continue
+      if (existingMs.some(ms => Math.abs(ms - utcMs) < 90 * 60 * 1000)) continue
+      usedHours.add(h)
       out.push({
-        ms: utcMs,
         value: `${Y}-${p2(M + 1)}-${p2(D)}T${p2(h)}:00`,
         label: `${AR_DAYS[wd]} ${D} ${AR_MONTHS[M]} · ${hour12(h)}`,
         note: dens === 0 ? 'يوم فارغ' : `${dens} منشور`,
-        empty: dens === 0, dens,
+        empty: dens === 0,
       })
-      break // أفضل وقت واحد لكل يوم
+      break // مقترح واحد (يوم واحد) لكل تكرار
     }
   }
-  // الأقل ازدحاماً أولاً ثم الأقرب زمنياً
-  out.sort((a, b) => a.dens - b.dens || a.ms - b.ms)
-  return out.slice(0, count).map(({ value, label, note, empty }) => ({ value, label, note, empty }))
+  return out
 }
 
 export default function ScheduleSuggestions({ value, onPick }: { value?: string; onPick: (v: string) => void }) {
