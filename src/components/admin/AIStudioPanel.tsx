@@ -229,6 +229,10 @@ export default function AIStudioPanel({
   const [regenIndex, setRegenIndex] = useState<number | null>(null)
   const [singleNote, setSingleNote] = useState('')
   const [regenSingle, setRegenSingle] = useState(false)
+  // إعادة توليد كل التصاميم بملاحظة واحدة مشتركة
+  const [bulkNote, setBulkNote] = useState('')
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkProgress, setBulkProgress] = useState('')
 
   const callStep = async (step: StepKey) => {
     setLoadingStep(step)
@@ -415,6 +419,30 @@ export default function AIStudioPanel({
       }
     } finally {
       setRegenIndex(null)
+    }
+  }
+
+  // إعادة توليد كل التصاميم بملاحظة واحدة مشتركة (حذف/إضافة نص أو تعديل عام)
+  const regenerateAllWithNote = async () => {
+    if (!batchResults.length) return
+    const note = bulkNote.trim()
+    if (!note) { showToast('اكتب ملاحظة لإعادة توليد الكل', 'error'); return }
+    setBulkBusy(true)
+    try {
+      const updated = [...batchResults]
+      for (let i = 0; i < updated.length; i++) {
+        setBulkProgress(`جارٍ إعادة التوليد ${i + 1}/${updated.length}…`)
+        const url = await generateOneDesign(updated[i].brief, note)
+        if (url) {
+          updated[i] = { ...updated[i], imageUrl: url }
+          setBatchResults(prev => prev.map((x, idx) => idx === i ? { ...x, imageUrl: url } : x))
+          setSelectedBatch(prev => new Set(prev).add(i))
+        }
+      }
+      persistStudioState({ designs: updated }) // حفظ كل التحديثات
+      showToast('تم إعادة توليد كل التصاميم بالملاحظة ✅', 'success')
+    } finally {
+      setBulkBusy(false); setBulkProgress('')
     }
   }
 
@@ -666,6 +694,18 @@ export default function AIStudioPanel({
           {batchResults.length > 0 && (
             <div className="space-y-3">
               <p className="text-xs text-muted">اختر التصاميم لإرسالها للعميل، أو اكتب ملاحظة وأعد توليد أي تصميم:</p>
+              {/* إعادة توليد كل التصاميم بملاحظة واحدة (حذف نص/إضافة نص/تعديل عام) */}
+              <div className="rounded-xl border border-green/40 bg-green/5 p-3 space-y-2">
+                <p className="text-[11px] text-muted">✍️ ملاحظة تُطبَّق على كل التصاميم معاً — مثل: احذف نص «كذا»، أضِف «كذا»، أو تعديل عام على التصميم.</p>
+                <textarea value={bulkNote} onChange={e => setBulkNote(e.target.value)} disabled={bulkBusy}
+                  placeholder="اكتب ملاحظة لإعادة توليد كل التصاميم..." className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[60px] resize-y" />
+                <div className="flex items-center gap-2">
+                  <Button onClick={regenerateAllWithNote} loading={bulkBusy} disabled={bulkBusy || regenIndex !== null || batchLoading || !bulkNote.trim()} size="sm">
+                    🔁 أعد توليد الكل بالملاحظة
+                  </Button>
+                  {bulkBusy && <span className="text-xs text-green-700 flex items-center gap-1.5"><LoadingSpinner size="sm" />{bulkProgress}</span>}
+                </div>
+              </div>
               <div className="space-y-3">
                 {batchResults.map((r, i) => {
                   const on = selectedBatch.has(i)
