@@ -187,7 +187,7 @@ export async function uploadMediaFromUrl(imageUrl: string): Promise<{ path: stri
   const putRes = await fetch(presign.url, {
     method: 'PUT',
     headers: putHeaders,
-    body: bytes as Uint8Array, // Buffer<ArrayBufferLike> غير متوافق مباشرةً مع BodyInit؛ Uint8Array متوافق
+    body: new Uint8Array(bytes), // Uint8Array عادي متوافق مع BodyInit (يتجنّب وسيط ArrayBufferLike لـ Buffer)
   })
   if (!putRes.ok) {
     const errBody = await putRes.text().catch(() => '')
