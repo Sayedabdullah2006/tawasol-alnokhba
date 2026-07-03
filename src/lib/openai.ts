@@ -172,6 +172,8 @@ export const SYS_ANALYZE = `أنت محلّل أخبار لحساب "First1Saudi
 - التزم بالحقائق الواردة فقط، ولا تضف أو تبالغ.
 - لا تستخدم نِسباً مئوية.
 - تجاهل العبارات الإنشائية والعاطفية، وركّز على الإنجاز والقيمة.
+- ‼️ الاسم يُذكر في حقل "name" فقط. لا تُكرّر اسم الشخص داخل achievement_core أو key_facts أو titles أو context_label (تُعرَض هذه بلا اسم).
+- ‼️ صُغ achievement_core و key_facts و reader_value كإنجازات ملموسة مباشرة، لا كتعريف موسوعي. احذف أي صياغة تعريفية/وصفية للمحتوى أو الشخص مثل: «يُعرّف بـ»، «يعرف المحتوى بـ»، «هو عبارة عن»، «هو/هي عالم/لاعب…» (كتعريف)، «نبذة عن»، «يتحدث عن»، «هذا المحتوى». حوّل الجملة التعريفية إلى الإنجاز نفسه (مثال: بدل «فلان هو عالم سعودي في X» اكتب «إنجاز علمي سعودي في X»).
 - إن كان المحتوى عدة منشورات منفصلة، حلّل كل منشور ككيان مستقل.`
 
 /** الخطوة الثانية - كاتب التغريدات */
@@ -296,6 +298,8 @@ Render all Arabic text crisp, correctly shaped and connected (RTL), exactly as q
 ✗ Repeating ANY text element — the name and every phrase appear ONCE only; never duplicate the name or any info across the layout
 ✗ Any phrase that refers to the photo/source such as "وفق الصورة المرفقة" / "كما هو مذكور في الصورة" / "كما في الصورة" / "الصورة المرفقة" / "توضّح الصورة" / "حسب الصورة" or similar
 ✗ emojis / 3D / sparkles inside the design
+✗ ‼️ تكرار اسم صاحب الإنجاز: يظهر مرة واحدة فقط في عنصر NAME، ولا يُعاد في سطر الإنجاز أو الحقائق أو اللِّيبل إطلاقاً.
+✗ ‼️ أي عبارة تعريفية/وصفية للمحتوى أو الشخص مثل: «يُعرّف بـ» / «يعرف المحتوى بـ» / «هو عبارة عن» / «نبذة عن» / «يتحدث عن» / «هذا المحتوى» — اعرض مضمون الخبر وصياغة الإنجاز مباشرةً فقط.
 ✗ the phrase "أول سعودية" unless it appears in the source
 
 FINAL REMINDER: EDIT THE PROVIDED PHOTO IN PLACE. The real person stays pixel-identical; you only add the FIRST1SAUDI graphic layer around/over the background. Output the result as a 1080×1350 (4:5) portrait image.`
