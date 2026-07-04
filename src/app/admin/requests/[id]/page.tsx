@@ -14,6 +14,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import QuoteComposer from '@/components/admin/QuoteComposer'
 import ContentSender from '@/components/admin/ContentSender'
 import AIStudioPanel from '@/components/admin/AIStudioPanel'
+import ImageEditSchedule from '@/components/admin/ImageEditSchedule'
 import PostReviewStatus from '@/components/admin/PostReviewStatus'
 import CampaignPostStatusManager from '@/components/admin/CampaignPostStatusManager'
 import EditableNewsContent from '@/components/admin/EditableNewsContent'
@@ -111,6 +112,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   const [rejectReason, setRejectReason] = useState('')
   const [sendingContent, setSendingContent] = useState(false)
   const [showAIStudio, setShowAIStudio] = useState(false)
+  const [showImageUpload, setShowImageUpload] = useState(false)
   const [aiContent, setAiContent] = useState<string | null>(null)
   const [aiImages, setAiImages] = useState<string[] | null>(null)
   const [aiPostIndex, setAiPostIndex] = useState<number | null>(null)
@@ -446,6 +448,14 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                     }
                     return <AIStudioPanel request={request} onUsedContent={studioOnUsed} />
                   })()}
+              </div>
+
+              {/* رفع صورة وتعديلها مباشرة + جدولة نشر بلا المرور بخط تحليل الخبر الكامل */}
+              <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
+                <Button variant="outline" onClick={() => setShowImageUpload(v => !v)} className="w-full">
+                  ✂️ {showImageUpload ? 'إخفاء رفع وتعديل صورة' : 'رفع صورة وتعديلها + جدولة مباشرة'}
+                </Button>
+                {showImageUpload && <ImageEditSchedule />}
               </div>
 
               {/* طلب صورة/معلومات من العميل */}

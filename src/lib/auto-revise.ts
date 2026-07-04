@@ -1,14 +1,14 @@
 /**
- * إعادة التوليد التلقائي لتصاميم الطلب بناءً على ملاحظات العميل.
+ * إعادة تعديل تلقائية لتصاميم الطلب بناءً على ملاحظات العميل.
  *
  * يُستدعى «fire-and-forget» من مسارَي طلب التعديل (مفرد/حملة) بعد حفظ الملاحظة.
- * يأخذ التحليل المحفوظ + موجز كل تصميم + صور المصدر + ملاحظة العميل كـ note،
- * ويعيد توليد التصاميم مع **الإبقاء على القديمة**، ويخزّن المجموعة المعدّلة في
- * ai_revised_designs (مفرد) أو ai_posts[idx].revised (حملة). ثم يُشعر الأدمن.
+ * يستخدم «التعديل الدقيق» (editDesign — image-to-image) على كل تصميم مُرسل فعلياً
+ * للعميل، فيُطبَّق طلب العميل على **نفس التصميم/الصورة** دون إعادة التوليد الكامل
+ * من معطيات الخبر. تُحفظ النتيجة في ai_revised_designs (مفرد) أو
+ * ai_posts[idx].revised (حملة) مع الإبقاء على القديمة، ثم يُشعر الأدمن.
  */
 import { createServiceRoleClient } from '@/lib/supabase-server'
-import { getOpenAI } from '@/lib/openai'
-import { generateDesign } from '@/lib/ai-studio'
+import { editDesign } from '@/lib/ai-studio'
 import { sendEmail } from '@/lib/email'
 
 const ADMIN_EMAIL = 'first1saudi@gmail.com'
@@ -19,10 +19,10 @@ interface DesignEntry { title?: string; imageUrl?: string; url?: string; brief?:
 function normalizeDesigns(v: unknown): DesignEntry[] {
   return (Array.isArray(v) ? v : [])
     .map((d: any) => ({ title: d?.title, imageUrl: d?.imageUrl ?? d?.url, brief: d?.brief }))
-    .filter(d => d.imageUrl && !((d as any).revised)) // نعيد التوليد من الأصلية فقط
+    .filter(d => d.imageUrl && !((d as any).revised)) // نعدّل من الأصلية فقط
 }
 
-/** ينفّذ إعادة التوليد بالملاحظة. آمن للاستدعاء fire-and-forget. */
+/** ينفّذ التعديل الدقيق بالملاحظة على كل تصميم مُرسل. آمن للاستدعاء fire-and-forget. */
 export async function autoReviseFromFeedback(args: { requestId: string; postIndex?: number | null; feedback: string }): Promise<void> {
   const { requestId } = args
   const feedback = (args.feedback || '').trim()
@@ -33,35 +33,33 @@ export async function autoReviseFromFeedback(args: { requestId: string; postInde
   const sc = await createServiceRoleClient()
   const { data: req } = await sc
     .from('publish_requests')
-    .select('id, request_number, client_name, ai_analysis, ai_designs, ai_source_image, ai_uploaded_images, ai_posts')
+    .select('id, request_number, client_name, ai_designs, ai_posts, post_reviews')
     .eq('id', requestId)
     .single()
   if (!req) return
 
-  // مصدر البيانات: حملة (ai_posts[idx]) أو مفرد (أعمدة الطلب)
-  const entry: any = isPost && req.ai_posts && typeof req.ai_posts === 'object' ? (req.ai_posts as any)[postIndex] ?? {} : {}
-  const analysis = isPost ? entry.analysis : req.ai_analysis
-  const baseDesigns = normalizeDesigns(isPost ? entry.designs : req.ai_designs)
-  const srcSingle = isPost ? entry.source_image : req.ai_source_image
-  const uploaded = isPost ? entry.uploaded_images : req.ai_uploaded_images
-  const sourceImages: string[] = [srcSingle, ...(Array.isArray(uploaded) ? uploaded : [])].filter(Boolean) as string[]
+  // مصدر التصاميم: آخر جولة مُرسلة فعلياً للعميل (post_reviews) وإلا مخرجات الاستوديو المحفوظة
+  const reviews: Record<string, any> = req.post_reviews && typeof req.post_reviews === 'object' ? (req.post_reviews as any) : {}
+  const sentImages: string[] | undefined = Array.isArray(reviews?.[postIndex ?? 0]?.proposed_images)
+    ? reviews[postIndex ?? 0].proposed_images
+    : undefined
 
-  // نحتاج تحليلاً + تصاميم أصلية + صورة مصدر لإعادة التوليد آلياً
-  if (!analysis || !baseDesigns.length || !sourceImages.length) return
+  const entry: any = isPost && req.ai_posts && typeof req.ai_posts === 'object' ? (req.ai_posts as any)[postIndex] ?? {} : {}
+  const studioDesigns = normalizeDesigns(isPost ? entry.designs : req.ai_designs)
+
+  // نُفضّل التصاميم المُرسلة فعلياً (ما يراه العميل)؛ وإلا نستخدم مخرجات الاستوديو المحفوظة.
+  const baseDesigns: DesignEntry[] = sentImages?.length
+    ? sentImages.map((url, i) => ({ title: studioDesigns[i]?.title ?? `تصميم ${i + 1}`, imageUrl: url }))
+    : studioDesigns
+
+  if (!baseDesigns.length) return
 
   try {
-    const openai = getOpenAI()
     const revised: DesignEntry[] = []
     for (const d of baseDesigns) {
-      const brief = d.brief || d.title || ''
       try {
-        const { imageUrl } = await generateDesign(openai, {
-          analysis,
-          chosenConcept: brief,
-          sourceImages,
-          note: `تعديل بناءً على ملاحظات العميل: ${feedback}`,
-        })
-        revised.push({ title: `🔁 معدّل: ${d.title ?? 'تصميم'}`, imageUrl, brief })
+        const { imageUrl } = await editDesign({ designImageUrl: d.imageUrl as string, note: feedback })
+        revised.push({ title: `🔁 معدّل: ${d.title ?? 'تصميم'}`, imageUrl })
       } catch { /* تجاهل فشل تصميم واحد */ }
     }
     if (!revised.length) return
@@ -80,10 +78,10 @@ export async function autoReviseFromFeedback(args: { requestId: string; postInde
     await sendEmail(ADMIN_EMAIL, `🔁 ملاحظات عميل + تصاميم معدّلة — الطلب ${reqNumber}`,
       `<!DOCTYPE html><html dir="rtl" lang="ar"><body style="font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f1f5f9;padding:24px">
         <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:14px;padding:24px">
-          <h2 style="color:#0A2D35;margin:0 0 8px">🔁 وصلت ملاحظات العميل وأُعيد توليد التصاميم — الطلب ${reqNumber}</h2>
+          <h2 style="color:#0A2D35;margin:0 0 8px">🔁 وصلت ملاحظات العميل وطُبِّق التعديل الدقيق — الطلب ${reqNumber}</h2>
           <p style="color:#475569;font-size:14px;margin:0 0 8px">العميل: ${(req.client_name as string) || 'عميل'}</p>
           <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px;color:#92400e;font-size:14px;margin:0 0 12px">✍️ ملاحظة العميل: ${feedback}</div>
-          <p style="color:#475569;font-size:13px;margin:0 0 8px">أُنشئت ${revised.length} تصاميم معدّلة (مع الإبقاء على القديمة). راجعها في الاستوديو وأرسل الأنسب.</p>
+          <p style="color:#475569;font-size:13px;margin:0 0 8px">طُبِّق التعديل على نفس التصاميم المُرسلة (${revised.length}) مع الإبقاء على القديمة. راجعها في الاستوديو وأرسل الأنسب.</p>
           <div style="text-align:center">${thumbs}</div>
           <div style="text-align:center;margin-top:16px">
             <a href="${SITE_URL}/admin/requests/${requestId}" style="display:inline-block;background:#2D8B3F;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold">فتح الطلب في الاستوديو</a>

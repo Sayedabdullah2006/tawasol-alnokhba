@@ -8,6 +8,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ImageLightbox from '@/components/ui/ImageLightbox'
 import { StepHead } from '@/components/admin/StudioStep'
 import ScheduleSuggestions from '@/components/admin/ScheduleSuggestions'
+import ImageEditSchedule from '@/components/admin/ImageEditSchedule'
 import { SECTION_NAMES } from '@/lib/showcase-sections'
 
 type StepKey = 'analyze' | 'tweets' | 'concepts' | 'image'
@@ -38,7 +39,7 @@ export default function StandaloneStudio() {
   const [publishingCover, setPublishingCover] = useState<string | null>(null)
   const [publishedCover, setPublishedCover] = useState<string | null>(null)
   // تبويب الإنفوجرافيك (عدة أشخاص)
-  const [mode, setMode] = useState<'news' | 'info'>('news')
+  const [mode, setMode] = useState<'news' | 'info' | 'upload'>('news')
   const [infoTitle, setInfoTitle] = useState('')
   const [infoExtra, setInfoExtra] = useState('')
   const [people, setPeople] = useState<{ imageUrl: string; name: string; blurb: string }[]>([{ imageUrl: '', name: '', blurb: '' }])
@@ -370,7 +371,10 @@ export default function StandaloneStudio() {
       <div className="flex rounded-xl border border-border overflow-hidden w-fit">
         <button onClick={() => setMode('news')} className={`px-4 py-2 text-sm font-bold ${mode === 'news' ? 'bg-green text-white' : 'bg-card text-dark'}`}>📰 تصميم خبر</button>
         <button onClick={() => setMode('info')} className={`px-4 py-2 text-sm font-bold ${mode === 'info' ? 'bg-green text-white' : 'bg-card text-dark'}`}>📊 إنفوجرافيك</button>
+        <button onClick={() => setMode('upload')} className={`px-4 py-2 text-sm font-bold ${mode === 'upload' ? 'bg-green text-white' : 'bg-card text-dark'}`}>✂️ رفع وتعديل صورة</button>
       </div>
+
+      {mode === 'upload' && <ImageEditSchedule />}
 
       {mode === 'info' && (
         <div className="space-y-4">
