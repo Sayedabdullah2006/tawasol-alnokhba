@@ -4,7 +4,8 @@ import { notifyContentApprovedToAdmin } from '@/lib/email'
 
 /**
  * اعتماد العميل لمحتوى/تصميم خبر واحد (postIndex) مع اختيار تصميم واحد.
- * يُحدّث post_reviews[postIndex] فقط؛ يبقى الطلب «قيد التنفيذ».
+ * يُحدّث post_reviews[postIndex]، وعند اعتماد كل منشورات الطلب تُنقل حالة الطلب
+ * إلى «قيد التنفيذ» (جاهز لينشره الأدمن) — مطابقةً لمسار الاعتماد المفرد.
  */
 export async function POST(request: Request) {
   try {
@@ -54,17 +55,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'اختر تصميماً أولاً' }, { status: 400 })
     }
 
+    const now = new Date().toISOString()
     reviews[postIndex] = {
       ...entry,
       status: 'approved',
       selected_image: chosen,
       user_feedback: null,
-      content_approved_at: new Date().toISOString(),
+      content_approved_at: now,
     }
+
+    // هل اعتُمدت كل منشورات الطلب الآن؟ (المفرد = منشور واحد)
+    const isCampaign = existingRequest.request_type === 'campaign' && Array.isArray(existingRequest.campaign_posts)
+    const totalPosts = isCampaign ? existingRequest.campaign_posts.length : 1
+    const approvedCount = Object.values(reviews).filter((e: any) => e?.status === 'approved').length
+    const allApproved = approvedCount >= totalPosts
+
+    const upd: Record<string, unknown> = { post_reviews: reviews, updated_at: now }
+    if (allApproved) { upd.status = 'in_progress'; upd.content_approved_at = now } // خرج من مرحلة المراجعة
 
     const { error } = await supabase
       .from('publish_requests')
-      .update({ post_reviews: reviews, updated_at: new Date().toISOString() })
+      .update(upd)
       .eq('id', requestId)
 
     if (error) {
