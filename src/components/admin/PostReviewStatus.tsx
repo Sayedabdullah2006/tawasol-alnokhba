@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import ImageLightbox from '@/components/ui/ImageLightbox'
+import ScheduleSuggestions from '@/components/admin/ScheduleSuggestions'
 import { getReviewItems, getPostReviews } from '@/lib/review-items'
 
 interface Props {
@@ -25,6 +26,31 @@ export default function PostReviewStatus({ request, onEdit }: Props) {
   const items = getReviewItems(request)
   const reviews = getPostReviews(request)
   const [lightbox, setLightbox] = useState<string | null>(null)
+  // جدولة نشر المحتوى المعتمد
+  const [sched, setSched] = useState<{ cover: string } | null>(null)
+  const [schedWhen, setSchedWhen] = useState('')
+  const [schedText, setSchedText] = useState('')
+  const [schedBusy, setSchedBusy] = useState(false)
+
+  const openSchedule = (cover: string, text: string) => { setSchedText(text || ''); setSchedWhen(''); setSched({ cover }) }
+  const submitSchedule = async () => {
+    if (!sched) return
+    if (!schedText.trim() && !sched.cover) { alert('لا يوجد نص أو تصميم للجدولة'); return }
+    if (!schedWhen) { alert('حدّد تاريخ ووقت الجدولة'); return }
+    setSchedBusy(true)
+    try {
+      const res = await fetch('/api/postpulse/schedule', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: schedText, imageUrl: sched.cover || undefined, scheduledLocal: schedWhen }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { alert(d.error ?? 'فشل الجدولة'); return }
+      const n = Array.isArray(d.accountIds) ? d.accountIds.length : 0
+      alert(`تمت الجدولة في ${n} قناة بتوقيت السعودية 🗓️`)
+      setSched(null)
+    } catch { alert('حدث خطأ أثناء الجدولة') } finally { setSchedBusy(false) }
+  }
+
   const hasAny = items.some(it => reviews[it.index])
   if (!hasAny) return null
 
@@ -125,10 +151,57 @@ export default function PostReviewStatus({ request, onEdit }: Props) {
                   ✏️ تعديل المحتوى والصور المُرسلة
                 </button>
               )}
+
+              {/* جدولة نشر المحتوى المعتمد على القنوات */}
+              {status === 'approved' && (
+                <button
+                  type="button"
+                  onClick={() => openSchedule((r.selected_image as string) ?? images[0] ?? '', r.proposed_content ?? '')}
+                  className="w-full rounded-lg py-1.5 text-[11px] font-bold bg-green text-white hover:opacity-90 transition"
+                >
+                  🗓️ جدولة نشر هذا المحتوى
+                </button>
+              )}
             </div>
           )
         })}
       </div>
+
+      {/* نافذة جدولة نشر المحتوى المعتمد */}
+      {sched && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => schedBusy ? null : setSched(null)}>
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-border">
+              <h3 className="font-black text-dark text-base">🗓️ جدولة نشر المحتوى المعتمد</h3>
+              <p className="text-xs text-muted mt-0.5">يُنشر التصميم والنص في كل القنوات المربوطة في الموعد المحدّد (توقيت السعودية).</p>
+            </div>
+            <div className="px-5 py-4 overflow-y-auto space-y-3">
+              {sched.cover && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={sched.cover} alt="التصميم" className="w-32 mx-auto aspect-[4/5] object-cover rounded-xl border border-border" />
+              )}
+              <div>
+                <label className="block text-xs font-bold text-dark mb-1">الموعد (توقيت السعودية):</label>
+                <input type="datetime-local" value={schedWhen} onChange={e => setSchedWhen(e.target.value)} disabled={schedBusy}
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm mb-2" />
+                <ScheduleSuggestions value={schedWhen} onPick={setSchedWhen} />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-dark mb-1">نص المنشور:</label>
+                <textarea value={schedText} onChange={e => setSchedText(e.target.value)} disabled={schedBusy}
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[110px] resize-y" placeholder="نص المنشور..." />
+              </div>
+            </div>
+            <div className="px-5 py-3 border-t border-border flex gap-2">
+              <button onClick={submitSchedule} disabled={schedBusy || !schedWhen}
+                className="flex-1 bg-green text-white text-sm font-bold rounded-xl px-4 py-2 hover:opacity-90 transition disabled:opacity-60">
+                {schedBusy ? '⏳ جارٍ الجدولة…' : '🗓️ جدولة النشر'}
+              </button>
+              <button onClick={() => setSched(null)} disabled={schedBusy} className="text-sm text-muted hover:text-dark px-3 py-2">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ImageLightbox src={lightbox} onClose={() => setLightbox(null)} />
     </div>
