@@ -53,6 +53,16 @@ export const CLIENT_STATUS_LABELS: Record<RequestStatus, { label: string; color:
     color: 'purple',
     description: 'وصل إليك محتوى مقترح للمراجعة والموافقة'
   },
+  changes_requested: {
+    label: 'طلبت تعديلات',
+    color: 'yellow',
+    description: 'أرسلت ملاحظاتك، وتعمل الإدارة على تعديل المحتوى وإعادة إرساله'
+  },
+  scheduled: {
+    label: 'مجدول للنشر',
+    color: 'cyan',
+    description: 'تم اعتماد المحتوى وتحديد موعد نشره على قنواتنا'
+  },
   completed: {
     label: 'مكتمل',
     color: 'green',
@@ -126,6 +136,16 @@ export const ADMIN_STATUS_LABELS: Record<RequestStatus, { label: string; color: 
     label: 'العميل يراجع المحتوى',
     color: 'purple',
     description: 'تم إرسال المحتوى للعميل، في انتظار موافقته'
+  },
+  changes_requested: {
+    label: 'العميل طلب تعديلات',
+    color: 'yellow',
+    description: 'طلب العميل تعديلات على المحتوى — عدّله وأعد الإرسال'
+  },
+  scheduled: {
+    label: 'مجدول للنشر',
+    color: 'cyan',
+    description: 'تم اعتماد المحتوى وجدولته للنشر على القنوات'
   },
   completed: {
     label: 'مكتمل',
