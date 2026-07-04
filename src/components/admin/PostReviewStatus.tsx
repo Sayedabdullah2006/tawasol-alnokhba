@@ -41,7 +41,7 @@ export default function PostReviewStatus({ request, onEdit }: Props) {
     try {
       const res = await fetch('/api/postpulse/schedule', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: schedText, imageUrl: sched.cover || undefined, scheduledLocal: schedWhen }),
+        body: JSON.stringify({ content: schedText, imageUrl: sched.cover || undefined, scheduledLocal: schedWhen, requestId: request.id, notifyClient: true }),
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) { alert(d.error ?? 'فشل الجدولة'); return }

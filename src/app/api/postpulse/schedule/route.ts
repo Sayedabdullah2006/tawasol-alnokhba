@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { uploadMediaFromUrl, publishNow } from '@/lib/postpulse'
+import { sendEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 180
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
 
-  let body: { content?: string; imageUrl?: string; scheduledLocal?: string; accountIds?: number[] }
+  let body: { content?: string; imageUrl?: string; scheduledLocal?: string; accountIds?: number[]; requestId?: string; notifyClient?: boolean }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 }) }
 
   const content = (body.content ?? '').trim()
@@ -62,8 +63,51 @@ export async function POST(req: Request) {
       })
     } catch { /* تجاهل */ }
 
+    // عند جدولة محتوى طلب معتمد: الحالة «مجدول للنشر» + إشعار العميل بموعد النشر
+    if (body.requestId) {
+      try {
+        const sc = await createServiceRoleClient()
+        const { data: reqRow } = await sc
+          .from('publish_requests')
+          .select('client_email, client_name, request_number')
+          .eq('id', body.requestId)
+          .single()
+        await sc.from('publish_requests').update({ status: 'scheduled', updated_at: new Date().toISOString() }).eq('id', body.requestId)
+        if (body.notifyClient && reqRow?.client_email) {
+          const whenAr = new Intl.DateTimeFormat('ar', {
+            timeZone: 'Asia/Riyadh', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+            hour: 'numeric', minute: '2-digit', hour12: true, calendar: 'gregory',
+          }).format(scheduledTime)
+          const reqNo = `ATH-${String(reqRow.request_number).padStart(4, '0')}`
+          await sendEmail(
+            reqRow.client_email as string,
+            `🗓️ تم تحديد موعد نشر طلبك ${reqNo}`,
+            clientScheduleEmail(reqNo, (reqRow.client_name as string) || 'عزيزنا العميل', whenAr, imageUrl),
+          ).catch(() => {})
+        }
+      } catch { /* تجاهل أخطاء التحديث/الإشعار */ }
+    }
+
     return NextResponse.json({ ok: true, accountIds, scheduledTime: scheduledTime.toISOString() })
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'فشل الجدولة' }, { status: 502 })
   }
+}
+
+// إيميل إشعار العميل بموعد نشر محتواه المعتمد.
+function clientScheduleEmail(reqNo: string, clientName: string, whenAr: string, imageUrl: string): string {
+  const design = imageUrl
+    ? `<div style="text-align:center;margin:16px 0"><img src="${imageUrl}" alt="التصميم" style="max-width:220px;border-radius:12px;border:1px solid #e2e8f0" /></div>`
+    : ''
+  return `<!DOCTYPE html><html dir="rtl" lang="ar"><body style="font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f1f5f9;padding:24px">
+    <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:14px;padding:24px;text-align:center">
+      <h2 style="color:#0A2D35;margin:0 0 6px">🗓️ تم تحديد موعد نشر طلبك</h2>
+      <p style="color:#475569;font-size:14px;margin:0 0 12px">مرحباً ${clientName}، تمّت جدولة نشر محتوى طلبك <strong>${reqNo}</strong> على قنواتنا في الموعد التالي:</p>
+      <div style="background:#e8f5e8;border:1px solid #bbf7d0;border-radius:12px;padding:16px;margin:12px 0">
+        <div style="color:#166534;font-size:16px;font-weight:bold">${whenAr}</div>
+        <div style="color:#166534;font-size:12px;margin-top:4px">(بتوقيت السعودية)</div>
+      </div>
+      ${design}
+      <p style="color:#94a3b8;font-size:12px;margin-top:16px">سيُنشر المحتوى تلقائياً في الموعد المحدّد. شكراً لثقتك.</p>
+    </div></body></html>`
 }
