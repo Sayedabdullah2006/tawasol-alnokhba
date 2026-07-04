@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       .from('publish_requests')
       .update({
         post_reviews: reviews,
-        status: 'in_progress', // طلب التعديل يُعيد الطلب لطاولة الأدمن
+        status: 'changes_requested', // العميل طلب تعديلات — يعود لطاولة الأدمن بحالة واضحة
         updated_at: new Date().toISOString(),
       })
       .eq('id', requestId)

@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     const { error } = await supabase
       .from('publish_requests')
       .update({
-        status: 'in_progress',
+        status: 'changes_requested',
         user_feedback: feedback.trim(),
         feedback_sent_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

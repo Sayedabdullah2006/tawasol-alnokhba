@@ -48,8 +48,8 @@ export async function POST(request: Request) {
     if (!existingRequest) {
       return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 })
     }
-    // يُسمح بالإرسال أثناء التنفيذ أو أثناء المراجعة (لإرسال/تعديل بقية منشورات الحملة)
-    if (existingRequest.status !== 'in_progress' && existingRequest.status !== 'content_review') {
+    // يُسمح بالإرسال أثناء التنفيذ/المراجعة/طلب التعديل (لإرسال أو إعادة إرسال المحتوى)
+    if (!['in_progress', 'content_review', 'changes_requested'].includes(existingRequest.status)) {
       return NextResponse.json({ error: 'الطلب ليس في مرحلة التنفيذ' }, { status: 400 })
     }
 

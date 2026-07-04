@@ -233,6 +233,7 @@ export const REQUEST_STATUSES = {
   in_progress: { label: 'التحضير', color: 'orange' },
   info_requested: { label: 'بانتظار تعديل العميل', color: 'orange' },
   content_review: { label: 'مراجعة المحتوى', color: 'purple' },
+  changes_requested: { label: 'العميل طلب تعديلات', color: 'yellow' },
   completed: { label: 'مكتمل', color: 'green' },
   rejected: { label: 'مرفوض', color: 'red' },
   auto_closed: { label: 'أُغلق تلقائياً', color: 'gray' },
@@ -268,6 +269,7 @@ export function getCurrentStepIndex(status: RequestStatus): number {
     case 'paid': return 2
     case 'in_progress': return 3
     case 'content_review': return 4
+    case 'changes_requested': return 4
     case 'completed': return 5
     case 'rejected': return -1 // Special case for rejected
     default: return 0

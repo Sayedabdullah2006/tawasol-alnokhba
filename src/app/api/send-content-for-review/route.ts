@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 })
     }
 
-    if (existingRequest.status !== 'in_progress') {
+    if (existingRequest.status !== 'in_progress' && existingRequest.status !== 'changes_requested') {
       return NextResponse.json({ error: 'الطلب ليس في مرحلة التنفيذ' }, { status: 400 })
     }
 
