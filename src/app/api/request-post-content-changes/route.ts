@@ -56,11 +56,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'هذا الخبر ليس في مرحلة المراجعة' }, { status: 400 })
     }
 
+    // أرفق ملاحظة العميل بآخر جولة في السجل (هيستوري التصاميم + الملاحظات)
+    const history: any[] = Array.isArray(entry.history) ? [...entry.history] : []
+    if (history.length) history[history.length - 1] = { ...history[history.length - 1], feedback: feedback.trim(), feedback_at: new Date().toISOString() }
+
     reviews[postIndex] = {
       ...entry,
       status: 'changes_requested',
       user_feedback: feedback.trim(),
       feedback_sent_at: new Date().toISOString(),
+      history,
     }
 
     const { error } = await supabase

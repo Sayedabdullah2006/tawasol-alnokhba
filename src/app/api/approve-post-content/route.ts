@@ -56,12 +56,17 @@ export async function POST(request: Request) {
     }
 
     const now = new Date().toISOString()
+    // وسم آخر جولة في السجل بأنها معتمدة + التصميم المختار
+    const history: any[] = Array.isArray(entry.history) ? [...entry.history] : []
+    if (history.length) history[history.length - 1] = { ...history[history.length - 1], approved: true, selected_image: chosen, approved_at: now }
+
     reviews[postIndex] = {
       ...entry,
       status: 'approved',
       selected_image: chosen,
       user_feedback: null,
       content_approved_at: now,
+      history,
     }
 
     // هل اعتُمدت كل منشورات الطلب الآن؟ (المفرد = منشور واحد)

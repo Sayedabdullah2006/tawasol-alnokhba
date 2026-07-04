@@ -100,6 +100,7 @@ export default function StandaloneStudio() {
   const [batchProgress, setBatchProgress] = useState('')
   const [noteByIndex, setNoteByIndex] = useState<Record<number, string>>({})
   const [regenIndex, setRegenIndex] = useState<number | null>(null)
+  const [editIndex, setEditIndex] = useState<number | null>(null)
   // إعادة توليد كل التصاميم بملاحظة مشتركة
   const [bulkNote, setBulkNote] = useState('')
   const [bulkBusy, setBulkBusy] = useState(false)
@@ -244,6 +245,23 @@ export default function StandaloneStudio() {
       const url = await genOne(r.brief, note)
       if (url) { setBatchResults(prev => prev.map((x, idx) => idx === i ? { ...x, imageUrl: url } : x)); showToast('تم إعادة التوليد', 'success') }
     } finally { setRegenIndex(null) }
+  }
+
+  // تعديل دقيق: يطبّق التعديل على نفس التصميم (لا يعيد التوليد من معطيات الخبر)
+  const editOne = async (i: number) => {
+    const r = batchResults[i]; const note = (noteByIndex[i] ?? '').trim()
+    if (!r || !note) { showToast('اكتب التعديل المطلوب', 'error'); return }
+    setEditIndex(i)
+    try {
+      const res = await fetch('/api/admin/ai-studio/edit-design', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: r.imageUrl, note }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { showToast(d.error ?? 'فشل التعديل', 'error'); return }
+      setBatchResults(prev => prev.map((x, idx) => idx === i ? { ...x, imageUrl: d.imageUrl } : x))
+      showToast('تم التعديل الدقيق على نفس التصميم ✅', 'success')
+    } finally { setEditIndex(null) }
   }
 
   // إعادة توليد كل التصاميم بملاحظة واحدة مشتركة (حذف/إضافة نص أو تعديل عام)
@@ -580,9 +598,10 @@ export default function StandaloneStudio() {
                 <div className="flex-1 min-w-0 space-y-1.5">
                   <div className="font-bold text-dark text-xs">{r.title}</div>
                   <textarea value={noteByIndex[i] ?? ''} onChange={e => setNoteByIndex(p => ({ ...p, [i]: e.target.value }))}
-                    placeholder="ملاحظة لإعادة التوليد..." className="w-full px-2 py-1.5 rounded-lg border border-border bg-white text-xs min-h-[48px] resize-y" />
+                    placeholder="ملاحظة/تعديل مطلوب..." className="w-full px-2 py-1.5 rounded-lg border border-border bg-white text-xs min-h-[48px] resize-y" />
                   <div className="flex flex-wrap gap-2">
-                    <Button onClick={() => regenerate(i)} loading={regenIndex === i} disabled={regenIndex !== null || !(noteByIndex[i] ?? '').trim()} variant="outline" size="sm">🔄 إعادة التوليد</Button>
+                    <Button onClick={() => editOne(i)} loading={editIndex === i} disabled={editIndex !== null || regenIndex !== null || !(noteByIndex[i] ?? '').trim()} size="sm">✂️ تعديل دقيق (نفس التصميم)</Button>
+                    <Button onClick={() => regenerate(i)} loading={regenIndex === i} disabled={regenIndex !== null || editIndex !== null || !(noteByIndex[i] ?? '').trim()} variant="outline" size="sm">🔄 إعادة توليد (تصميم جديد)</Button>
                     <Button onClick={() => featureInMagazine(r.imageUrl)} loading={featuringCover === r.imageUrl} disabled={featuringCover !== null} variant={featuredCover === r.imageUrl ? 'secondary' : 'outline'} size="sm">
                       {featuredCover === r.imageUrl ? '⭐ مميّز في المجلة' : '⭐ ضمّن في المجلة'}
                     </Button>

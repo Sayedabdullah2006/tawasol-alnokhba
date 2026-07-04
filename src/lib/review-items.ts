@@ -20,6 +20,16 @@ export interface PostReview {
   content_sent_at?: string
   content_approved_at?: string | null
   feedback_sent_at?: string | null
+  // سجل الجولات: كل إرسال يُضاف كجولة (تصاميم + نص + ملاحظة العميل)
+  history?: Array<{
+    images?: string[]
+    content?: string
+    sent_at?: string
+    feedback?: string | null
+    feedback_at?: string
+    approved?: boolean
+    selected_image?: string | null
+  }>
 }
 
 export function getReviewItems(request: any): ReviewItem[] {

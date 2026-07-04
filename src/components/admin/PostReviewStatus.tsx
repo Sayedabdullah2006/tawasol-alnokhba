@@ -31,6 +31,27 @@ export default function PostReviewStatus({ request, onEdit }: Props) {
   const [schedWhen, setSchedWhen] = useState('')
   const [schedText, setSchedText] = useState('')
   const [schedBusy, setSchedBusy] = useState(false)
+  // سجل التصاميم المُرسلة (هيستوري) + تعديل دقيق
+  const [historyOpen, setHistoryOpen] = useState<Record<number, boolean>>({})
+  const [editTarget, setEditTarget] = useState<string | null>(null)
+  const [editNote, setEditNote] = useState('')
+  const [editBusy, setEditBusy] = useState(false)
+
+  const resend = (index: number, content: string, img: string) => onEdit?.(index, content, [img])
+  const applyEdit = async (index: number, content: string) => {
+    if (!editTarget || !editNote.trim()) { alert('اكتب التعديل المطلوب'); return }
+    setEditBusy(true)
+    try {
+      const res = await fetch('/api/admin/ai-studio/edit-design', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: editTarget, note: editNote }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { alert(d.error ?? 'فشل التعديل'); return }
+      setEditTarget(null); setEditNote('')
+      onEdit?.(index, content, [d.imageUrl]) // يفتح محرّر الإرسال بالتصميم المعدّل للمراجعة والإرسال
+    } catch { alert('حدث خطأ أثناء التعديل') } finally { setEditBusy(false) }
+  }
 
   const openSchedule = (cover: string, text: string) => { setSchedText(text || ''); setSchedWhen(''); setSched({ cover }) }
   const submitSchedule = async () => {
@@ -140,6 +161,70 @@ export default function PostReviewStatus({ request, onEdit }: Props) {
                   <p className="text-[11px] text-muted mt-1">عدّل المحتوى/الصور وأعد الإرسال، أو أعد التوليد من الاستوديو.</p>
                 </div>
               )}
+
+              {/* 📜 سجل التصاميم المُرسلة عبر الجولات + ملاحظات العميل لكل جولة */}
+              {(() => {
+                const rounds: any[] = Array.isArray(r.history) && r.history.length
+                  ? r.history
+                  : (images.length ? [{ images, content: r.proposed_content, feedback: r.user_feedback, approved: status === 'approved', selected_image: r.selected_image }] : [])
+                if (!rounds.length) return null
+                const open = historyOpen[item.index]
+                return (
+                  <div className="border-t border-border pt-2">
+                    <button type="button" onClick={() => setHistoryOpen(p => ({ ...p, [item.index]: !p[item.index] }))}
+                      className="text-[11px] font-bold text-green hover:underline">
+                      📜 سجل التصاميم المُرسلة ({rounds.length} {rounds.length === 1 ? 'جولة' : 'جولات'}) {open ? '▲' : '▼'}
+                    </button>
+                    {open && (
+                      <div className="mt-2 space-y-2">
+                        {rounds.map((rd, ri) => (
+                          <div key={ri} className="rounded-lg border border-border bg-white p-2 space-y-1.5">
+                            <span className="text-[11px] font-bold text-dark">الجولة {ri + 1}{rd.approved ? ' — ✅ معتمدة' : ''}</span>
+                            <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
+                              {(Array.isArray(rd.images) ? rd.images : []).map((img: string, ii: number) => (
+                                <div key={ii} className="space-y-0.5">
+                                  <button type="button" onClick={() => setLightbox(img)}
+                                    className={`relative aspect-[4/5] w-full rounded-lg overflow-hidden border-2 cursor-zoom-in ${rd.selected_image === img ? 'border-green ring-1 ring-green/40' : 'border-border'}`}>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={img} alt={`جولة ${ri + 1}`} className="w-full h-full object-cover" />
+                                  </button>
+                                  {onEdit && (
+                                    <div className="flex flex-col gap-0.5">
+                                      <button type="button" onClick={() => resend(item.index, rd.content ?? r.proposed_content ?? '', img)}
+                                        className="text-[10px] rounded bg-green/10 text-green py-0.5 hover:bg-green/20">📤 أعد إرساله</button>
+                                      <button type="button" onClick={() => { setEditTarget(img); setEditNote('') }}
+                                        className="text-[10px] rounded bg-cream text-dark py-0.5 hover:bg-border/40">✂️ عدّله</button>
+                                    </div>
+                                  )}
+                                  {editTarget === img && (
+                                    <div className="space-y-1">
+                                      <textarea value={editNote} onChange={e => setEditNote(e.target.value)}
+                                        placeholder="التعديل المطلوب (حذف/إضافة كلمة، حذف عنصر...) — يُطبَّق على نفس التصميم"
+                                        className="w-full text-[10px] border border-border rounded p-1 min-h-[42px] resize-y" />
+                                      <div className="flex gap-1">
+                                        <button type="button" onClick={() => applyEdit(item.index, rd.content ?? r.proposed_content ?? '')}
+                                          disabled={editBusy || !editNote.trim()}
+                                          className="flex-1 text-[10px] rounded bg-green text-white py-0.5 disabled:opacity-50">{editBusy ? '⏳ جارٍ التعديل…' : 'طبّق وأرسل'}</button>
+                                        <button type="button" onClick={() => { setEditTarget(null); setEditNote('') }} className="text-[10px] text-muted px-1">إلغاء</button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                            {rd.feedback && (
+                              <div className="bg-yellow-50 border border-yellow-200 rounded p-1.5">
+                                <span className="text-[10px] font-bold text-yellow-700">ملاحظة العميل: </span>
+                                <span className="text-[10px] text-yellow-700 whitespace-pre-line">{rd.feedback}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* تعديل المحتوى/الصور المُرسلة قبل موافقة العميل */}
               {status !== 'approved' && onEdit && (

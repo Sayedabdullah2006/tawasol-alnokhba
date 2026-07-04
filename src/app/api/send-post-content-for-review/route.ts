@@ -59,17 +59,25 @@ export async function POST(request: Request) {
         : {}
 
     // إن كان لهذا الخبر محتوى مُرسل سابقاً فهذا تعديل/إعادة إرسال (نُخصّص الإيميل)
-    const isEdit = !!reviews[postIndex]
+    const prevEntry = reviews[postIndex]
+    const isEdit = !!prevEntry
+    const now = new Date().toISOString()
+    const images = Array.isArray(proposedImages) ? proposedImages : []
+
+    // سجل الجولات: نضيف كل إرسال كجولة (تصاميم + نص + وقت) للاحتفاظ بالهيستوري كاملاً
+    const history: any[] = Array.isArray(prevEntry?.history) ? [...prevEntry.history] : []
+    history.push({ content: proposedContent.trim(), images, sent_at: now })
 
     reviews[postIndex] = {
       proposed_content: proposedContent.trim(),
-      proposed_images: Array.isArray(proposedImages) ? proposedImages : [],
+      proposed_images: images,
       selected_image: null,
       status: 'content_review',
       user_feedback: null,
-      content_sent_at: new Date().toISOString(),
+      content_sent_at: now,
       content_approved_at: null,
       feedback_sent_at: null,
+      history,
     }
 
     const { error } = await supabase

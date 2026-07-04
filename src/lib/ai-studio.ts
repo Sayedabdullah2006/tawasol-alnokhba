@@ -216,6 +216,33 @@ export async function generateDesign(
   return { imageUrl: pub.publicUrl, prompt: designPrompt }
 }
 
+/**
+ * تعديل دقيق لتصميم جاهز: يأخذ صورة التصميم النهائي ويطبّق التعديل المطلوب فقط
+ * (حذف/إضافة كلمة، حذف عنصر…) مع إبقاء نفس التصميم والصورة والتخطيط تماماً — بلا
+ * إعادة توليد من معطيات الطلب. لا يُعيد تركيب الشعار (موجود أصلاً داخل الصورة).
+ */
+export async function editDesign(args: { designImageUrl: string; note: string }): Promise<{ imageUrl: string }> {
+  const { designImageUrl, note } = args
+  if (!designImageUrl) throw new Error('لا يوجد تصميم للتعديل')
+  if (!note.trim()) throw new Error('اكتب التعديل المطلوب')
+  const service = await createServiceRoleClient()
+
+  const prompt =
+    'This is a FINISHED social-media design image. Apply ONLY the requested change below, and keep EVERYTHING ELSE 100% IDENTICAL — ' +
+    'same layout, same composition, same background, same person/photo and face (unchanged, pixel-identical), same colors, same fonts, ' +
+    'same element positions, same footer and logo. Do NOT redesign, do NOT move or resize elements, do NOT regenerate the person, do NOT change any text except what the change requires.\n' +
+    '‼️ REQUESTED CHANGE (apply precisely — nothing else): ' + note.trim() + '\n' +
+    'بالعربية: هذه صورة تصميم منشور نهائي. طبّق التعديل المطلوب فقط أعلاه، وأبقِ كل شيء آخر مطابقاً تماماً (نفس التخطيط والصورة والوجه والألوان والخطوط والمواضع والفوتر والشعار). لا تُعِد التصميم ولا تُحرّك العناصر.\n' +
+    'Output the SAME design at EXACTLY 1080×1350 (4:5), ultra-HD, with only that change applied.'
+
+  const { b64 } = await generateImageWithGemini(prompt, [designImageUrl])
+  const posterBase = await resizeToPoster(Buffer.from(b64, 'base64'))
+  const path = `studio-edit-${Date.now()}-${Math.random().toString(36).slice(2)}.png`
+  const { error } = await service.storage.from('content-images').upload(path, posterBase, { contentType: 'image/png' })
+  if (error) throw new Error(`فشل رفع الصورة: ${error.message}`)
+  return { imageUrl: service.storage.from('content-images').getPublicUrl(path).data.publicUrl }
+}
+
 export interface InfographicPerson { imageUrl: string; name: string; blurb: string }
 
 export const INFOGRAPHIC_DIRECTIONS = [

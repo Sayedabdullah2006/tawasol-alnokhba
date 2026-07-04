@@ -229,6 +229,7 @@ export default function AIStudioPanel({
   // ملاحظات وإعادة توليد التصاميم
   const [noteByIndex, setNoteByIndex] = useState<Record<number, string>>({})
   const [regenIndex, setRegenIndex] = useState<number | null>(null)
+  const [editIndex, setEditIndex] = useState<number | null>(null)
   const [singleNote, setSingleNote] = useState('')
   const [regenSingle, setRegenSingle] = useState(false)
   // إعادة توليد كل التصاميم بملاحظة واحدة مشتركة
@@ -421,6 +422,32 @@ export default function AIStudioPanel({
       }
     } finally {
       setRegenIndex(null)
+    }
+  }
+
+  // تعديل دقيق لتصميم: يطبّق التعديل على نفس التصميم/الصورة (لا يعيد التوليد من معطيات الطلب)
+  const editBatchDesign = async (i: number) => {
+    const r = batchResults[i]
+    const note = (noteByIndex[i] ?? '').trim()
+    if (!r) return
+    if (!note) { showToast('اكتب التعديل المطلوب', 'error'); return }
+    setEditIndex(i)
+    try {
+      const res = await fetch('/api/admin/ai-studio/edit-design', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: r.imageUrl, note }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { showToast(d.error ?? 'فشل التعديل', 'error'); return }
+      setBatchResults(prev => {
+        const next = prev.map((x, idx) => (idx === i ? { ...x, imageUrl: d.imageUrl } : x))
+        persistStudioState({ designs: next })
+        return next
+      })
+      setSelectedBatch(prev => new Set(prev).add(i))
+      showToast('تم التعديل الدقيق على نفس التصميم ✅', 'success')
+    } finally {
+      setEditIndex(null)
     }
   }
 
@@ -738,18 +765,26 @@ export default function AIStudioPanel({
                           <textarea
                             value={noteByIndex[i] ?? ''}
                             onChange={e => setNoteByIndex(prev => ({ ...prev, [i]: e.target.value }))}
-                            placeholder="ملاحظة لإعادة التوليد (مثال: اجعل الخلفية أغمق، كبّر الاسم، خفّف الزخارف...)"
+                            placeholder="التعديل المطلوب (مثال: احذف كلمة «كذا»، أضِف «كذا»، كبّر الاسم، اجعل الخلفية أغمق...)"
                             className="w-full px-2 py-1.5 rounded-lg border border-border bg-white text-xs min-h-[52px] resize-y"
                           />
                           <div className="flex flex-wrap gap-2">
                             <Button
+                              onClick={() => editBatchDesign(i)}
+                              loading={editIndex === i}
+                              disabled={editIndex !== null || regenIndex !== null || batchLoading || !(noteByIndex[i] ?? '').trim()}
+                              size="sm"
+                            >
+                              ✂️ تعديل دقيق (نفس التصميم)
+                            </Button>
+                            <Button
                               onClick={() => regenerateBatchDesign(i)}
                               loading={regenerating}
-                              disabled={regenIndex !== null || batchLoading || !(noteByIndex[i] ?? '').trim()}
+                              disabled={regenIndex !== null || editIndex !== null || batchLoading || !(noteByIndex[i] ?? '').trim()}
                               variant="outline"
                               size="sm"
                             >
-                              🔄 إعادة التوليد بالملاحظة
+                              🔄 إعادة توليد (تصميم جديد)
                             </Button>
                             <Button
                               onClick={() => featureInMagazine(r.imageUrl)}
