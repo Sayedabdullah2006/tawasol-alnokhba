@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import DesignShowcase from '@/components/home/DesignShowcase'
 
 const stats = [
   { value: '+500K', label: 'وصول شهري' },
@@ -58,11 +57,6 @@ export default function HomePage() {
             className="inline-block px-12 py-4 bg-gold text-dark rounded-2xl text-lg font-black hover:bg-gold/90 transition-all active:scale-[0.98] shadow-2xl shadow-gold/20">
             ابدأ طلبك الآن
           </Link>
-        </section>
-
-        {/* المعرض الحي — قلب الصفحة، ينساب من البطل */}
-        <section className="py-6 md:py-10">
-          <DesignShowcase />
         </section>
 
         {/* شريط أرقام رفيع منساب */}
