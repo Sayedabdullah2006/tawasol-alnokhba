@@ -228,12 +228,13 @@ export async function editDesign(args: { designImageUrl: string; note: string })
   const service = await createServiceRoleClient()
 
   const prompt =
-    'This is a FINISHED social-media design image. Apply ONLY the requested change below, and keep EVERYTHING ELSE 100% IDENTICAL — ' +
-    'same layout, same composition, same background, same person/photo and face (unchanged, pixel-identical), same colors, same fonts, ' +
-    'same element positions, same footer and logo. Do NOT redesign, do NOT move or resize elements, do NOT regenerate the person, do NOT change any text except what the change requires.\n' +
-    '‼️ REQUESTED CHANGE (apply precisely — nothing else): ' + note.trim() + '\n' +
-    'بالعربية: هذه صورة تصميم منشور نهائي. طبّق التعديل المطلوب فقط أعلاه، وأبقِ كل شيء آخر مطابقاً تماماً (نفس التخطيط والصورة والوجه والألوان والخطوط والمواضع والفوتر والشعار). لا تُعِد التصميم ولا تُحرّك العناصر.\n' +
-    'Output the SAME design at EXACTLY 1080×1350 (4:5), ultra-HD, with only that change applied.'
+    'EDIT the attached social-media design image (this is an image-editing task, not generation).\n' +
+    '‼️ APPLY THIS CHANGE NOW — it MUST be clearly and visibly applied to the image: ' + note.trim() + '\n' +
+    'بالعربية — نفّذ هذا التعديل على الصورة المرفقة فوراً بحيث يظهر واضحاً: ' + note.trim() + '\n\n' +
+    'Then keep the REST of the design as close to the original as possible: same overall layout, same background and colors, ' +
+    'the same person/photo and face (do not change or regenerate the person), the same footer/logo, and the same other text. ' +
+    'Only modify what the requested change requires — but DO make that change; do not return the image unchanged.\n' +
+    'Render Arabic text crisp and correctly shaped (RTL). Output the edited design as a portrait 1080×1350 (4:5) ultra-HD image.'
 
   const { b64 } = await generateImageWithGemini(prompt, [designImageUrl])
   const posterBase = await resizeToPoster(Buffer.from(b64, 'base64'))
