@@ -11,8 +11,9 @@ import { useEffect, useState } from 'react'
 const AR_DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
 const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
 // أوقات نشر جيدة على السوشال (توقيت السعودية) — تُخلط لتنويع الأوقات في كل مرة.
-const BEST_HOURS = [11, 13, 16, 19, 20, 21, 22]
+const BEST_HOURS = [9, 11, 13, 16, 18, 19, 20, 21, 22]
 const MAX_PER_DAY = 3 // يُقترح اليوم ما لم يبلغ 3 منشورات مجدولة
+const SEARCH_DAYS = 30 // نافذة البحث عن أيام مؤهّلة
 const KSA_MS = 3 * 3600 * 1000
 
 interface Slot { value: string; label: string; note: string; empty: boolean }
@@ -28,10 +29,11 @@ const shuffle = <T,>(a: T[]): T[] => {
 interface Day { Y: number; M: number; D: number; wd: number; dens: number }
 
 /**
- * يبني `count` مقترحات كمزيج: أيام فيها منشورات (لكن أقل من 3) + يوم فارغ قادم،
- * على **أيام وأوقات مختلفة** من مجموعة أفضل أوقات النشر (مخلوطة).
+ * يبني `count` مقترحات كمزيج متوازن: نصف تقريباً في أيام فيها منشورات (لكن أقل
+ * من 3) ونصف في أيام فارغة قادمة، على **أيام وأوقات مختلفة** من مجموعة أفضل
+ * أوقات النشر (مخلوطة).
  */
-function buildSuggestions(existingISO: string[], count = 3): Slot[] {
+function buildSuggestions(existingISO: string[], count = 6): Slot[] {
   const nowMs = Date.now()
   const existingMs = existingISO.map(s => Date.parse(s)).filter(n => !Number.isNaN(n))
 
@@ -39,21 +41,22 @@ function buildSuggestions(existingISO: string[], count = 3): Slot[] {
   const density: Record<string, number> = {}
   for (const ms of existingMs) { const k = dayKey(ms); density[k] = (density[k] ?? 0) + 1 }
 
-  // كل الأيام المؤهّلة (أقل من 3 منشورات) خلال 21 يوماً، بالأقرب
+  // كل الأيام المؤهّلة (أقل من 3 منشورات) خلال نافذة البحث، بالأقرب
   const todayK = new Date(nowMs + KSA_MS)
   const days: Day[] = []
-  for (let off = 0; off < 21; off++) {
+  for (let off = 0; off < SEARCH_DAYS; off++) {
     const base = new Date(Date.UTC(todayK.getUTCFullYear(), todayK.getUTCMonth(), todayK.getUTCDate() + off))
     const Y = base.getUTCFullYear(), M = base.getUTCMonth(), D = base.getUTCDate()
     const dens = density[`${Y}-${p2(M + 1)}-${p2(D)}`] ?? 0
     if (dens < MAX_PER_DAY) days.push({ Y, M, D, wd: base.getUTCDay(), dens })
   }
 
-  // مزيج: أيام فيها منشورات (dens ≥ 1) + يوم فارغ واحد قادم
+  // مزيج متوازن: نصف الحصص تقريباً لأيام فارغة (إن وُجدت) والباقي لأيام فيها منشورات
   const withPosts = days.filter(d => d.dens >= 1)
   const empty = days.filter(d => d.dens === 0)
-  const wantEmpty = empty.length ? 1 : 0
-  const primary = [...withPosts.slice(0, count - wantEmpty), ...empty.slice(0, wantEmpty)]
+  const wantEmpty = Math.min(empty.length, Math.ceil(count / 2))
+  const wantWithPosts = Math.min(withPosts.length, count - wantEmpty)
+  const primary = [...withPosts.slice(0, wantWithPosts), ...empty.slice(0, wantEmpty)]
   // أولوية للمزيج ثم بقية الأيام كتعبئة، مع إزالة التكرار
   const ordered = [...primary, ...days].filter((d, i, arr) => arr.indexOf(d) === i)
 
@@ -88,8 +91,8 @@ export default function ScheduleSuggestions({ value, onPick }: { value?: string;
     let alive = true
     fetch('/api/admin/schedule')
       .then(r => r.ok ? r.json() : { items: [] })
-      .then(d => { if (alive) setSlots(buildSuggestions((d.items ?? []).map((it: { when?: string }) => it.when).filter(Boolean), 3)) })
-      .catch(() => { if (alive) setSlots(buildSuggestions([], 3)) })
+      .then(d => { if (alive) setSlots(buildSuggestions((d.items ?? []).map((it: { when?: string }) => it.when).filter(Boolean), 6)) })
+      .catch(() => { if (alive) setSlots(buildSuggestions([], 6)) })
     return () => { alive = false }
   }, [])
 
