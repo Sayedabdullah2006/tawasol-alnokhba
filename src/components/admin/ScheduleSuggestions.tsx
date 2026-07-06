@@ -13,7 +13,9 @@ const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'ما
 // أوقات نشر جيدة على السوشال (توقيت السعودية) — تُخلط لتنويع الأوقات في كل مرة.
 const BEST_HOURS = [9, 11, 13, 16, 18, 19, 20, 21, 22]
 const MAX_PER_DAY = 3 // يُقترح اليوم ما لم يبلغ 3 منشورات مجدولة
-const SEARCH_DAYS = 30 // نافذة البحث عن أيام مؤهّلة
+// نافذة بحث واسعة (وليست ثابتة عند 30 يوماً) — تضمن إيجاد أيام فارغة حتى لو
+// امتلأت الأيام القريبة بالجدولة، بدل أن يتقلّص عدد المقترحات الفارغة تدريجياً.
+const HARD_CAP_DAYS = 120
 const KSA_MS = 3 * 3600 * 1000
 
 interface Slot { value: string; label: string; note: string; empty: boolean }
@@ -28,43 +30,11 @@ const shuffle = <T,>(a: T[]): T[] => {
 
 interface Day { Y: number; M: number; D: number; wd: number; dens: number }
 
-/**
- * يبني `count` مقترحات كمزيج متوازن: نصف تقريباً في أيام فيها منشورات (لكن أقل
- * من 3) ونصف في أيام فارغة قادمة، على **أيام وأوقات مختلفة** من مجموعة أفضل
- * أوقات النشر (مخلوطة).
- */
-function buildSuggestions(existingISO: string[], count = 6): Slot[] {
-  const nowMs = Date.now()
-  const existingMs = existingISO.map(s => Date.parse(s)).filter(n => !Number.isNaN(n))
-
-  const dayKey = (ms: number) => { const d = new Date(ms + KSA_MS); return `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}` }
-  const density: Record<string, number> = {}
-  for (const ms of existingMs) { const k = dayKey(ms); density[k] = (density[k] ?? 0) + 1 }
-
-  // كل الأيام المؤهّلة (أقل من 3 منشورات) خلال نافذة البحث، بالأقرب
-  const todayK = new Date(nowMs + KSA_MS)
-  const days: Day[] = []
-  for (let off = 0; off < SEARCH_DAYS; off++) {
-    const base = new Date(Date.UTC(todayK.getUTCFullYear(), todayK.getUTCMonth(), todayK.getUTCDate() + off))
-    const Y = base.getUTCFullYear(), M = base.getUTCMonth(), D = base.getUTCDate()
-    const dens = density[`${Y}-${p2(M + 1)}-${p2(D)}`] ?? 0
-    if (dens < MAX_PER_DAY) days.push({ Y, M, D, wd: base.getUTCDay(), dens })
-  }
-
-  // مزيج متوازن: نصف الحصص تقريباً لأيام فارغة (إن وُجدت) والباقي لأيام فيها منشورات
-  const withPosts = days.filter(d => d.dens >= 1)
-  const empty = days.filter(d => d.dens === 0)
-  const wantEmpty = Math.min(empty.length, Math.ceil(count / 2))
-  const wantWithPosts = Math.min(withPosts.length, count - wantEmpty)
-  const primary = [...withPosts.slice(0, wantWithPosts), ...empty.slice(0, wantEmpty)]
-  // أولوية للمزيج ثم بقية الأيام كتعبئة، مع إزالة التكرار
-  const ordered = [...primary, ...days].filter((d, i, arr) => arr.indexOf(d) === i)
-
-  const pool = shuffle(BEST_HOURS)
-  const usedHours = new Set<number>()
+/** يحاول تعيين موعد لكل يوم من `candidates` (بالترتيب) حتى يبلغ `want`، بأوقات لا تتكرر. */
+function assignSlots(candidates: Day[], want: number, pool: number[], usedHours: Set<number>, existingMs: number[], nowMs: number): Slot[] {
   const out: Slot[] = []
-  for (const d of ordered) {
-    if (out.length >= count) break
+  for (const d of candidates) {
+    if (out.length >= want) break
     for (const h of pool) {
       if (usedHours.has(h)) continue
       const utcMs = Date.UTC(d.Y, d.M, d.D, h, 0, 0) - KSA_MS
@@ -79,6 +49,53 @@ function buildSuggestions(existingISO: string[], count = 6): Slot[] {
       })
       break
     }
+  }
+  return out
+}
+
+/**
+ * يبني `count` مقترحات كمزيج متوازن **ثابت دائماً**: نصف في أيام فيها منشورات
+ * (لكن أقل من 3) ونصف في أيام فارغة — حتى لو امتلأت الأيام القريبة بالجدولة،
+ * يوسّع البحث (حتى 120 يوماً) لإيجاد أيام فارغة بدل تقليص حصتها.
+ */
+function buildSuggestions(existingISO: string[], count = 6): Slot[] {
+  const nowMs = Date.now()
+  const existingMs = existingISO.map(s => Date.parse(s)).filter(n => !Number.isNaN(n))
+
+  const dayKey = (ms: number) => { const d = new Date(ms + KSA_MS); return `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}` }
+  const density: Record<string, number> = {}
+  for (const ms of existingMs) { const k = dayKey(ms); density[k] = (density[k] ?? 0) + 1 }
+
+  const wantEmpty = Math.ceil(count / 2)
+  const wantWithPosts = count - wantEmpty
+  // مخزون مضاعف من كل فئة (احتياط لأيام يتعذّر فيها إيجاد ساعة صالحة)
+  const bufferEmpty = wantEmpty * 3
+  const bufferWithPosts = wantWithPosts * 3
+
+  const todayK = new Date(nowMs + KSA_MS)
+  const withPosts: Day[] = []
+  const empty: Day[] = []
+  for (let off = 0; off < HARD_CAP_DAYS; off++) {
+    if (withPosts.length >= bufferWithPosts && empty.length >= bufferEmpty) break
+    const base = new Date(Date.UTC(todayK.getUTCFullYear(), todayK.getUTCMonth(), todayK.getUTCDate() + off))
+    const Y = base.getUTCFullYear(), M = base.getUTCMonth(), D = base.getUTCDate()
+    const dens = density[`${Y}-${p2(M + 1)}-${p2(D)}`] ?? 0
+    if (dens >= MAX_PER_DAY) continue
+    const day: Day = { Y, M, D, wd: base.getUTCDay(), dens }
+    if (dens === 0) { if (empty.length < bufferEmpty) empty.push(day) }
+    else if (withPosts.length < bufferWithPosts) withPosts.push(day)
+  }
+
+  const pool = shuffle(BEST_HOURS)
+  const usedHours = new Set<number>()
+  let out = [
+    ...assignSlots(withPosts, wantWithPosts, pool, usedHours, existingMs, nowMs),
+    ...assignSlots(empty, wantEmpty, pool, usedHours, existingMs, nowMs),
+  ]
+  // تعويض أي نقص (تعذّر إيجاد ساعة صالحة لبعض الأيام) من بقية المرشّحين المخزّنين
+  if (out.length < count) {
+    const leftovers = [...withPosts.slice(wantWithPosts), ...empty.slice(wantEmpty)]
+    out = out.concat(assignSlots(leftovers, count - out.length, pool, usedHours, existingMs, nowMs))
   }
   // ترتيب العرض بالأقرب زمنياً
   return out.sort((a, b) => a.value.localeCompare(b.value))
