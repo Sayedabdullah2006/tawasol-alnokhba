@@ -67,7 +67,8 @@ async function handle(request: NextRequest) {
 
 /**
  * توليد دفعة منشورات ليوم. تُستدعى من الكرون ومن زر «توليد يدوي» في لوحة الإدارة.
- * force=true يتخطّى حماية «تم توليد اليوم» فيضيف منشورات جديدة لنفس اليوم (بلا تكرار المصدر).
+ * كل استدعاء يُولّد count منشوراً جديداً بغضّ النظر عمّا وُلّد يدوياً اليوم — الحماية
+ * الوحيدة هي منع تكرار نفس الخبر لكل مصدر (DEDUP_WINDOW_DAYS)، لا حدّ إجمالي لليوم.
  */
 export async function runBatch(
   { count, force, sourceParam }: { count: number; force: boolean; sourceParam: string | null },
@@ -77,19 +78,10 @@ export async function runBatch(
   try {
     const sc = await createServiceRoleClient()
 
-    // ── 0) حماية عدم التكرار: إن نجحت دفعة اليوم وأُرسلت بالإيميل، نتخطّى. ──
-    // يسمح بجدولة عدة محاولات صباحاً (تحسّباً لتعطّل المصدر مؤقتاً) بإيميل واحد فقط.
-    if (!force) {
-      const { data: doneToday } = await sc
-        .from('social_schedule')
-        .select('id')
-        .eq('batch_date', today)
-        .eq('email_sent', true)
-        .limit(1)
-      if (doneToday && doneToday.length) {
-        return NextResponse.json({ skipped: true, reason: 'تم توليد دفعة اليوم مسبقاً', date: today })
-      }
-    }
+    // ── 0) توليد الكرون اليومي غير مشروط بعدد ما وُلّد يدوياً اليوم. ──
+    // زر «توليد يدوي» منفصل تماماً ولا يُقلّل حصة الكرون: يُولَّد العدد المطلوب
+    // (count) كاملاً في كل استدعاء، والحماية الوحيدة من التكرار هي عدم إعادة نفس
+    // الأخبار (منع التكرار لكل مصدر خلال DEDUP_WINDOW_DAYS في الخطوة التالية).
 
     // ── 1) منع التكرار (لكل مصدر على حدة) خلال آخر N يوماً ──
     const since = new Date(Date.now() - DEDUP_WINDOW_DAYS * 86400000).toISOString().slice(0, 10)
