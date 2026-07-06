@@ -28,6 +28,9 @@ jobs:
 
           if echo "$response" | grep -q '"success":true'; then
             echo "✅ Daily social plan generated & emailed"
+          elif echo "$response" | grep -q '"skipped":true'; then
+            # دفعة اليوم مُولَّدة ومُرسَلة مسبقاً (يدوياً أو بتشغيل سابق) — ليس فشلاً.
+            echo "ℹ️ Skipped — today's batch was already generated & emailed"
           else
             echo "❌ Daily social plan failed"
             exit 1
