@@ -106,25 +106,48 @@ export default function ScheduleSuggestions({ value, onPick }: { value?: string;
 
   useEffect(() => {
     let alive = true
+    // نستبعد الحالات الفاشلة/غير المكتملة من حساب الازدحام — لم تُنشر فعلياً فلا يجب أن تحجز الموعد.
+    const FAILED = new Set(['failed', 'cancelled', 'canceled', 'draft', 'media_import_failed'])
     fetch('/api/admin/schedule')
       .then(r => r.ok ? r.json() : { items: [] })
-      .then(d => { if (alive) setSlots(buildSuggestions((d.items ?? []).map((it: { when?: string }) => it.when).filter(Boolean), 6)) })
+      .then(d => {
+        if (!alive) return
+        const when = (d.items ?? [])
+          .filter((it: { status?: string }) => !FAILED.has(String(it.status || '').toLowerCase()))
+          .map((it: { when?: string }) => it.when)
+          .filter(Boolean)
+        setSlots(buildSuggestions(when, 6))
+      })
       .catch(() => { if (alive) setSlots(buildSuggestions([], 6)) })
     return () => { alive = false }
   }, [])
 
   if (!slots || !slots.length) return null
+  const emptyCount = slots.filter(s => s.empty).length
+  const busyCount = slots.length - emptyCount
   return (
     <div className="space-y-1.5">
-      <p className="text-[11px] text-muted">💡 مواعيد مقترحة (الأقرب والأقل ازدحاماً):</p>
+      <p className="text-[11px] text-muted">
+        💡 مواعيد مقترحة — {busyCount > 0 && <span>{busyCount} في أيام فيها منشورات</span>}
+        {busyCount > 0 && emptyCount > 0 && ' · '}
+        {emptyCount > 0 && <span className="font-bold text-green-700">{emptyCount} في أيام فارغة 🌿</span>}:
+      </p>
       <div className="flex flex-wrap gap-1.5">
         {slots.map(s => {
           const on = value === s.value
           return (
             <button key={s.value} type="button" onClick={() => onPick(s.value)}
-              className={`text-[11px] rounded-lg border px-2.5 py-1.5 text-right transition ${on ? 'border-green bg-green/10 ring-1 ring-green/30' : 'border-green/40 bg-green/5 hover:bg-green/10'}`}>
+              className={`text-[11px] rounded-lg border-2 px-2.5 py-1.5 text-right transition ${
+                on
+                  ? 'border-green bg-green/15 ring-1 ring-green/40'
+                  : s.empty
+                    ? 'border-green-400 bg-green-50 hover:bg-green-100'
+                    : 'border-border bg-cream hover:bg-border/30'
+              }`}>
               <span className="block font-bold text-dark">{s.label}</span>
-              <span className={`block ${s.empty ? 'text-green-700' : 'text-muted'}`}>{s.note}</span>
+              <span className={`block ${s.empty ? 'font-bold text-green-700' : 'text-muted'}`}>
+                {s.empty ? '🌿 يوم فارغ' : s.note}
+              </span>
             </button>
           )
         })}
