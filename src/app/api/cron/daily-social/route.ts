@@ -2,9 +2,9 @@
  * المُنسّق اليومي لخطة النشر الاجتماعي.
  *
  * يومياً (عبر GitHub Actions أو أي خدمة cron):
- *   1. يجلب مرشّحين من أخبار first1saudi.net (التي تملك صورة بارزة).
- *   2. يستبعد ما نُشر خلال آخر N يوماً (تدوير الأرشيف بلا تكرار).
- *   3. يختار 3 أخبار منوّعة (تصنيفات مختلفة قدر الإمكان).
+ *   1. يجلب مرشّحين من first1saudi.net + مصادر RSS + سعوديبيديا + سيدتي + manhom.
+ *   2. يستبعد ما نُشر خلال آخر N يوماً لكل مصدر على حدة (تدوير الأرشيف بلا تكرار).
+ *   3. يختار DEFAULT_COUNT أخبار منوّعة (مصادر/تصنيفات مختلفة قدر الإمكان).
  *   4. يمرّر كل خبر في الاستوديو: تحليل → تغريدات → اتجاه → تصميم.
  *   5. يسجّل الدفعة في social_schedule (للتقويم ومنع التكرار).
  *   6. يرسل إيميلاً واحداً بالتصاميم الثلاثة + التغريدات إلى الإدارة.
@@ -17,6 +17,7 @@ import { fetchCategories, fetchPostsByCategory, resolveImageUrl, type NewsPost }
 import { fetchManhomCandidates, ensureColorImage, MANHOM_NOTE } from '@/lib/manhom-news'
 import { fetchRssCandidates, RSS_SOURCES } from '@/lib/rss-news'
 import { fetchSaudipediaCandidates } from '@/lib/saudipedia-news'
+import { fetchSayidatyCandidates, SAYIDATY_SOURCES } from '@/lib/sayidaty-news'
 import { runStudioPipeline, shuffledPosterStyles } from '@/lib/ai-studio'
 import { classifySection } from '@/lib/showcase-sections'
 import { sendEmail } from '@/lib/email'
@@ -32,7 +33,7 @@ const CRON_API_KEY = process.env.CRON_API_KEY || 'nukhba-daily-reminders-2024'
 const ADMIN_EMAIL = 'first1saudi@gmail.com'
 // لا نعيد نشر نفس الخبر خلال هذه النافذة (أيام) — يضمن تدوير الأرشيف.
 const DEDUP_WINDOW_DAYS = Number(process.env.SOCIAL_DEDUP_WINDOW_DAYS) || 30
-const DEFAULT_COUNT = 3
+const DEFAULT_COUNT = 5
 // أقل عدد مواضيع ليُعتبر القسم مؤهلاً للتنويع.
 const MIN_SECTION_POSTS = 10
 // أقسام نستبعدها من التنويع (عامة/تشغيلية/فارغة).
@@ -153,6 +154,15 @@ export async function runBatch(
         const items = await fetchSaudipediaCandidates()
         for (const p of items) { if (!used.has(p.id)) pool.push({ post: p, key: 'saudipedia' }) }
       } catch { /* تجاهل مصدراً متعذّراً */ }
+
+      // سيدتي: صفحات وسم قصص/إنجازات السعوديات (رائدات/المرأة السعودية)
+      for (const src of SAYIDATY_SOURCES) {
+        try {
+          const used = usedByKey.get(src.key) ?? new Set<number>()
+          const items = await fetchSayidatyCandidates(src)
+          for (const p of items) { if (!used.has(p.id)) pool.push({ post: p, key: src.key }) }
+        } catch { /* تجاهل مصدراً متعذّراً */ }
+      }
 
       pool.sort(() => Math.random() - 0.5)
       // تمريرة أولى: مصدر مختلف لكل عنصر (تنويع)؛ ثم تمريرة ثانية للتعبئة.
