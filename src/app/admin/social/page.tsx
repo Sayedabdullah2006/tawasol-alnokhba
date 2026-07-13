@@ -29,6 +29,28 @@ function formatArabicDate(dateStr: string): string {
   })
 }
 
+function getScheduleStatusBadge(status: string): { label: string; className: string } {
+  switch (status) {
+    case 'published':
+      return { label: 'تم النشر', className: 'bg-green/10 text-green' }
+    case 'skipped':
+      return { label: 'تم التخطي', className: 'bg-red-50 text-red-700 border border-red-100' }
+    case 'suggested':
+    default:
+      return { label: 'مجدول للنشر', className: 'bg-blue-50 text-blue-700 border border-blue-100' }
+  }
+}
+
+function ScheduleStatusBadge({ status }: { status: string }) {
+  const badge = getScheduleStatusBadge(status)
+
+  return (
+    <span className={`text-xs font-bold rounded-full px-2.5 py-0.5 ${badge.className}`}>
+      {badge.label}
+    </span>
+  )
+}
+
 export default function AdminSocialPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -252,6 +274,7 @@ export default function AdminSocialPage() {
 
                   <div className="p-4 flex flex-col gap-3 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
+                      <ScheduleStatusBadge status={item.status} />
                       <span className={`text-xs font-bold rounded-full px-2.5 py-0.5 ${item.source === 'manhom' ? 'bg-purple-100 text-purple-700' : 'bg-teal-100 text-teal-700'}`}>
                         {item.source === 'manhom' ? 'السعوديات الأوائل' : 'first1saudi'}
                       </span>
