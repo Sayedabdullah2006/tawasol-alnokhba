@@ -31,18 +31,16 @@ function formatArabicDate(dateStr: string): string {
 
 function getScheduleStatusBadge(status: string): { label: string; className: string } {
   switch (status) {
-    case 'published':
-      return { label: 'تم النشر', className: 'bg-green/10 text-green' }
-    case 'skipped':
-      return { label: 'تم التخطي', className: 'bg-red-50 text-red-700 border border-red-100' }
-    case 'suggested':
-    default:
+    case 'scheduled':
       return { label: 'مجدول للنشر', className: 'bg-blue-50 text-blue-700 border border-blue-100' }
+    default:
+      return { label: '', className: '' }
   }
 }
 
 function ScheduleStatusBadge({ status }: { status: string }) {
   const badge = getScheduleStatusBadge(status)
+  if (!badge.label) return null
 
   return (
     <span className={`text-xs font-bold rounded-full px-2.5 py-0.5 ${badge.className}`}>
@@ -117,12 +115,13 @@ export default function AdminSocialPage() {
       const res = await fetch('/api/postpulse/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: schedText, imageUrl: item.design_image_url, scheduledLocal: schedWhen }),
+        body: JSON.stringify({ content: schedText, imageUrl: item.design_image_url, scheduledLocal: schedWhen, socialScheduleId: item.id }),
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json.error || 'فشل الجدولة')
       const n = Array.isArray(json.accountIds) ? json.accountIds.length : 0
       alert(`تمت الجدولة في ${n} قناة بتوقيت السعودية ✅`)
+      setItems(prev => prev.map(it => (it.id === item.id ? { ...it, status: 'scheduled' } : it)))
       setSchedId(null); setSchedWhen(''); setSchedText('')
     } catch (e) {
       alert(e instanceof Error ? e.message : 'فشل الجدولة')

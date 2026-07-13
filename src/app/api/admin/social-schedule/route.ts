@@ -25,5 +25,26 @@ export async function GET() {
     .limit(500)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ items: data ?? [] })
+
+  const { data: scheduledRows } = await sc
+    .from('postpulse_posts')
+    .select('design_url, status')
+    .in('status', ['scheduled', 'queued', 'pending'])
+    .limit(500)
+
+  const scheduledDesignUrls = new Set(
+    (scheduledRows ?? [])
+      .map(row => (row.design_url as string | null) || null)
+      .filter((url): url is string => !!url),
+  )
+
+  const items = (data ?? []).map(item => {
+    const isScheduled =
+      item.status === 'scheduled' ||
+      (!!item.design_image_url && scheduledDesignUrls.has(item.design_image_url))
+
+    return isScheduled && item.status === 'suggested' ? { ...item, status: 'scheduled' } : item
+  })
+
+  return NextResponse.json({ items })
 }

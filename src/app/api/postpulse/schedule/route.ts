@@ -1,6 +1,6 @@
 /**
  * جدولة منشور في موعد محدّد (بتوقيت السعودية) لكل القنوات عبر Post-Pulse.
- * أدمن فقط. body: { content, imageUrl?, scheduledLocal: "YYYY-MM-DDTHH:mm", accountIds? }
+ * أدمن فقط. body: { content, imageUrl?, scheduledLocal: "YYYY-MM-DDTHH:mm", accountIds?, socialScheduleId? }
  * scheduledLocal يُفسَّر كتوقيت السعودية (UTC+3).
  */
 import { NextResponse } from 'next/server'
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
 
-  let body: { content?: string; imageUrl?: string; scheduledLocal?: string; accountIds?: number[]; requestId?: string; notifyClient?: boolean }
+  let body: { content?: string; imageUrl?: string; scheduledLocal?: string; accountIds?: number[]; requestId?: string; notifyClient?: boolean; socialScheduleId?: string }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 }) }
 
   const content = (body.content ?? '').trim()
@@ -62,6 +62,16 @@ export async function POST(req: Request) {
         event_raw: result as object,
       })
     } catch { /* تجاهل */ }
+
+    if (body.socialScheduleId) {
+      try {
+        const sc = await createServiceRoleClient()
+        await sc
+          .from('social_schedule')
+          .update({ status: 'scheduled' })
+          .eq('id', body.socialScheduleId)
+      } catch { /* تجاهل */ }
+    }
 
     // عند جدولة محتوى طلب معتمد: الحالة «مجدول للنشر» + إشعار العميل بموعد النشر
     if (body.requestId) {
