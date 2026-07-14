@@ -21,11 +21,11 @@ export const OPENAI_MODEL = 'gpt-5.5'
  * مكتوبة بالعربية والإنجليزية لأقصى التزام من النموذج.
  */
 export const FACE_LOCK =
-  '‼️🔒 ABSOLUTE TOP RULE (overrides everything): This is a PHOTO EDIT of the attached real photograph. ' +
-  'COPY THE PERSON’S FACE FROM THE ATTACHED PHOTO EXACTLY, pixel-for-pixel — same bone structure, same eyes, nose, mouth, beard/eyebrows, skin tone, age and expression. ' +
-  'DO NOT redraw, regenerate, beautify, age, slim, swap or replace the face. If you cannot preserve the exact face, output the original photo unchanged. ' +
-  'Generating a new or different-looking person is STRICTLY FORBIDDEN. ' +
-  'بالعربية: انسخ وجه الشخص من الصورة المرفقة كما هو حرفياً دون أي تغيير أو إعادة رسم؛ ممنوع توليد وجه/شخص مختلف منعاً باتاً.'
+  'IDENTITY PRESERVATION RULE: use the attached photo as the real identity reference. ' +
+  'Preserve the subject/person recognizably: same identity, age, face structure, skin tone, expression, hair/veil, and key clothing cues. ' +
+  'Do not invent, swap, beautify into, age, slim, or replace the person with a different-looking person. ' +
+  'Creative poster composition is allowed: crop, reframe, extend the background, add depth, editorial lighting, graphic layers, and bold typography while keeping the face/identity faithful. ' +
+  'بالعربية: حافظ على هوية الشخص وملامحه بوضوح من الصورة المرجعية، لكن اسمح بتكوين بوستر إبداعي حوله دون استبداله أو تغيير هويته.'
 
 /**
  * توجيه تخطيط الفيديو — يُلحق فقط عند تفعيل "الخبر يتضمّن فيديو" في الاستوديو.
@@ -77,6 +77,11 @@ export const POSTER_STYLES: string[] = [
   'هندسي مجرّد: أشكال هندسية وأقواس ودوائر ذهبية/خضراء كزخرفة خلفية منظّمة حول الصورة.',
   'بورتريه فخم كلاسيكي: إطار راقٍ للصورة، تناظر ووقار، لمسات ذهبية كلاسيكية وهيبة.',
   'سبوتلايت دراماتيكي: خلفية داكنة جداً وبقعة ضوء على الشخص، تباين عالٍ وتركيز كامل على البطل.',
+  'غلاف مجلة سعودي جريء: قصّ غير متماثل، عنوان ضخم كغلاف افتتاحي، طبقات صغيرة للحقائق حول الصورة.',
+  'انقسام شاشة بطولي: نصف للصورة بقصّة قوية ونصف للإنجاز بتايبوغرافي معماري ومساحات سالبة واضحة.',
+  'نحت بيانات بصري: تحويل الرقم/الإنجاز إلى كتلة بصرية كبيرة أو مسار ذهبي يلتف حول الصورة.',
+  'مسار حركة وطاقة: خطوط اتجاه وطبقات شفافة تعطي إحساس تقدم/سباق/صعود بدون زخرفة عشوائية.',
+  'إطار معماري فاخر: شبكة أعمدة وأقواس حديثة تحتضن الصورة والنص مثل واجهة مؤسسة أو جائزة عالمية.',
 ]
 
 /** يخلط أنماط التصميم ويعيدها (لتوزيع نمط مختلف على كل منشور في الدفعة). */

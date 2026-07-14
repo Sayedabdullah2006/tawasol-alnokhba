@@ -9,25 +9,18 @@ interface OpenAIImageOptions {
   aspectRatio?: string
   size?: string
   quality?: 'low' | 'medium' | 'high' | 'auto'
-  action?: 'auto' | 'generate' | 'edit'
   timeoutMs?: number
   retries?: number
 }
 
-interface OpenAIResponsesImageOutput {
-  type?: string
-  result?: string
-}
-
-interface OpenAIResponsesPayload {
-  output?: OpenAIResponsesImageOutput[]
-  output_text?: string
+interface OpenAIImageResponse {
+  data?: Array<{ b64_json?: string }>
   error?: { message?: string }
 }
 
-// ChatGPT image generation via the Responses API image_generation tool.
-// Override in production if needed without touching code.
-const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || 'gpt-5.6'
+// Direct GPT Image API. This avoids the extra mainline-model hop in Responses.
+const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-2'
+const OPENAI_IMAGE_QUALITY = (process.env.OPENAI_IMAGE_QUALITY || 'medium') as OpenAIImageOptions['quality']
 const OA_AGENT = new https.Agent({ keepAlive: false })
 
 function imageSizeFor(opts: OpenAIImageOptions): string {
@@ -62,15 +55,16 @@ async function fetchImageAsBase64(url: string): Promise<RefImage> {
   return { mimeType, data: buf.toString('base64') }
 }
 
-function postResponsesOnce(
+function postJsonOnce(
   apiKey: string,
+  path: string,
   bodyPayload: unknown,
   timeoutMs: number,
-): Promise<OpenAIResponsesPayload> {
+): Promise<OpenAIImageResponse> {
   return new Promise((resolve, reject) => {
     const body = Buffer.from(JSON.stringify(bodyPayload), 'utf8')
     const baseURL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '')
-    const url = new URL(`${baseURL}/responses`)
+    const url = new URL(`${baseURL}${path}`)
     const org = process.env.OPENAI_ORG_ID || process.env.OPENAI_ORGANIZATION
     const project = process.env.OPENAI_PROJECT_ID
     const headers: Record<string, string> = {
@@ -103,7 +97,7 @@ function postResponsesOnce(
             return reject(e)
           }
           try {
-            resolve(JSON.parse(text) as OpenAIResponsesPayload)
+            resolve(JSON.parse(text) as OpenAIImageResponse)
           } catch {
             reject(new Error('invalid response body from OpenAI Images (JSON parse failed)'))
           }
@@ -118,7 +112,88 @@ function postResponsesOnce(
   })
 }
 
-async function createImageViaResponses(
+function buildMultipartBody(fields: Record<string, string>, files: RefImage[]): { body: Buffer; contentType: string } {
+  const boundary = `----openai-image-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const chunks: Buffer[] = []
+
+  for (const [name, value] of Object.entries(fields)) {
+    chunks.push(Buffer.from(`--${boundary}\r\n`))
+    chunks.push(Buffer.from(`Content-Disposition: form-data; name="${name}"\r\n\r\n`))
+    chunks.push(Buffer.from(`${value}\r\n`))
+  }
+
+  files.forEach((file, index) => {
+    const ext = file.mimeType.includes('jpeg') || file.mimeType.includes('jpg') ? 'jpg' : file.mimeType.includes('webp') ? 'webp' : 'png'
+    chunks.push(Buffer.from(`--${boundary}\r\n`))
+    chunks.push(Buffer.from(`Content-Disposition: form-data; name="image[]"; filename="reference-${index + 1}.${ext}"\r\n`))
+    chunks.push(Buffer.from(`Content-Type: ${file.mimeType}\r\n\r\n`))
+    chunks.push(Buffer.from(file.data, 'base64'))
+    chunks.push(Buffer.from('\r\n'))
+  })
+
+  chunks.push(Buffer.from(`--${boundary}--\r\n`))
+  return { body: Buffer.concat(chunks), contentType: `multipart/form-data; boundary=${boundary}` }
+}
+
+function postMultipartOnce(
+  apiKey: string,
+  path: string,
+  fields: Record<string, string>,
+  files: RefImage[],
+  timeoutMs: number,
+): Promise<OpenAIImageResponse> {
+  return new Promise((resolve, reject) => {
+    const { body, contentType } = buildMultipartBody(fields, files)
+    const baseURL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '')
+    const url = new URL(`${baseURL}${path}`)
+    const org = process.env.OPENAI_ORG_ID || process.env.OPENAI_ORGANIZATION
+    const project = process.env.OPENAI_PROJECT_ID
+    const headers: Record<string, string> = {
+      'Content-Type': contentType,
+      'Content-Length': String(body.length),
+      Authorization: `Bearer ${apiKey}`,
+    }
+    if (org) headers['OpenAI-Organization'] = org
+    if (project) headers['OpenAI-Project'] = project
+
+    const req = https.request(
+      {
+        method: 'POST',
+        hostname: url.hostname,
+        port: url.port || 443,
+        path: url.pathname + url.search,
+        agent: OA_AGENT,
+        headers,
+        timeout: timeoutMs,
+      },
+      res => {
+        const chunks: Buffer[] = []
+        res.on('data', c => chunks.push(c as Buffer))
+        res.on('end', () => {
+          const text = Buffer.concat(chunks).toString('utf8')
+          const status = res.statusCode ?? 0
+          if (status < 200 || status >= 300) {
+            const e = new Error(`OpenAI Images ${status}: ${text.slice(0, 500)}`) as Error & { status?: number }
+            e.status = status
+            return reject(e)
+          }
+          try {
+            resolve(JSON.parse(text) as OpenAIImageResponse)
+          } catch {
+            reject(new Error('invalid response body from OpenAI Images (JSON parse failed)'))
+          }
+        })
+        res.on('error', reject)
+      },
+    )
+    req.on('error', reject)
+    req.on('timeout', () => req.destroy(new Error('OpenAI Images request timeout')))
+    req.write(body)
+    req.end()
+  })
+}
+
+async function createImageViaImageApi(
   promptText: string,
   refs: RefImage[],
   opts: OpenAIImageOptions,
@@ -128,25 +203,11 @@ async function createImageViaResponses(
     throw new Error('مفتاح OpenAI غير مهيّأ — أضِف OPENAI_API_KEY في إعدادات الخادم')
   }
 
-  const content: Array<Record<string, string>> = [{ type: 'input_text', text: promptText }]
-  for (const img of refs) {
-    content.push({
-      type: 'input_image',
-      image_url: `data:${img.mimeType};base64,${img.data}`,
-    })
-  }
-
-  const payload = {
+  const commonFields: Record<string, string> = {
     model: OPENAI_IMAGE_MODEL,
-    input: [{ role: 'user', content }],
-    tools: [
-      {
-        type: 'image_generation',
-        action: opts.action ?? (refs.length ? 'edit' : 'generate'),
-        size: imageSizeFor(opts),
-        quality: opts.quality ?? 'high',
-      },
-    ],
+    prompt: promptText,
+    size: imageSizeFor(opts),
+    quality: opts.quality ?? OPENAI_IMAGE_QUALITY ?? 'medium',
   }
 
   const retries = opts.retries ?? 3
@@ -154,15 +215,13 @@ async function createImageViaResponses(
   let lastErr: unknown
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const json = await postResponsesOnce(apiKey, payload, timeoutMs)
-      const imageBase64 = (json.output ?? [])
-        .filter(output => output.type === 'image_generation_call')
-        .map(output => output.result)
-        .find((result): result is string => typeof result === 'string' && result.length > 0)
-
+      const json = refs.length
+        ? await postMultipartOnce(apiKey, '/images/edits', commonFields, refs, timeoutMs)
+        : await postJsonOnce(apiKey, '/images/generations', commonFields, timeoutMs)
+      const imageBase64 = json.data?.find(item => typeof item.b64_json === 'string' && item.b64_json.length > 0)?.b64_json
       if (imageBase64) return { b64: imageBase64, mimeType: 'image/png' }
 
-      const message = json.error?.message || json.output_text || 'لم يُرجِع OpenAI صورة'
+      const message = json.error?.message || 'لم يُرجِع OpenAI صورة'
       throw new Error(message)
     } catch (err) {
       lastErr = err
@@ -192,5 +251,5 @@ export async function generateImageFromPartsWithOpenAI(
   refs: RefImage[],
   opts: OpenAIImageOptions = {},
 ): Promise<{ b64: string; mimeType: string }> {
-  return createImageViaResponses(promptText, refs, opts)
+  return createImageViaImageApi(promptText, refs, opts)
 }
