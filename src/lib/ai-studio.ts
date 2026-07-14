@@ -10,14 +10,14 @@
 import OpenAI from 'openai'
 import sharp from 'sharp'
 import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives, buildTweetDirectives } from './openai'
-import { generateImageWithGemini, generateImageFromParts } from './gemini'
+import { generateImageWithOpenAI, generateImageFromPartsWithOpenAI } from './image-generation'
 import { compositeLogoBottomRight, resizeToPoster } from './logo-overlay'
 import { createServiceRoleClient } from './supabase-server'
 
 export const OPENAI_MODEL = 'gpt-5.5'
 
 /**
- * قفل الوجه — تعليمة قصوى تُحاط بموجّه Gemini لتقليل إعادة رسمه للوجه.
+ * قفل الوجه — تعليمة قصوى تُحاط بموجّه صورة OpenAI لتقليل إعادة رسمه للوجه.
  * مكتوبة بالعربية والإنجليزية لأقصى التزام من النموذج.
  */
 export const FACE_LOCK =
@@ -158,7 +158,7 @@ export function conceptToString(c: Concept | undefined): string {
   return [c.title, c.mood].filter(Boolean).join(' — ') + (c.brief ? `\n${c.brief}` : '')
 }
 
-/** الخطوة 4 — توليد التصميم عبر Gemini + تركيب اللوقو + الرفع إلى التخزين. */
+/** الخطوة 4 — توليد التصميم عبر OpenAI Images + تركيب اللوقو + الرفع إلى التخزين. */
 export async function generateDesign(
   openai: OpenAI,
   args: { analysis: unknown; chosenConcept: string; sourceImages: string[]; note?: string; extra?: string; hasVideo?: boolean },
@@ -195,12 +195,12 @@ export async function generateDesign(
   })
   const designPrompt = promptCompletion.choices[0]?.message?.content ?? ''
 
-  // قفل الوجه: يُحاط به موجّه Gemini من الطرفين (بداية ونهاية) لتقليل إعادة رسم الوجه.
+  // قفل الوجه: يُحاط به موجّه الصورة من الطرفين (بداية ونهاية) لتقليل إعادة رسم الوجه.
   // عند وجود فيديو: نُلحق توجيه تخطيط الفيديو في النهاية (أولوية قصوى).
-  const geminiPrompt = hasVideo
+  const imagePrompt = hasVideo
     ? `${FACE_LOCK}\n\n${designPrompt}\n\n${VIDEO_LAYOUT}\n\n${FACE_LOCK}`
     : `${FACE_LOCK}\n\n${designPrompt}\n\n${FACE_LOCK}`
-  const { b64 } = await generateImageWithGemini(geminiPrompt, sourceImages)
+  const { b64 } = await generateImageWithOpenAI(imagePrompt, sourceImages)
   const rawImage = Buffer.from(b64, 'base64')
   const posterBase = await resizeToPoster(rawImage)
   const { buffer: finalImage, mimeType } = logoUrl
@@ -236,7 +236,7 @@ export async function editDesign(args: { designImageUrl: string; note: string })
     'Only modify what the requested change requires — but DO make that change; do not return the image unchanged.\n' +
     'Render Arabic text crisp and correctly shaped (RTL). Output the edited design as a portrait 1080×1350 (4:5) ultra-HD image.'
 
-  const { b64 } = await generateImageWithGemini(prompt, [designImageUrl])
+  const { b64 } = await generateImageWithOpenAI(prompt, [designImageUrl])
   const posterBase = await resizeToPoster(Buffer.from(b64, 'base64'))
   const path = `studio-edit-${Date.now()}-${Math.random().toString(36).slice(2)}.png`
   const { error } = await service.storage.from('content-images').upload(path, posterBase, { contentType: 'image/png' })
@@ -309,8 +309,8 @@ export async function generateInfographic(
     extraInfo && extraInfo.trim() ? `\nمعلومات إضافية تُراعى: ${extraInfo.trim()}` : '',
   ].filter(Boolean).join('\n')
 
-  const geminiPrompt = `${FACE_LOCK}\n\n${prompt}\n\n${FACE_LOCK}`
-  const { b64 } = await generateImageFromParts(geminiPrompt, refs)
+  const imagePrompt = `${FACE_LOCK}\n\n${prompt}\n\n${FACE_LOCK}`
+  const { b64 } = await generateImageFromPartsWithOpenAI(imagePrompt, refs)
   const rawImage = Buffer.from(b64, 'base64')
   const posterBase = await resizeToPoster(rawImage)
   const { buffer: finalImage, mimeType } = logoUrl
@@ -329,7 +329,7 @@ export async function generateInfographic(
 /**
  * يعيد استضافة صورة مصدر خارجية على تخزين Supabase ويُعيد رابطاً عاماً.
  *
- * ضروري للأخبار من first1saudi.net: تمرير روابطها مباشرةً إلى OpenAI/Gemini يفشل
+ * ضروري للأخبار من first1saudi.net: تمرير روابطها مباشرةً إلى نماذج الصور يفشل
  * لأن تلك الخدمات تحمّل الصورة من المصدر، وموقع الأخبار بطيء/يحجب التحميل الخارجي
  * ("400 Timeout while downloading ..."). برفعها إلى Supabase (CDN) تصبح سريعة وموثوقة.
  */
@@ -390,7 +390,7 @@ export async function runStudioPipeline(input: {
   const openai = getOpenAI()
   const newsText = buildNewsText(input)
 
-  // أعِد استضافة الصور الخارجية على Supabase أولاً (تجنّب فشل تحميل OpenAI/Gemini).
+  // أعِد استضافة الصور الخارجية على Supabase أولاً (تجنّب فشل تحميل نماذج الصور لها).
   const sourceImages = await Promise.all(input.sourceImages.map(rehostImage))
 
   const analysis = await analyzeNews(openai, { newsText, sourceImages })

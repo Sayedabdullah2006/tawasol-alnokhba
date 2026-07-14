@@ -6,7 +6,7 @@
  */
 import sharp from 'sharp'
 import { createServiceRoleClient } from '@/lib/supabase-server'
-import { generateImageWithGemini } from '@/lib/gemini'
+import { generateImageWithOpenAI } from '@/lib/image-generation'
 import { getOpenAI, chatComplete } from '@/lib/openai'
 
 const NL_WIDTH = 1080
@@ -220,6 +220,7 @@ function buildNewsletterPrompt(window: WeeklyWindow, items: NewsletterItem[], di
   return [
     `DESIGN TASK — صمّم واجهة مجلّة/جريدة عربية عمودية **إبداعية وعصرية** (editorial magazine cover, not a plain classic newspaper). تكوين فنّي جريء وأنيق غير تقليدي.`,
     `OUTPUT SIZE: vertical poster ${NL_WIDTH}×${NL_HEIGHT} (9:16), ultra-HD, print-quality.`,
+    `الاتجاه الإبداعي لهذا الأسبوع: ${direction}.`,
     ``,
     `الإبداع المطلوب: تكوين تحريري ديناميكي — خبر رئيسي (hero) بمساحة درامية كبيرة، وبقية الأخبار بأحجام وأعمدة متفاوتة، مع كتل لونية من الهوية، أشكال هندسية/أقواس ناعمة، عمق وطبقات، فواصل ذهبية رفيعة، تايبوغرافي عربي قوي بأوزان متدرّجة. تجنّب الشبكة المتساوية الجامدة تمامًا.`,
     ``,
@@ -341,7 +342,7 @@ export async function getItemsByIds(ids: string[]): Promise<NewsletterItem[]> {
 }
 
 /**
- * يولّد بوستر نشرة الأسبوع عبر Gemini ويخزّنه كصف في newsletters.
+ * يولّد بوستر نشرة الأسبوع عبر OpenAI Images ويخزّنه كصف في newsletters.
  * opts.ids: تصاميم مختارة يدوياً (من البوب-أب). opts.endUtc: جمعة النشر المستهدفة.
  * opts.status: 'draft' (معاينة) أو 'scheduled'.
  */
@@ -364,7 +365,7 @@ export async function generateNewsletterPoster(opts?: {
   const prompt = buildNewsletterPrompt(window, items, direction)
   const refs = items.map(i => i.sourceImage || i.image).filter((u): u is string => !!u).slice(0, 8)
 
-  const { b64 } = await generateImageWithGemini(prompt, refs)
+  const { b64 } = await generateImageWithOpenAI(prompt, refs, { aspectRatio: '9:16' })
   const raw = Buffer.from(b64, 'base64')
   const poster = await sharp(raw).resize(NL_WIDTH, NL_HEIGHT, { fit: 'cover', position: 'top' }).png().toBuffer()
   const withLogo = await compositeBrandLogo(poster)

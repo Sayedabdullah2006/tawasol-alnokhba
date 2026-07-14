@@ -8,7 +8,7 @@
  * نُعيد كائنات بشكل NewsPost لإعادة استخدام نفس خط الاستوديو.
  */
 import { createServiceRoleClient } from './supabase-server'
-import { generateImageWithGemini } from './gemini'
+import { generateImageWithOpenAI } from './image-generation'
 import type { NewsPost } from './first1-news'
 
 const COLORIZE_PROMPT =
@@ -20,7 +20,7 @@ const COLORIZE_PROMPT =
 
 /**
  * يضمن وجود نسخة ملوّنة من صورة السيدة (صور المصدر رمادية).
- * يلوّنها مرة واحدة عبر Gemini ويخزّنها (cache)، ثم يعيد رابطها. عند أي فشل
+ * يلوّنها مرة واحدة عبر OpenAI Images ويخزّنها (cache)، ثم يعيد رابطها. عند أي فشل
  * يعيد الصورة الرمادية الأصلية حتى لا تتعطّل العملية.
  */
 export async function ensureColorImage(personId: number, bwUrl: string): Promise<string> {
@@ -33,7 +33,7 @@ export async function ensureColorImage(personId: number, bwUrl: string): Promise
   if (existing?.image_url_color) return existing.image_url_color
 
   try {
-    const { b64, mimeType } = await generateImageWithGemini(COLORIZE_PROMPT, [bwUrl])
+    const { b64, mimeType } = await generateImageWithOpenAI(COLORIZE_PROMPT, [bwUrl], { aspectRatio: '1:1' })
     const buf = Buffer.from(b64, 'base64')
     const ext = mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg' : 'png'
     const path = `manhom-color-${personId}-${Date.now()}.${ext}`

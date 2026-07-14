@@ -3,7 +3,7 @@ import OpenAI from 'openai'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives, buildTweetDirectives } from '@/lib/openai'
 import { logGeneratedDesign } from '@/lib/newsletter'
-import { generateImageWithGemini } from '@/lib/gemini'
+import { generateImageWithOpenAI } from '@/lib/image-generation'
 import { compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
 
 export const dynamic = 'force-dynamic'
@@ -129,9 +129,12 @@ export async function POST(req: Request) {
     imageUrl?: string
   }) => {
     if (isCampaignPost) {
-      const aiPosts: Record<string, any> =
-        reqRow.ai_posts && typeof reqRow.ai_posts === 'object' ? { ...reqRow.ai_posts } : {}
-      const entry: Record<string, any> = { ...(aiPosts[postIndex as number] ?? {}) }
+      const postKey = String(postIndex as number)
+      const aiPosts: Record<string, Record<string, unknown>> =
+        reqRow.ai_posts && typeof reqRow.ai_posts === 'object'
+          ? { ...(reqRow.ai_posts as Record<string, Record<string, unknown>>) }
+          : {}
+      const entry: Record<string, unknown> = { ...(aiPosts[postKey] ?? {}) }
       if ('analysis' in patch) entry.analysis = patch.analysis
       if ('tweets' in patch) entry.tweets = patch.tweets
       if ('concepts' in patch) entry.design_concepts = patch.concepts
@@ -140,7 +143,7 @@ export async function POST(req: Request) {
       if ('sourceImage' in patch) entry.source_image = patch.sourceImage
       if ('generatedAt' in patch) entry.generated_at = patch.generatedAt
       if ('imageUrl' in patch) entry.image_url = patch.imageUrl
-      aiPosts[postIndex as number] = entry
+      aiPosts[postKey] = entry
       reqRow.ai_posts = aiPosts // إبقاء النسخة المحلية متزامنة
       const { error } = await service
         .from('publish_requests')
@@ -332,13 +335,13 @@ export async function POST(req: Request) {
 
       await saveStep({ imagePrompt: designPrompt })
 
-      // 2) توليد الصورة عبر Gemini (نموذج توليد الصور من Google).
+      // 2) توليد الصورة عبر OpenAI Images.
       // نمرّر الصورة الشخصية الحقيقية فقط كمرجع. لا نمرّر اللوقو إطلاقاً لأن
       // النموذج يُعيد رسمه ويُشوّه نصه العربي — سنُركّبه برمجياً بعد التوليد.
       const referenceImages = sourceImages
       // لا نفرض نسبة 4:5 على النموذج — فرضها يجعله يُعيد تكوين المشهد ويتجاهل الصورة الحقيقية.
       // المقاس النهائي يُضبط بـ sharp إلى 1080×1350 لاحقاً.
-      const { b64 } = await generateImageWithGemini(designPrompt, referenceImages)
+      const { b64 } = await generateImageWithOpenAI(designPrompt, referenceImages)
 
       // 3) ضبط المقاس إلى 1080×1350 بالضبط، ثم تركيب لوقو أول سعودي أسفل اليمين (إن وُجد).
       const rawImage = Buffer.from(b64, 'base64')
