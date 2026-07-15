@@ -22,6 +22,8 @@ interface ScheduleItem {
   created_at: string
 }
 
+type ScheduleFilter = 'all' | 'scheduled' | 'unscheduled'
+
 function formatArabicDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-').map(Number)
   return new Date(y, m - 1, d).toLocaleDateString('ar', {
@@ -87,6 +89,7 @@ export default function AdminSocialPage() {
   // توليد يدوي لمنشورات إضافية لنفس اليوم
   const [genBusy, setGenBusy] = useState(false)
   const [genCount, setGenCount] = useState(3)
+  const [scheduleFilter, setScheduleFilter] = useState<ScheduleFilter>('all')
 
   const generateMore = async () => {
     setGenBusy(true)
@@ -188,13 +191,26 @@ export default function AdminSocialPage() {
 
   if (loading) return <LoadingSpinner size="lg" />
 
+  const scheduledItems = items.filter(item => item.status === 'scheduled')
+  const unscheduledItems = items.filter(item => item.status !== 'scheduled')
+  const visibleItems = items.filter(item => {
+    if (scheduleFilter === 'scheduled') return item.status === 'scheduled'
+    if (scheduleFilter === 'unscheduled') return item.status !== 'scheduled'
+    return true
+  })
+
   // تجميع حسب اليوم
   const byDate = new Map<string, ScheduleItem[]>()
-  for (const it of items) {
+  for (const it of visibleItems) {
     if (!byDate.has(it.batch_date)) byDate.set(it.batch_date, [])
     byDate.get(it.batch_date)!.push(it)
   }
   const dates = [...byDate.keys()].sort((a, b) => (a < b ? 1 : -1))
+  const filterOptions: Array<{ value: ScheduleFilter; label: string; count: number }> = [
+    { value: 'all', label: 'الكل', count: items.length },
+    { value: 'scheduled', label: 'المجدولة', count: scheduledItems.length },
+    { value: 'unscheduled', label: 'غير المجدولة', count: unscheduledItems.length },
+  ]
 
   return (
     <div className="p-4 md:p-6 space-y-5">
@@ -241,10 +257,37 @@ export default function AdminSocialPage() {
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm">{error}</div>
       )}
 
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-2">
+        {filterOptions.map(option => {
+          const active = scheduleFilter === option.value
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setScheduleFilter(option.value)}
+              className={`rounded-xl px-3 py-2 text-sm font-bold transition ${
+                active
+                  ? 'bg-green text-white shadow-sm'
+                  : 'text-muted hover:bg-cream hover:text-dark'
+              }`}
+            >
+              {option.label}
+              <span className={`ms-2 rounded-full px-2 py-0.5 text-xs ${active ? 'bg-white/20 text-white' : 'bg-cream text-dark'}`}>
+                {option.count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
       {dates.length === 0 && !error && (
         <div className="text-center py-20">
           <div className="text-6xl mb-4 opacity-20">🗓️</div>
-          <p className="text-muted">لا توجد أخبار مولّدة بعد — ستظهر هنا تلقائياً كل يوم.</p>
+          <p className="text-muted">
+            {items.length === 0
+              ? 'لا توجد أخبار مولّدة بعد — ستظهر هنا تلقائياً كل يوم.'
+              : 'لا توجد منشورات مطابقة لهذا الفلتر.'}
+          </p>
         </div>
       )}
 
