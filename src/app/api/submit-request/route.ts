@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { generateRequestNumber } from '@/lib/utils'
 import { notifyNewRequestToAdmin, notifyRequestReceivedToClient, notifyQuoteApprovedAwaitingPaymentToClient } from '@/lib/email'
-import { CATEGORIES, PACKAGES } from '@/lib/constants'
+import { CATEGORIES, ORDERABLE_PACKAGES } from '@/lib/constants'
 import { calculateAutoQuote, calculateCampaignQuote, CAMPAIGN_DISCOUNT_PCT } from '@/lib/auto-quote'
 
 // الحالات التي تُعدّ «طلباً قائماً» يمنع رفع طلب جديد (قبل الدفع/الاكتمال).
@@ -15,6 +15,10 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const serviceClient = await createServiceRoleClient()
+
+    if (body.selected_package && !ORDERABLE_PACKAGES.some((pkg) => pkg.id === body.selected_package)) {
+      return NextResponse.json({ error: 'الباقة المختارة لم تعد متاحة' }, { status: 400 })
+    }
 
     // ── تحديد المستخدم ───────────────────────────────────────────
     let userId: string | null = null
@@ -153,7 +157,7 @@ export async function POST(request: Request) {
 
       // ── باقة الحملة (للأفراد فقط) — باقة واحدة تنطبق على كل الأخبار ──
       const campaignSelectedPackage: string | null = isIndividual ? (body.selected_package ?? null) : null
-      const campaignPkg = campaignSelectedPackage ? PACKAGES.find(p => p.id === campaignSelectedPackage) ?? null : null
+      const campaignPkg = campaignSelectedPackage ? ORDERABLE_PACKAGES.find(p => p.id === campaignSelectedPackage) ?? null : null
       const isUpgradedCampaignPkg = campaignPkg != null && campaignPkg.id !== 'basic'
 
       // القنوات: الباقة الأساسية = قناة واحدة يحددها العميل ؛ غيرها = كل القنوات
@@ -334,7 +338,7 @@ export async function POST(request: Request) {
     // ── الباقة المختارة (للأفراد + المنشور الواحد فقط، ولا تُطبَّق على «أخرى») ──
     const selectedPackage: string | null = needsManualQuote ? null : (body.selected_package ?? null)
     const pkg = selectedPackage
-      ? PACKAGES.find(p => p.id === selectedPackage) ?? null
+      ? ORDERABLE_PACKAGES.find(p => p.id === selectedPackage) ?? null
       : null
 
     // قنوات النشر الفعلية:

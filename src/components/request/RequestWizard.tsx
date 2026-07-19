@@ -11,6 +11,7 @@ import type { RequestType } from './RStepRequestType'
 import type { ClientType } from './RStep1ClientType'
 import type { CampaignSetup } from './RStepCampaignSetup'
 import RStep3Details from './RStep3Details'
+import RStepExtras from './RStepExtras'
 import { type ContactData } from './RStep5Contact'
 import { TERMS_TEXT } from './RStep6Terms'
 import RStepCampaignPosts, { type CampaignPostData, makeEmptyPost, isPostComplete } from './RStepCampaignPosts'
@@ -19,8 +20,8 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
 import RequestManageActions from '@/components/dashboard/RequestManageActions'
 import { getStatusLabel } from '@/lib/status-labels'
-import { COMPETITION_SUBCATEGORIES, getCompetitionPositions, PACKAGES, CATEGORY_CONDITIONS } from '@/lib/constants'
-import { calculateAutoQuote } from '@/lib/auto-quote'
+import { COMPETITION_SUBCATEGORIES, getCompetitionPositions, ORDERABLE_PACKAGES, CATEGORY_CONDITIONS } from '@/lib/constants'
+import { AQ_EXTRAS_PRICES, calculateAutoQuote } from '@/lib/auto-quote'
 
 // القيم الافتراضية لمحتوى الموقع (تُستخدم حتى يصل المحتوى المعدَّل من القاعدة)
 // الشروط العامة محذوفة — يُكتفى بشروط القبول بحسب الفئة.
@@ -117,6 +118,7 @@ export default function RequestWizard() {
   const siteContent = useSiteContent(SITE_CONTENT_FALLBACK)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [reviewing, setReviewing] = useState(false)
   const [requestNumber, setRequestNumber] = useState('')
   const [influencers, setInfluencers] = useState<Influencer[]>([])
   const [loading, setLoading] = useState(true)
@@ -140,8 +142,8 @@ export default function RequestWizard() {
     title: '', content: '', link: '', hashtags: '', preferredDate: '', images: [] as string[],
   })
   const [channels, setChannels]         = useState<string[]>([])
-  // الخدمات الإضافية لم تَعُد تُختار أثناء الإرسال — تُعرض على العميل بعد وصول العرض
-  const selectedExtras: string[] = []
+  const [selectedExtras, setSelectedExtras] = useState<string[]>([])
+  const [discountCode, setDiscountCode] = useState('')
   const [contact, setContact]           = useState<ContactData>({ fullName: '', phone: '', email: '', city: '', xHandle: '' })
   const [isLoggedIn, setIsLoggedIn]     = useState(false)
   const [orgInfo, setOrgInfo]           = useState({ name: '', representative: '', license: '' })
@@ -245,7 +247,11 @@ export default function RequestWizard() {
           if (d.contact)              setContact(d.contact)
           if (d.orgInfo)              setOrgInfo(d.orgInfo)
           if (d.campaignSetup)        setCampaignSetup(d.campaignSetup)
-          if (d.selectedPackage)      setSelectedPackage(d.selectedPackage)
+          if (d.selectedPackage === 'basic' && Array.isArray(d.selectedExtras)) setSelectedExtras(d.selectedExtras)
+          if (typeof d.discountCode === 'string') setDiscountCode(d.discountCode)
+          if (ORDERABLE_PACKAGES.some((pkg) => pkg.id === d.selectedPackage)) {
+            setSelectedPackage(d.selectedPackage)
+          }
           if (d.basicChannel)         setBasicChannel(d.basicChannel)
           if (Array.isArray(d.campaignPosts) && d.campaignPosts.length) setCampaignPosts(d.campaignPosts)
           showToast('تم استرجاع طلبك غير المكتمل ✨', 'info')
@@ -276,13 +282,13 @@ export default function RequestWizard() {
         savedAt: Date.now(),
         selectedInfluencer, requestType, clientType, category, subOption,
         competitionSelection, details, channels, contact, orgInfo,
-        campaignSetup, campaignPosts, selectedPackage, basicChannel,
+        campaignSetup, campaignPosts, selectedPackage, basicChannel, selectedExtras, discountCode,
       }))
     } catch { /* تجاوز سعة التخزين — نتجاهل بهدوء */ }
   }, [
     hydrated, selectedInfluencer, requestType, clientType, category, subOption,
     competitionSelection, details, channels, contact, orgInfo,
-    campaignSetup, campaignPosts, selectedPackage,
+    campaignSetup, campaignPosts, selectedPackage, basicChannel, selectedExtras, discountCode,
   ])
 
   // ملاحظة: بيانات التواصل تُحمَّل تلقائياً من بروفايل الحساب وتُرسَل مع الطلب،
@@ -356,6 +362,20 @@ export default function RequestWizard() {
     }
   })()
 
+  const selectedPackageData = ORDERABLE_PACKAGES.find((pkg) => pkg.id === selectedPackage) ?? null
+  const extrasTotal = selectedExtras.reduce((total, id) => total + (AQ_EXTRAS_PRICES[id] ?? 0), 0)
+  const estimatedTotal = (() => {
+    if (!showPackages || !selectedPackageData) return null
+    if (requestType === 'campaign' && campaignBaseSubtotal != null) {
+      const packageTotal = Math.round(campaignBaseSubtotal * selectedPackageData.priceMultiplier)
+      return packageTotal - Math.round(packageTotal * CAMPAIGN_DISCOUNT / 100)
+    }
+    if (requestType === 'single' && basicDynamicPrice != null) {
+      return Math.round(basicDynamicPrice * selectedPackageData.priceMultiplier)
+    }
+    return null
+  })()
+
   // بيانات تواصل الضيف (الزائر غير المسجَّل) — إلزامية لإنشاء حسابه ومتابعة طلبه.
   const emailValid = /^\S+@\S+\.\S+$/.test(contact.email.trim())
   const contactComplete = isLoggedIn || (
@@ -407,6 +427,7 @@ export default function RequestWizard() {
           org_license:        clientType !== 'individual' ? (orgInfo.license.trim() || null) : null,
           channels,
           selected_extras:  selectedExtras,
+          discount_code:    discountCode.trim() || null,
           // باقة واحدة للحملة كلها (للأفراد)
           selected_package: showPackages ? selectedPackage : null,
           basic_channel:    showPackages && selectedPackage === 'basic' ? basicChannel : null,
@@ -454,6 +475,7 @@ export default function RequestWizard() {
           x_handle:        contact.xHandle || null,
           channels,
           selected_extras: selectedExtras,
+          discount_code: discountCode.trim() || null,
           selected_package: showPackages ? selectedPackage : null,
           basic_channel: showPackages && selectedPackage === 'basic' ? basicChannel : null,
         }
@@ -512,6 +534,12 @@ export default function RequestWizard() {
     }
   }
 
+  const openReview = () => {
+    if (!canSubmit) return
+    setReviewing(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   if (loading || catsLoading) return <LoadingSpinner size="lg" />
   if (success) return <SuccessScreen requestNumber={requestNumber} />
 
@@ -550,6 +578,125 @@ export default function RequestWizard() {
     )
   }
 
+  if (reviewing) {
+    const summaryTitle = requestType === 'campaign'
+      ? `حملة من ${campaignPosts.length} منشورات`
+      : details.title
+    const checkoutTotal = estimatedTotal != null ? estimatedTotal + extrasTotal : null
+    const totalLabel = checkoutTotal != null
+      ? `${checkoutTotal.toLocaleString('ar-SA')} ر.س`
+      : 'سيصلك عرض سعر بعد المراجعة'
+    const canSelectExtras = requestType === 'single' && selectedPackage === 'basic' && estimatedTotal != null
+
+    return (
+      <div className="bg-cream min-h-screen pb-8">
+        <div className="max-w-2xl mx-auto w-full px-4 py-6">
+          <button
+            type="button"
+            onClick={() => setReviewing(false)}
+            className="text-sm font-bold text-green mb-5"
+          >
+            ← تعديل الطلب
+          </button>
+
+          <div className="mb-5">
+            <span className="inline-flex bg-green/10 text-green text-xs font-black px-3 py-1 rounded-full mb-3">الخطوة الأخيرة</span>
+            <h1 className="text-2xl font-black text-dark mb-1">راجع طلبك</h1>
+            <p className="text-sm text-muted">تأكد من التفاصيل قبل المتابعة.</p>
+          </div>
+
+          <div className="space-y-3">
+            <section className="bg-card border border-border rounded-2xl p-5">
+              <h2 className="font-black text-dark mb-3">تفاصيل الطلب</h2>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between gap-4"><span className="text-muted">نوع الطلب</span><span className="font-bold text-dark">{requestType === 'campaign' ? 'حملة متعددة' : 'منشور واحد'}</span></div>
+                <div className="flex justify-between gap-4"><span className="text-muted">المحتوى</span><span className="font-bold text-dark text-left">{summaryTitle}</span></div>
+                {details.preferredDate && requestType === 'single' && (
+                  <div className="flex justify-between gap-4"><span className="text-muted">موعد النشر</span><span className="font-bold text-dark">{details.preferredDate}</span></div>
+                )}
+              </div>
+            </section>
+
+            {selectedPackageData && (
+              <section className="bg-card border border-border rounded-2xl p-5">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div>
+                    <h2 className="font-black text-dark">{selectedPackageData.name}</h2>
+                    <p className="text-sm text-muted mt-1">{selectedPackageData.blurb}</p>
+                  </div>
+                  {estimatedTotal != null && <span className="text-green font-black whitespace-nowrap">{totalLabel}</span>}
+                </div>
+                <ul className="space-y-2">
+                  {selectedPackageData.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-2 text-sm text-dark">
+                      <span className="text-green">✓</span>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {canSelectExtras && (
+              <RStepExtras
+                selected={selectedExtras}
+                onChange={setSelectedExtras}
+                basePrice={estimatedTotal}
+                baseLabel="سعر الباقة الأساسية"
+              />
+            )}
+
+            {clientType === 'individual' && estimatedTotal != null && (
+              <section className="bg-card border border-border rounded-2xl p-5">
+                <label className={fieldLabel}>كوبون الخصم</label>
+                <input
+                  type="text"
+                  value={discountCode}
+                  onChange={(event) => setDiscountCode(event.target.value.toUpperCase())}
+                  placeholder="أدخل الكود إن وجد"
+                  className={selectCls}
+                  autoCapitalize="characters"
+                />
+                <p className="text-xs text-muted mt-2">يُطبَّق الخصم بعد التحقق من الكود.</p>
+              </section>
+            )}
+
+            <section className="bg-card border border-border rounded-2xl p-5">
+              <div className="flex justify-between items-center gap-4">
+                <div>
+                  <h2 className="font-black text-dark">ملخص الدفع</h2>
+                  <p className="text-xs text-muted mt-1">{discountCode.trim() ? 'سيُحدّث المبلغ بعد التحقق من الكوبون.' : 'السعر قبل الخصم إن وجد.'}</p>
+                </div>
+                <span className="text-green font-black text-lg text-left">{totalLabel}</span>
+              </div>
+            </section>
+          </div>
+
+          <p className="text-[11px] text-muted text-center mt-5 mb-3 leading-relaxed">
+            بالمتابعة فإنك توافق على{' '}
+            <button type="button" onClick={() => setShowTerms(true)} className="text-green font-medium underline">الشروط والأحكام وسياسة الخصوصية</button>
+          </p>
+          <Button onClick={handleSubmit} loading={submitting} disabled={submitting} className="w-full" size="lg">
+            {clientType === 'individual' ? 'المتابعة إلى الدفع' : 'إرسال الطلب للمراجعة'}
+          </Button>
+        </div>
+
+        {showTerms && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setShowTerms(false)}>
+            <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+                <h3 className="font-black text-dark text-base">الشروط والأحكام وسياسة الخصوصية</h3>
+                <button type="button" onClick={() => setShowTerms(false)} className="w-8 h-8 rounded-full flex items-center justify-center text-muted hover:bg-muted/10 text-lg" aria-label="إغلاق">✕</button>
+              </div>
+              <div className="px-5 py-4 overflow-y-auto text-sm text-dark/80 leading-relaxed whitespace-pre-line">{siteContent.terms_text}</div>
+              <div className="px-5 py-3 border-t border-border"><Button onClick={() => setShowTerms(false)} className="w-full">إغلاق</Button></div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const competitionPositions = competitionSelection?.subcategory
     ? getCompetitionPositions(competitionSelection.subcategory)
     : []
@@ -557,12 +704,19 @@ export default function RequestWizard() {
   // اختيار نوع الطلب / الصفة عبر البطاقات — بنفس آثار القوائم المنسدلة السابقة
   const selectRequestType = (v: RequestType) => {
     setRequestType(v)
-    if (v === 'campaign') { setCategory(null); setSubOption(null); setCompetitionSelection(null) }
+    if (v === 'campaign') {
+      setCategory(null); setSubOption(null); setCompetitionSelection(null)
+      setSelectedExtras([])
+    }
   }
   const selectClientType = (v: ClientType) => {
     if (clientType !== v) {
       setCategory(null); setSubOption(null); setCompetitionSelection(null)
       setCampaignPosts(prev => prev.map(p => ({ ...p, category: '', subOption: null })))
+    }
+    if (v !== 'individual') {
+      setSelectedExtras([])
+      setDiscountCode('')
     }
     setClientType(v)
   }
@@ -871,8 +1025,8 @@ export default function RequestWizard() {
                   التالي ←
                 </Button>
               ) : (
-                <Button size="sm" onClick={handleSubmit} loading={submitting} disabled={!canSubmit || submitting}>
-                  إرسال الطلب للمراجعة
+                <Button size="sm" onClick={openReview} disabled={!canSubmit}>
+                  مراجعة الطلب
                 </Button>
               )}
             </div>
@@ -893,8 +1047,8 @@ export default function RequestWizard() {
                   🚀 الباقة المختارة تنطبق على كل أخبار الحملة ({campaignPosts.length} منشورات) — السعر يشمل خصم الحملة {CAMPAIGN_DISCOUNT}%.
                 </p>
               )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {PACKAGES.map(pkg => {
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {ORDERABLE_PACKAGES.map(pkg => {
                   const isSelected = selectedPackage === pkg.id
                   // السعر: المفرد = سعر الخبر × معامل الباقة ؛ الحملة = مجموع الأخبار × معامل الباقة − خصم الحملة
                   let pkgPrice: number | null = null   // بعد الخصم
@@ -913,7 +1067,10 @@ export default function RequestWizard() {
                     <button
                       type="button"
                       key={pkg.id}
-                      onClick={() => setSelectedPackage(pkg.id)}
+                      onClick={() => {
+                        setSelectedPackage(pkg.id)
+                        if (pkg.id !== 'basic') setSelectedExtras([])
+                      }}
                       className={cn(
                         'relative text-right rounded-2xl border-2 p-4 transition-all flex flex-col',
                         isSelected
@@ -998,8 +1155,8 @@ export default function RequestWizard() {
               )}
 
               <div className="flex justify-end pt-4">
-                <Button size="sm" onClick={handleSubmit} loading={submitting} disabled={!canSubmit || submitting}>
-                  {clientType === 'individual' ? '💳 المتابعة إلى الدفع' : 'إرسال الطلب'}
+                <Button size="sm" onClick={openReview} disabled={!canSubmit}>
+                  مراجعة الطلب
                 </Button>
               </div>
             </FormSection>
@@ -1008,32 +1165,27 @@ export default function RequestWizard() {
         </div>
       </div>
 
-      {/* شريط الإرسال الثابت */}
+      {/* سلة الطلب الثابتة */}
       <div className="fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur-md border-t border-border px-4 py-3">
         <div className="max-w-2xl mx-auto">
           {!canSubmit && missingHint() && (
             <p className="text-xs text-muted text-center mb-2">⬑ {missingHint()}</p>
           )}
-          {/* الموافقة على الشروط ضمنية بالإرسال — مع رابط لعرضها */}
-          <p className="text-[11px] text-muted text-center mb-2 leading-relaxed">
-            بالضغط على الزر أدناه فإنك توافق على{' '}
-            <button
-              type="button"
-              onClick={() => setShowTerms(true)}
-              className="text-green font-medium underline hover:text-green/80"
-            >
-              الشروط والأحكام وسياسة الخصوصية
-            </button>
-          </p>
+          {showPackages && selectedPackageData && (
+            <div className="flex items-center justify-between gap-3 text-sm mb-2">
+              <div className="min-w-0">
+                <span className="text-muted">السلة: </span>
+                <span className="font-bold text-dark">{selectedPackageData.name}</span>
+              </div>
+              {estimatedTotal != null && <span className="font-black text-green whitespace-nowrap">{estimatedTotal.toLocaleString('ar-SA')} ر.س</span>}
+            </div>
+          )}
           <Button
-            onClick={handleSubmit}
-            disabled={!canSubmit || submitting}
-            loading={submitting}
+            onClick={openReview}
+            disabled={!canSubmit}
             className="w-full"
           >
-            {submitting
-              ? (clientType === 'individual' ? 'جارٍ التجهيز...' : 'جارٍ إرسال طلبك...')
-              : (clientType === 'individual' ? '💳 المتابعة إلى الدفع' : 'إرسال الطلب للمراجعة')}
+            مراجعة الطلب
           </Button>
         </div>
       </div>

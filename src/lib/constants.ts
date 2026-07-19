@@ -206,6 +206,9 @@ export const PACKAGES: Package[] = [
   },
 ]
 
+// «الصدارة» محفوظة لعرض الطلبات القديمة فقط، ولا تتاح للطلبات الجديدة.
+export const ORDERABLE_PACKAGES = PACKAGES.filter((pkg) => pkg.id !== 'prime')
+
 // ─── Post count messages ───
 export const POST_COUNT_MESSAGES: Record<number, string> = {
   1: 'سيتم احتساب السعر الأساسي',
