@@ -732,16 +732,15 @@ export default function RequestWizard() {
 
   // ── العرض ───────────────────────────────────────────────────────
   return (
-    <div className="bg-cream min-h-screen pb-28">
-      <div className="max-w-6xl mx-auto w-full px-4 pt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start lg:gap-8">
-        <main className="min-w-0 max-w-2xl lg:max-w-none lg:justify-self-stretch">
-        <div className="text-center mb-5">
+    <div className="bg-cream min-h-screen pb-36 lg:pb-10">
+      <div className="max-w-6xl mx-auto w-full px-4 pt-6">
+        <div className="max-w-3xl mx-auto text-center mb-5">
           <h1 className="text-2xl md:text-3xl font-black text-dark mb-1">طلب نشر جديد</h1>
           <p className="text-sm text-muted">عبّئ بياناتك بسرعة — وبمجرد الإرسال يظهر سعرك ويصلك العرض</p>
         </div>
 
         {/* شريط التقدّم */}
-        <div className="mb-5">
+        <div className="max-w-3xl mx-auto mb-6">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs font-bold text-dark">{progressDone} من {progressSteps.length} مكتمل</span>
             <span className="text-xs font-black text-green">{progressPct}%</span>
@@ -754,6 +753,8 @@ export default function RequestWizard() {
           </div>
         </div>
 
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start lg:gap-6 xl:gap-8">
+        <main className="min-w-0 max-w-2xl mx-auto w-full lg:max-w-none lg:mx-0">
         <div className="space-y-3">
 
           {/* ① عن الطلب ─────────────────────────────────────────── */}
@@ -1167,7 +1168,7 @@ export default function RequestWizard() {
         </main>
 
         <aside className="hidden lg:block sticky top-6">
-          <div className="bg-card border border-border rounded-2xl p-5">
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3 mb-5">
               <h2 className="font-black text-dark">سلة الطلب</h2>
               <span className="text-xs font-bold text-green">{progressPct}% مكتمل</span>
@@ -1207,9 +1208,10 @@ export default function RequestWizard() {
           </div>
         </aside>
       </div>
+      </div>
 
       {/* سلة الطلب الثابتة */}
-      <div className="fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur-md border-t border-border px-4 py-3 lg:hidden">
+      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-card/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-lg backdrop-blur-md lg:hidden">
         <div className="max-w-2xl mx-auto">
           {!canSubmit && missingHint() && (
             <p className="text-xs text-muted text-center mb-2">⬑ {missingHint()}</p>
