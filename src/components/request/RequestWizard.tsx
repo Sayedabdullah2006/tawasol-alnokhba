@@ -733,7 +733,8 @@ export default function RequestWizard() {
   // ── العرض ───────────────────────────────────────────────────────
   return (
     <div className="bg-cream min-h-screen pb-28">
-      <div className="max-w-2xl mx-auto w-full px-4 pt-6">
+      <div className="max-w-6xl mx-auto w-full px-4 pt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start lg:gap-8">
+        <main className="min-w-0 max-w-2xl lg:max-w-none lg:justify-self-stretch">
         <div className="text-center mb-5">
           <h1 className="text-2xl md:text-3xl font-black text-dark mb-1">طلب نشر جديد</h1>
           <p className="text-sm text-muted">عبّئ بياناتك بسرعة — وبمجرد الإرسال يظهر سعرك ويصلك العرض</p>
@@ -1163,10 +1164,52 @@ export default function RequestWizard() {
           )}
 
         </div>
+        </main>
+
+        <aside className="hidden lg:block sticky top-6">
+          <div className="bg-card border border-border rounded-2xl p-5">
+            <div className="flex items-center justify-between gap-3 mb-5">
+              <h2 className="font-black text-dark">سلة الطلب</h2>
+              <span className="text-xs font-bold text-green">{progressPct}% مكتمل</span>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
+                <span className="text-muted">الخدمة</span>
+                <span className="font-bold text-dark text-left">{requestType === 'campaign' ? 'حملة متعددة' : requestType === 'single' ? 'منشور واحد' : 'لم تختر بعد'}</span>
+              </div>
+              <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
+                <span className="text-muted">المحتوى</span>
+                <span className="font-bold text-dark text-left line-clamp-2">{requestType === 'campaign' ? `${campaignPosts.length} منشورات` : details.title || 'أضف عنوان المنشور'}</span>
+              </div>
+              <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
+                <span className="text-muted">الباقة</span>
+                <span className="font-bold text-dark text-left">{selectedPackageData?.name ?? (showPackages ? 'اختر الباقة' : 'عرض سعر يدوي')}</span>
+              </div>
+              {selectedPackageData && (
+                <ul className="space-y-1.5 pb-3 border-b border-border">
+                  {selectedPackageData.features.slice(0, 3).map((feature) => (
+                    <li key={feature} className="flex items-start gap-2 text-xs text-dark">
+                      <span className="text-green">✓</span>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex items-end justify-between gap-3 pt-1">
+                <span className="font-black text-dark">الإجمالي المتوقع</span>
+                <span className="text-green font-black text-lg text-left">{estimatedTotal != null ? `${estimatedTotal.toLocaleString('ar-SA')} ر.س` : 'يحدد لاحقًا'}</span>
+              </div>
+            </div>
+
+            {!canSubmit && missingHint() && <p className="text-xs text-muted mt-4">{missingHint()}</p>}
+            <Button onClick={openReview} disabled={!canSubmit} className="w-full mt-5">مراجعة الطلب</Button>
+          </div>
+        </aside>
       </div>
 
       {/* سلة الطلب الثابتة */}
-      <div className="fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur-md border-t border-border px-4 py-3">
+      <div className="fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur-md border-t border-border px-4 py-3 lg:hidden">
         <div className="max-w-2xl mx-auto">
           {!canSubmit && missingHint() && (
             <p className="text-xs text-muted text-center mb-2">⬑ {missingHint()}</p>
