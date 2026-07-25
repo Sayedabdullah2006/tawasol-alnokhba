@@ -58,8 +58,8 @@ export function getAdminActions(status: RequestStatus): AdminActionConfig {
       return {
         showStatusUpdate: false,
         showAdminNotes: false,
-        showQuickActions: false,
-        allowedActions: [],
+        showQuickActions: true,
+        allowedActions: ['confirm_payment'],
         message: {
           type: 'success',
           text: 'وافق العميل على العرض، في انتظار إتمام عملية الدفع',

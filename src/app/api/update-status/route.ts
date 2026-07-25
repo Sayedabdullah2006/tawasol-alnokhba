@@ -84,7 +84,7 @@ export async function POST(request: Request) {
         last_status_change: now,
         updated_at:         now,
         // سجّل وقت تأكيد الدفع عند انتقال الطلب إلى "مدفوع" (تحويل بنكي)
-        ...(newStatus === 'paid' ? { paid_at: now } : {}),
+        ...(newStatus === 'paid' ? { paid_at: now, payment_status: 'paid' } : {}),
       })
       .eq('id', requestId)
       .select('request_number, client_name, client_email, final_total, admin_quoted_price, estimated_reach')

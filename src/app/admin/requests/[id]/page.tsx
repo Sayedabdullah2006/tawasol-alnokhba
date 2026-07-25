@@ -120,6 +120,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   const [discountPercentage, setDiscountPercentage] = useState('')
   const [negotiationNotes, setNegotiationNotes] = useState('')
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showPaymentConfirm, setShowPaymentConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [sendingReminder, setSendingReminder] = useState(false)
   const [activeTab, setActiveTab] = useState<TabKey>('details')
@@ -200,6 +201,11 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
       showToast(data.error ?? 'فشل تحديث الحالة', 'error')
     }
     setSaving(false)
+  }
+
+  const handleConfirmPayment = async () => {
+    setShowPaymentConfirm(false)
+    await handleUpdateStatus('paid')
   }
 
   const handleAcceptClientPrice = async () => {
@@ -344,6 +350,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
 
   const adminActions = getAdminActions(request.status as any)
   const isPendingPhase = request.status === 'pending' || request.status === 'client_rejected'
+  const canConfirmPayment = ['approved', 'payment_review'].includes(request.status)
 
   const TABS: { key: TabKey; label: string }[] = [
     { key: 'details', label: '📋 تفاصيل الطلب' },
@@ -676,10 +683,17 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
             ) : (
               <div className="space-y-4">
                 {/* تأكيد الدفع السريع */}
-                {request.receipt_url && ['approved', 'payment_review'].includes(request.status) && (
+                {canConfirmPayment && (
                   <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-2">
-                    <p className="text-sm font-bold text-orange-700">📎 إيصال تحويل بانتظار التحقق</p>
-                    <Button onClick={() => handleUpdateStatus('paid')} loading={saving} className="w-full">✓ تأكيد استلام الدفع</Button>
+                    <p className="text-sm font-bold text-orange-700">
+                      {request.receipt_url ? '📎 إيصال تحويل بانتظار التحقق' : '💳 بانتظار تأكيد استلام الدفع'}
+                    </p>
+                    <p className="text-xs text-orange-700/80">
+                      {request.receipt_url
+                        ? 'راجع الإيصال ثم أكّد الدفع لبدء التنفيذ.'
+                        : 'استخدم هذا الإجراء عند استلام تأكيد الدفع خارج المنصة، مثل واتساب أو التحويل البنكي.'}
+                    </p>
+                    <Button onClick={() => setShowPaymentConfirm(true)} loading={saving} className="w-full">✓ تأكيد الدفع</Button>
                   </div>
                 )}
 
@@ -793,7 +807,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                     حفظ وإرسال إشعار للعميل
                   </Button>
                 )}
-                {waitingForClient(request.status as any) && !adminActions.showStatusUpdate && (
+                {waitingForClient(request.status as any) && !adminActions.showStatusUpdate && !canConfirmPayment && (
                   <div className="text-center py-6">
                     <div className="inline-flex items-center gap-2 text-muted">
                       <span className="text-lg">⏳</span>
@@ -838,6 +852,28 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
           <ActivityTab request={request} />
         </div>
       </div>
+
+      {/* ── Dialog تأكيد الدفع ───────────────────────────────────────── */}
+      {showPaymentConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6">
+            <div className="text-center">
+              <div className="mb-3 text-5xl">💳</div>
+              <h3 className="mb-2 text-xl font-bold text-dark">تأكيد الدفع</h3>
+              <p className="text-sm text-muted">
+                سيُعتمد الدفع لهذا الطلب، ويُسجّل وقت التأكيد ويصل إشعار للعميل.
+              </p>
+            </div>
+            <div className="mt-5 rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">
+              استخدم هذا الإجراء فقط بعد التحقق من التحويل أو الدفع المستلم خارج المنصة.
+            </div>
+            <div className="mt-5 flex gap-3">
+              <Button variant="outline" onClick={() => setShowPaymentConfirm(false)} className="flex-1" disabled={saving}>إلغاء</Button>
+              <Button onClick={handleConfirmPayment} loading={saving} className="flex-1">تأكيد الدفع</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Dialog حذف الطلب ─────────────────────────────────────────── */}
       {showDeleteDialog && (
