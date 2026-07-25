@@ -107,6 +107,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   const [adminNotes, setAdminNotes] = useState('')
   const [newStatus, setNewStatus] = useState('')
   const [saving, setSaving] = useState(false)
+  const [savingAdminNote, setSavingAdminNote] = useState(false)
   const [composingQuote, setComposingQuote] = useState(false)
   const [rejecting, setRejecting] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
@@ -206,6 +207,29 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   const handleConfirmPayment = async () => {
     setShowPaymentConfirm(false)
     await handleUpdateStatus('paid')
+  }
+
+  const handleSaveAdminNote = async () => {
+    if (!request) return
+    setSavingAdminNote(true)
+    try {
+      const res = await fetch('/api/admin/request-note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: request.id, adminNotes: adminNotes.trim() || null }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        showToast(data.error ?? 'تعذّر حفظ ملاحظة الإدارة', 'error')
+        return
+      }
+      setRequest(current => current ? { ...current, admin_notes: data.adminNotes } : current)
+      showToast(adminNotes.trim() ? 'تم حفظ ملاحظة الإدارة' : 'تم حذف ملاحظة الإدارة')
+    } catch {
+      showToast('خطأ في الاتصال بالخادم', 'error')
+    } finally {
+      setSavingAdminNote(false)
+    }
   }
 
   const handleAcceptClientPrice = async () => {
@@ -697,6 +721,27 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                   </div>
                 )}
 
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3">
+                  <div>
+                    <label className="mb-1 block text-sm font-bold text-red-800">ملاحظة من الإدارة</label>
+                    <p className="text-xs text-red-700">تظهر للعميل باللون الأحمر في بطاقة الطلب.</p>
+                  </div>
+                  <textarea
+                    value={adminNotes}
+                    onChange={e => setAdminNotes(e.target.value)}
+                    className="min-h-[88px] w-full resize-y rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-dark"
+                    placeholder="اكتب الملاحظة التي تريد أن يراها العميل..."
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={handleSaveAdminNote}
+                    loading={savingAdminNote}
+                    className="w-full border-red-300 text-red-700 hover:bg-red-100"
+                  >
+                    حفظ الملاحظة
+                  </Button>
+                </div>
+
                 {/* التفاوض */}
                 {request.status === 'negotiation' && !respondingToNegotiation && (
                   <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3">
@@ -791,18 +836,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                     </select>
                   </div>
                 )}
-                {adminActions.showAdminNotes && (
-                  <div>
-                    <label className="text-sm font-medium text-dark block mb-2">ملاحظات الإدارة</label>
-                    <textarea
-                      value={adminNotes}
-                      onChange={e => setAdminNotes(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-border bg-white text-sm min-h-[100px] resize-y"
-                      placeholder="أضف ملاحظة..."
-                    />
-                  </div>
-                )}
-                {(adminActions.showStatusUpdate || adminActions.showAdminNotes) && (
+                {adminActions.showStatusUpdate && (
                   <Button onClick={() => handleUpdateStatus()} loading={saving} className="w-full">
                     حفظ وإرسال إشعار للعميل
                   </Button>
