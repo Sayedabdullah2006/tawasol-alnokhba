@@ -13,6 +13,7 @@ type EducationTopic = {
   category: string
   sourceUrl: string
   facts: string[]
+  contentTags: string[]
 }
 
 type GeneratedEducation = {
@@ -21,6 +22,7 @@ type GeneratedEducation = {
   infographicTitle: string
   infographicPoints: string[]
   visualDirection: string
+  contentTags: string[]
 }
 
 const TOPICS: EducationTopic[] = [
@@ -33,6 +35,7 @@ const TOPICS: EducationTopic[] = [
       'تتطلب براءة الاختراع الجدة والخطوة الابتكارية والقابلية للتطبيق الصناعي.',
       'الإفصاح العلني عن الاختراع قبل الإيداع قد يؤثر في شرط الجدة.',
     ],
+    contentTags: ['#براءات_اختراع', '#مخترعون'],
   },
   {
     id: 'patent-search',
@@ -43,6 +46,7 @@ const TOPICS: EducationTopic[] = [
       'توفر الهيئة السعودية للملكية الفكرية خدمة بحث في وثائق البراءات الوطنية.',
       'الخدمة متاحة للأفراد والمنشآت، ونتيجتها فورية ومجانية وفق وصف الخدمة.',
     ],
+    contentTags: ['#بحث_البراءات', '#ابتكار'],
   },
   {
     id: 'mvp',
@@ -53,6 +57,7 @@ const TOPICS: EducationTopic[] = [
       'الحد الأدنى من المنتج القابل للتطبيق يساعد على اختبار الفكرة في السوق.',
       'اختبار الفكرة مبكراً يقلل تكلفة بناء منتج كامل قبل التحقق من الحاجة إليه.',
     ],
+    contentTags: ['#ريادة_الأعمال', '#نموذج_أولي'],
   },
   {
     id: 'market-study',
@@ -63,6 +68,7 @@ const TOPICS: EducationTopic[] = [
       'تساعد دراسة السوق على فهم العميل والسوق قبل اتخاذ قرارات المشروع.',
       'البحث المنظم يرفع جودة القرارات المرتبطة بالفكرة والفرصة.',
     ],
+    contentTags: ['#دراسة_السوق', '#رواد_الأعمال'],
   },
   {
     id: 'prototype',
@@ -73,6 +79,7 @@ const TOPICS: EducationTopic[] = [
       'يمكن استخدام النموذج الأولي لاختبار الفكرة قبل التوسع في التنفيذ.',
       'التعلم من المستخدمين في المراحل المبكرة جزء من تحسين الحل.',
     ],
+    contentTags: ['#تطوير_المنتجات', '#ابتكار'],
   },
 ]
 
@@ -108,6 +115,11 @@ function cleanCaption(value: string): string {
   return value.replace(/\*+/g, '').replace(/https?:\/\/\S+/g, '').trim()
 }
 
+function normalizeTag(value: string): string | null {
+  const tag = value.trim().replace(/^#+/, '').replace(/\s+/g, '_').replace(/[^\p{L}\p{N}_]/gu, '')
+  return tag ? `#${tag}` : null
+}
+
 async function generateCopy(topic: EducationTopic): Promise<GeneratedEducation> {
   const completion = await chatComplete(getOpenAI(), {
     model: OPENAI_MODEL,
@@ -115,7 +127,7 @@ async function generateCopy(topic: EducationTopic): Promise<GeneratedEducation> 
     messages: [
       {
         role: 'system',
-        content: 'أنت كاتب محتوى لحساب أول سعودي. اكتب منشوراً عربياً واحداً فقط، عملياً ومشوقاً ومفيداً للمبتكرين والمخترعين ورواد الأعمال في السعودية. اجعل النبرة واثقة ومحفزة بلا مبالغة، وقدم معلومة أو إطاراً قابلاً للحفظ وإعادة النشر. ممنوع ذكر المصدر أو الرابط أو اسم الجهة داخل المنشور. لا تستخدم Markdown أو النجوم أو التعداد الشكلي. لا تضف حقائق خارج المعطيات. أعد JSON فقط بالمفاتيح: title, caption, infographicTitle, infographicPoints, visualDirection. caption بين 70 و130 كلمة وينتهي بـ #First1Saudi وهاشتاق عربي مناسب. infographicPoints مصفوفة من 3 نقاط عربية قصيرة جداً.',
+        content: 'أنت كاتب محتوى لحساب أول سعودي. اكتب منشوراً عربياً واحداً فقط، عملياً ومشوقاً ومفيداً للمبتكرين والمخترعين ورواد الأعمال في السعودية. اكتب بأسلوب عفوي ذكي بلهجة سعودية خفيفة ومفهومة، كأنك تفتح سالفة مفيدة مع شخص طموح؛ تجنب الفصحى الرسمية والتقريرية والعبارات المعلبة. ابدأ بخطاف قصير يثير الفضول، واجعل القارئ يشعر أن المعلومة تستحق الحفظ وإعادة النشر. حافظ على الدقة ولا تضف حقائق خارج المعطيات. ممنوع ذكر المصدر أو الرابط أو اسم الجهة داخل المنشور. لا تستخدم Markdown أو النجوم أو التعداد الشكلي. أعد JSON فقط بالمفاتيح: title, caption, infographicTitle, infographicPoints, visualDirection, contentTags. caption بين 55 و100 كلمة ومن دون أي هاشتاق. contentTags مصفوفة من هاشتاقين عربيين فقط، مرتبطين مباشرة بموضوع المنشور. لا تستخدم #First1Saudi. infographicPoints مصفوفة من 3 نقاط عربية قصيرة جداً.',
       },
       {
         role: 'user',
@@ -130,13 +142,18 @@ async function generateCopy(topic: EducationTopic): Promise<GeneratedEducation> 
     ? parsed.infographicPoints.map(point => cleanCaption(String(point))).filter(Boolean).slice(0, 3)
     : []
   const caption = cleanCaption(String(parsed.caption ?? ''))
+  const contentTags = Array.isArray(parsed.contentTags)
+    ? parsed.contentTags.map(tag => normalizeTag(String(tag))).filter((tag): tag is string => !!tag && tag !== '#إضاءات' && tag !== '#First1Saudi').slice(0, 2)
+    : []
   if (!caption || points.length !== 3) throw new Error('تعذّر تجهيز النص التثقيفي بصيغته المطلوبة')
+  const tags = contentTags.length === 2 ? contentTags : topic.contentTags
   return {
     title: cleanCaption(String(parsed.title ?? topic.title)) || topic.title,
-    caption: caption.includes('#First1Saudi') ? caption : `${caption}\n\n#First1Saudi #ابتكار_سعودي`,
+    caption: `${caption.replace(/#\S+/g, '').trim()}\n\n#إضاءات ${tags.join(' ')}`,
     infographicTitle: cleanCaption(String(parsed.infographicTitle ?? topic.title)) || topic.title,
     infographicPoints: points,
     visualDirection: cleanCaption(String(parsed.visualDirection ?? 'مخطط معلوماتي حديث وواضح')),
+    contentTags: tags,
   }
 }
 
