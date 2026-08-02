@@ -35,6 +35,7 @@ export default function InsoCoveragePage() {
   const [publishItem, setPublishItem] = useState<InsoCoverageItem | null>(null)
   const [publishText, setPublishText] = useState('')
   const [deleteItem, setDeleteItem] = useState<InsoCoverageItem | null>(null)
+  const [designPreview, setDesignPreview] = useState<{ title: string; imageUrl: string } | null>(null)
   const [savedTexts, setSavedTexts] = useState<Record<string, string>>({})
   const [designItem, setDesignItem] = useState<InsoCoverageItem | null>(null)
   const [designSource, setDesignSource] = useState('')
@@ -318,10 +319,12 @@ export default function InsoCoveragePage() {
                 <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 className="font-black text-dark">{item.title}</h4><p className="mt-1 text-xs text-muted">محفوظ ضمن محتوى {activeDate ? formatInsoDate(activeDate) : 'اليوم'}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${status.className}`}>{status.label}</span></div>
                 <textarea value={item.post_text ?? ''} onChange={event => replace({ ...item, post_text: event.target.value })} onBlur={() => { if (skipNextTextSave.current === item.id) { skipNextTextSave.current = null; return }; if (item.post_text?.trim()) void callAction('save', { id: item.id, postText: item.post_text }, 'تم حفظ النص ضمن محتوى اليوم') }} className="mt-3 min-h-32 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm leading-6 text-dark" />
                 <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openDesigner(item)}>🎨 توليد 3 تصاميم</Button><Button size="sm" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => rewriteSavedContent(item)} loading={busy === `rewrite-saved:${item.id}`}>إعادة الصياغة</Button>{hasApprovedDesign && <Button size="sm" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openPublishDialog(item)} loading={busy === `publish:${item.id}`}>نشر الآن</Button>}{hasApprovedDesign && <Button size="sm" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => { setScheduleItem(item); setScheduleWhen('') }}>جدولة</Button>}<Button size="sm" variant="ghost" onClick={() => setDeleteItem(item)} className="text-red-600 hover:text-red-700">حذف المحتوى</Button></div>
-                {item.design_options?.length ? <div className="mt-4 grid gap-3 sm:grid-cols-3">{item.design_options.map(option => <div key={option.id} className={`overflow-hidden rounded-lg border ${option.selected ? 'border-teal-500 bg-teal-50/40' : 'border-border bg-white'}`}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={option.imageUrl} alt={`${item.title} - ${option.title}`} className="aspect-[4/5] w-full object-cover" />
-                  <div className="space-y-2 p-2"><p className="text-xs font-bold text-dark">{option.title}</p><p className="text-[11px] text-muted">{option.direction}</p><div className="flex gap-2"><Button size="sm" className="flex-1" onClick={() => callAction('select-design-option', { id: item.id, optionId: option.id }, 'تم اعتماد التصميم')} variant={option.selected ? 'secondary' : 'outline'}>{option.selected ? 'التصميم المعتمد' : 'اعتماد التصميم'}</Button><Button size="sm" variant="ghost" onClick={() => { setEditOption({ item, optionId: option.id }); setEditNote('') }}>تعديل</Button></div></div>
+                {item.design_options?.length ? <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">{item.design_options.map(option => <div key={option.id} className={`overflow-hidden rounded-lg border ${option.selected ? 'border-teal-500 bg-teal-50/40' : 'border-border bg-white'}`}>
+                  <button type="button" onClick={() => setDesignPreview({ title: `${item.title} - ${option.title}`, imageUrl: option.imageUrl })} className="block w-full" title="تكبير التصميم" aria-label={`تكبير ${option.title}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={option.imageUrl} alt={`${item.title} - ${option.title}`} className="aspect-[4/5] w-full object-cover" />
+                  </button>
+                  <div className="space-y-2 p-2"><p className="text-xs font-bold text-dark">{option.title}</p><p className="hidden text-[11px] text-muted sm:block">{option.direction}</p><div className="flex gap-1"><Button size="sm" className="flex-1" onClick={() => callAction('select-design-option', { id: item.id, optionId: option.id }, 'تم اعتماد التصميم')} variant={option.selected ? 'secondary' : 'outline'}>{option.selected ? 'معتمد' : 'اعتماد'}</Button><Button size="sm" variant="ghost" onClick={() => { setEditOption({ item, optionId: option.id }); setEditNote('') }}>تعديل</Button></div></div>
                 </div>)}</div> : null}
               </article>
             })}
@@ -330,13 +333,20 @@ export default function InsoCoveragePage() {
       </section>
 
       {designItem && <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 md:items-center md:p-4" role="dialog" aria-modal="true" aria-label="توليد خيارات التصميم">
-        <div className="max-h-[calc(100dvh-0.75rem)] w-full max-w-lg overflow-y-auto rounded-t-lg bg-white shadow-xl md:max-h-[calc(100dvh-2rem)] md:rounded-lg">
+        <div className="max-h-[calc(100svh-0.75rem)] w-screen max-w-none overflow-y-auto rounded-t-lg bg-white shadow-xl md:max-h-[calc(100dvh-2rem)] md:w-full md:max-w-lg md:rounded-lg">
           <div className="space-y-4 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-5"><div><h3 className="font-black text-dark">3 خيارات تصميم: {designItem.title}</h3><p className="mt-1 text-xs text-muted">أرفق صورة مرجعية عند الحاجة أو اختر أن المنشور مقطع فيديو.</p></div>
             <textarea value={designNote} onChange={e => setDesignNote(e.target.value)} placeholder="توجيه إضافي للتصميم (اختياري)" className="min-h-28 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm" />
             <div className="grid gap-3 sm:grid-cols-2"><div><p className="mb-2 text-sm font-bold text-dark">صورة مرجعية</p><label className="flex h-11 cursor-pointer items-center justify-center rounded-lg border border-border bg-white px-3 text-sm font-bold text-dark hover:bg-cream"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadDesignSource} className="sr-only" />{designUploading ? 'جارٍ رفع الصورة...' : 'اختيار صورة'}</label></div><label className="flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-bold text-dark"><input type="checkbox" checked={designHasVideo} onChange={e => setDesignHasVideo(e.target.checked)} /> المنشور مقطع فيديو</label></div>
             {designSource && <p className="text-xs font-bold text-teal-700">تم إرفاق الصورة المرجعية.</p>}
           </div>
           <div className="sticky bottom-0 flex gap-2 border-t border-border bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-5"><Button className="flex-1" onClick={generateDesignOptions} loading={busy === `generate-design-options:${designItem.id}`} disabled={designUploading || !designItem.post_text}>توليد الخيارات الثلاثة</Button><Button variant="outline" onClick={() => setDesignItem(null)}>إلغاء</Button></div>
+        </div>
+      </div>}
+
+      {designPreview && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-3 md:p-6" role="dialog" aria-modal="true" aria-label="تكبير التصميم">
+        <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-3 shadow-xl"><div className="mb-3 flex items-center justify-between gap-3"><p className="text-sm font-black text-dark">{designPreview.title}</p><button type="button" onClick={() => setDesignPreview(null)} className="grid h-9 w-9 place-items-center rounded-lg border border-border text-lg text-dark hover:bg-cream" aria-label="إغلاق">×</button></div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={designPreview.imageUrl} alt={designPreview.title} className="mx-auto max-h-[78dvh] w-auto max-w-full object-contain" />
         </div>
       </div>}
 

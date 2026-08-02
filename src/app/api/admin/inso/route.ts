@@ -77,7 +77,7 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
       : 'No reference image was supplied. Make Jeddah unmistakable and authentic: use one relevant real-world cue such as the Jeddah Corniche and Red Sea waterfront, King Fahd Fountain, Al-Balad coral-stone architecture, or the Jeddah skyline. Never use a generic foreign city.',
     args.hasVideo ? 'This is the cover for a short event video. Build a dynamic visual opening frame with space for motion cues, while remaining a polished 4:5 static poster.' : '',
     'Turn the facts into an original visual infographic hierarchy: use a concise Arabic headline only when it can be rendered accurately, then 2 to 4 short factual callouts, numbers, icons, data marks, or a small timeline. Never use long paragraphs, never repeat the full post caption, and never make the design look like a screenshot of a social post.',
-    'Do not render event logos, brand logos, account handles, or hashtags. Keep the artwork full-bleed to every edge. Reserve a protected logo-safe zone in the lower-right 30% of the canvas and bottom 15% of the canvas: it must be completely free of people, text, numbers, icons, data marks, borders, and high-detail imagery so two original logos can be placed there afterwards without covering the design. Keep this safe zone visually integrated with the artwork using the same dark teal or turquoise background/texture with calm tonal contrast. Absolutely no white, cream, or separate empty panel, card, banner, footer strip, or boxed area.',
+    'Do not render event logos, brand logos, account handles, or hashtags. Keep the artwork full-bleed to every edge. Reserve ONLY a compact logo-safe zone at the extreme lower-right, approximately 240 by 120 pixels on the 1080 by 1350 canvas. Keep this tiny area free of text, people, numbers, icons, and high-detail imagery so two original logos can be overlaid without covering the design. It must be a subtle continuation of the surrounding teal artwork with a little texture or soft pattern, never a large dark void, empty field, panel, banner, footer, or boxed area. The rest of the canvas must remain visually rich and balanced.',
     args.note?.trim() ? `Additional creative direction: ${args.note.trim()}` : '',
   ].filter(Boolean).join('\n\n')
   const { b64 } = await generateImageWithOpenAI(prompt, args.sourceImage ? [args.sourceImage] : [])
@@ -85,10 +85,10 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
   const response = await fetch(brand.first1saudi_logo_url)
   if (!response.ok) throw new Error('تعذّر تحميل شعار أول سعودي من إعدادات الهوية')
   const logos: Array<{ input: Buffer; widthRatio: number }> = [
-    { input: Buffer.from(await response.arrayBuffer()), widthRatio: 0.105 },
+    { input: Buffer.from(await response.arrayBuffer()), widthRatio: 0.09 },
   ]
   const mawhibaLogo = await readFile(path.join(process.cwd(), 'public', 'brands', 'mawhiba-colored-icon.svg'))
-  logos.push({ input: mawhibaLogo, widthRatio: 0.105 })
+  logos.push({ input: mawhibaLogo, widthRatio: 0.09 })
   const finalImage = await compositeCampaignLogos(poster, logos)
   const imagePath = `inso-2026-${Date.now()}-${Math.random().toString(36).slice(2)}.png`
   const { error: uploadError } = await service.storage.from('content-images').upload(imagePath, finalImage, { contentType: 'image/png' })
