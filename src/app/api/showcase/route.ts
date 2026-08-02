@@ -53,7 +53,9 @@ export async function GET() {
     const cover = (r.design_image_url as string) || ''
     if (!cover) continue
     const gallery = [cover, r.source_image_url as string | null].filter((u): u is string => !!u)
-    const category = normalizeSection(r.category as string | null, r.post_title as string, r.source_content as string)
+    const category = r.source === 'first1saudi-educational'
+      ? 'إضاءات أول سعودي'
+      : normalizeSection(r.category as string | null, r.post_title as string, r.source_content as string)
     items.push({
       id: `daily-${r.id}`,
       source: 'daily',

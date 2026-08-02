@@ -1,0 +1,20 @@
+name: Daily First1Saudi Education
+
+on:
+  schedule:
+    - cron: '15 5 * * *'
+  workflow_dispatch:
+
+jobs:
+  daily-education:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate and schedule the educational batch when due
+        run: |
+          response=$(curl -s -X POST \
+            "${{ secrets.APP_BASE_URL }}/api/cron/daily-education" \
+            -H "x-api-key: ${{ secrets.CRON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            --max-time 290)
+          echo "$response"
+          echo "$response" | grep -q '"success":true'
