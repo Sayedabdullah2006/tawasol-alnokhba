@@ -32,6 +32,8 @@ export default function InsoCoveragePage() {
   const [designNote, setDesignNote] = useState('')
   const [scheduleItem, setScheduleItem] = useState<InsoCoverageItem | null>(null)
   const [scheduleWhen, setScheduleWhen] = useState('')
+  const [scheduleText, setScheduleText] = useState('')
+  const [scheduleImageUrl, setScheduleImageUrl] = useState('')
   const [publishItem, setPublishItem] = useState<InsoCoverageItem | null>(null)
   const [publishText, setPublishText] = useState('')
   const [deleteItem, setDeleteItem] = useState<InsoCoverageItem | null>(null)
@@ -145,6 +147,18 @@ export default function InsoCoveragePage() {
     setPublishText(item.post_text)
   }
 
+  const openScheduleDialog = (item: InsoCoverageItem, imageUrl: string) => {
+    const postText = (savedTexts[item.id] ?? item.post_text ?? '').trim()
+    if (!postText || !imageUrl) {
+      showToast('احفظ نص المنشور واختر التصميم المعتمد أولاً', 'error')
+      return
+    }
+    setScheduleItem(item)
+    setScheduleText(postText)
+    setScheduleImageUrl(imageUrl)
+    setScheduleWhen('')
+  }
+
   const shareToWhatsApp = async (item: InsoCoverageItem, imageUrl: string) => {
     const postText = (savedTexts[item.id] ?? item.post_text ?? '').trim()
     if (!postText || !imageUrl) {
@@ -211,17 +225,29 @@ export default function InsoCoveragePage() {
 
   const schedule = async () => {
     if (!scheduleItem || !scheduleWhen) { showToast('حدّد تاريخ ووقت الجدولة', 'error'); return }
-    if (!scheduleItem.post_text) { showToast('ولّد أو اكتب نص المنشور أولاً', 'error'); return }
+    const postText = scheduleText.trim()
+    if (!postText || !scheduleImageUrl) { showToast('راجع النص والتصميم قبل الجدولة', 'error'); return }
     setBusy(`schedule:${scheduleItem.id}`)
     try {
+      if (postText !== (scheduleItem.post_text ?? '').trim()) {
+        const saveResponse = await fetch('/api/admin/inso', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'save', id: scheduleItem.id, postText }),
+        })
+        const saved = await saveResponse.json().catch(() => ({}))
+        if (!saveResponse.ok) throw new Error(saved.error || 'تعذّر حفظ تعديل النص')
+        if (saved.item) {
+          replace(saved.item)
+          setSavedTexts(current => ({ ...current, [saved.item.id]: saved.item.post_text ?? '' }))
+        }
+      }
       const response = await fetch('/api/postpulse/schedule', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: scheduleItem.post_text, imageUrl: scheduleItem.design_url || undefined, scheduledLocal: scheduleWhen }),
+        body: JSON.stringify({ content: postText, imageUrl: scheduleImageUrl, scheduledLocal: scheduleWhen }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || 'فشلت الجدولة')
       await callAction('mark-scheduled', { id: scheduleItem.id, scheduledFor: data.scheduledTime }, 'تمت الجدولة عبر القنوات المتصلة')
-      setScheduleItem(null); setScheduleWhen('')
+      setScheduleItem(null); setScheduleWhen(''); setScheduleText(''); setScheduleImageUrl('')
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'فشلت الجدولة', 'error')
     } finally {
@@ -404,14 +430,14 @@ export default function InsoCoveragePage() {
               return <article key={item.id} className="rounded-lg border border-teal-200 bg-teal-50/30 p-3 sm:p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h4 className="font-black text-dark">{item.title}</h4><p className="mt-1 text-xs text-muted">محفوظ ضمن محتوى {activeDate ? formatInsoDate(activeDate) : 'اليوم'}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${status.className}`}>{status.label}</span></div>
                 <textarea value={item.post_text ?? ''} onChange={event => replace({ ...item, post_text: event.target.value })} onBlur={() => { if (skipNextTextSave.current === item.id) { skipNextTextSave.current = null; return }; if (item.post_text?.trim()) void callAction('save', { id: item.id, postText: item.post_text }, 'تم حفظ النص ضمن محتوى اليوم') }} className="mt-3 min-h-40 w-full resize-y rounded-lg border border-border bg-white p-3 text-base leading-7 text-dark sm:min-h-32 sm:text-sm sm:leading-6" />
-                <div className="mt-3 flex flex-nowrap gap-2 overflow-x-auto overscroll-x-contain pb-1 touch-pan-x sm:flex-wrap sm:overflow-visible"><Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openDesigner(item)}>🎨 توليد 3 تصاميم</Button><Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => rewriteSavedContent(item)} loading={busy === `rewrite-saved:${item.id}`}>إعادة الصياغة</Button>{hasApprovedDesign && <Button size="sm" className="shrink-0" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openPublishDialog(item)} loading={busy === `publish:${item.id}`}>نشر الآن</Button>}{hasApprovedDesign && <Button size="sm" className="shrink-0" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => { setScheduleItem(item); setScheduleWhen('') }}>جدولة</Button>}<Button size="sm" className="shrink-0 text-red-600 hover:text-red-700" variant="ghost" onClick={() => setDeleteItem(item)}>حذف المحتوى</Button></div>
+                <div className="mt-3 flex flex-nowrap gap-2 overflow-x-auto overscroll-x-contain pb-1 touch-pan-x sm:flex-wrap sm:overflow-visible"><Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openDesigner(item)}>🎨 توليد 3 تصاميم</Button><Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => rewriteSavedContent(item)} loading={busy === `rewrite-saved:${item.id}`}>إعادة الصياغة</Button>{hasApprovedDesign && <Button size="sm" className="shrink-0" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openPublishDialog(item)} loading={busy === `publish:${item.id}`}>نشر الآن</Button>}<Button size="sm" className="shrink-0 text-red-600 hover:text-red-700" variant="ghost" onClick={() => setDeleteItem(item)}>حذف المحتوى</Button></div>
                 {item.design_options?.length ? <div className="mt-4 flex snap-x snap-proximity gap-3 overflow-x-auto overscroll-x-contain pb-2 touch-pan-x lg:grid lg:grid-cols-3 lg:overflow-visible">{item.design_options.map(option => <div key={option.id} className={`w-[72vw] max-w-64 shrink-0 snap-start overflow-hidden rounded-lg border lg:w-auto lg:max-w-none ${option.selected ? 'border-teal-500 bg-teal-50/40' : 'border-border bg-white'}`}>
                   <button type="button" onClick={() => setDesignPreview({ title: `${item.title} - ${option.title}`, imageUrl: option.imageUrl })} className="relative block w-full" title="تكبير التصميم" aria-label={`تكبير ${option.title}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={option.imageUrl} alt={`${item.title} - ${option.title}`} className="h-64 w-full object-cover lg:h-auto lg:aspect-[4/5]" />
                     <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-[11px] font-bold text-white">تكبير ⤢</span>
                   </button>
-                  <div className="space-y-2 p-2"><p className="text-xs font-bold text-dark">{option.title}</p><p className="hidden text-[11px] text-muted lg:block">{option.direction}</p><div className="grid grid-cols-3 gap-1"><Button size="sm" className="w-full" onClick={() => callAction('select-design-option', { id: item.id, optionId: option.id }, option.selected ? 'تم إلغاء اعتماد التصميم' : 'تم اعتماد التصميم')} variant={option.selected ? 'secondary' : 'outline'}>{option.selected ? 'معتمد' : 'اعتماد'}</Button><Button size="sm" className="w-full" variant="outline" onClick={() => void shareToWhatsApp(item, option.imageUrl)}>واتساب</Button><Button size="sm" className="w-full" variant="ghost" onClick={() => { setEditOption({ item, optionId: option.id }); setEditNote(''); setEditSources([]) }}>تعديل</Button></div></div>
+                  <div className="space-y-2 p-2"><p className="text-xs font-bold text-dark">{option.title}</p><p className="hidden text-[11px] text-muted lg:block">{option.direction}</p><div className="grid grid-cols-4 gap-1"><Button size="sm" className="w-full px-1" onClick={() => callAction('select-design-option', { id: item.id, optionId: option.id }, option.selected ? 'تم إلغاء اعتماد التصميم' : 'تم اعتماد التصميم')} variant={option.selected ? 'secondary' : 'outline'}>{option.selected ? 'معتمد' : 'اعتماد'}</Button><Button size="sm" className="w-full px-1" variant="outline" title="إرسال عبر واتساب" aria-label="إرسال عبر واتساب" onClick={() => void shareToWhatsApp(item, option.imageUrl)}><span aria-hidden="true" className="grid h-5 w-5 place-items-center rounded-full bg-[#25D366] text-[10px] font-black text-white">W</span><span className="sr-only">واتساب</span></Button>{option.selected && <Button size="sm" className="w-full px-1" variant="outline" title="جدولة التصميم المعتمد" aria-label="جدولة التصميم المعتمد" onClick={() => openScheduleDialog(item, option.imageUrl)}><span aria-hidden="true" className="text-lg leading-none">◷</span><span className="sr-only">جدولة</span></Button>}<Button size="sm" className={`w-full px-1 ${option.selected ? '' : 'col-span-2'}`} variant="ghost" onClick={() => { setEditOption({ item, optionId: option.id }); setEditNote(''); setEditSources([]) }}>تعديل</Button></div></div>
                 </div>)}</div> : null}
               </article>
             })}
@@ -465,10 +491,12 @@ export default function InsoCoveragePage() {
         </div>
       </div>}
 
-      {scheduleItem && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl"><h3 className="font-black text-dark">جدولة «{scheduleItem.title}»</h3><p className="mt-1 text-xs text-muted">الوقت بتوقيت السعودية.</p>
-          <input type="datetime-local" value={scheduleWhen} onChange={e => setScheduleWhen(e.target.value)} className="mt-4 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm" />
-          <div className="mt-4 flex gap-2"><Button className="flex-1" onClick={schedule} loading={busy === `schedule:${scheduleItem.id}`}>تأكيد الجدولة</Button><Button className="flex-1" variant="outline" onClick={() => setScheduleItem(null)}>إلغاء</Button></div>
+      {scheduleItem && <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 md:items-center md:p-4" role="dialog" aria-modal="true" aria-label="مراجعة وجدولة المنشور">
+        <div className="max-h-[calc(100svh-0.75rem)] w-screen max-w-none space-y-4 overflow-y-auto rounded-t-lg bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl md:max-h-[calc(100dvh-2rem)] md:w-full md:max-w-lg md:rounded-lg md:p-5"><div><h3 className="font-black text-dark">مراجعة وجدولة «{scheduleItem.title}»</h3><p className="mt-1 text-xs text-muted">راجع النص والتصميم المعتمد ثم اختر الموعد بتوقيت السعودية.</p></div>
+          {scheduleImageUrl && <div className="overflow-hidden rounded-lg border border-border bg-cream"><img src={scheduleImageUrl} alt={`التصميم المعتمد لمنشور ${scheduleItem.title}`} className="max-h-52 w-full object-contain" /></div>}
+          <textarea value={scheduleText} onChange={event => setScheduleText(event.target.value)} className="min-h-36 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm leading-6 text-dark" aria-label="نص المنشور قبل الجدولة" />
+          <input type="datetime-local" value={scheduleWhen} onChange={e => setScheduleWhen(e.target.value)} className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm" />
+          <div className="flex gap-2"><Button className="flex-1" onClick={schedule} loading={busy === `schedule:${scheduleItem.id}`} disabled={!scheduleText.trim() || !scheduleWhen}>تأكيد الجدولة</Button><Button className="flex-1" variant="outline" onClick={() => { setScheduleItem(null); setScheduleText(''); setScheduleImageUrl('') }}>إلغاء</Button></div>
         </div>
       </div>}
     </div>
