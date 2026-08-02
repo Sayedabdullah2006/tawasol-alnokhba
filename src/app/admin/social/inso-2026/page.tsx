@@ -67,7 +67,13 @@ export default function InsoCoveragePage() {
       setSavedTexts(Object.fromEntries(incoming.map((item: InsoCoverageItem) => [item.id, item.post_text ?? ''])))
       const availableDays = new Set(incoming.map((item: InsoCoverageItem) => item.coverage_date))
       const savedDay = window.localStorage.getItem(ACTIVE_DAY_STORAGE_KEY)
+      const todayParts = new Intl.DateTimeFormat('en', {
+        timeZone: 'Asia/Riyadh', year: 'numeric', month: '2-digit', day: '2-digit',
+      }).formatToParts(new Date())
+      const todayPart = (type: Intl.DateTimeFormatPartTypes) => todayParts.find(part => part.type === type)?.value
+      const todayInRiyadh = `${todayPart('year')}-${todayPart('month')}-${todayPart('day')}`
       setActiveDate(current => {
+        if (availableDays.has(todayInRiyadh)) return todayInRiyadh
         if (current && availableDays.has(current)) return current
         if (savedDay && availableDays.has(savedDay)) return savedDay
         return incoming[0]?.coverage_date || ''
