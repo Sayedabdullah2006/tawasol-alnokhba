@@ -155,15 +155,15 @@ export default function InsoCoveragePage() {
 
       <section id="timeline" className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <div><h2 className="font-black text-dark">1. خطة الأيام</h2><p className="text-xs text-muted">اختر يوماً للانتقال إلى محطات التغطية الخاصة به.</p></div>
+          <div><h2 className="font-black text-dark">خطة النشر حسب اليوم</h2><p className="text-xs text-muted">كل تبويب يجمع منشورات اليوم وتوليد النص والتصميم والنشر والجدولة.</p></div>
           <button onClick={() => { setLoading(true); load() }} className="h-9 w-9 rounded-lg border border-border text-dark hover:bg-cream" title="تحديث الخطة" aria-label="تحديث الخطة">↻</button>
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-2">
+        <div className="flex gap-2 overflow-x-auto pb-2" role="tablist" aria-label="أيام خطة النشر">
           {days.map(date => {
             const dayItems = items.filter(item => item.coverage_date === date)
             const phase = PHASES.find(entry => entry.id === dayItems[0]?.phase)
             const active = date === activeDate
-            return <button key={date} onClick={() => { setActiveDate(date); setSelectedId(dayItems[0]?.id ?? '') }} className={`min-w-36 rounded-lg border p-3 text-right transition ${active ? 'border-teal-600 bg-teal-700 text-white shadow-sm' : 'border-border bg-card text-dark hover:bg-cream'}`}>
+            return <button key={date} id={`day-tab-${date}`} role="tab" aria-selected={active} aria-controls={`day-panel-${date}`} onClick={() => { setActiveDate(date); setSelectedId(dayItems[0]?.id ?? ''); setAdding(false); setDesignNote('') }} className={`min-w-36 rounded-lg border p-3 text-right transition ${active ? 'border-teal-600 bg-teal-700 text-white shadow-sm' : 'border-border bg-card text-dark hover:bg-cream'}`}>
               <span className="block text-xs font-bold opacity-80">{phase?.label}</span>
               <span className="mt-1 block text-sm font-black">{formatInsoDate(date)}</span>
               <span className="mt-1 block text-xs opacity-80">{dayItems.length} محطات</span>
@@ -172,10 +172,15 @@ export default function InsoCoveragePage() {
         </div>
       </section>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_23rem]">
+      <section id={`day-panel-${activeDate}`} role="tabpanel" aria-labelledby={`day-tab-${activeDate}`} className="space-y-5 rounded-lg border border-border bg-card p-4 md:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+          <div><p className="text-xs font-bold text-teal-700">تبويب اليوم</p><h2 className="mt-1 text-xl font-black text-dark">{activeDate ? formatInsoDate(activeDate) : 'خطة اليوم'}</h2></div>
+          <p className="max-w-md text-sm text-muted">اعمل على محتوى اليوم كاملا ثم انشره أو جدوله من نفس التبويب.</p>
+        </div>
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_23rem]">
         <section id="posts" className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><h2 className="font-black text-dark">2. منشورات {activeDate ? formatInsoDate(activeDate) : ''}</h2><p className="text-xs text-muted">كل نص يتضمن تلقائياً موهبة ووزارة التعليم والمنشنات المطلوبة.</p></div>
+            <div><h3 className="font-black text-dark">منشورات اليوم</h3><p className="text-xs text-muted">كل نص يتضمن تلقائياً موهبة ووزارة التعليم والمنشنات المطلوبة.</p></div>
             <Button size="sm" variant="outline" onClick={() => setAdding(current => !current)}>＋ منشور إضافي</Button>
           </div>
 
@@ -205,8 +210,8 @@ export default function InsoCoveragePage() {
           </div>
         </section>
 
-        <aside id="designs" className="sticky top-5 space-y-4 rounded-lg border border-border bg-card p-5 shadow-sm">
-          <div><h2 className="font-black text-dark">3. التصميم والنشر</h2><p className="mt-1 text-xs text-muted">تصميم واحد لكل منشور، ثم نشر فوري أو جدولة في القنوات المتصلة.</p></div>
+        <aside id="designs" className="space-y-4 rounded-lg border border-border bg-white p-5 shadow-sm lg:sticky lg:top-5">
+          <div><h3 className="font-black text-dark">التصميم والنشر</h3><p className="mt-1 text-xs text-muted">تصميم واحد لكل منشور، ثم نشر فوري أو جدولة في القنوات المتصلة.</p></div>
           {!selected ? <p className="py-8 text-center text-sm text-muted">اختر منشوراً من خطة اليوم.</p> : <>
             <div className="rounded-lg bg-cream p-3"><p className="text-xs text-muted">المنشور المحدد</p><p className="mt-1 text-sm font-black text-dark">{selected.title}</p></div>
             <textarea value={designNote} onChange={e => setDesignNote(e.target.value)} placeholder="توجيه للتصميم، مثل: لقطة علمية، ألوان أهدأ، مساحة لصورة المتحدث..." className="min-h-24 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm" />
@@ -222,6 +227,7 @@ export default function InsoCoveragePage() {
           </>}
         </aside>
       </div>
+      </section>
 
       {scheduleItem && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
         <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl"><h3 className="font-black text-dark">جدولة «{scheduleItem.title}»</h3><p className="mt-1 text-xs text-muted">الوقت بتوقيت السعودية.</p>
