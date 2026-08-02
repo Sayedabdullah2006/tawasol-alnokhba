@@ -49,7 +49,7 @@ export const INSO_COVERAGE_SEEDS: InsoCoverageSeed[] = [
 ]
 
 export function enforceInsoFooter(text: string): string {
-  const normalized = text.trim()
+  const normalized = text.replace(/\*/g, '').trim()
   const required = ['#INSO2026', '#موهبة', '@mawhiba', '@moe_gov_sa']
   const missing = required.filter(token => !normalized.includes(token))
   return missing.length ? `${normalized}\n\n${missing.join(' ')}` : normalized
