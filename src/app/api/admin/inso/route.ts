@@ -19,7 +19,7 @@ import {
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-type Action = 'generate-copy' | 'generate-design-options' | 'select-design-option' | 'edit-design-option' | 'save' | 'add' | 'add-saved' | 'delete-saved' | 'mark-published' | 'mark-scheduled'
+type Action = 'generate-copy' | 'generate-design-options' | 'select-design-option' | 'edit-design-option' | 'save' | 'add' | 'add-saved' | 'rewrite-saved' | 'delete-saved' | 'mark-published' | 'mark-scheduled'
 
 async function requireAdmin() {
   const supabase = await createServerSupabaseClient()
@@ -156,6 +156,22 @@ export async function POST(request: Request) {
       }).select('*').single()
       if (error) throw error
       return NextResponse.json({ item: data })
+    }
+
+    if (body.action === 'rewrite-saved') {
+      if (!body.postText?.trim()) return NextResponse.json({ error: 'اكتب نص المنشور أولاً' }, { status: 400 })
+      const openai = getOpenAI()
+      const completion = await chatComplete(openai, {
+        model: OPENAI_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: 'أنت محرر محتوى سعودي للحسابات الرسمية. أعد صياغة النص العربي بأسلوب رصين وحيوي ومختلف في كل مرة، مع الحفاظ على الحقائق فقط وعدم اختراع معلومات. اجعل النص جاهزاً للنشر، واذكر موهبة ووزارة التعليم داخل السياق. أخرج النص النهائي فقط.',
+          },
+          { role: 'user', content: `${INSO_CORE_CONTEXT}\nعنوان المنشور: ${body.title?.trim() || 'منشور INSO'}\nالنص المراد إعادة صياغته:\n${body.postText.trim()}` },
+        ],
+      })
+      return NextResponse.json({ postText: enforceInsoFooter(completion.choices[0]?.message?.content ?? body.postText) })
     }
 
     if (!body.id) return NextResponse.json({ error: 'معرّف المنشور مطلوب' }, { status: 400 })

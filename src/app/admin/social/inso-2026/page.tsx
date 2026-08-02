@@ -218,6 +218,12 @@ export default function InsoCoveragePage() {
     }
   }
 
+  const rewriteSavedPost = async () => {
+    if (!savedContent.trim()) { showToast('اكتب النص الذي تريد إعادة صياغته أولاً', 'error'); return }
+    const result = await callAction('rewrite-saved', { title: savedTitle, postText: savedContent }, 'تمت إعادة صياغة المنشور')
+    if (result?.postText) setSavedContent(result.postText)
+  }
+
   const deleteSavedContent = async () => {
     if (!deleteItem) return
     const removed = await callAction('delete-saved', { id: deleteItem.id }, 'تم حذف المحتوى المحفوظ')
@@ -270,7 +276,7 @@ export default function InsoCoveragePage() {
           {addingSaved && <div className="space-y-3 rounded-lg border border-teal-200 bg-teal-50 p-4">
             <input value={savedTitle} onChange={event => setSavedTitle(event.target.value)} placeholder="عنوان المنشور" className="w-full rounded-lg border border-teal-200 bg-white px-3 py-2 text-sm" />
             <textarea value={savedContent} onChange={event => setSavedContent(event.target.value)} placeholder="اكتب النص الجاهز للنشر..." className="min-h-32 w-full resize-y rounded-lg border border-teal-200 bg-white p-3 text-sm leading-6" />
-            <div className="flex flex-wrap gap-2"><Button size="sm" onClick={addSavedPost} loading={busy?.startsWith('add-saved:')}>حفظ وبدء التصميم</Button><Button size="sm" variant="ghost" onClick={() => setAddingSaved(false)}>إلغاء</Button></div>
+            <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={rewriteSavedPost} loading={busy === 'rewrite-saved:'} disabled={!savedContent.trim()}>إعادة الصياغة</Button><Button size="sm" onClick={addSavedPost} loading={busy?.startsWith('add-saved:')}>حفظ وبدء التصميم</Button><Button size="sm" variant="ghost" onClick={() => setAddingSaved(false)}>إلغاء</Button></div>
           </div>}
           {activeItems.length ? <div className="space-y-3">
             {activeItems.map(item => {
