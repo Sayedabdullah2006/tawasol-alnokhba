@@ -59,7 +59,7 @@ async function generateInsoCopy(item: InsoCoverageSeed, extra?: string) {
   return enforceInsoFooter(completion.choices[0]?.message?.content ?? '')
 }
 
-async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args: { note?: string; direction: string; sourceImages?: string[]; hasVideo?: boolean }) {
+async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args: { note?: string; exactText?: string; direction: string; sourceImages?: string[]; hasVideo?: boolean }) {
   const service = await createServiceRoleClient()
   const { data: brand } = await service.from('brand_settings').select('first1saudi_logo_url').eq('id', 1).single()
   if (!brand?.first1saudi_logo_url) {
@@ -77,6 +77,7 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
       : 'No reference image was supplied. Make Jeddah unmistakable and authentic: use one relevant real-world cue such as the Jeddah Corniche and Red Sea waterfront, King Fahd Fountain, Al-Balad coral-stone architecture, or the Jeddah skyline. Never use a generic foreign city.',
     args.hasVideo ? 'This is the cover for a short event video. Build a dynamic visual opening frame with space for motion cues, while remaining a polished 4:5 static poster.' : '',
     'Turn the facts into an original visual infographic hierarchy: use a concise Arabic headline only when it can be rendered accurately, then 2 to 4 short factual callouts, numbers, icons, data marks, or a small timeline. Never use long paragraphs, never repeat the full post caption, and never make the design look like a screenshot of a social post.',
+    args.exactText?.trim() ? `Add this exact Arabic phrase in a small, readable line: "${args.exactText.trim()}". Copy every character exactly as supplied with correct connected RTL shaping. Do not invent, shorten, translate, spell-correct, or alter it.` : '',
     'Do not render event logos, brand logos, or hashtags. Add a compact social footer for First1Saudi with the official icons for X, Instagram, LinkedIn, Facebook, and TikTok, followed by the exact handle "@First1Saudi". All five icons are mandatory, equal in size, and must remain fully visible. Keep the artwork full-bleed to every edge. Reserve ONLY a compact logo-safe zone at the extreme lower-right, approximately 300 by 130 pixels on the 1080 by 1350 canvas. Keep this tiny area free of text, people, numbers, icons, and high-detail imagery so the original First1Saudi logo and the full Mawhiba Arabic/English lockup can be overlaid without covering the design. It must be a subtle continuation of the surrounding teal artwork with a little texture or soft pattern, never a large dark void, empty field, panel, banner, footer, or boxed area. The rest of the canvas must remain visually rich and balanced.',
     args.note?.trim() ? `Additional creative direction: ${args.note.trim()}` : '',
   ].filter(Boolean).join('\n\n')
@@ -120,7 +121,7 @@ export async function POST(request: Request) {
   if ('error' in auth) return auth.error
   let body: {
     action?: Action; id?: string; title?: string; brief?: string; coverageDate?: string; phase?: 'before' | 'during' | 'after';
-    postText?: string; designNote?: string; scheduledFor?: string; sourceImages?: string[]; hasVideo?: boolean; optionId?: string;
+    postText?: string; designNote?: string; exactText?: string; scheduledFor?: string; sourceImages?: string[]; hasVideo?: boolean; optionId?: string;
   }
   try { body = await request.json() } catch { return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 }) }
   if (!body.action) return NextResponse.json({ error: 'الإجراء مطلوب' }, { status: 400 })
@@ -241,7 +242,7 @@ export async function POST(request: Request) {
         id: `${Date.now()}-${index}`,
         title: `الخيار ${index + 1}`,
         direction,
-        imageUrl: await generateInsoDesign(item, postText, { direction, note: body.designNote, sourceImages, hasVideo: body.hasVideo }),
+        imageUrl: await generateInsoDesign(item, postText, { direction, note: body.designNote, exactText: body.exactText, sourceImages, hasVideo: body.hasVideo }),
         hasVideo: Boolean(body.hasVideo),
         selected: false,
         createdAt: new Date().toISOString(),
@@ -275,12 +276,13 @@ export async function POST(request: Request) {
       const sourceImages = Array.isArray(body.sourceImages)
         ? body.sourceImages.filter((url): url is string => typeof url === 'string' && url.startsWith('http')).slice(0, 5)
         : []
-      if (optionIndex < 0 || (!body.designNote?.trim() && !sourceImages.length)) return NextResponse.json({ error: 'اختر التصميم واكتب التعديل أو أرفق صورة بديلة' }, { status: 400 })
-      const note = body.designNote?.trim() || 'استبدل الصورة الرئيسية في التصميم بالصور المرجعية المرفقة، وادمجها بأسلوب تحريري متناسق.'
+      const exactText = body.exactText?.trim() ?? ''
+      if (optionIndex < 0 || (!body.designNote?.trim() && !exactText && !sourceImages.length)) return NextResponse.json({ error: 'اختر التصميم واكتب التعديل أو العبارة المطلوبة أو أرفق صورة بديلة' }, { status: 400 })
+      const note = body.designNote?.trim() || (exactText ? 'أضف العبارة المحددة إلى التصميم.' : 'استبدل الصورة الرئيسية في التصميم بالصور المرجعية المرفقة، وادمجها بأسلوب تحريري متناسق.')
       const editHistory = Array.isArray(options[optionIndex].editHistory)
         ? options[optionIndex].editHistory.filter((entry: unknown): entry is string => typeof entry === 'string' && entry.trim().length > 0).slice(-8)
         : []
-      const edited = await editDesign({ designImageUrl: options[optionIndex].imageUrl, note, referenceImageUrls: sourceImages, preserveEdits: editHistory })
+      const edited = await editDesign({ designImageUrl: options[optionIndex].imageUrl, note, exactText, referenceImageUrls: sourceImages, preserveEdits: editHistory })
       await throwIfGenerationCancelled(generationJobId)
       const nextOptions = options.map((entry: { id?: string }, index: number) => index === optionIndex ? { ...entry, imageUrl: edited.imageUrl, createdAt: new Date().toISOString(), editHistory: [...editHistory, note].slice(-8) } : entry)
       const { data, error } = await service.from('event_coverage_items').update({
