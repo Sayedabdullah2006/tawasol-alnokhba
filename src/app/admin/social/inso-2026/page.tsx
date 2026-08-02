@@ -30,6 +30,9 @@ export default function InsoCoveragePage() {
   const [designNote, setDesignNote] = useState('')
   const [scheduleItem, setScheduleItem] = useState<InsoCoverageItem | null>(null)
   const [scheduleWhen, setScheduleWhen] = useState('')
+  const [publishItem, setPublishItem] = useState<InsoCoverageItem | null>(null)
+  const [publishText, setPublishText] = useState('')
+  const [deleteItem, setDeleteItem] = useState<InsoCoverageItem | null>(null)
   const [savedTexts, setSavedTexts] = useState<Record<string, string>>({})
   const [designItem, setDesignItem] = useState<InsoCoverageItem | null>(null)
   const [designSource, setDesignSource] = useState('')
@@ -87,6 +90,14 @@ export default function InsoCoveragePage() {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || 'تعذّر تنفيذ الإجراء')
+      if (data.deletedId) {
+        setItems(current => current.filter(item => item.id !== data.deletedId))
+        setSavedTexts(current => {
+          const next = { ...current }
+          delete next[data.deletedId]
+          return next
+        })
+      }
       if (data.item) {
         if (action === 'add-saved') {
           setItems(current => [...current, data.item])
@@ -106,17 +117,39 @@ export default function InsoCoveragePage() {
     }
   }
 
-  const publishNow = async (item: InsoCoverageItem) => {
-    if (!item.post_text) { showToast('ولّد أو اكتب نص المنشور أولاً', 'error'); return }
+  const openPublishDialog = (item: InsoCoverageItem) => {
+    if (!item.post_text || !item.design_options?.some(option => option.selected)) {
+      showToast('ولّد النص والتصميم ثم اختر التصميم المعتمد أولاً', 'error')
+      return
+    }
+    setPublishItem(item)
+    setPublishText(item.post_text)
+  }
+
+  const publishNow = async () => {
+    if (!publishItem || !publishText.trim() || !publishItem.design_url) return
+    const item = publishItem
+    const postText = publishText.trim()
     setBusy(`publish:${item.id}`)
     try {
+      const saveResponse = await fetch('/api/admin/inso', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save', id: item.id, postText }),
+      })
+      const saved = await saveResponse.json().catch(() => ({}))
+      if (!saveResponse.ok) throw new Error(saved.error || 'تعذّر حفظ التعديل')
+      if (saved.item) {
+        replace(saved.item)
+        setSavedTexts(current => ({ ...current, [saved.item.id]: saved.item.post_text ?? '' }))
+      }
       const response = await fetch('/api/postpulse/publish', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: item.post_text, imageUrl: item.design_url || undefined }),
+        body: JSON.stringify({ content: postText, imageUrl: item.design_url }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || 'فشل النشر')
       await callAction('mark-published', { id: item.id }, 'تم النشر عبر القنوات المتصلة')
+      setPublishItem(null)
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'فشل النشر', 'error')
     } finally {
@@ -185,6 +218,12 @@ export default function InsoCoveragePage() {
     }
   }
 
+  const deleteSavedContent = async () => {
+    if (!deleteItem) return
+    const removed = await callAction('delete-saved', { id: deleteItem.id }, 'تم حذف المحتوى المحفوظ')
+    if (removed) setDeleteItem(null)
+  }
+
   if (loading) return <LoadingSpinner size="lg" />
 
   return (
@@ -223,13 +262,6 @@ export default function InsoCoveragePage() {
       </section>
 
       <section id={`day-panel-${activeDate}`} role="tabpanel" aria-labelledby={`day-tab-${activeDate}`} className="space-y-5">
-        <section id="posts" className="space-y-2" aria-label="محطات توليد منشورات اليوم">
-          {activeItems.map(item => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-border py-3 last:border-b-0">
-            <div className="min-w-0"><h3 className="font-black text-dark">{item.title}</h3><p className="mt-1 text-xs text-muted">{item.brief}</p></div>
-            <Button size="sm" onClick={() => callAction('generate-copy', { id: item.id }, 'تم توليد المنشور وحفظه ضمن محتوى اليوم')} loading={busy === `generate-copy:${item.id}`}>✨ توليد / إعادة توليد</Button>
-          </div>)}
-        </section>
-
         <section className="space-y-3 border-t border-border pt-5" aria-label="المحتوى المحفوظ لليوم">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div><h3 className="font-black text-dark">المحتوى المحفوظ لليوم</h3><p className="text-xs text-muted">تظهر هنا النصوص التي تم حفظها من منشورات هذا التبويب.</p></div>
@@ -240,17 +272,21 @@ export default function InsoCoveragePage() {
             <textarea value={savedContent} onChange={event => setSavedContent(event.target.value)} placeholder="اكتب النص الجاهز للنشر..." className="min-h-32 w-full resize-y rounded-lg border border-teal-200 bg-white p-3 text-sm leading-6" />
             <div className="flex flex-wrap gap-2"><Button size="sm" onClick={addSavedPost} loading={busy?.startsWith('add-saved:')}>حفظ وبدء التصميم</Button><Button size="sm" variant="ghost" onClick={() => setAddingSaved(false)}>إلغاء</Button></div>
           </div>}
-          {savedDayItems.length ? <div className="space-y-3">
-            {savedDayItems.map(item => {
+          {activeItems.length ? <div className="space-y-3">
+            {activeItems.map(item => {
               const status = STATUS[item.publication_status]
+              const hasApprovedDesign = Boolean(item.design_options?.some(option => option.selected))
+              if (!item.post_text) return <article key={item.id} className="rounded-lg border border-dashed border-border bg-card p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3"><div className="min-w-0"><h4 className="font-black text-dark">{item.title}</h4><p className="mt-1 text-xs text-muted">{item.brief}</p></div><Button size="sm" onClick={() => callAction('generate-copy', { id: item.id }, 'تم توليد المنشور وحفظه ضمن محتوى اليوم')} loading={busy === `generate-copy:${item.id}`}>✨ توليد المنشور</Button></div>
+              </article>
               return <article key={item.id} className="rounded-lg border border-teal-200 bg-teal-50/30 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 className="font-black text-dark">{item.title}</h4><p className="mt-1 text-xs text-muted">محفوظ ضمن محتوى {activeDate ? formatInsoDate(activeDate) : 'اليوم'}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${status.className}`}>{status.label}</span></div>
                 <textarea value={item.post_text ?? ''} onChange={event => replace({ ...item, post_text: event.target.value })} onBlur={() => { if (skipNextTextSave.current === item.id) { skipNextTextSave.current = null; return }; if (item.post_text?.trim()) void callAction('save', { id: item.id, postText: item.post_text }, 'تم حفظ النص ضمن محتوى اليوم') }} className="mt-3 min-h-32 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm leading-6 text-dark" />
-                <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openDesigner(item)}>🎨 توليد 3 تصاميم</Button><Button size="sm" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => publishNow(item)} loading={busy === `publish:${item.id}`}>نشر الآن</Button><Button size="sm" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => { setScheduleItem(item); setScheduleWhen('') }}>جدولة</Button></div>
-                {item.design_options?.length ? <div className="mt-4 grid gap-3 sm:grid-cols-3">{item.design_options.map(option => <div key={option.id} className={`overflow-hidden rounded-lg border ${item.design_url === option.imageUrl ? 'border-teal-500 bg-teal-50/40' : 'border-border bg-white'}`}>
+                <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openDesigner(item)}>🎨 توليد 3 تصاميم</Button>{hasApprovedDesign && <Button size="sm" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openPublishDialog(item)} loading={busy === `publish:${item.id}`}>نشر الآن</Button>}{hasApprovedDesign && <Button size="sm" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => { setScheduleItem(item); setScheduleWhen('') }}>جدولة</Button>}<Button size="sm" variant="ghost" onClick={() => setDeleteItem(item)} className="text-red-600 hover:text-red-700">حذف المحتوى</Button></div>
+                {item.design_options?.length ? <div className="mt-4 grid gap-3 sm:grid-cols-3">{item.design_options.map(option => <div key={option.id} className={`overflow-hidden rounded-lg border ${option.selected ? 'border-teal-500 bg-teal-50/40' : 'border-border bg-white'}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={option.imageUrl} alt={`${item.title} - ${option.title}`} className="aspect-[4/5] w-full object-cover" />
-                  <div className="space-y-2 p-2"><p className="text-xs font-bold text-dark">{option.title}</p><p className="text-[11px] text-muted">{option.direction}</p><div className="flex gap-2"><Button size="sm" className="flex-1" onClick={() => callAction('select-design-option', { id: item.id, optionId: option.id }, 'تم اختيار التصميم')} variant={item.design_url === option.imageUrl ? 'secondary' : 'outline'}>اختيار</Button><Button size="sm" variant="ghost" onClick={() => { setEditOption({ item, optionId: option.id }); setEditNote('') }}>تعديل</Button></div></div>
+                  <div className="space-y-2 p-2"><p className="text-xs font-bold text-dark">{option.title}</p><p className="text-[11px] text-muted">{option.direction}</p><div className="flex gap-2"><Button size="sm" className="flex-1" onClick={() => callAction('select-design-option', { id: item.id, optionId: option.id }, 'تم اعتماد التصميم')} variant={option.selected ? 'secondary' : 'outline'}>{option.selected ? 'التصميم المعتمد' : 'اعتماد التصميم'}</Button><Button size="sm" variant="ghost" onClick={() => { setEditOption({ item, optionId: option.id }); setEditNote('') }}>تعديل</Button></div></div>
                 </div>)}</div> : null}
               </article>
             })}
@@ -271,6 +307,23 @@ export default function InsoCoveragePage() {
         <div className="w-full max-w-md space-y-4 rounded-lg bg-white p-5 shadow-xl"><div><h3 className="font-black text-dark">تعديل خيار التصميم</h3><p className="mt-1 text-xs text-muted">سيُحفظ التعديل داخل هذا الخيار فقط.</p></div>
           <textarea value={editNote} onChange={e => setEditNote(e.target.value)} placeholder="اكتب التعديل المطلوب" className="min-h-28 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm" />
           <div className="flex gap-2"><Button className="flex-1" onClick={async () => { const result = await callAction('edit-design-option', { id: editOption.item.id, optionId: editOption.optionId, designNote: editNote }, 'تم تعديل خيار التصميم'); if (result?.item) setEditOption(null) }} loading={busy === `edit-design-option:${editOption.item.id}`} disabled={!editNote.trim()}>حفظ التعديل</Button><Button variant="outline" onClick={() => setEditOption(null)}>إلغاء</Button></div>
+        </div>
+      </div>}
+
+      {publishItem && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="مراجعة المنشور قبل النشر">
+        <div className="w-full max-w-2xl space-y-4 rounded-lg bg-white p-5 shadow-xl"><div><h3 className="font-black text-dark">مراجعة قبل النشر</h3><p className="mt-1 text-xs text-muted">عدّل التغريدة إن لزم، ثم أكّد النشر باستخدام التصميم المعتمد.</p></div>
+          <textarea value={publishText} onChange={event => setPublishText(event.target.value)} className="min-h-48 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm leading-6 text-dark" />
+          {publishItem.design_url && <div className="overflow-hidden rounded-lg border border-border">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={publishItem.design_url} alt={`التصميم المعتمد لمنشور ${publishItem.title}`} className="max-h-64 w-full object-contain bg-cream" />
+          </div>}
+          <div className="flex gap-2"><Button className="flex-1" onClick={publishNow} loading={busy === `publish:${publishItem.id}`} disabled={!publishText.trim()}>تأكيد النشر</Button><Button variant="outline" onClick={() => setPublishItem(null)}>إلغاء</Button></div>
+        </div>
+      </div>}
+
+      {deleteItem && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="تأكيد حذف المحتوى">
+        <div className="w-full max-w-md space-y-4 rounded-lg bg-white p-5 shadow-xl"><div><h3 className="font-black text-dark">حذف المحتوى المحفوظ</h3><p className="mt-1 text-sm text-muted">سيُحذف نص «{deleteItem.title}» وتصاميمه المحفوظة. لا يمكن التراجع عن ذلك.</p></div>
+          <div className="flex gap-2"><Button className="flex-1 bg-red-600 hover:bg-red-700" onClick={deleteSavedContent} loading={busy === `delete-saved:${deleteItem.id}`}>تأكيد الحذف</Button><Button variant="outline" onClick={() => setDeleteItem(null)}>إلغاء</Button></div>
         </div>
       </div>}
 

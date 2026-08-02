@@ -19,7 +19,7 @@ import {
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-type Action = 'generate-copy' | 'generate-design-options' | 'select-design-option' | 'edit-design-option' | 'save' | 'add' | 'add-saved' | 'mark-published' | 'mark-scheduled'
+type Action = 'generate-copy' | 'generate-design-options' | 'select-design-option' | 'edit-design-option' | 'save' | 'add' | 'add-saved' | 'delete-saved' | 'mark-published' | 'mark-scheduled'
 
 async function requireAdmin() {
   const supabase = await createServerSupabaseClient()
@@ -171,6 +171,20 @@ export async function POST(request: Request) {
       return NextResponse.json(payload)
     }
 
+    if (body.action === 'delete-saved') {
+      if (item.slot.startsWith('saved-')) {
+        const { error } = await service.from('event_coverage_items').delete().eq('id', item.id)
+        if (error) throw error
+        return success({ deletedId: item.id })
+      }
+      const { data, error } = await service.from('event_coverage_items').update({
+        post_text: null, design_url: null, design_options: [], design_brief: null,
+        publication_status: 'draft', scheduled_for: null, published_at: null, updated_at: new Date().toISOString(),
+      }).eq('id', item.id).select('*').single()
+      if (error) throw error
+      return success({ item: data })
+    }
+
     if (body.action === 'save') {
       const postText = enforceInsoFooter(body.postText ?? '')
       const { data, error } = await service.from('event_coverage_items').update({
@@ -203,11 +217,12 @@ export async function POST(request: Request) {
         direction,
         imageUrl: await generateInsoDesign(item, postText, { direction, note: body.designNote, sourceImage: body.sourceImage, hasVideo: body.hasVideo }),
         hasVideo: Boolean(body.hasVideo),
+        selected: false,
         createdAt: new Date().toISOString(),
       })))
       await throwIfGenerationCancelled(generationJobId)
       const { data, error } = await service.from('event_coverage_items').update({
-        post_text: postText, design_url: options[0].imageUrl, design_options: options, design_brief: body.designNote?.trim() || null,
+        post_text: postText, design_url: null, design_options: options, design_brief: body.designNote?.trim() || null,
         publication_status: 'ready', updated_at: new Date().toISOString(),
       }).eq('id', item.id).select('*').single()
       if (error) throw error
@@ -219,7 +234,9 @@ export async function POST(request: Request) {
       const option = options.find((entry: { id?: string }) => entry.id === body.optionId)
       if (!option?.imageUrl) return NextResponse.json({ error: 'خيار التصميم غير موجود' }, { status: 404 })
       const { data, error } = await service.from('event_coverage_items').update({
-        design_url: option.imageUrl, updated_at: new Date().toISOString(),
+        design_url: option.imageUrl,
+        design_options: options.map((entry: { id?: string }) => ({ ...entry, selected: entry.id === body.optionId })),
+        updated_at: new Date().toISOString(),
       }).eq('id', item.id).select('*').single()
       if (error) throw error
       return success({ item: data })
