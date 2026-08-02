@@ -156,8 +156,11 @@ export default function InsoCoveragePage() {
       const file = new File([image], `${item.title || 'inso-design'}.png`, { type: image.type || 'image/png' })
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         try {
-          await navigator.share({ title: item.title, text: postText, files: [file] })
-          showToast('اختر واتساب من نافذة المشاركة لإرسال الصورة والنص معاً.', 'success')
+          // Some mobile WhatsApp clients ignore the Web Share "text" caption when a file is attached.
+          // Copy it first and provide it in both fields so it is either included or ready to paste.
+          await navigator.clipboard?.writeText(postText)
+          await navigator.share({ title: postText, text: postText, files: [file] })
+          showToast('تمت مشاركة الصورة، والنص نُسخ أيضاً: ألصقه في وصف الصورة داخل واتساب إن لم يظهر تلقائياً.', 'success')
           return
         } catch (error) {
           if (error instanceof DOMException && error.name === 'AbortError') return
