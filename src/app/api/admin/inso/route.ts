@@ -22,6 +22,8 @@ export const maxDuration = 300
 
 type Action = 'generate-copy' | 'generate-design-options' | 'select-design-option' | 'edit-design-option' | 'save' | 'add' | 'add-saved' | 'rewrite-saved' | 'delete-saved' | 'mark-published' | 'mark-scheduled' | 'cancel-scheduled'
 
+const REAL_ARCHITECTURE_RULE = 'STRICT REAL-WORLD ARCHITECTURE RULE: never invent, redesign, exaggerate, or combine buildings, towers, skylines, landmarks, venues, or cityscapes. Do not use futuristic, imaginary, AI-looking, or generic foreign architecture. If a reference image contains a building, preserve it faithfully without changing its shape, height, facade, or surroundings. If no reference image is supplied, either use a clearly recognizable real Jeddah landmark only (Jeddah Corniche, King Fahd Fountain, Al-Balad heritage buildings, or an authentic Jeddah skyline) or omit buildings entirely and use science, people, sea, light, and abstract editorial elements instead. When accuracy is uncertain, omit the building rather than invent one.'
+
 async function requireAdmin() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -70,12 +72,13 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
     'Create an editorial 4:5 social media poster for the International Nuclear Science Olympiad 2026 in Jeddah.',
     STUDIO_EDITORIAL_DESIGN_RULES,
     'Arabic-first premium scientific event design. Deep teal, bright turquoise and restrained gold accents; white may only be a small supporting detail, never a dominant field. Show science, global exchange, youth talent, and peaceful nuclear science through elegant visual metaphors; never show weapons, explosions, radiation danger signs, or fake logos.',
+    REAL_ARCHITECTURE_RULE,
     `Event moment: ${item.title}. ${item.brief}`,
     `Source post facts to interpret visually: ${postText}. Do not copy or paste this caption into the design.`,
     `Creative direction: ${args.direction}.`,
     args.sourceImages?.length
       ? `Use all ${args.sourceImages.length} supplied reference images as editorial visual sources and integrate them into one creative composition. Treat every depicted person as identity-critical: preserve their exact facial identity and features, skin tone, apparent age, body proportions, hairstyle, clothing, uniforms, accessories, and overall appearance. Do not beautify, restyle, swap, invent, alter, or regenerate their face, body, clothes, or identity. Do not turn the people into illustrations, avatars, or lookalikes. Keep them recognizably faithful while designing the surrounding composition creatively.`
-      : 'No reference image was supplied. Make Jeddah unmistakable and authentic: use one relevant real-world cue such as the Jeddah Corniche and Red Sea waterfront, King Fahd Fountain, Al-Balad coral-stone architecture, or the Jeddah skyline. Never use a generic foreign city.',
+      : 'No reference image was supplied. Make Jeddah unmistakable and authentic through the Red Sea waterfront, people, event details, science, or a real verified landmark only. Never use a generic foreign city, invented tower, fictional venue, or imaginary cityscape.',
     args.hasVideo ? 'This is the cover for a short event video. Build a dynamic visual opening frame with space for motion cues, while remaining a polished 4:5 static poster.' : '',
     'Turn the facts into an original visual infographic hierarchy: use a concise Arabic headline only when it can be rendered accurately, then 2 to 4 short factual callouts, numbers, icons, data marks, or a small timeline. Never use long paragraphs, never repeat the full post caption, and never make the design look like a screenshot of a social post.',
     args.exactText?.trim() ? `Add this exact Arabic phrase in a small, readable line: "${args.exactText.trim()}". Copy every character exactly as supplied with correct connected RTL shaping. Do not invent, shorten, translate, spell-correct, or alter it.` : '',
@@ -279,7 +282,8 @@ export async function POST(request: Request) {
         : []
       const exactText = body.exactText?.trim() ?? ''
       if (optionIndex < 0 || (!body.designNote?.trim() && !exactText && !sourceImages.length)) return NextResponse.json({ error: 'اختر التصميم واكتب التعديل أو العبارة المطلوبة أو أرفق صورة بديلة' }, { status: 400 })
-      const note = body.designNote?.trim() || (exactText ? 'أضف العبارة المحددة إلى التصميم.' : 'استبدل الصورة الرئيسية في التصميم بالصور المرجعية المرفقة، وادمجها بأسلوب تحريري متناسق.')
+      const requestedNote = body.designNote?.trim() || (exactText ? 'أضف العبارة المحددة إلى التصميم.' : 'استبدل الصورة الرئيسية في التصميم بالصور المرجعية المرفقة، وادمجها بأسلوب تحريري متناسق.')
+      const note = `${requestedNote}\n\n${REAL_ARCHITECTURE_RULE}`
       const editHistory = Array.isArray(options[optionIndex].editHistory)
         ? options[optionIndex].editHistory.filter((entry: unknown): entry is string => typeof entry === 'string' && entry.trim().length > 0).slice(-8)
         : []
