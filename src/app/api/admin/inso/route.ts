@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { readFile } from 'fs/promises'
 import path from 'path'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
-import { getOpenAI, chatComplete } from '@/lib/openai'
+import { getOpenAI, chatComplete, STUDIO_EDITORIAL_DESIGN_RULES } from '@/lib/openai'
 import { OPENAI_MODEL } from '@/lib/ai-studio'
 import { generateImageWithOpenAI } from '@/lib/image-generation'
 import { compositeCampaignLogos, resizeToPoster } from '@/lib/logo-overlay'
@@ -67,13 +67,17 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
   }
   const prompt = [
     'Create an editorial 4:5 social media poster for the International Nuclear Science Olympiad 2026 in Jeddah.',
-    'Arabic-first premium scientific event design. Deep teal, bright turquoise, white and restrained gold accents. Show science, global exchange, youth talent, and peaceful nuclear science through elegant visual metaphors; never show weapons, explosions, radiation danger signs, or fake logos.',
+    STUDIO_EDITORIAL_DESIGN_RULES,
+    'Arabic-first premium scientific event design. Deep teal, bright turquoise and restrained gold accents; white may only be a small supporting detail, never a dominant field. Show science, global exchange, youth talent, and peaceful nuclear science through elegant visual metaphors; never show weapons, explosions, radiation danger signs, or fake logos.',
     `Event moment: ${item.title}. ${item.brief}`,
-    `Post theme: ${postText}`,
+    `Source post facts to interpret visually: ${postText}. Do not copy or paste this caption into the design.`,
     `Creative direction: ${args.direction}.`,
-    args.sourceImage ? 'Use the supplied reference image faithfully as a visual source while keeping it editorial.' : '',
+    args.sourceImage
+      ? 'Use the supplied reference image faithfully as a visual source while keeping it editorial.'
+      : 'No reference image was supplied. Make Jeddah unmistakable and authentic: use one relevant real-world cue such as the Jeddah Corniche and Red Sea waterfront, King Fahd Fountain, Al-Balad coral-stone architecture, or the Jeddah skyline. Never use a generic foreign city.',
     args.hasVideo ? 'This is the cover for a short event video. Build a dynamic visual opening frame with space for motion cues, while remaining a polished 4:5 static poster.' : '',
-    'Do not render Arabic text, event logos, brand logos, account handles, or hashtags. Leave a clean, quiet footer strip in the lower-right area for two original logos to be composited after generation.',
+    'Turn the facts into an original visual infographic hierarchy: use a concise Arabic headline only when it can be rendered accurately, then 2 to 4 short factual callouts, numbers, icons, data marks, or a small timeline. Never use long paragraphs, never repeat the full post caption, and never make the design look like a screenshot of a social post.',
+    'Do not render event logos, brand logos, account handles, or hashtags. Keep the artwork full-bleed to every edge. Absolutely no blank white, cream, or empty panel, card, banner, footer strip, or boxed area for logos. The lower-right corner should remain visually integrated with the artwork, with a small area of tonal contrast where two original logos will be overlaid after generation.',
     args.note?.trim() ? `Additional creative direction: ${args.note.trim()}` : '',
   ].filter(Boolean).join('\n\n')
   const { b64 } = await generateImageWithOpenAI(prompt, args.sourceImage ? [args.sourceImage] : [])

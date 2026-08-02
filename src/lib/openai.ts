@@ -229,6 +229,19 @@ export const SYS_CONCEPTS = `أنت مدير فني لحساب "First1Saudi". ا
 
 لا تكتب أي شيء خارج JSON.`
 
+/**
+ * قواعد التكوين التي تستخدمها تجربة الاستديو. تُشارك مع مولدات الحملات
+ * التي تركّب شعاراتها برمجياً بعد التوليد، لذلك لا تتضمن تذييل الاستديو.
+ */
+export const STUDIO_EDITORIAL_DESIGN_RULES = `
+Build a campaign-grade Arabic editorial poster, not a conservative text overlay.
+Make the supplied reference the source of truth when one exists: preserve real people, clothing, and culturally important details while allowing smart cropping, reframing, background extension, editorial lighting, depth, and graphic layers.
+Use one distinctive visual mechanism that makes the selected direction visible: split-screen hero crop, magazine grid, cinematic spotlight, cutout collage, typographic monument, data sculpture, diagonal editorial bands, architectural frame, motion trail, or a layered depth system.
+Avoid generic stock-template composition and the safe default of a bottom text strip. Create a memorable first read with strong asymmetry, a clear hierarchy, and intentional negative space.
+Arabic typography: GE Dinar One Heavy. Alternatives: Lomar or Din Next Arabic Heavy. Use sharp, weighty Arabic type with correct connected RTL shaping; never use Cairo or rounded soft lettering.
+Treat descriptive source-image notes as internal direction only. Do not render captions about the image or its source as visible text.
+`
+
 /** الخطوة الرابعة - مولد برومبت التصميم/الصورة */
 export const SYS_IMAGE = `أنت مهندس برومبتات تصميم لحساب "First1Saudi".
 حوّل (الخبر + الاتجاه المعتمد + بيانات JSON المُحلَّلة) إلى برومبت **تحرير صورة** واحد بالإنجليزية، مع إبقاء كل النصوص المعروضة بالعربية حرفياً.
