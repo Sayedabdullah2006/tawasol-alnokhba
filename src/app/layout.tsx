@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Cairo } from 'next/font/google'
 import './globals.css'
 import { ToastProvider } from '@/components/ui/Toast'
@@ -16,6 +16,12 @@ export const metadata: Metadata = {
   description: 'منصة احترافية لنشر أخبارك وإنجازاتك عبر أبرز المؤثرين في السعودية',
 }
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -23,10 +29,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ar" dir="rtl" className={`${cairo.className} h-full`}>
-      <head>
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-      </head>
       <body className="min-h-full flex flex-col antialiased bg-cream overflow-x-hidden">
         <ToastProvider>
           <Header />
