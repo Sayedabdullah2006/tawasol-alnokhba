@@ -5,7 +5,7 @@ import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useToast } from '@/components/ui/Toast'
 import { createClient } from '@/lib/supabase'
-import { formatInsoDate, INSO_MANDATORY_FOOTER, type InsoCoverageItem, type InsoPhase } from '@/lib/inso-2026'
+import { formatInsoDate, type InsoCoverageItem, type InsoPhase } from '@/lib/inso-2026'
 
 const PHASES: Array<{ id: InsoPhase; label: string; color: string }> = [
   { id: 'before', label: 'قبل الفعالية', color: 'bg-blue-50 text-blue-700 border-blue-200' },
@@ -47,6 +47,7 @@ export default function InsoCoveragePage() {
   const [savedTitle, setSavedTitle] = useState('')
   const [savedContent, setSavedContent] = useState('')
   const [generatingPending, setGeneratingPending] = useState(false)
+  const [exportingReport, setExportingReport] = useState(false)
   const skipNextTextSave = useRef<string | null>(null)
 
   const load = useCallback(async () => {
@@ -140,6 +141,26 @@ export default function InsoCoveragePage() {
     }
     setPublishItem(item)
     setPublishText(item.post_text)
+  }
+
+  const shareToWhatsApp = async (item: InsoCoverageItem) => {
+    const postText = (savedTexts[item.id] ?? item.post_text ?? '').trim()
+    const imageUrl = item.design_url
+    if (!postText || !imageUrl) {
+      showToast('اعتمد التصميم واحفظ نص المنشور أولاً', 'error')
+      return
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(postText)}`, '_blank', 'noopener,noreferrer')
+    try {
+      if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') throw new Error('Clipboard unavailable')
+      const response = await fetch(imageUrl)
+      if (!response.ok) throw new Error('Image unavailable')
+      const image = await response.blob()
+      await navigator.clipboard.write([new ClipboardItem({ [image.type || 'image/png']: image })])
+      showToast('تم فتح واتساب ونسخ التصميم. ألصقه في المحادثة ثم أرسل.', 'success')
+    } catch {
+      showToast('تم فتح واتساب بالنص. حمّل التصميم أو انسخ الرابط لإرفاق الصورة يدوياً.', 'success')
+    }
   }
 
   const publishNow = async () => {
@@ -270,6 +291,30 @@ export default function InsoCoveragePage() {
     if (removed) setDeleteItem(null)
   }
 
+  const exportCampaignReport = async () => {
+    setExportingReport(true)
+    try {
+      const response = await fetch('/api/admin/inso/report')
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'تعذر إنشاء التقرير')
+      }
+      const url = URL.createObjectURL(await response.blob())
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'inso-2026-campaign-report.pdf'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      showToast('تم تجهيز تقرير الحملة بصيغة PDF', 'success')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'تعذر إنشاء التقرير', 'error')
+    } finally {
+      setExportingReport(false)
+    }
+  }
+
   if (loading) return <LoadingSpinner size="lg" />
 
   return (
@@ -281,10 +326,7 @@ export default function InsoCoveragePage() {
             <h1 className="text-2xl font-black text-dark md:text-3xl">أولمبياد العلوم النووية الدولي 2026</h1>
             <p className="mt-1 max-w-3xl text-sm text-muted">منشورات وتصاميم وجدولة مباشرة، مرتبة حسب أيام الفعالية في جدة.</p>
           </div>
-          <div className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-left text-xs font-bold text-teal-800" dir="ltr">
-            <div>First1Saudi × mawhiba</div>
-            <div className="mt-1 text-teal-700">{INSO_MANDATORY_FOOTER}</div>
-          </div>
+          <Button size="sm" variant="outline" onClick={exportCampaignReport} loading={exportingReport}>تصدير تقرير الحملة PDF</Button>
         </div>
       </header>
 
@@ -325,7 +367,7 @@ export default function InsoCoveragePage() {
               return <article key={item.id} className="rounded-lg border border-teal-200 bg-teal-50/30 p-3 sm:p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h4 className="font-black text-dark">{item.title}</h4><p className="mt-1 text-xs text-muted">محفوظ ضمن محتوى {activeDate ? formatInsoDate(activeDate) : 'اليوم'}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${status.className}`}>{status.label}</span></div>
                 <textarea value={item.post_text ?? ''} onChange={event => replace({ ...item, post_text: event.target.value })} onBlur={() => { if (skipNextTextSave.current === item.id) { skipNextTextSave.current = null; return }; if (item.post_text?.trim()) void callAction('save', { id: item.id, postText: item.post_text }, 'تم حفظ النص ضمن محتوى اليوم') }} className="mt-3 min-h-40 w-full resize-y rounded-lg border border-border bg-white p-3 text-base leading-7 text-dark sm:min-h-32 sm:text-sm sm:leading-6" />
-                <div className="mt-3 flex flex-nowrap gap-2 overflow-x-auto overscroll-x-contain pb-1 touch-pan-x sm:flex-wrap sm:overflow-visible"><Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openDesigner(item)}>🎨 توليد 3 تصاميم</Button><Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => rewriteSavedContent(item)} loading={busy === `rewrite-saved:${item.id}`}>إعادة الصياغة</Button>{hasApprovedDesign && <Button size="sm" className="shrink-0" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openPublishDialog(item)} loading={busy === `publish:${item.id}`}>نشر الآن</Button>}{hasApprovedDesign && <Button size="sm" className="shrink-0" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => { setScheduleItem(item); setScheduleWhen('') }}>جدولة</Button>}<Button size="sm" className="shrink-0 text-red-600 hover:text-red-700" variant="ghost" onClick={() => setDeleteItem(item)}>حذف المحتوى</Button></div>
+                <div className="mt-3 flex flex-nowrap gap-2 overflow-x-auto overscroll-x-contain pb-1 touch-pan-x sm:flex-wrap sm:overflow-visible"><Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openDesigner(item)}>🎨 توليد 3 تصاميم</Button><Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => rewriteSavedContent(item)} loading={busy === `rewrite-saved:${item.id}`}>إعادة الصياغة</Button>{hasApprovedDesign && <Button size="sm" className="shrink-0" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openPublishDialog(item)} loading={busy === `publish:${item.id}`}>نشر الآن</Button>}{hasApprovedDesign && <Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => void shareToWhatsApp(item)}>واتساب</Button>}{hasApprovedDesign && <Button size="sm" className="shrink-0" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => { setScheduleItem(item); setScheduleWhen('') }}>جدولة</Button>}<Button size="sm" className="shrink-0 text-red-600 hover:text-red-700" variant="ghost" onClick={() => setDeleteItem(item)}>حذف المحتوى</Button></div>
                 {item.design_options?.length ? <div className="mt-4 flex snap-x snap-proximity gap-3 overflow-x-auto overscroll-x-contain pb-2 touch-pan-x lg:grid lg:grid-cols-3 lg:overflow-visible">{item.design_options.map(option => <div key={option.id} className={`w-[72vw] max-w-64 shrink-0 snap-start overflow-hidden rounded-lg border lg:w-auto lg:max-w-none ${option.selected ? 'border-teal-500 bg-teal-50/40' : 'border-border bg-white'}`}>
                   <button type="button" onClick={() => setDesignPreview({ title: `${item.title} - ${option.title}`, imageUrl: option.imageUrl })} className="relative block w-full" title="تكبير التصميم" aria-label={`تكبير ${option.title}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
