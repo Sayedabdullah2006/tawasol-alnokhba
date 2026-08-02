@@ -8,6 +8,7 @@ import { generateImageWithOpenAI } from '@/lib/image-generation'
 import { compositeCampaignLogos, resizeToPoster } from '@/lib/logo-overlay'
 import { completeGenerationJob, failGenerationJob, startGenerationJob, throwIfGenerationCancelled } from '@/lib/generation-jobs'
 import { editDesign } from '@/lib/ai-studio'
+import { cancelScheduledPost } from '@/lib/postpulse'
 import {
   enforceInsoFooter,
   INSO_CAMPAIGN_KEY,
@@ -19,7 +20,7 @@ import {
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-type Action = 'generate-copy' | 'generate-design-options' | 'select-design-option' | 'edit-design-option' | 'save' | 'add' | 'add-saved' | 'rewrite-saved' | 'delete-saved' | 'mark-published' | 'mark-scheduled'
+type Action = 'generate-copy' | 'generate-design-options' | 'select-design-option' | 'edit-design-option' | 'save' | 'add' | 'add-saved' | 'rewrite-saved' | 'delete-saved' | 'mark-published' | 'mark-scheduled' | 'cancel-scheduled'
 
 async function requireAdmin() {
   const supabase = await createServerSupabaseClient()
@@ -305,6 +306,34 @@ export async function POST(request: Request) {
       const scheduledFor = body.scheduledFor ? new Date(body.scheduledFor).toISOString() : null
       const { data, error } = await service.from('event_coverage_items').update({
         publication_status: 'scheduled', scheduled_for: scheduledFor, updated_at: new Date().toISOString(),
+      }).eq('id', item.id).select('*').single()
+      if (error) throw error
+      return NextResponse.json({ item: data })
+    }
+
+    if (body.action === 'cancel-scheduled') {
+      if (item.publication_status !== 'scheduled' || !item.scheduled_for) {
+        return NextResponse.json({ error: 'هذا المنشور ليس مجدولاً حالياً' }, { status: 400 })
+      }
+
+      const { data: schedules, error: schedulesError } = await service
+        .from('postpulse_posts')
+        .select('id, schedule_id, design_url')
+        .eq('status', 'scheduled')
+        .eq('content', item.post_text ?? '')
+        .eq('scheduled_for', item.scheduled_for)
+        .order('created_at', { ascending: false })
+        .limit(10)
+      if (schedulesError) throw schedulesError
+      const schedule = (schedules ?? []).find(row => !item.design_url || row.design_url === item.design_url) ?? schedules?.[0]
+      if (!schedule?.schedule_id) {
+        return NextResponse.json({ error: 'تعذر العثور على معرّف الجدولة في PostPulse؛ لم يتم تغيير حالة المنشور.' }, { status: 409 })
+      }
+
+      await cancelScheduledPost(String(schedule.schedule_id))
+      await service.from('postpulse_posts').update({ status: 'cancelled' }).eq('id', schedule.id)
+      const { data, error } = await service.from('event_coverage_items').update({
+        publication_status: 'ready', scheduled_for: null, updated_at: new Date().toISOString(),
       }).eq('id', item.id).select('*').single()
       if (error) throw error
       return NextResponse.json({ item: data })

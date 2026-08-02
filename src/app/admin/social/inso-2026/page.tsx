@@ -35,6 +35,7 @@ export default function InsoCoveragePage() {
   const [scheduleWhen, setScheduleWhen] = useState('')
   const [scheduleText, setScheduleText] = useState('')
   const [scheduleImageUrl, setScheduleImageUrl] = useState('')
+  const [cancelScheduleItem, setCancelScheduleItem] = useState<InsoCoverageItem | null>(null)
   const [publishItem, setPublishItem] = useState<InsoCoverageItem | null>(null)
   const [publishText, setPublishText] = useState('')
   const [deleteItem, setDeleteItem] = useState<InsoCoverageItem | null>(null)
@@ -257,6 +258,12 @@ export default function InsoCoveragePage() {
     }
   }
 
+  const cancelSchedule = async () => {
+    if (!cancelScheduleItem) return
+    const cancelled = await callAction('cancel-scheduled', { id: cancelScheduleItem.id }, 'تم إلغاء الجدولة من PostPulse')
+    if (cancelled?.item) setCancelScheduleItem(null)
+  }
+
   const uploadDesignSources = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? [])
     event.target.value = ''
@@ -431,7 +438,7 @@ export default function InsoCoveragePage() {
               const status = STATUS[item.publication_status]
               const hasApprovedDesign = Boolean(item.design_options?.some(option => option.selected))
               return <article key={item.id} className="w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-teal-200 bg-teal-50/30 p-3 sm:p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h4 className="font-black text-dark">{item.title}</h4><p className="mt-1 text-xs text-muted">محفوظ ضمن محتوى {activeDate ? formatInsoDate(activeDate) : 'اليوم'}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${status.className}`}>{status.label}</span></div>
+                <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h4 className="font-black text-dark">{item.title}</h4><p className="mt-1 text-xs text-muted">محفوظ ضمن محتوى {activeDate ? formatInsoDate(activeDate) : 'اليوم'}</p></div>{item.publication_status === 'scheduled' ? <button type="button" onClick={() => setCancelScheduleItem(item)} className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold transition hover:ring-2 hover:ring-blue-200 ${status.className}`} title="إلغاء الجدولة">{status.label}</button> : <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${status.className}`}>{status.label}</span>}</div>
                 <textarea value={item.post_text ?? ''} onChange={event => replace({ ...item, post_text: event.target.value })} onBlur={() => { if (skipNextTextSave.current === item.id) { skipNextTextSave.current = null; return }; if (item.post_text?.trim()) void callAction('save', { id: item.id, postText: item.post_text }, 'تم حفظ النص ضمن محتوى اليوم') }} className="mt-3 min-h-40 w-full resize-y rounded-lg border border-border bg-white p-3 text-base leading-7 text-dark sm:min-h-32 sm:text-sm sm:leading-6" />
                 <div className="mt-3 flex w-full min-w-0 max-w-full flex-nowrap gap-2 overflow-x-auto overscroll-x-contain pb-1 touch-pan-x sm:flex-wrap sm:overflow-visible"><Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openDesigner(item)}>🎨 توليد 3 تصاميم</Button><Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => rewriteSavedContent(item)} loading={busy === `rewrite-saved:${item.id}`}>إعادة الصياغة</Button>{hasApprovedDesign && <Button size="sm" className="shrink-0" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openPublishDialog(item)} loading={busy === `publish:${item.id}`}>نشر الآن</Button>}<Button size="sm" className="shrink-0 text-red-600 hover:text-red-700" variant="ghost" onClick={() => setDeleteItem(item)}>حذف المحتوى</Button></div>
                 {item.design_options?.length ? <div className="mt-4 flex w-full min-w-0 max-w-full snap-x snap-proximity gap-3 overflow-x-auto overscroll-x-contain pb-2 touch-pan-x lg:grid lg:grid-cols-3 lg:overflow-visible">{item.design_options.map(option => <div key={option.id} className={`w-[62vw] max-w-56 shrink-0 snap-start overflow-hidden rounded-lg border lg:w-auto lg:max-w-none ${option.selected ? 'border-teal-500 bg-teal-50/40' : 'border-border bg-white'}`}>
@@ -440,7 +447,7 @@ export default function InsoCoveragePage() {
                     <img src={option.imageUrl} alt={`${item.title} - ${option.title}`} className="aspect-[4/5] w-full object-cover" />
                     <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-[11px] font-bold text-white">تكبير ⤢</span>
                   </button>
-                  <div className="space-y-2 p-2"><p className="text-xs font-bold text-dark">{option.title}</p><p className="hidden text-[11px] text-muted lg:block">{option.direction}</p><div className="grid grid-cols-2 gap-1"><Button size="sm" className="w-full px-1" onClick={() => callAction('select-design-option', { id: item.id, optionId: option.id }, option.selected ? 'تم إلغاء اعتماد التصميم' : 'تم اعتماد التصميم')} variant={option.selected ? 'secondary' : 'outline'}>{option.selected ? 'معتمد' : 'اعتماد'}</Button><Button size="sm" className="w-full px-1" variant="ghost" onClick={() => { setEditOption({ item, optionId: option.id }); setEditNote(''); setEditExactText(''); setEditSources([]) }}>تعديل</Button><Button size="sm" className="w-full px-1" variant="outline" title="إرسال عبر واتساب" aria-label="إرسال عبر واتساب" onClick={() => void shareToWhatsApp(item, option.imageUrl)}><span aria-hidden="true" className="grid h-5 w-5 place-items-center rounded-full bg-[#25D366] text-[10px] font-black text-white">W</span><span className="sr-only">واتساب</span></Button>{option.selected ? <Button size="sm" className="w-full" variant="outline" title="جدولة التصميم المعتمد" onClick={() => openScheduleDialog(item, option.imageUrl)}>جدولة</Button> : <Button size="sm" className="w-full" variant="ghost" disabled title="اعتمد التصميم لإتاحة الجدولة">جدولة</Button>}</div></div>
+                  <div className="space-y-2 p-2"><p className="text-xs font-bold text-dark">{option.title}</p><p className="hidden text-[11px] text-muted lg:block">{option.direction}</p><div className="grid grid-cols-2 gap-1"><Button size="sm" className="w-full px-1" onClick={() => callAction('select-design-option', { id: item.id, optionId: option.id }, option.selected ? 'تم إلغاء اعتماد التصميم' : 'تم اعتماد التصميم')} variant={option.selected ? 'secondary' : 'outline'}>{option.selected ? 'معتمد' : 'اعتماد'}</Button><Button size="sm" className="w-full px-1" variant="ghost" onClick={() => { setEditOption({ item, optionId: option.id }); setEditNote(''); setEditExactText(''); setEditSources([]) }}>تعديل</Button><Button size="sm" className="w-full px-1" variant="outline" title="إرسال عبر واتساب" aria-label="إرسال عبر واتساب" onClick={() => void shareToWhatsApp(item, option.imageUrl)}><span aria-hidden="true" className="grid h-5 w-5 place-items-center rounded-full bg-[#25D366] text-[10px] font-black text-white">W</span><span className="sr-only">واتساب</span></Button>{item.publication_status === 'scheduled' ? <Button size="sm" className="w-full" variant="secondary" title="إلغاء الجدولة" onClick={() => setCancelScheduleItem(item)}>مجدول</Button> : option.selected ? <Button size="sm" className="w-full" variant="outline" title="جدولة التصميم المعتمد" onClick={() => openScheduleDialog(item, option.imageUrl)}>جدولة</Button> : <Button size="sm" className="w-full" variant="ghost" disabled title="اعتمد التصميم لإتاحة الجدولة">جدولة</Button>}</div></div>
                 </div>)}</div> : null}
               </article>
             })}
@@ -493,6 +500,12 @@ export default function InsoCoveragePage() {
       {deleteItem && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="تأكيد حذف المحتوى">
         <div className="w-full max-w-md space-y-4 rounded-lg bg-white p-5 shadow-xl"><div><h3 className="font-black text-dark">حذف المحتوى المحفوظ</h3><p className="mt-1 text-sm text-muted">سيُحذف نص «{deleteItem.title}» وتصاميمه المحفوظة. لا يمكن التراجع عن ذلك.</p></div>
           <div className="flex gap-2"><Button className="flex-1 bg-red-600 hover:bg-red-700" onClick={deleteSavedContent} loading={busy === `delete-saved:${deleteItem.id}`}>تأكيد الحذف</Button><Button variant="outline" onClick={() => setDeleteItem(null)}>إلغاء</Button></div>
+        </div>
+      </div>}
+
+      {cancelScheduleItem && <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 md:items-center md:p-4" role="dialog" aria-modal="true" aria-label="تأكيد إلغاء الجدولة">
+        <div className="w-full max-w-md space-y-4 rounded-t-lg bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-xl md:rounded-lg"><div><h3 className="font-black text-dark">إلغاء الجدولة؟</h3><p className="mt-1 text-sm leading-6 text-muted">هل ترغب في إلغاء جدولة «{cancelScheduleItem.title}»؟ لن يُنشر المحتوى في الموعد المحدد، وسيبقى النص والتصميم محفوظين في الغرفة.</p></div>
+          <div className="flex gap-2"><Button className="flex-1 bg-red-600 hover:bg-red-700" onClick={cancelSchedule} loading={busy === `cancel-scheduled:${cancelScheduleItem.id}`}>نعم، إلغاء الجدولة</Button><Button className="flex-1" variant="outline" onClick={() => setCancelScheduleItem(null)}>الاحتفاظ بالجدولة</Button></div>
         </div>
       </div>}
 

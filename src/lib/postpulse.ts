@@ -372,6 +372,27 @@ export async function getScheduleStatus(id: string): Promise<{ path: string; dat
   throw new Error(`تعذّر جلب حالة الجدولة (آخر رمز: ${lastStatus})`)
 }
 
+/** يلغي جدولاً مستقبلياً من Post-Pulse. */
+export async function cancelScheduledPost(id: string): Promise<void> {
+  const token = await getValidAccessToken()
+  const encodedId = encodeURIComponent(id)
+  const paths = [`/v1/posts/${encodedId}`, `/v1/schedules/${encodedId}`, `/v1/posts/schedule/${encodedId}`]
+  let lastStatus = 0
+  let lastBody = ''
+
+  for (const path of paths) {
+    const response = await fetch(`${API_BASE}${path}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (response.ok || response.status === 204) return
+    lastStatus = response.status
+    lastBody = await response.text().catch(() => '')
+  }
+
+  throw new Error(`تعذر إلغاء الجدولة من PostPulse (${lastStatus})${lastBody ? `: ${lastBody}` : ''}`)
+}
+
 export interface PPScheduledItem {
   id: string
   when: string          // ISO scheduledTime
