@@ -258,9 +258,10 @@ export async function POST(request: Request) {
       const options = Array.isArray(item.design_options) ? item.design_options : []
       const option = options.find((entry: { id?: string }) => entry.id === body.optionId)
       if (!option?.imageUrl) return NextResponse.json({ error: 'خيار التصميم غير موجود' }, { status: 404 })
+      const isAlreadySelected = Boolean(option.selected)
       const { data, error } = await service.from('event_coverage_items').update({
-        design_url: option.imageUrl,
-        design_options: options.map((entry: { id?: string }) => ({ ...entry, selected: entry.id === body.optionId })),
+        design_url: isAlreadySelected ? null : option.imageUrl,
+        design_options: options.map((entry: { id?: string }) => ({ ...entry, selected: isAlreadySelected ? false : entry.id === body.optionId })),
         updated_at: new Date().toISOString(),
       }).eq('id', item.id).select('*').single()
       if (error) throw error

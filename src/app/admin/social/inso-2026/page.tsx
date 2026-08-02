@@ -143,22 +143,32 @@ export default function InsoCoveragePage() {
     setPublishText(item.post_text)
   }
 
-  const shareToWhatsApp = async (item: InsoCoverageItem) => {
+  const shareToWhatsApp = async (item: InsoCoverageItem, imageUrl: string) => {
     const postText = (savedTexts[item.id] ?? item.post_text ?? '').trim()
-    const imageUrl = item.design_url
     if (!postText || !imageUrl) {
-      showToast('اعتمد التصميم واحفظ نص المنشور أولاً', 'error')
+      showToast('احفظ نص المنشور أولاً', 'error')
       return
     }
-    window.open(`https://wa.me/?text=${encodeURIComponent(postText)}`, '_blank', 'noopener,noreferrer')
     try {
-      if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') throw new Error('Clipboard unavailable')
       const response = await fetch(imageUrl)
       if (!response.ok) throw new Error('Image unavailable')
       const image = await response.blob()
+      const file = new File([image], `${item.title || 'inso-design'}.png`, { type: image.type || 'image/png' })
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ title: item.title, text: postText, files: [file] })
+          showToast('اختر واتساب من نافذة المشاركة لإرسال الصورة والنص معاً.', 'success')
+          return
+        } catch (error) {
+          if (error instanceof DOMException && error.name === 'AbortError') return
+        }
+      }
+      window.open(`https://wa.me/?text=${encodeURIComponent(postText)}`, '_blank', 'noopener,noreferrer')
+      if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') throw new Error('Clipboard unavailable')
       await navigator.clipboard.write([new ClipboardItem({ [image.type || 'image/png']: image })])
       showToast('تم فتح واتساب ونسخ التصميم. ألصقه في المحادثة ثم أرسل.', 'success')
     } catch {
+      window.open(`https://wa.me/?text=${encodeURIComponent(postText)}`, '_blank', 'noopener,noreferrer')
       showToast('تم فتح واتساب بالنص. حمّل التصميم أو انسخ الرابط لإرفاق الصورة يدوياً.', 'success')
     }
   }
@@ -367,14 +377,14 @@ export default function InsoCoveragePage() {
               return <article key={item.id} className="rounded-lg border border-teal-200 bg-teal-50/30 p-3 sm:p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h4 className="font-black text-dark">{item.title}</h4><p className="mt-1 text-xs text-muted">محفوظ ضمن محتوى {activeDate ? formatInsoDate(activeDate) : 'اليوم'}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${status.className}`}>{status.label}</span></div>
                 <textarea value={item.post_text ?? ''} onChange={event => replace({ ...item, post_text: event.target.value })} onBlur={() => { if (skipNextTextSave.current === item.id) { skipNextTextSave.current = null; return }; if (item.post_text?.trim()) void callAction('save', { id: item.id, postText: item.post_text }, 'تم حفظ النص ضمن محتوى اليوم') }} className="mt-3 min-h-40 w-full resize-y rounded-lg border border-border bg-white p-3 text-base leading-7 text-dark sm:min-h-32 sm:text-sm sm:leading-6" />
-                <div className="mt-3 flex flex-nowrap gap-2 overflow-x-auto overscroll-x-contain pb-1 touch-pan-x sm:flex-wrap sm:overflow-visible"><Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openDesigner(item)}>🎨 توليد 3 تصاميم</Button><Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => rewriteSavedContent(item)} loading={busy === `rewrite-saved:${item.id}`}>إعادة الصياغة</Button>{hasApprovedDesign && <Button size="sm" className="shrink-0" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openPublishDialog(item)} loading={busy === `publish:${item.id}`}>نشر الآن</Button>}{hasApprovedDesign && <Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => void shareToWhatsApp(item)}>واتساب</Button>}{hasApprovedDesign && <Button size="sm" className="shrink-0" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => { setScheduleItem(item); setScheduleWhen('') }}>جدولة</Button>}<Button size="sm" className="shrink-0 text-red-600 hover:text-red-700" variant="ghost" onClick={() => setDeleteItem(item)}>حذف المحتوى</Button></div>
+                <div className="mt-3 flex flex-nowrap gap-2 overflow-x-auto overscroll-x-contain pb-1 touch-pan-x sm:flex-wrap sm:overflow-visible"><Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openDesigner(item)}>🎨 توليد 3 تصاميم</Button><Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => rewriteSavedContent(item)} loading={busy === `rewrite-saved:${item.id}`}>إعادة الصياغة</Button>{hasApprovedDesign && <Button size="sm" className="shrink-0" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openPublishDialog(item)} loading={busy === `publish:${item.id}`}>نشر الآن</Button>}{hasApprovedDesign && <Button size="sm" className="shrink-0" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => { setScheduleItem(item); setScheduleWhen('') }}>جدولة</Button>}<Button size="sm" className="shrink-0 text-red-600 hover:text-red-700" variant="ghost" onClick={() => setDeleteItem(item)}>حذف المحتوى</Button></div>
                 {item.design_options?.length ? <div className="mt-4 flex snap-x snap-proximity gap-3 overflow-x-auto overscroll-x-contain pb-2 touch-pan-x lg:grid lg:grid-cols-3 lg:overflow-visible">{item.design_options.map(option => <div key={option.id} className={`w-[72vw] max-w-64 shrink-0 snap-start overflow-hidden rounded-lg border lg:w-auto lg:max-w-none ${option.selected ? 'border-teal-500 bg-teal-50/40' : 'border-border bg-white'}`}>
                   <button type="button" onClick={() => setDesignPreview({ title: `${item.title} - ${option.title}`, imageUrl: option.imageUrl })} className="relative block w-full" title="تكبير التصميم" aria-label={`تكبير ${option.title}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={option.imageUrl} alt={`${item.title} - ${option.title}`} className="h-64 w-full object-cover lg:h-auto lg:aspect-[4/5]" />
                     <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-[11px] font-bold text-white">تكبير ⤢</span>
                   </button>
-                  <div className="space-y-2 p-2"><p className="text-xs font-bold text-dark">{option.title}</p><p className="hidden text-[11px] text-muted lg:block">{option.direction}</p><div className="grid grid-cols-2 gap-1"><Button size="sm" className="w-full" onClick={() => callAction('select-design-option', { id: item.id, optionId: option.id }, 'تم اعتماد التصميم')} variant={option.selected ? 'secondary' : 'outline'}>{option.selected ? 'معتمد' : 'اعتماد'}</Button><Button size="sm" className="w-full" variant="ghost" onClick={() => { setEditOption({ item, optionId: option.id }); setEditNote('') }}>تعديل</Button></div></div>
+                  <div className="space-y-2 p-2"><p className="text-xs font-bold text-dark">{option.title}</p><p className="hidden text-[11px] text-muted lg:block">{option.direction}</p><div className="grid grid-cols-3 gap-1"><Button size="sm" className="w-full" onClick={() => callAction('select-design-option', { id: item.id, optionId: option.id }, option.selected ? 'تم إلغاء اعتماد التصميم' : 'تم اعتماد التصميم')} variant={option.selected ? 'secondary' : 'outline'}>{option.selected ? 'معتمد' : 'اعتماد'}</Button><Button size="sm" className="w-full" variant="outline" onClick={() => void shareToWhatsApp(item, option.imageUrl)}>واتساب</Button><Button size="sm" className="w-full" variant="ghost" onClick={() => { setEditOption({ item, optionId: option.id }); setEditNote('') }}>تعديل</Button></div></div>
                 </div>)}</div> : null}
               </article>
             })}

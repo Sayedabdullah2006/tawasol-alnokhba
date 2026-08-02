@@ -5,7 +5,7 @@ import { createInsoCampaignReport, type InsoReportChannel } from '@/lib/inso-cam
 import { INSO_CAMPAIGN_KEY, type InsoCoverageItem } from '@/lib/inso-2026'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 180
+export const maxDuration = 300
 
 const PLATFORM_LABELS: Record<string, string> = {
   X_TWITTER: 'X', X: 'X', INSTAGRAM: 'Instagram', LINKEDIN: 'LinkedIn', FACEBOOK: 'Facebook', TIKTOK: 'TikTok',
