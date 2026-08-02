@@ -56,6 +56,7 @@ export default function InsoCoveragePage() {
   const [generatingPending, setGeneratingPending] = useState(false)
   const [exportingReport, setExportingReport] = useState(false)
   const skipNextTextSave = useRef<string | null>(null)
+  const dayTabsRef = useRef<HTMLDivElement | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -94,6 +95,12 @@ export default function InsoCoveragePage() {
   const activeItems = items.filter(item => item.coverage_date === activeDate)
   const phaseForDate = activeItems[0]?.phase ?? 'during'
   const savedDayItems = activeItems.filter(item => savedTexts[item.id]?.trim())
+
+  useEffect(() => {
+    if (!activeDate) return
+    const activeTab = dayTabsRef.current?.querySelector<HTMLButtonElement>(`[data-coverage-date="${activeDate}"]`)
+    activeTab?.scrollIntoView({ block: 'nearest', inline: 'center' })
+  }, [activeDate, days.length])
 
   const replace = (item: InsoCoverageItem) => {
     setItems(current => current.map(entry => entry.id === item.id ? item : entry))
@@ -415,12 +422,12 @@ export default function InsoCoveragePage() {
           <div><h2 className="font-black text-dark">خطة النشر حسب اليوم</h2><p className="text-xs text-muted">كل تبويب يجمع منشورات اليوم وتوليد النص والتصميم والنشر والجدولة.</p></div>
           <button onClick={() => { setLoading(true); load() }} className="h-9 w-9 rounded-lg border border-border text-dark hover:bg-cream" title="تحديث الخطة" aria-label="تحديث الخطة">↻</button>
         </div>
-        <div className="flex w-full min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-2" role="tablist" aria-label="أيام خطة النشر">
+        <div ref={dayTabsRef} className="flex w-full min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-2" role="tablist" aria-label="أيام خطة النشر">
           {days.map(date => {
             const dayItems = items.filter(item => item.coverage_date === date)
             const phase = PHASES.find(entry => entry.id === dayItems[0]?.phase)
             const active = date === activeDate
-            return <button key={date} id={`day-tab-${date}`} role="tab" aria-selected={active} aria-controls={`day-panel-${date}`} onClick={() => selectDay(date)} className={`min-w-36 shrink-0 rounded-lg border p-3 text-right transition ${active ? 'border-teal-600 bg-teal-700 text-white shadow-sm' : 'border-border bg-card text-dark hover:bg-cream'}`}>
+            return <button key={date} id={`day-tab-${date}`} data-coverage-date={date} role="tab" aria-selected={active} aria-controls={`day-panel-${date}`} onClick={() => selectDay(date)} className={`min-w-36 shrink-0 rounded-lg border p-3 text-right transition ${active ? 'border-teal-600 bg-teal-700 text-white shadow-sm' : 'border-border bg-card text-dark hover:bg-cream'}`}>
               <span className="block text-xs font-bold opacity-80">{phase?.label}</span>
               <span className="mt-1 block text-sm font-black">{formatInsoDate(date)}</span>
               <span className="mt-1 block text-xs opacity-80">{dayItems.length} محطات</span>
