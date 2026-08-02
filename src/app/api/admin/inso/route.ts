@@ -7,6 +7,7 @@ import { OPENAI_MODEL } from '@/lib/ai-studio'
 import { generateImageWithOpenAI } from '@/lib/image-generation'
 import { compositeCampaignLogos, resizeToPoster } from '@/lib/logo-overlay'
 import { completeGenerationJob, failGenerationJob, startGenerationJob, throwIfGenerationCancelled } from '@/lib/generation-jobs'
+import { editDesign } from '@/lib/ai-studio'
 import {
   enforceInsoFooter,
   INSO_CAMPAIGN_KEY,
@@ -18,7 +19,7 @@ import {
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-type Action = 'generate-copy' | 'generate-design' | 'save' | 'add' | 'mark-published' | 'mark-scheduled'
+type Action = 'generate-copy' | 'generate-design-options' | 'select-design-option' | 'edit-design-option' | 'save' | 'add' | 'add-saved' | 'mark-published' | 'mark-scheduled'
 
 async function requireAdmin() {
   const supabase = await createServerSupabaseClient()
@@ -58,7 +59,7 @@ async function generateInsoCopy(item: InsoCoverageSeed, extra?: string) {
   return enforceInsoFooter(completion.choices[0]?.message?.content ?? '')
 }
 
-async function generateInsoDesign(item: InsoCoverageSeed, postText: string, note?: string) {
+async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args: { note?: string; direction: string; sourceImage?: string; hasVideo?: boolean }) {
   const service = await createServiceRoleClient()
   const { data: brand } = await service.from('brand_settings').select('first1saudi_logo_url').eq('id', 1).single()
   if (!brand?.first1saudi_logo_url) {
@@ -69,10 +70,13 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, note
     'Arabic-first premium scientific event design. Deep teal, bright turquoise, white and restrained gold accents. Show science, global exchange, youth talent, and peaceful nuclear science through elegant visual metaphors; never show weapons, explosions, radiation danger signs, or fake logos.',
     `Event moment: ${item.title}. ${item.brief}`,
     `Post theme: ${postText}`,
+    `Creative direction: ${args.direction}.`,
+    args.sourceImage ? 'Use the supplied reference image faithfully as a visual source while keeping it editorial.' : '',
+    args.hasVideo ? 'This is the cover for a short event video. Build a dynamic visual opening frame with space for motion cues, while remaining a polished 4:5 static poster.' : '',
     'Do not render Arabic text, event logos, brand logos, account handles, or hashtags. Leave a clean, quiet footer strip in the lower-right area for two original logos to be composited after generation.',
-    note?.trim() ? `Creative direction: ${note.trim()}` : '',
+    args.note?.trim() ? `Additional creative direction: ${args.note.trim()}` : '',
   ].filter(Boolean).join('\n\n')
-  const { b64 } = await generateImageWithOpenAI(prompt, [])
+  const { b64 } = await generateImageWithOpenAI(prompt, args.sourceImage ? [args.sourceImage] : [])
   const poster = await resizeToPoster(Buffer.from(b64, 'base64'))
   const response = await fetch(brand.first1saudi_logo_url)
   if (!response.ok) throw new Error('تعذّر تحميل شعار أول سعودي من إعدادات الهوية')
@@ -111,7 +115,7 @@ export async function POST(request: Request) {
   if ('error' in auth) return auth.error
   let body: {
     action?: Action; id?: string; title?: string; brief?: string; coverageDate?: string; phase?: 'before' | 'during' | 'after';
-    postText?: string; designNote?: string; scheduledFor?: string;
+    postText?: string; designNote?: string; scheduledFor?: string; sourceImage?: string; hasVideo?: boolean; optionId?: string;
   }
   try { body = await request.json() } catch { return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 }) }
   if (!body.action) return NextResponse.json({ error: 'الإجراء مطلوب' }, { status: 400 })
@@ -132,11 +136,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ item: data })
     }
 
+    if (body.action === 'add-saved') {
+      if (!body.title?.trim() || !body.postText?.trim() || !body.coverageDate || !body.phase) {
+        return NextResponse.json({ error: 'أكمل عنوان المنشور ونصه وتاريخه' }, { status: 400 })
+      }
+      const { data, error } = await service.from('event_coverage_items').insert({
+        campaign_key: INSO_CAMPAIGN_KEY,
+        coverage_date: body.coverageDate,
+        phase: body.phase,
+        slot: `saved-${Date.now()}`,
+        title: body.title.trim(),
+        brief: 'منشور أضيف مباشرة إلى المحتوى المحفوظ.',
+        post_text: enforceInsoFooter(body.postText),
+        publication_status: 'ready',
+      }).select('*').single()
+      if (error) throw error
+      return NextResponse.json({ item: data })
+    }
+
     if (!body.id) return NextResponse.json({ error: 'معرّف المنشور مطلوب' }, { status: 400 })
     const { data: item, error: lookupError } = await service
       .from('event_coverage_items').select('*').eq('id', body.id).eq('campaign_key', INSO_CAMPAIGN_KEY).single()
     if (lookupError || !item) return NextResponse.json({ error: 'المنشور غير موجود' }, { status: 404 })
-    generationJobId = body.action === 'generate-copy' || body.action === 'generate-design'
+    generationJobId = body.action === 'generate-copy' || body.action === 'generate-design-options' || body.action === 'edit-design-option'
       ? await startGenerationJob({ ownerId: auth.user.id, scope: 'inso', operation: body.action, targetId: item.id })
       : null
     const success = async (payload: Record<string, unknown>) => {
@@ -164,17 +186,51 @@ export async function POST(request: Request) {
       return success({ item: data })
     }
 
-    if (body.action === 'generate-design') {
+    if (body.action === 'generate-design-options') {
       const postText = enforceInsoFooter(body.postText ?? item.post_text ?? '')
       if (!postText) {
         await failGenerationJob(generationJobId, new Error('ولّد أو اكتب نص المنشور أولاً'))
         return NextResponse.json({ error: 'ولّد أو اكتب نص المنشور أولاً' }, { status: 400 })
       }
-      const designUrl = await generateInsoDesign(item, postText, body.designNote)
+      const directions = ['منظور علمي تحريري جريء', 'لقطة إنسانية دولية دافئة', 'تكوين بصري مستقبلي مستلهم من العلوم النووية السلمية']
+      const options = await Promise.all(directions.map(async (direction, index) => ({
+        id: `${Date.now()}-${index}`,
+        title: `الخيار ${index + 1}`,
+        direction,
+        imageUrl: await generateInsoDesign(item, postText, { direction, note: body.designNote, sourceImage: body.sourceImage, hasVideo: body.hasVideo }),
+        hasVideo: Boolean(body.hasVideo),
+        createdAt: new Date().toISOString(),
+      })))
       await throwIfGenerationCancelled(generationJobId)
       const { data, error } = await service.from('event_coverage_items').update({
-        post_text: postText, design_url: designUrl, design_brief: body.designNote?.trim() || null,
+        post_text: postText, design_url: options[0].imageUrl, design_options: options, design_brief: body.designNote?.trim() || null,
         publication_status: 'ready', updated_at: new Date().toISOString(),
+      }).eq('id', item.id).select('*').single()
+      if (error) throw error
+      return success({ item: data })
+    }
+
+    if (body.action === 'select-design-option') {
+      const options = Array.isArray(item.design_options) ? item.design_options : []
+      const option = options.find((entry: { id?: string }) => entry.id === body.optionId)
+      if (!option?.imageUrl) return NextResponse.json({ error: 'خيار التصميم غير موجود' }, { status: 404 })
+      const { data, error } = await service.from('event_coverage_items').update({
+        design_url: option.imageUrl, updated_at: new Date().toISOString(),
+      }).eq('id', item.id).select('*').single()
+      if (error) throw error
+      return success({ item: data })
+    }
+
+    if (body.action === 'edit-design-option') {
+      const options = Array.isArray(item.design_options) ? item.design_options : []
+      const optionIndex = options.findIndex((entry: { id?: string }) => entry.id === body.optionId)
+      if (optionIndex < 0 || !body.designNote?.trim()) return NextResponse.json({ error: 'اختر التصميم واكتب التعديل المطلوب' }, { status: 400 })
+      const edited = await editDesign({ designImageUrl: options[optionIndex].imageUrl, note: body.designNote })
+      await throwIfGenerationCancelled(generationJobId)
+      const nextOptions = options.map((entry: { id?: string }, index: number) => index === optionIndex ? { ...entry, imageUrl: edited.imageUrl, createdAt: new Date().toISOString() } : entry)
+      const { data, error } = await service.from('event_coverage_items').update({
+        design_options: nextOptions, design_url: item.design_url === options[optionIndex].imageUrl ? edited.imageUrl : item.design_url,
+        updated_at: new Date().toISOString(),
       }).eq('id', item.id).select('*').single()
       if (error) throw error
       return success({ item: data })
