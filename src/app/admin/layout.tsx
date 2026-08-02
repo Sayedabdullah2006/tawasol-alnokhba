@@ -52,9 +52,9 @@ const adminFlatNav: NavLeaf[] = adminNav.flatMap(e => ('children' in e ? e.child
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-1 w-full">
+    <div className="flex w-full min-w-0 flex-1 overflow-x-clip">
       <Sidebar items={adminNav} title="لوحة الإدارة" />
-      <div className="flex-1 pb-20 md:pb-0">
+      <div className="w-full min-w-0 flex-1 overflow-x-clip pb-20 md:pb-0">
         {children}
       </div>
       <BottomNav items={adminFlatNav} />

@@ -29,6 +29,8 @@
 }
 
 body {
+  width: 100%;
+  max-width: 100%;
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-cairo), Arial, sans-serif;
@@ -178,6 +180,14 @@ td[class*="client"], th[class*="client"] {
   /* Prevent horizontal overflow */
   body {
     overflow-x: hidden;
+  }
+
+  /* Flex children must be allowed to shrink to the visual viewport. */
+  main,
+  main > *,
+  [role="tabpanel"] {
+    min-width: 0;
+    max-width: 100%;
   }
 
   /* Fix mobile content width */
