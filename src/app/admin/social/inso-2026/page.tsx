@@ -43,6 +43,8 @@ export default function InsoCoveragePage() {
   const [designUploading, setDesignUploading] = useState(false)
   const [editOption, setEditOption] = useState<{ item: InsoCoverageItem; optionId: string } | null>(null)
   const [editNote, setEditNote] = useState('')
+  const [editSources, setEditSources] = useState<string[]>([])
+  const [editUploading, setEditUploading] = useState(false)
   const [addingSaved, setAddingSaved] = useState(false)
   const [savedTitle, setSavedTitle] = useState('')
   const [savedContent, setSavedContent] = useState('')
@@ -249,6 +251,28 @@ export default function InsoCoveragePage() {
     } catch { showToast('تعذّر رفع إحدى الصور المرجعية', 'error') } finally { setDesignUploading(false) }
   }
 
+  const uploadEditSources = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? [])
+    event.target.value = ''
+    if (!files.length) return
+    if (files.some(file => !['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(file.type))) { showToast('أرفق صورا بصيغة PNG أو JPG أو WEBP', 'error'); return }
+    const remaining = Math.max(0, 5 - editSources.length)
+    if (!remaining) { showToast('يمكن إرفاق 5 صور بديلة كحد أقصى', 'error'); return }
+    const acceptedFiles = files.slice(0, remaining)
+    setEditUploading(true)
+    try {
+      const uploaded = await Promise.all(acceptedFiles.map(async file => {
+        const extension = file.name.split('.').pop() || 'png'
+        const path = `inso-edit-source-${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`
+        const { error } = await supabase.storage.from('content-images').upload(path, file)
+        if (error) throw error
+        return supabase.storage.from('content-images').getPublicUrl(path).data.publicUrl
+      }))
+      setEditSources(current => [...current, ...uploaded])
+      if (files.length > acceptedFiles.length) showToast('تم إرفاق أول 5 صور فقط', 'success')
+    } catch { showToast('تعذّر رفع إحدى الصور البديلة', 'error') } finally { setEditUploading(false) }
+  }
+
   const openDesigner = (item: InsoCoverageItem) => {
     setDesignItem(item)
     setDesignSources([])
@@ -387,7 +411,7 @@ export default function InsoCoveragePage() {
                     <img src={option.imageUrl} alt={`${item.title} - ${option.title}`} className="h-64 w-full object-cover lg:h-auto lg:aspect-[4/5]" />
                     <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-[11px] font-bold text-white">تكبير ⤢</span>
                   </button>
-                  <div className="space-y-2 p-2"><p className="text-xs font-bold text-dark">{option.title}</p><p className="hidden text-[11px] text-muted lg:block">{option.direction}</p><div className="grid grid-cols-3 gap-1"><Button size="sm" className="w-full" onClick={() => callAction('select-design-option', { id: item.id, optionId: option.id }, option.selected ? 'تم إلغاء اعتماد التصميم' : 'تم اعتماد التصميم')} variant={option.selected ? 'secondary' : 'outline'}>{option.selected ? 'معتمد' : 'اعتماد'}</Button><Button size="sm" className="w-full" variant="outline" onClick={() => void shareToWhatsApp(item, option.imageUrl)}>واتساب</Button><Button size="sm" className="w-full" variant="ghost" onClick={() => { setEditOption({ item, optionId: option.id }); setEditNote('') }}>تعديل</Button></div></div>
+                  <div className="space-y-2 p-2"><p className="text-xs font-bold text-dark">{option.title}</p><p className="hidden text-[11px] text-muted lg:block">{option.direction}</p><div className="grid grid-cols-3 gap-1"><Button size="sm" className="w-full" onClick={() => callAction('select-design-option', { id: item.id, optionId: option.id }, option.selected ? 'تم إلغاء اعتماد التصميم' : 'تم اعتماد التصميم')} variant={option.selected ? 'secondary' : 'outline'}>{option.selected ? 'معتمد' : 'اعتماد'}</Button><Button size="sm" className="w-full" variant="outline" onClick={() => void shareToWhatsApp(item, option.imageUrl)}>واتساب</Button><Button size="sm" className="w-full" variant="ghost" onClick={() => { setEditOption({ item, optionId: option.id }); setEditNote(''); setEditSources([]) }}>تعديل</Button></div></div>
                 </div>)}</div> : null}
               </article>
             })}
@@ -414,10 +438,13 @@ export default function InsoCoveragePage() {
         </div>
       </div>}
 
-      {editOption && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="تعديل خيار التصميم">
-        <div className="w-full max-w-md space-y-4 rounded-lg bg-white p-5 shadow-xl"><div><h3 className="font-black text-dark">تعديل خيار التصميم</h3><p className="mt-1 text-xs text-muted">سيُحفظ التعديل داخل هذا الخيار فقط.</p></div>
+      {editOption && <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 md:items-center md:p-4" role="dialog" aria-modal="true" aria-label="تعديل خيار التصميم">
+        <div className="max-h-[calc(100svh-0.75rem)] w-screen max-w-none space-y-4 overflow-y-auto rounded-t-lg bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl md:max-h-[calc(100dvh-2rem)] md:w-full md:max-w-md md:rounded-lg md:p-5"><div><h3 className="font-black text-dark">تعديل خيار التصميم</h3><p className="mt-1 text-xs text-muted">اكتب التعديل أو أرفق صورا بديلة لتصبح جزءا من التصميم.</p></div>
           <textarea value={editNote} onChange={e => setEditNote(e.target.value)} placeholder="اكتب التعديل المطلوب" className="min-h-28 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm" />
-          <div className="flex gap-2"><Button className="flex-1" onClick={async () => { const result = await callAction('edit-design-option', { id: editOption.item.id, optionId: editOption.optionId, designNote: editNote }, 'تم تعديل خيار التصميم'); if (result?.item) setEditOption(null) }} loading={busy === `edit-design-option:${editOption.item.id}`} disabled={!editNote.trim()}>حفظ التعديل</Button><Button variant="outline" onClick={() => setEditOption(null)}>إلغاء</Button></div>
+          <div><p className="mb-2 text-sm font-bold text-dark">صور بديلة ({editSources.length}/5)</p><label className="flex h-11 cursor-pointer items-center justify-center rounded-lg border border-border bg-white px-3 text-sm font-bold text-dark hover:bg-cream"><input type="file" multiple accept="image/png,image/jpeg,image/webp" onChange={uploadEditSources} className="sr-only" />{editUploading ? 'جارٍ رفع الصور...' : 'إرفاق صور بديلة'}</label></div>
+          {editSources.length > 0 && <div className="flex gap-2 overflow-x-auto pb-1" aria-label="الصور البديلة المرفقة">{editSources.map((source, index) => <div key={source} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border"><img src={source} alt={`الصورة البديلة ${index + 1}`} className="h-full w-full object-cover" /><button type="button" onClick={() => setEditSources(current => current.filter(entry => entry !== source))} className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/70 text-xs text-white" aria-label={`حذف الصورة البديلة ${index + 1}`}>×</button></div>)}</div>}
+          <p className="rounded-lg border border-teal-200 bg-teal-50 p-3 text-xs leading-6 text-teal-900">تُستخدم الصور المرفقة لاستبدال الصورة داخل التصميم أو دمجها، مع الحفاظ الكامل على ملامح الأشخاص وملبسهم وهيئتهم.</p>
+          <div className="flex gap-2"><Button className="flex-1" onClick={async () => { const result = await callAction('edit-design-option', { id: editOption.item.id, optionId: editOption.optionId, designNote: editNote, sourceImages: editSources }, 'تم تعديل خيار التصميم'); if (result?.item) setEditOption(null) }} loading={busy === `edit-design-option:${editOption.item.id}`} disabled={editUploading || (!editNote.trim() && !editSources.length)}>حفظ التعديل</Button><Button variant="outline" onClick={() => setEditOption(null)}>إلغاء</Button></div>
         </div>
       </div>}
 
