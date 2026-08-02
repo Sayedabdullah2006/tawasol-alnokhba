@@ -223,7 +223,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
         showToast(data.error ?? 'تعذّر حفظ ملاحظة الإدارة', 'error')
         return
       }
-      setRequest(current => current ? { ...current, admin_notes: data.adminNotes } : current)
+      setRequest((current: typeof request) => current ? { ...current, admin_notes: data.adminNotes } : current)
       showToast(adminNotes.trim() ? 'تم حفظ ملاحظة الإدارة' : 'تم حذف ملاحظة الإدارة')
     } catch {
       showToast('خطأ في الاتصال بالخادم', 'error')
