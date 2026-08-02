@@ -83,6 +83,8 @@ const TOPICS: EducationTopic[] = [
   },
 ]
 
+const MAX_EDUCATIONAL_POSTS_PER_DAY = 1
+
 function riyadhDateParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Riyadh', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -192,19 +194,34 @@ function isActiveStatus(status: unknown): boolean {
   return !['failed', 'cancelled', 'canceled', 'draft', 'media_import_failed'].includes(String(status ?? '').toLowerCase())
 }
 
-async function occupiedScheduleTimes(): Promise<string[]> {
+async function schedulingOccupancy(): Promise<{ times: string[]; educationalDays: Set<string> }> {
   const service = await createServiceRoleClient()
-  const { data } = await service.from('postpulse_posts').select('scheduled_for,status').gte('scheduled_for', new Date().toISOString())
-  const local = (data ?? []).filter(row => isActiveStatus(row.status)).map(row => String(row.scheduled_for)).filter(Boolean)
+  const { data: localPosts } = await service
+    .from('postpulse_posts')
+    .select('design_url,scheduled_for,status')
+    .gte('scheduled_for', new Date().toISOString())
+  const activeLocal = (localPosts ?? []).filter(row => isActiveStatus(row.status) && row.scheduled_for)
+  const localTimes = activeLocal.map(row => String(row.scheduled_for))
+  const { data: educational } = await service
+    .from('social_schedule')
+    .select('design_image_url')
+    .eq('source', FIRST1_EDUCATION_SOURCE)
+    .eq('status', 'scheduled')
+  const educationalDesigns = new Set((educational ?? []).map(row => String(row.design_image_url ?? '')).filter(Boolean))
+  const educationalDays = new Set(
+    activeLocal
+      .filter(row => educationalDesigns.has(String(row.design_url ?? '')))
+      .map(row => riyadhDay(new Date(String(row.scheduled_for)))),
+  )
   try {
     const remote = await listScheduledPosts()
-    return [...new Set([...local, ...remote.filter(row => isActiveStatus(row.status)).map(row => row.when)])]
+    return { times: [...new Set([...localTimes, ...remote.filter(row => isActiveStatus(row.status)).map(row => row.when)])], educationalDays }
   } catch {
-    return local
+    return { times: localTimes, educationalDays }
   }
 }
 
-function nextAvailableSlot(occupied: string[]): Date {
+function nextAvailableSlot(occupied: string[], educationalDays: Set<string>): Date {
   const now = Date.now() + 20 * 60_000
   const times = occupied.map(value => new Date(value).getTime()).filter(Number.isFinite)
   const hours = [9, 11, 13, 16, 18, 19, 20, 21, 22]
@@ -212,8 +229,7 @@ function nextAvailableSlot(occupied: string[]): Date {
   for (let offset = 0; offset < 60; offset++) {
     const dayStart = new Date(Date.UTC(start.year, start.month - 1, start.day + offset))
     const dayKey = riyadhDay(dayStart)
-    const sameDay = times.filter(value => riyadhDay(new Date(value)) === dayKey).length
-    if (sameDay >= 3) continue
+    if (educationalDays.has(dayKey) && MAX_EDUCATIONAL_POSTS_PER_DAY <= 1) continue
     for (const hour of hours) {
       const candidate = new Date(Date.UTC(dayStart.getUTCFullYear(), dayStart.getUTCMonth(), dayStart.getUTCDate(), hour - 3, 0, 0))
       if (candidate.getTime() < now) continue
@@ -243,10 +259,11 @@ export async function ensureDailyFirst1Education(): Promise<{ created: boolean; 
     const content = await generateCopy(topic)
     return { topic, content, designUrl: await generateInfographic(content) }
   }))
-  const occupied = await occupiedScheduleTimes()
+  const { times: occupied, educationalDays } = await schedulingOccupancy()
   const slots = prepared.map(() => {
-    const slot = nextAvailableSlot(occupied)
+    const slot = nextAvailableSlot(occupied, educationalDays)
     occupied.push(slot.toISOString())
+    educationalDays.add(riyadhDay(slot))
     return slot
   })
   const { data: inserted, error: insertError } = await service.from('social_schedule').insert(prepared.map((entry, index) => ({
