@@ -43,6 +43,7 @@ export default function InsoCoveragePage() {
   const [addingSaved, setAddingSaved] = useState(false)
   const [savedTitle, setSavedTitle] = useState('')
   const [savedContent, setSavedContent] = useState('')
+  const [generatingPending, setGeneratingPending] = useState(false)
   const skipNextTextSave = useRef<string | null>(null)
 
   const load = useCallback(async () => {
@@ -218,6 +219,19 @@ export default function InsoCoveragePage() {
     }
   }
 
+  const generatePendingPosts = async () => {
+    const pendingItems = activeItems.filter(item => !item.post_text?.trim())
+    if (!pendingItems.length) { showToast('تم توليد جميع منشورات هذا اليوم', 'success'); return }
+    setGeneratingPending(true)
+    try {
+      for (const item of pendingItems) {
+        await callAction('generate-copy', { id: item.id }, 'تم توليد المنشور وحفظه ضمن محتوى اليوم')
+      }
+    } finally {
+      setGeneratingPending(false)
+    }
+  }
+
   const rewriteSavedPost = async () => {
     if (!savedContent.trim()) { showToast('اكتب النص الذي تريد إعادة صياغته أولاً', 'error'); return }
     const result = await callAction('rewrite-saved', { title: savedTitle, postText: savedContent }, 'تمت إعادة صياغة المنشور')
@@ -271,20 +285,17 @@ export default function InsoCoveragePage() {
         <section className="space-y-3 border-t border-border pt-5" aria-label="المحتوى المحفوظ لليوم">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div><h3 className="font-black text-dark">المحتوى المحفوظ لليوم</h3><p className="text-xs text-muted">تظهر هنا النصوص التي تم حفظها من منشورات هذا التبويب.</p></div>
-            <div className="flex items-center gap-2"><span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800">{savedDayItems.length} نصوص محفوظة</span><Button size="sm" variant="outline" onClick={() => setAddingSaved(current => !current)}>＋ إضافة منشور محفوظ</Button></div>
+            <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800">{savedDayItems.length} نصوص محفوظة</span>{activeItems.some(item => !item.post_text?.trim()) && <Button size="sm" variant="outline" onClick={generatePendingPosts} loading={generatingPending}>✨ توليد المنشورات المتبقية</Button>}<Button size="sm" variant="outline" onClick={() => setAddingSaved(current => !current)}>＋ إضافة منشور محفوظ</Button></div>
           </div>
           {addingSaved && <div className="space-y-3 rounded-lg border border-teal-200 bg-teal-50 p-4">
             <input value={savedTitle} onChange={event => setSavedTitle(event.target.value)} placeholder="عنوان المنشور" className="w-full rounded-lg border border-teal-200 bg-white px-3 py-2 text-sm" />
             <textarea value={savedContent} onChange={event => setSavedContent(event.target.value)} placeholder="اكتب النص الجاهز للنشر..." className="min-h-32 w-full resize-y rounded-lg border border-teal-200 bg-white p-3 text-sm leading-6" />
             <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={rewriteSavedPost} loading={busy === 'rewrite-saved:'} disabled={!savedContent.trim()}>إعادة الصياغة</Button><Button size="sm" onClick={addSavedPost} loading={busy?.startsWith('add-saved:')}>حفظ وبدء التصميم</Button><Button size="sm" variant="ghost" onClick={() => setAddingSaved(false)}>إلغاء</Button></div>
           </div>}
-          {activeItems.length ? <div className="space-y-3">
-            {activeItems.map(item => {
+          {savedDayItems.length ? <div className="space-y-3">
+            {savedDayItems.map(item => {
               const status = STATUS[item.publication_status]
               const hasApprovedDesign = Boolean(item.design_options?.some(option => option.selected))
-              if (!item.post_text) return <article key={item.id} className="rounded-lg border border-dashed border-border bg-card p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3"><div className="min-w-0"><h4 className="font-black text-dark">{item.title}</h4><p className="mt-1 text-xs text-muted">{item.brief}</p></div><Button size="sm" onClick={() => callAction('generate-copy', { id: item.id }, 'تم توليد المنشور وحفظه ضمن محتوى اليوم')} loading={busy === `generate-copy:${item.id}`}>✨ توليد المنشور</Button></div>
-              </article>
               return <article key={item.id} className="rounded-lg border border-teal-200 bg-teal-50/30 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 className="font-black text-dark">{item.title}</h4><p className="mt-1 text-xs text-muted">محفوظ ضمن محتوى {activeDate ? formatInsoDate(activeDate) : 'اليوم'}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${status.className}`}>{status.label}</span></div>
                 <textarea value={item.post_text ?? ''} onChange={event => replace({ ...item, post_text: event.target.value })} onBlur={() => { if (skipNextTextSave.current === item.id) { skipNextTextSave.current = null; return }; if (item.post_text?.trim()) void callAction('save', { id: item.id, postText: item.post_text }, 'تم حفظ النص ضمن محتوى اليوم') }} className="mt-3 min-h-32 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm leading-6 text-dark" />
