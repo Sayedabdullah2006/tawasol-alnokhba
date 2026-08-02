@@ -169,6 +169,7 @@ async function generateInfographic(content: GeneratedEducation): Promise<string>
     'Make it an original, elegant editorial information design for Saudi innovators and inventors. Use deep teal, Saudi green accents, warm gold details, and generous but balanced visual hierarchy. Full bleed artwork, no white logo panel, no huge empty spaces, no copied social-post screenshot.',
     `Headline: ${content.infographicTitle}`,
     `Use exactly these three compact Arabic callouts, each visually distinct with a simple icon or data mark: ${content.infographicPoints.map((point, index) => `${index + 1}. ${point}`).join(' | ')}`,
+    'STRICT RIGHT-TO-LEFT ARABIC LAYOUT: every Arabic text block must be right-aligned and read from right to left. For the three callouts, place number 1 on the FAR RIGHT, number 2 in the center, and number 3 on the LEFT. The visual journey must flow right-to-left; never put 1 on the left or arrange the numbered steps left-to-right. Use correctly connected Arabic letterforms and clear RTL hierarchy.',
     `Visual direction: ${content.visualDirection}.`,
     'Use symbolic innovation visuals such as a patent document, magnifier, prototype, blueprint, light path, or idea-to-market journey. Do not use people, flags, official seals, fake logos, sources, URLs, citations, or long paragraphs.',
     'Add a compact, elegant social footer with the recognizable icons for X, Instagram, LinkedIn, Facebook, and TikTok followed by the exact handle @First1Saudi. Keep the footer small and readable.',

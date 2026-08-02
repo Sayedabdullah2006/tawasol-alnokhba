@@ -40,9 +40,17 @@ function getScheduleStatusBadge(status: string): { label: string; className: str
   }
 }
 
-function ScheduleStatusBadge({ status }: { status: string }) {
+function ScheduleStatusBadge({ status, onCancel }: { status: string; onCancel?: () => void }) {
   const badge = getScheduleStatusBadge(status)
   if (!badge.label) return null
+
+  if (onCancel) {
+    return (
+      <button type="button" onClick={onCancel} title="إلغاء الجدولة" className={`text-xs font-bold rounded-full px-2.5 py-0.5 transition hover:ring-2 hover:ring-blue-200 ${badge.className}`}>
+        {badge.label}
+      </button>
+    )
+  }
 
   return (
     <span className={`text-xs font-bold rounded-full px-2.5 py-0.5 ${badge.className}`}>
@@ -92,6 +100,8 @@ export default function AdminSocialPage() {
   const [educationBusy, setEducationBusy] = useState(false)
   const [previewBusy, setPreviewBusy] = useState(false)
   const [educationPreview, setEducationPreview] = useState<{ title: string; caption: string; designUrl: string } | null>(null)
+  const [cancelScheduleItem, setCancelScheduleItem] = useState<ScheduleItem | null>(null)
+  const [cancelScheduleBusy, setCancelScheduleBusy] = useState(false)
   const [scheduleFilter, setScheduleFilter] = useState<ScheduleFilter>('all')
 
   const generateEducation = async () => {
@@ -122,6 +132,25 @@ export default function AdminSocialPage() {
       alert(e instanceof Error ? e.message : 'تعذّرت المعاينة')
     } finally {
       setPreviewBusy(false)
+    }
+  }
+
+  const cancelSchedule = async () => {
+    if (!cancelScheduleItem) return
+    setCancelScheduleBusy(true)
+    try {
+      const res = await fetch('/api/admin/social-schedule/cancel', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: cancelScheduleItem.id }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.ok) throw new Error(json.error || 'تعذّر إلغاء الجدولة')
+      setItems(current => current.map(item => item.id === cancelScheduleItem.id ? { ...item, status: 'suggested' } : item))
+      setCancelScheduleItem(null)
+      alert('تم إلغاء الجدولة من PostPulse')
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'تعذّر إلغاء الجدولة')
+    } finally {
+      setCancelScheduleBusy(false)
     }
   }
 
@@ -340,6 +369,21 @@ export default function AdminSocialPage() {
         </div>
       )}
 
+      {cancelScheduleItem && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-5" role="dialog" aria-modal="true" aria-label="تأكيد إلغاء الجدولة">
+          <div className="w-full max-w-md rounded-t-2xl bg-card p-5 shadow-2xl sm:rounded-2xl">
+            <h2 className="font-black text-dark">إلغاء الجدولة؟</h2>
+            <p className="mt-2 text-sm leading-6 text-muted">لن يُنشر «{cancelScheduleItem.post_title}» في موعده المحدد، وسيبقى النص والتصميم محفوظين ضمن الخطة.</p>
+            <div className="mt-5 flex gap-2">
+              <button type="button" onClick={cancelSchedule} disabled={cancelScheduleBusy} className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60">
+                {cancelScheduleBusy ? 'جارٍ الإلغاء...' : 'نعم، إلغاء الجدولة'}
+              </button>
+              <button type="button" onClick={() => setCancelScheduleItem(null)} disabled={cancelScheduleBusy} className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm font-bold text-dark disabled:opacity-60">الاحتفاظ بالجدولة</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-2">
         {filterOptions.map(option => {
           const active = scheduleFilter === option.value
@@ -399,7 +443,7 @@ export default function AdminSocialPage() {
 
                   <div className="p-4 flex flex-col gap-3 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <ScheduleStatusBadge status={item.status} />
+                      <ScheduleStatusBadge status={item.status} onCancel={item.status === 'scheduled' ? () => setCancelScheduleItem(item) : undefined} />
                       <span className={`text-xs font-bold rounded-full px-2.5 py-0.5 ${item.source === 'manhom' ? 'bg-purple-100 text-purple-700' : item.source === 'first1saudi-educational' ? 'bg-green/10 text-green' : 'bg-teal-100 text-teal-700'}`}>
                         {item.source === 'manhom' ? 'السعوديات الأوائل' : item.source === 'first1saudi-educational' ? 'محتوى تثقيفي' : 'first1saudi'}
                       </span>
