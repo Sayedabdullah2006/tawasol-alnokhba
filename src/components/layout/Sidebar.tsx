@@ -32,15 +32,29 @@ export default function Sidebar({ items, title }: SidebarProps) {
 
   // الأقسام مفتوحة افتراضياً (شجرة واضحة كاملة)، مع إمكانية الطيّ.
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const toggle = (label: string) =>
     setCollapsed(prev => ({ ...prev, [label]: !prev[label] }))
 
   return (
-    <aside className="hidden md:flex flex-col w-60 bg-card border-l border-border min-h-[calc(100vh-80px)] sticky top-20">
-      <div className="p-4 border-b border-border">
-        <h2 className="font-black text-dark text-sm">{title}</h2>
+    <aside className={cn(
+      'hidden md:flex flex-col shrink-0 bg-card border-l border-border min-h-[calc(100vh-80px)] sticky top-20 transition-[width] duration-200',
+      sidebarCollapsed ? 'w-12' : 'w-60'
+    )}>
+      <div className={cn('flex items-center border-b border-border', sidebarCollapsed ? 'justify-center p-2' : 'justify-between p-4')}>
+        {!sidebarCollapsed && <h2 className="font-black text-dark text-sm">{title}</h2>}
+        <button
+          type="button"
+          onClick={() => setSidebarCollapsed(current => !current)}
+          className="grid h-8 w-8 place-items-center rounded-lg text-lg text-dark transition hover:bg-cream"
+          title={sidebarCollapsed ? 'إظهار القائمة الجانبية' : 'طي القائمة الجانبية'}
+          aria-label={sidebarCollapsed ? 'إظهار القائمة الجانبية' : 'طي القائمة الجانبية'}
+          aria-expanded={!sidebarCollapsed}
+        >
+          {sidebarCollapsed ? '›' : '‹'}
+        </button>
       </div>
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+      {!sidebarCollapsed && <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {items.map(entry =>
           isGroup(entry) ? (
             <Group
@@ -55,6 +69,7 @@ export default function Sidebar({ items, title }: SidebarProps) {
           )
         )}
       </nav>
+      }
     </aside>
   )
 }

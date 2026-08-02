@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useToast } from '@/components/ui/Toast'
@@ -44,6 +44,7 @@ export default function InsoCoveragePage() {
   const [addingSaved, setAddingSaved] = useState(false)
   const [savedTitle, setSavedTitle] = useState('')
   const [savedContent, setSavedContent] = useState('')
+  const skipNextTextSave = useRef<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -77,6 +78,13 @@ export default function InsoCoveragePage() {
   const replace = (item: InsoCoverageItem) => {
     setItems(current => current.map(entry => entry.id === item.id ? item : entry))
     setSelectedId(item.id)
+  }
+
+  const skipTextSaveForAction = (itemId: string) => {
+    skipNextTextSave.current = itemId
+    window.setTimeout(() => {
+      if (skipNextTextSave.current === itemId) skipNextTextSave.current = null
+    }, 0)
   }
 
   const callAction = async (action: string, payload: Record<string, unknown>, label: string) => {
@@ -238,12 +246,7 @@ export default function InsoCoveragePage() {
         </div>
       </section>
 
-      <section id={`day-panel-${activeDate}`} role="tabpanel" aria-labelledby={`day-tab-${activeDate}`} className="space-y-5 rounded-lg border border-border bg-card p-4 md:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
-          <div><p className="text-xs font-bold text-teal-700">تبويب اليوم</p><h2 className="mt-1 text-xl font-black text-dark">{activeDate ? formatInsoDate(activeDate) : 'خطة اليوم'}</h2></div>
-          <p className="max-w-md text-sm text-muted">اعمل على محتوى اليوم كاملا ثم انشره أو جدوله من نفس التبويب.</p>
-        </div>
-        <div>
+      <section id={`day-panel-${activeDate}`} role="tabpanel" aria-labelledby={`day-tab-${activeDate}`} className="space-y-5">
         <section id="posts" className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div><h3 className="font-black text-dark">منشورات اليوم</h3><p className="text-xs text-muted">كل نص يتضمن تلقائياً موهبة ووزارة التعليم والمنشنات المطلوبة.</p></div>
@@ -265,13 +268,12 @@ export default function InsoCoveragePage() {
                   <button onClick={() => setSelectedId(item.id)} className="min-w-0 text-right"><h3 className="font-black text-dark">{item.title}</h3><p className="mt-1 text-xs text-muted">{item.brief}</p></button>
                   <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${status.className}`}>{status.label}</span>
                 </div>
-                <textarea value={item.post_text ?? ''} onChange={e => replace({ ...item, post_text: e.target.value })} onFocus={() => setSelectedId(item.id)} placeholder="اضغط توليد المنشور أو اكتب الصياغة هنا..." className="mt-3 min-h-28 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm leading-6 text-dark" />
+                <textarea value={item.post_text ?? ''} onChange={e => replace({ ...item, post_text: e.target.value })} onFocus={() => setSelectedId(item.id)} onBlur={() => { if (skipNextTextSave.current === item.id) { skipNextTextSave.current = null; return }; if (item.post_text?.trim()) void callAction('save', { id: item.id, postText: item.post_text }, 'تم حفظ النص ضمن محتوى اليوم') }} placeholder="اضغط توليد المنشور أو اكتب الصياغة هنا..." className="mt-3 min-h-28 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm leading-6 text-dark" />
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Button size="sm" onClick={() => callAction('generate-copy', { id: item.id, designNote }, 'تم توليد منشور جديد')} loading={busy === `generate-copy:${item.id}`}>✨ توليد / إعادة توليد</Button>
-                  <Button size="sm" variant="outline" onClick={() => callAction('save', { id: item.id, postText: item.post_text }, 'تم حفظ النص')}>حفظ النص</Button>
-                  <Button size="sm" variant="outline" onClick={() => openDesigner(item)} disabled={!item.post_text}>🎨 توليد 3 تصاميم</Button>
-                  <Button size="sm" variant="ghost" onClick={() => publishNow(item)} loading={busy === `publish:${item.id}`} disabled={!item.post_text}>نشر الآن</Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setScheduleItem(item); setScheduleWhen('') }} disabled={!item.post_text}>جدولة</Button>
+                  <Button size="sm" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => callAction('generate-copy', { id: item.id }, 'تم توليد المنشور وحفظه ضمن محتوى اليوم')} loading={busy === `generate-copy:${item.id}`}>✨ توليد / إعادة توليد</Button>
+                  <Button size="sm" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openDesigner(item)} disabled={!item.post_text}>🎨 توليد 3 تصاميم</Button>
+                  <Button size="sm" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => publishNow(item)} loading={busy === `publish:${item.id}`} disabled={!item.post_text}>نشر الآن</Button>
+                  <Button size="sm" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => { setScheduleItem(item); setScheduleWhen('') }} disabled={!item.post_text}>جدولة</Button>
                 </div>
                 {item.design_options?.length ? <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   {item.design_options.map(option => <div key={option.id} className={`overflow-hidden rounded-lg border ${item.design_url === option.imageUrl ? 'border-teal-500 bg-teal-50/40' : 'border-border bg-white'}`}>
@@ -287,7 +289,6 @@ export default function InsoCoveragePage() {
           </div>
         </section>
 
-      </div>
         <section className="space-y-3 border-t border-border pt-5" aria-label="المحتوى المحفوظ لليوم">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div><h3 className="font-black text-dark">المحتوى المحفوظ لليوم</h3><p className="text-xs text-muted">تظهر هنا النصوص التي تم حفظها من منشورات هذا التبويب.</p></div>
@@ -298,7 +299,7 @@ export default function InsoCoveragePage() {
             <textarea value={savedContent} onChange={event => setSavedContent(event.target.value)} placeholder="اكتب النص الجاهز للنشر..." className="min-h-32 w-full resize-y rounded-lg border border-teal-200 bg-white p-3 text-sm leading-6" />
             <div className="flex flex-wrap gap-2"><Button size="sm" onClick={addSavedPost} loading={busy?.startsWith('add-saved:')}>حفظ وبدء التصميم</Button><Button size="sm" variant="ghost" onClick={() => setAddingSaved(false)}>إلغاء</Button></div>
           </div>}
-          {savedDayItems.length ? <textarea readOnly value={savedDayText} className="min-h-56 w-full resize-y rounded-lg border border-teal-200 bg-teal-50/40 p-4 text-sm leading-7 text-dark" /> : <div className="rounded-lg border border-dashed border-border bg-cream p-4 text-sm text-muted">بعد توليد النص اضغط «حفظ النص» ليُضاف هنا ضمن محتوى اليوم.</div>}
+          {savedDayItems.length ? <textarea readOnly value={savedDayText} className="min-h-56 w-full resize-y rounded-lg border border-teal-200 bg-teal-50/40 p-4 text-sm leading-7 text-dark" /> : <div className="rounded-lg border border-dashed border-border bg-cream p-4 text-sm text-muted">تظهر هنا المنشورات فور توليدها أو عند حفظ تعديل يدوي على النص.</div>}
         </section>
       </section>
 
