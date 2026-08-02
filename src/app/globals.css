@@ -194,6 +194,33 @@ td[class*="client"], th[class*="client"] {
     max-width: 100%;
   }
 
+  /* لا تحجز لوحة الإدارة مساحة القائمة الجانبية في الجوال. */
+  .admin-shell {
+    display: block;
+    width: 100%;
+    max-width: 100vw;
+  }
+
+  .admin-content {
+    width: 100% !important;
+    max-width: 100vw;
+    min-width: 0;
+    flex: none;
+  }
+
+  .inso-coverage-page {
+    width: 100% !important;
+    max-width: 100vw !important;
+    margin-inline: 0 !important;
+    padding-inline: 0.75rem !important;
+  }
+
+  .inso-coverage-page > * {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
   /* Fix mobile content width */
   .mobile-container {
     max-width: 100vw;

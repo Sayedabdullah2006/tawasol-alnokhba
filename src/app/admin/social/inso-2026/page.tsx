@@ -384,7 +384,7 @@ export default function InsoCoveragePage() {
   if (loading) return <LoadingSpinner size="lg" />
 
   return (
-    <div className="mx-auto min-h-[100dvh] w-full min-w-0 max-w-7xl space-y-6 overflow-x-hidden p-4 md:p-6" dir="rtl">
+    <div className="inso-coverage-page mx-auto min-h-[100dvh] w-full min-w-0 max-w-7xl space-y-6 overflow-x-hidden p-4 md:p-6" dir="rtl">
       <header className="border-b border-border pb-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
