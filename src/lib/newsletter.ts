@@ -241,7 +241,7 @@ function buildNewsletterPrompt(window: WeeklyWindow, items: NewsletterItem[], di
     list,
     ``,
     `🔒 BRAND IDENTITY (FIRST1SAUDI): Deep teal #0A2D35–#0D3D47 · Saudi green #2D8B3F–#3A9B4F · gold #FFD700 · white.`,
-    `FOOTER: شريط فيه أيقونات سوشال + "@First1Saudi".`,
+    `FOOTER: شريط إلزامي فيه أيقونات X وInstagram وLinkedIn وFacebook وTikTok كاملة وبالحجم نفسه، ثم "@First1Saudi".`,
     `قواعد: نصوص عربية حادّة متّصلة صحيحة الاتجاه (RTL) وحرفية. كل نبذة جملة مكتملة المعنى. لا تختلق نصاً. لا نِسب مئوية. لا إيموجي. لا نقاط «...». لا منشن (@) ولا أسماء أقسام في التصميم.`,
   ].join('\n')
 }

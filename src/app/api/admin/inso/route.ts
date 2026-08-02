@@ -59,7 +59,7 @@ async function generateInsoCopy(item: InsoCoverageSeed, extra?: string) {
   return enforceInsoFooter(completion.choices[0]?.message?.content ?? '')
 }
 
-async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args: { note?: string; direction: string; sourceImage?: string; hasVideo?: boolean }) {
+async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args: { note?: string; direction: string; sourceImages?: string[]; hasVideo?: boolean }) {
   const service = await createServiceRoleClient()
   const { data: brand } = await service.from('brand_settings').select('first1saudi_logo_url').eq('id', 1).single()
   if (!brand?.first1saudi_logo_url) {
@@ -72,15 +72,15 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
     `Event moment: ${item.title}. ${item.brief}`,
     `Source post facts to interpret visually: ${postText}. Do not copy or paste this caption into the design.`,
     `Creative direction: ${args.direction}.`,
-    args.sourceImage
-      ? 'Use the supplied reference image faithfully as a visual source while keeping it editorial.'
+    args.sourceImages?.length
+      ? `Use all ${args.sourceImages.length} supplied reference images as editorial visual sources and integrate them into one creative composition. Treat every depicted person as identity-critical: preserve their exact facial identity and features, skin tone, apparent age, body proportions, hairstyle, clothing, uniforms, accessories, and overall appearance. Do not beautify, restyle, swap, invent, alter, or regenerate their face, body, clothes, or identity. Do not turn the people into illustrations, avatars, or lookalikes. Keep them recognizably faithful while designing the surrounding composition creatively.`
       : 'No reference image was supplied. Make Jeddah unmistakable and authentic: use one relevant real-world cue such as the Jeddah Corniche and Red Sea waterfront, King Fahd Fountain, Al-Balad coral-stone architecture, or the Jeddah skyline. Never use a generic foreign city.',
     args.hasVideo ? 'This is the cover for a short event video. Build a dynamic visual opening frame with space for motion cues, while remaining a polished 4:5 static poster.' : '',
     'Turn the facts into an original visual infographic hierarchy: use a concise Arabic headline only when it can be rendered accurately, then 2 to 4 short factual callouts, numbers, icons, data marks, or a small timeline. Never use long paragraphs, never repeat the full post caption, and never make the design look like a screenshot of a social post.',
-    'Do not render event logos, brand logos, account handles, or hashtags. Keep the artwork full-bleed to every edge. Reserve ONLY a compact logo-safe zone at the extreme lower-right, approximately 240 by 120 pixels on the 1080 by 1350 canvas. Keep this tiny area free of text, people, numbers, icons, and high-detail imagery so two original logos can be overlaid without covering the design. It must be a subtle continuation of the surrounding teal artwork with a little texture or soft pattern, never a large dark void, empty field, panel, banner, footer, or boxed area. The rest of the canvas must remain visually rich and balanced.',
+    'Do not render event logos, brand logos, or hashtags. Add a compact social footer for First1Saudi with the official icons for X, Instagram, LinkedIn, Facebook, and TikTok, followed by the exact handle "@First1Saudi". All five icons are mandatory, equal in size, and must remain fully visible. Keep the artwork full-bleed to every edge. Reserve ONLY a compact logo-safe zone at the extreme lower-right, approximately 240 by 120 pixels on the 1080 by 1350 canvas. Keep this tiny area free of text, people, numbers, icons, and high-detail imagery so two original logos can be overlaid without covering the design. It must be a subtle continuation of the surrounding teal artwork with a little texture or soft pattern, never a large dark void, empty field, panel, banner, footer, or boxed area. The rest of the canvas must remain visually rich and balanced.',
     args.note?.trim() ? `Additional creative direction: ${args.note.trim()}` : '',
   ].filter(Boolean).join('\n\n')
-  const { b64 } = await generateImageWithOpenAI(prompt, args.sourceImage ? [args.sourceImage] : [])
+  const { b64 } = await generateImageWithOpenAI(prompt, args.sourceImages ?? [])
   const poster = await resizeToPoster(Buffer.from(b64, 'base64'))
   const response = await fetch(brand.first1saudi_logo_url)
   if (!response.ok) throw new Error('تعذّر تحميل شعار أول سعودي من إعدادات الهوية')
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
   if ('error' in auth) return auth.error
   let body: {
     action?: Action; id?: string; title?: string; brief?: string; coverageDate?: string; phase?: 'before' | 'during' | 'after';
-    postText?: string; designNote?: string; scheduledFor?: string; sourceImage?: string; hasVideo?: boolean; optionId?: string;
+    postText?: string; designNote?: string; scheduledFor?: string; sourceImages?: string[]; hasVideo?: boolean; optionId?: string;
   }
   try { body = await request.json() } catch { return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 }) }
   if (!body.action) return NextResponse.json({ error: 'الإجراء مطلوب' }, { status: 400 })
@@ -228,6 +228,9 @@ export async function POST(request: Request) {
 
     if (body.action === 'generate-design-options') {
       const postText = enforceInsoFooter(body.postText ?? item.post_text ?? '')
+      const sourceImages = Array.isArray(body.sourceImages)
+        ? body.sourceImages.filter((url): url is string => typeof url === 'string' && url.startsWith('http')).slice(0, 5)
+        : []
       if (!postText) {
         await failGenerationJob(generationJobId, new Error('ولّد أو اكتب نص المنشور أولاً'))
         return NextResponse.json({ error: 'ولّد أو اكتب نص المنشور أولاً' }, { status: 400 })
@@ -237,7 +240,7 @@ export async function POST(request: Request) {
         id: `${Date.now()}-${index}`,
         title: `الخيار ${index + 1}`,
         direction,
-        imageUrl: await generateInsoDesign(item, postText, { direction, note: body.designNote, sourceImage: body.sourceImage, hasVideo: body.hasVideo }),
+        imageUrl: await generateInsoDesign(item, postText, { direction, note: body.designNote, sourceImages, hasVideo: body.hasVideo }),
         hasVideo: Boolean(body.hasVideo),
         selected: false,
         createdAt: new Date().toISOString(),

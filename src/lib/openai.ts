@@ -231,7 +231,7 @@ export const SYS_CONCEPTS = `أنت مدير فني لحساب "First1Saudi". ا
 
 /**
  * قواعد التكوين التي تستخدمها تجربة الاستديو. تُشارك مع مولدات الحملات
- * التي تركّب شعاراتها برمجياً بعد التوليد، لذلك لا تتضمن تذييل الاستديو.
+ * التي تركّب شعاراتها برمجياً بعد التوليد، مع الحفاظ على تذييل اجتماعي موحّد.
  */
 export const STUDIO_EDITORIAL_DESIGN_RULES = `
 Build a campaign-grade Arabic editorial poster, not a conservative text overlay.
@@ -240,6 +240,7 @@ Use one distinctive visual mechanism that makes the selected direction visible: 
 Avoid generic stock-template composition and the safe default of a bottom text strip. Create a memorable first read with strong asymmetry, a clear hierarchy, and intentional negative space.
 Arabic typography: GE Dinar One Heavy. Alternatives: Lomar or Din Next Arabic Heavy. Use sharp, weighty Arabic type with correct connected RTL shaping; never use Cairo or rounded soft lettering.
 Treat descriptive source-image notes as internal direction only. Do not render captions about the image or its source as visible text.
+Every design must include a compact, clean social footer for First1Saudi: the official icons for X, Instagram, LinkedIn, Facebook, and TikTok, followed by the exact handle "@First1Saudi". Keep all five icons visible, equal in size, and visually balanced; never omit Facebook.
 `
 
 /** الخطوة الرابعة - مولد برومبت التصميم/الصورة */
@@ -295,7 +296,7 @@ FACTS — [عدد] compact points, thin-line gold icons, Saudi-green dividers:
 Dark teal strip (#0D3D47) full width.
 Two swoosh waves at top edge: Wave 1 dark teal (#0D3D47) · Wave 2 Saudi green (#2D8B3F).
 Thin gold line (#FFD700) along the top edge of Wave 2.
-LEFT side, LEFT-ALIGNED: [X icon] [LinkedIn icon] [Instagram icon] [TikTok icon] — all pure white #FFFFFF, same size — then "@First1Saudi" bold white.
+LEFT side, LEFT-ALIGNED: [X icon] [Instagram icon] [LinkedIn icon] [Facebook icon] [TikTok icon] — all pure white #FFFFFF, same size — then "@First1Saudi" bold white. All five icons are mandatory; never omit Facebook.
 RIGHT side: leave a CLEAR EMPTY area (a brand logo will be composited there afterwards). Keep this corner clean.
 FORBIDDEN: do NOT draw any logo or the word "FIRST1SAUDI" as text anywhere except the @handle.
 

@@ -38,7 +38,7 @@ export default function InsoCoveragePage() {
   const [designPreview, setDesignPreview] = useState<{ title: string; imageUrl: string } | null>(null)
   const [savedTexts, setSavedTexts] = useState<Record<string, string>>({})
   const [designItem, setDesignItem] = useState<InsoCoverageItem | null>(null)
-  const [designSource, setDesignSource] = useState('')
+  const [designSources, setDesignSources] = useState<string[]>([])
   const [designHasVideo, setDesignHasVideo] = useState(false)
   const [designUploading, setDesignUploading] = useState(false)
   const [editOption, setEditOption] = useState<{ item: InsoCoverageItem; optionId: string } | null>(null)
@@ -193,24 +193,31 @@ export default function InsoCoveragePage() {
     }
   }
 
-  const uploadDesignSource = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
+  const uploadDesignSources = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? [])
     event.target.value = ''
-    if (!file) return
-    if (!['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(file.type)) { showToast('ارفق صورة بصيغة PNG أو JPG أو WEBP', 'error'); return }
+    if (!files.length) return
+    if (files.some(file => !['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(file.type))) { showToast('ارفق صورا بصيغة PNG أو JPG أو WEBP', 'error'); return }
+    const remaining = Math.max(0, 5 - designSources.length)
+    if (!remaining) { showToast('يمكن إرفاق 5 صور مرجعية كحد أقصى', 'error'); return }
+    const acceptedFiles = files.slice(0, remaining)
     setDesignUploading(true)
     try {
-      const extension = file.name.split('.').pop() || 'png'
-      const path = `inso-source-${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`
-      const { error } = await supabase.storage.from('content-images').upload(path, file)
-      if (error) throw error
-      setDesignSource(supabase.storage.from('content-images').getPublicUrl(path).data.publicUrl)
-    } catch { showToast('تعذّر رفع الصورة المرجعية', 'error') } finally { setDesignUploading(false) }
+      const uploaded = await Promise.all(acceptedFiles.map(async file => {
+        const extension = file.name.split('.').pop() || 'png'
+        const path = `inso-source-${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`
+        const { error } = await supabase.storage.from('content-images').upload(path, file)
+        if (error) throw error
+        return supabase.storage.from('content-images').getPublicUrl(path).data.publicUrl
+      }))
+      setDesignSources(current => [...current, ...uploaded])
+      if (files.length > acceptedFiles.length) showToast('تم إرفاق أول 5 صور فقط', 'success')
+    } catch { showToast('تعذّر رفع إحدى الصور المرجعية', 'error') } finally { setDesignUploading(false) }
   }
 
   const openDesigner = (item: InsoCoverageItem) => {
     setDesignItem(item)
-    setDesignSource('')
+    setDesignSources([])
     setDesignNote('')
     setDesignHasVideo(false)
   }
@@ -218,7 +225,7 @@ export default function InsoCoveragePage() {
   const generateDesignOptions = async () => {
     if (!designItem) return
     const result = await callAction('generate-design-options', {
-      id: designItem.id, postText: designItem.post_text, designNote, sourceImage: designSource || undefined, hasVideo: designHasVideo,
+      id: designItem.id, postText: designItem.post_text, designNote, sourceImages: designSources, hasVideo: designHasVideo,
     }, 'تم توليد 3 خيارات للتصميم')
     if (result?.item) setDesignItem(result.item)
   }
@@ -335,10 +342,11 @@ export default function InsoCoveragePage() {
 
       {designItem && <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 md:items-center md:p-4" role="dialog" aria-modal="true" aria-label="توليد خيارات التصميم">
         <div className="max-h-[calc(100svh-0.75rem)] w-screen max-w-none overflow-y-auto rounded-t-lg bg-white shadow-xl md:max-h-[calc(100dvh-2rem)] md:w-full md:max-w-lg md:rounded-lg">
-          <div className="space-y-4 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-5"><div><h3 className="font-black text-dark">3 خيارات تصميم: {designItem.title}</h3><p className="mt-1 text-xs text-muted">أرفق صورة مرجعية عند الحاجة أو اختر أن المنشور مقطع فيديو.</p></div>
+          <div className="space-y-4 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-5"><div><h3 className="font-black text-dark">3 خيارات تصميم: {designItem.title}</h3><p className="mt-1 text-xs text-muted">أرفق حتى 5 صور مرجعية عند الحاجة أو اختر أن المنشور مقطع فيديو.</p></div>
             <textarea value={designNote} onChange={e => setDesignNote(e.target.value)} placeholder="توجيه إضافي للتصميم (اختياري)" className="min-h-28 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm" />
-            <div className="grid gap-3 sm:grid-cols-2"><div><p className="mb-2 text-sm font-bold text-dark">صورة مرجعية</p><label className="flex h-11 cursor-pointer items-center justify-center rounded-lg border border-border bg-white px-3 text-sm font-bold text-dark hover:bg-cream"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadDesignSource} className="sr-only" />{designUploading ? 'جارٍ رفع الصورة...' : 'اختيار صورة'}</label></div><label className="flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-bold text-dark"><input type="checkbox" checked={designHasVideo} onChange={e => setDesignHasVideo(e.target.checked)} /> المنشور مقطع فيديو</label></div>
-            {designSource && <p className="text-xs font-bold text-teal-700">تم إرفاق الصورة المرجعية.</p>}
+            <div className="grid gap-3 sm:grid-cols-2"><div><p className="mb-2 text-sm font-bold text-dark">صور مرجعية ({designSources.length}/5)</p><label className="flex h-11 cursor-pointer items-center justify-center rounded-lg border border-border bg-white px-3 text-sm font-bold text-dark hover:bg-cream"><input type="file" multiple accept="image/png,image/jpeg,image/webp" onChange={uploadDesignSources} className="sr-only" />{designUploading ? 'جارٍ رفع الصور...' : 'اختيار صور'}</label></div><label className="flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-bold text-dark"><input type="checkbox" checked={designHasVideo} onChange={e => setDesignHasVideo(e.target.checked)} /> المنشور مقطع فيديو</label></div>
+            {designSources.length > 0 && <div className="flex gap-2 overflow-x-auto pb-1" aria-label="الصور المرجعية المرفقة">{designSources.map((source, index) => <div key={source} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border"><img src={source} alt={`الصورة المرجعية ${index + 1}`} className="h-full w-full object-cover" /><button type="button" onClick={() => setDesignSources(current => current.filter(entry => entry !== source))} className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/70 text-xs text-white" aria-label={`حذف الصورة المرجعية ${index + 1}`}>×</button></div>)}</div>}
+            <p className="rounded-lg border border-teal-200 bg-teal-50 p-3 text-xs leading-6 text-teal-900">تُدمج الصور بشكل إبداعي في التصميم مع الحفاظ الكامل على ملامح الوجه والهوية والهيئة والملبس كما هي، دون تعديل أو إعادة تشكيل.</p>
           </div>
           <div className="sticky bottom-0 flex gap-2 border-t border-border bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-5"><Button className="flex-1" onClick={generateDesignOptions} loading={busy === `generate-design-options:${designItem.id}`} disabled={designUploading || !designItem.post_text}>توليد الخيارات الثلاثة</Button><Button variant="outline" onClick={() => setDesignItem(null)}>إلغاء</Button></div>
         </div>
