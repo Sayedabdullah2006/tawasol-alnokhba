@@ -1,5 +1,6 @@
 import Sidebar, { type NavEntry, type NavLeaf } from '@/components/layout/Sidebar'
 import BottomNav from '@/components/layout/BottomNav'
+import GenerationJobMonitor from '@/components/admin/GenerationJobMonitor'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,6 +22,7 @@ const adminNav: NavEntry[] = [
     children: [
       { href: '/admin/studio', label: 'استوديو الذكاء (مستقل)', icon: '🤖' },
       { href: '/admin/social', label: 'خطة النشر اليومية', icon: '🗓️' },
+      { href: '/admin/social/inso-2026', label: 'تغطية INSO 2026', icon: '⚛️' },
       { href: '/admin/newsletter', label: 'النخبة في ٧', icon: '🗞️' },
       { href: '/admin/social/calendar', label: 'تقويم الجدولة', icon: '📆' },
       { href: '/admin/integrations', label: 'النشر للقنوات', icon: '🔗' },
@@ -56,6 +58,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {children}
       </div>
       <BottomNav items={adminFlatNav} />
+      <GenerationJobMonitor />
     </div>
   )
 }

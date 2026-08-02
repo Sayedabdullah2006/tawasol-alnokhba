@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { editDesign } from '@/lib/ai-studio'
+import { completeGenerationJob, failGenerationJob, startGenerationJob, throwIfGenerationCancelled } from '@/lib/generation-jobs'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 180
@@ -22,11 +23,15 @@ export async function POST(req: Request) {
   const note = (body.note ?? '').trim()
   if (!imageUrl) return NextResponse.json({ error: 'لا يوجد تصميم للتعديل' }, { status: 400 })
   if (!note) return NextResponse.json({ error: 'اكتب التعديل المطلوب' }, { status: 400 })
+  const jobId = await startGenerationJob({ ownerId: user.id, scope: 'standalone', operation: 'edit' })
 
   try {
     const { imageUrl: out } = await editDesign({ designImageUrl: imageUrl, note })
+    await throwIfGenerationCancelled(jobId)
+    await completeGenerationJob(jobId, { imageUrl: out })
     return NextResponse.json({ ok: true, imageUrl: out })
   } catch (e) {
+    await failGenerationJob(jobId, e)
     return NextResponse.json({ error: e instanceof Error ? e.message : 'فشل التعديل' }, { status: 500 })
   }
 }

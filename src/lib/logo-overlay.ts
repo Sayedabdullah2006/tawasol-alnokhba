@@ -85,3 +85,36 @@ export async function compositeLogoBottomRight(
     return { buffer: baseImage, mimeType: 'image/png' }
   }
 }
+
+/** يضيف شعاري الحملة في تذييل واحد، مع الاحتفاظ بهما كأصول أصلية غير مولّدة. */
+export async function compositeCampaignLogos(
+  baseImage: Buffer,
+  logos: Array<{ input: Buffer; widthRatio: number }>,
+): Promise<Buffer> {
+  try {
+    const base = sharp(baseImage)
+    const meta = await base.metadata()
+    const W = meta.width ?? POSTER_WIDTH
+    const H = meta.height ?? POSTER_HEIGHT
+    const margin = Math.round(W * 0.035)
+    const gap = Math.round(W * 0.018)
+    const rendered = await Promise.all(logos.map(async logo => sharp(logo.input)
+      .resize({ width: Math.max(1, Math.round(W * logo.widthRatio)), fit: 'inside' })
+      .png()
+      .toBuffer()))
+
+    let cursor = W - margin
+    const composites: Array<{ input: Buffer; left: number; top: number }> = []
+    for (const logo of rendered) {
+      const logoMeta = await sharp(logo).metadata()
+      const logoW = logoMeta.width ?? 1
+      const logoH = logoMeta.height ?? 1
+      cursor -= logoW
+      composites.push({ input: logo, left: cursor, top: Math.max(0, H - logoH - Math.round(H * 0.035)) })
+      cursor -= gap
+    }
+    return base.composite(composites).png().toBuffer()
+  } catch {
+    return baseImage
+  }
+}

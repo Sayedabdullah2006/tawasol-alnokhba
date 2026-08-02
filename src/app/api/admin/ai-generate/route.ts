@@ -5,6 +5,7 @@ import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMA
 import { logGeneratedDesign } from '@/lib/newsletter'
 import { generateImageWithOpenAI } from '@/lib/image-generation'
 import { compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
+import { completeGenerationJob, failGenerationJob, startGenerationJob, throwIfGenerationCancelled } from '@/lib/generation-jobs'
 
 export const dynamic = 'force-dynamic'
 // Image generation can be slow — give it room.
@@ -112,6 +113,17 @@ export async function POST(req: Request) {
       }
     }
   }
+
+  const jobId = await startGenerationJob({ ownerId: user.id, scope: 'request', operation: step, targetId: requestId })
+  const success = async (payload: Record<string, unknown>) => {
+    await throwIfGenerationCancelled(jobId)
+    await completeGenerationJob(jobId, payload)
+    return NextResponse.json(payload)
+  }
+  const failure = async (message: string, status = 400) => {
+    await failGenerationJob(jobId, new Error(message))
+    return NextResponse.json({ error: message }, { status })
+  }
   // يُدمج السياق قبل نص الخبر الحالي عند بناء رسائل المستخدم
   const withContext = (text: string) =>
     campaignContext ? `${campaignContext}\n\n──────\n\nالخبر الحالي:\n${text}` : text
@@ -128,6 +140,7 @@ export async function POST(req: Request) {
     generatedAt?: string
     imageUrl?: string
   }) => {
+    await throwIfGenerationCancelled(jobId)
     if (isCampaignPost) {
       const postKey = String(postIndex as number)
       const aiPosts: Record<string, Record<string, unknown>> =
@@ -171,6 +184,7 @@ export async function POST(req: Request) {
   try {
     openai = getOpenAI()
   } catch {
+    await failGenerationJob(jobId, new Error('مفتاح OpenAI غير مهيّأ'))
     return NextResponse.json(
       { error: 'مفتاح OpenAI غير مهيّأ — أضِفه في إعدادات الخادم' },
       { status: 500 }
@@ -208,13 +222,13 @@ export async function POST(req: Request) {
 
       await saveStep({ analysis, sourceImage: primarySource })
 
-      return NextResponse.json({ analysis })
+      return success({ analysis })
     }
 
     // ── STEP: tweets ───────────────────────────────────────────
     if (step === 'tweets') {
       if (!priorAnalysis) {
-        return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 })
+        return failure('حلّل الخبر أولاً')
       }
 
       const completion = await chatComplete(openai, {
@@ -231,13 +245,13 @@ export async function POST(req: Request) {
       const rawText = completion.choices[0]?.message?.content ?? ''
       await saveStep({ tweets: { raw: rawText } })
 
-      return NextResponse.json({ tweets: rawText })
+      return success({ tweets: rawText })
     }
 
     // ── STEP: concepts ─────────────────────────────────────────
     if (step === 'concepts') {
       if (!priorAnalysis) {
-        return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 })
+        return failure('حلّل الخبر أولاً')
       }
 
       // استبعاد الاتجاهات المقترحة سابقاً لنفس الخبر (لإعادة توليد مختلفة)
@@ -282,19 +296,19 @@ export async function POST(req: Request) {
 
       await saveStep({ concepts: { items, raw: rawText } })
 
-      return NextResponse.json({ concepts: items, raw: rawText })
+      return success({ concepts: items, raw: rawText })
     }
 
     // ── STEP: image ────────────────────────────────────────────
     if (step === 'image') {
       if (!priorAnalysis) {
-        return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 })
+        return failure('حلّل الخبر أولاً')
       }
       if (!chosenConcept) {
-        return NextResponse.json({ error: 'اختر اتجاه التصميم أولاً' }, { status: 400 })
+        return failure('اختر اتجاه التصميم أولاً')
       }
       if (!sourceImages.length) {
-        return NextResponse.json({ error: 'اختر صورة المصدر أولاً' }, { status: 400 })
+        return failure('اختر صورة المصدر أولاً')
       }
 
       // Fetch the brand logo URL (if configured) so we can reference it in the prompt.
@@ -365,6 +379,7 @@ export async function POST(req: Request) {
       const existing: string[] = Array.isArray(reqRow.proposed_images)
         ? reqRow.proposed_images
         : []
+      await throwIfGenerationCancelled(jobId)
       const { error: appendErr } = await service
         .from('publish_requests')
         .update({ proposed_images: [...existing, imageUrl] })
@@ -388,12 +403,13 @@ export async function POST(req: Request) {
         })
       }
 
-      return NextResponse.json({ imageUrl, prompt: designPrompt })
+      return success({ imageUrl, prompt: designPrompt })
     }
 
-    return NextResponse.json({ error: 'خطوة غير معروفة' }, { status: 400 })
+    return failure('خطوة غير معروفة')
   } catch (err) {
     const message = err instanceof Error ? err.message : 'خطأ غير معروف'
+    await failGenerationJob(jobId, err)
     return NextResponse.json(
       { error: `فشل توليد الذكاء الاصطناعي: ${message}` },
       { status: 500 }

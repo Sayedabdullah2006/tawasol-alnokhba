@@ -7,6 +7,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { generateInfographic, INFOGRAPHIC_DIRECTIONS, type InfographicPerson } from '@/lib/ai-studio'
 import { getOpenAI, chatComplete, SYS_TWEETS, buildTweetDirectives } from '@/lib/openai'
 import { logGeneratedDesign } from '@/lib/newsletter'
+import { completeGenerationJob, failGenerationJob, startGenerationJob, throwIfGenerationCancelled } from '@/lib/generation-jobs'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -27,6 +28,7 @@ export async function POST(req: Request) {
   if (!people.length) return NextResponse.json({ error: 'أضِف صورة شخص واحدة على الأقل مع اسمه' }, { status: 400 })
 
   const title = (body.title ?? '').trim()
+  const jobId = await startGenerationJob({ ownerId: user.id, scope: 'standalone', operation: 'infographic' })
   // توليد 3 اتجاهات إبداعية بالتوازي
   const settled = await Promise.allSettled(
     INFOGRAPHIC_DIRECTIONS.map(direction =>
@@ -38,8 +40,12 @@ export async function POST(req: Request) {
 
   if (!images.length) {
     const err = settled.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined
+    await failGenerationJob(jobId, err?.reason)
     return NextResponse.json({ error: err?.reason instanceof Error ? err.reason.message : 'فشل التوليد' }, { status: 500 })
   }
+
+  try {
+    await throwIfGenerationCancelled(jobId)
 
   // تسجيل التصاميم في السجلّ الموحّد (مرشّحي النشرة/المجلة)
   for (const im of images) {
@@ -68,5 +74,10 @@ export async function POST(req: Request) {
     tweets = completion.choices[0]?.message?.content ?? ''
   } catch { /* تجاهل */ }
 
-  return NextResponse.json({ ok: true, images, tweets })
+    await completeGenerationJob(jobId, { images, tweets })
+    return NextResponse.json({ ok: true, images, tweets })
+  } catch (error) {
+    await failGenerationJob(jobId, error)
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'فشل التوليد' }, { status: 500 })
+  }
 }

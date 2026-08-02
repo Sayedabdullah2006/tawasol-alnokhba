@@ -10,6 +10,7 @@ import {
   generateDesign,
 } from '@/lib/ai-studio'
 import { logGeneratedDesign } from '@/lib/newsletter'
+import { completeGenerationJob, failGenerationJob, startGenerationJob, throwIfGenerationCancelled } from '@/lib/generation-jobs'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -46,6 +47,12 @@ export async function POST(req: Request) {
 
   const { step, title, content, sourceImage, analysis, chosenConcept, note, extraInfo, hasVideo } = body
   if (!step) return NextResponse.json({ error: 'الخطوة مطلوبة' }, { status: 400 })
+  const jobId = await startGenerationJob({ ownerId: user.id, scope: 'standalone', operation: step })
+  const success = async (payload: Record<string, unknown>) => {
+    await throwIfGenerationCancelled(jobId)
+    await completeGenerationJob(jobId, payload)
+    return NextResponse.json(payload)
+  }
 
   // دعم اختيار أكثر من صورة مصدر (مع التوافق الخلفي لصورة مفردة).
   const sourceImages: string[] =
@@ -59,6 +66,7 @@ export async function POST(req: Request) {
 
   let openai: OpenAI
   try { openai = getOpenAI() } catch {
+    await failGenerationJob(jobId, new Error('مفتاح OpenAI غير مهيّأ'))
     return NextResponse.json({ error: 'مفتاح OpenAI غير مهيّأ — أضِفه في إعدادات الخادم' }, { status: 500 })
   }
 
@@ -66,29 +74,29 @@ export async function POST(req: Request) {
     // ── analyze ──
     if (step === 'analyze') {
       const parsed = await analyzeNews(openai, { newsText, sourceImages })
-      return NextResponse.json({ analysis: parsed })
+      return success({ analysis: parsed })
     }
 
     // ── tweets ──
     if (step === 'tweets') {
-      if (!analysis) return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 })
+      if (!analysis) { await failGenerationJob(jobId, new Error('حلّل الخبر أولاً')); return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 }) }
       const tweets = await generateTweets(openai, { analysis, newsText })
-      return NextResponse.json({ tweets })
+      return success({ tweets })
     }
 
     // ── concepts ──
     if (step === 'concepts') {
-      if (!analysis) return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 })
+      if (!analysis) { await failGenerationJob(jobId, new Error('حلّل الخبر أولاً')); return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 }) }
       const excludeTitles = Array.isArray(body.previousConcepts) ? body.previousConcepts : []
       const items = await generateConcepts(openai, { analysis, newsText, sourceImages, excludeTitles })
-      return NextResponse.json({ concepts: items })
+      return success({ concepts: items })
     }
 
     // ── image ──
     if (step === 'image') {
-      if (!analysis) return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 })
-      if (!chosenConcept) return NextResponse.json({ error: 'اختر اتجاه التصميم أولاً' }, { status: 400 })
-      if (!sourceImages.length) return NextResponse.json({ error: 'ارفع صورة المصدر أولاً' }, { status: 400 })
+      if (!analysis) { await failGenerationJob(jobId, new Error('حلّل الخبر أولاً')); return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 }) }
+      if (!chosenConcept) { await failGenerationJob(jobId, new Error('اختر اتجاه التصميم أولاً')); return NextResponse.json({ error: 'اختر اتجاه التصميم أولاً' }, { status: 400 }) }
+      if (!sourceImages.length) { await failGenerationJob(jobId, new Error('ارفع صورة المصدر أولاً')); return NextResponse.json({ error: 'ارفع صورة المصدر أولاً' }, { status: 400 }) }
 
       const { imageUrl, prompt } = await generateDesign(openai, { analysis, chosenConcept, sourceImages, note, hasVideo })
       // تسجيل التصميم في السجلّ الموحّد (مرشّحي نشرة «النخبة في ٧»)
@@ -100,12 +108,14 @@ export async function POST(req: Request) {
         imageUrl,
         sourceImageUrl: sourceImages[0] ?? null,
       })
-      return NextResponse.json({ imageUrl, prompt })
+      return success({ imageUrl, prompt })
     }
 
+    await failGenerationJob(jobId, new Error('خطوة غير معروفة'))
     return NextResponse.json({ error: 'خطوة غير معروفة' }, { status: 400 })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'خطأ غير معروف'
+    await failGenerationJob(jobId, err)
     return NextResponse.json({ error: `فشل توليد الذكاء الاصطناعي: ${message}` }, { status: 500 })
   }
 }
