@@ -304,8 +304,11 @@ export async function POST(request: Request) {
 
     if (body.action === 'mark-scheduled') {
       const scheduledFor = body.scheduledFor ? new Date(body.scheduledFor).toISOString() : null
+      const options = Array.isArray(item.design_options) ? item.design_options : []
       const { data, error } = await service.from('event_coverage_items').update({
-        publication_status: 'scheduled', scheduled_for: scheduledFor, updated_at: new Date().toISOString(),
+        publication_status: 'scheduled', scheduled_for: scheduledFor,
+        design_options: options.map((option: { id?: string }) => ({ ...option, scheduledFor: option.id === body.optionId ? scheduledFor : undefined })),
+        updated_at: new Date().toISOString(),
       }).eq('id', item.id).select('*').single()
       if (error) throw error
       return NextResponse.json({ item: data })
@@ -332,8 +335,15 @@ export async function POST(request: Request) {
 
       await cancelScheduledPost(String(schedule.schedule_id))
       await service.from('postpulse_posts').update({ status: 'cancelled' }).eq('id', schedule.id)
+      const options = Array.isArray(item.design_options) ? item.design_options : []
       const { data, error } = await service.from('event_coverage_items').update({
-        publication_status: 'ready', scheduled_for: null, updated_at: new Date().toISOString(),
+        publication_status: 'ready', scheduled_for: null,
+        design_options: options.map((option: Record<string, unknown>) => {
+          const nextOption = { ...option }
+          delete nextOption.scheduledFor
+          return nextOption
+        }),
+        updated_at: new Date().toISOString(),
       }).eq('id', item.id).select('*').single()
       if (error) throw error
       return NextResponse.json({ item: data })
