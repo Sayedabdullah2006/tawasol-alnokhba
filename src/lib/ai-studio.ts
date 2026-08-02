@@ -226,8 +226,8 @@ export async function generateDesign(
  * (حذف/إضافة كلمة، حذف عنصر…) مع إبقاء نفس التصميم والصورة والتخطيط تماماً — بلا
  * إعادة توليد من معطيات الطلب. لا يُعيد تركيب الشعار (موجود أصلاً داخل الصورة).
  */
-export async function editDesign(args: { designImageUrl: string; note: string; referenceImageUrls?: string[] }): Promise<{ imageUrl: string }> {
-  const { designImageUrl, note, referenceImageUrls = [] } = args
+export async function editDesign(args: { designImageUrl: string; note: string; referenceImageUrls?: string[]; preserveEdits?: string[] }): Promise<{ imageUrl: string }> {
+  const { designImageUrl, note, referenceImageUrls = [], preserveEdits = [] } = args
   if (!designImageUrl) throw new Error('لا يوجد تصميم للتعديل')
   if (!note.trim()) throw new Error('اكتب التعديل المطلوب')
   const service = await createServiceRoleClient()
@@ -236,8 +236,12 @@ export async function editDesign(args: { designImageUrl: string; note: string; r
     'EDIT the attached social-media design image (this is an image-editing task, not generation).\n' +
     '‼️ APPLY THIS CHANGE NOW — it MUST be clearly and visibly applied to the image: ' + note.trim() + '\n' +
     'بالعربية — نفّذ هذا التعديل على الصورة المرفقة فوراً بحيث يظهر واضحاً: ' + note.trim() + '\n\n' +
+    'TEXT LOCK — Treat every visible Arabic and English word, number, date, hashtag, handle, logo, and typographic treatment in the current design as immutable, pixel-accurate content. Do not redraw, retype, translate, paraphrase, spell-correct, move, crop, remove, reflow, or alter any existing text, even by one letter, unless the current requested change explicitly supplies the replacement wording inside quotation marks. If the note contains no quoted replacement text, make absolutely no text changes. If quoted text is supplied, render only that exact quoted wording with correct connected RTL Arabic shaping; never invent, shorten, or alter it.\n' +
     'Then keep the REST of the design as close to the original as possible: same overall layout, same background and colors, ' +
     'the same person/photo and face (do not change or regenerate the person), the same footer/logo, and the same other text. ' +
+    (preserveEdits.length
+      ? `These are earlier completed edits. They are mandatory requirements that must remain visibly present; never remove, replace, or weaken them while applying the new edit: ${preserveEdits.map((entry, index) => `${index + 1}. ${entry}`).join(' | ')}. `
+      : '') +
     (referenceImageUrls.length
       ? `The ${referenceImageUrls.length} additional attached image(s) are the mandatory replacement visual source(s). Replace or integrate the requested photo content from them while preserving every depicted person's exact facial identity, features, skin tone, body proportions, clothing, accessories, and appearance. Never alter, beautify, restyle, or invent their face, body, or clothes. Keep the purple Mawhiba calligraphy logo and every white letter within it completely intact; do not crop, erase, translate, or regenerate any part of either campaign logo. `
       : '') +

@@ -277,9 +277,12 @@ export async function POST(request: Request) {
         : []
       if (optionIndex < 0 || (!body.designNote?.trim() && !sourceImages.length)) return NextResponse.json({ error: 'اختر التصميم واكتب التعديل أو أرفق صورة بديلة' }, { status: 400 })
       const note = body.designNote?.trim() || 'استبدل الصورة الرئيسية في التصميم بالصور المرجعية المرفقة، وادمجها بأسلوب تحريري متناسق.'
-      const edited = await editDesign({ designImageUrl: options[optionIndex].imageUrl, note, referenceImageUrls: sourceImages })
+      const editHistory = Array.isArray(options[optionIndex].editHistory)
+        ? options[optionIndex].editHistory.filter((entry: unknown): entry is string => typeof entry === 'string' && entry.trim().length > 0).slice(-8)
+        : []
+      const edited = await editDesign({ designImageUrl: options[optionIndex].imageUrl, note, referenceImageUrls: sourceImages, preserveEdits: editHistory })
       await throwIfGenerationCancelled(generationJobId)
-      const nextOptions = options.map((entry: { id?: string }, index: number) => index === optionIndex ? { ...entry, imageUrl: edited.imageUrl, createdAt: new Date().toISOString() } : entry)
+      const nextOptions = options.map((entry: { id?: string }, index: number) => index === optionIndex ? { ...entry, imageUrl: edited.imageUrl, createdAt: new Date().toISOString(), editHistory: [...editHistory, note].slice(-8) } : entry)
       const { data, error } = await service.from('event_coverage_items').update({
         design_options: nextOptions, design_url: item.design_url === options[optionIndex].imageUrl ? edited.imageUrl : item.design_url,
         updated_at: new Date().toISOString(),
