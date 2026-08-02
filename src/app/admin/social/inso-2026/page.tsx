@@ -20,6 +20,8 @@ const STATUS: Record<InsoCoverageItem['publication_status'], { label: string; cl
   published: { label: 'منشور', className: 'bg-green-50 text-green-700' },
 }
 
+const ACTIVE_DAY_STORAGE_KEY = 'inso-2026-active-day'
+
 export default function InsoCoveragePage() {
   const { showToast } = useToast()
   const supabase = createClient()
@@ -54,7 +56,13 @@ export default function InsoCoveragePage() {
       const incoming = data.items ?? []
       setItems(incoming)
       setSavedTexts(Object.fromEntries(incoming.map((item: InsoCoverageItem) => [item.id, item.post_text ?? ''])))
-      setActiveDate(current => current || incoming[0]?.coverage_date || '')
+      const availableDays = new Set(incoming.map((item: InsoCoverageItem) => item.coverage_date))
+      const savedDay = window.localStorage.getItem(ACTIVE_DAY_STORAGE_KEY)
+      setActiveDate(current => {
+        if (current && availableDays.has(current)) return current
+        if (savedDay && availableDays.has(savedDay)) return savedDay
+        return incoming[0]?.coverage_date || ''
+      })
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'تعذّر تحميل الخطة', 'error')
     } finally {
@@ -74,6 +82,12 @@ export default function InsoCoveragePage() {
 
   const replace = (item: InsoCoverageItem) => {
     setItems(current => current.map(entry => entry.id === item.id ? item : entry))
+  }
+
+  const selectDay = (date: string) => {
+    setActiveDate(date)
+    window.localStorage.setItem(ACTIVE_DAY_STORAGE_KEY, date)
+    setDesignNote('')
   }
 
   const skipTextSaveForAction = (itemId: string) => {
@@ -105,7 +119,7 @@ export default function InsoCoveragePage() {
           setSavedTexts(current => ({ ...current, [data.item.id]: data.item.post_text ?? '' }))
         } else {
           replace(data.item)
-          if (action === 'save' || action === 'generate-copy') setSavedTexts(current => ({ ...current, [data.item.id]: data.item.post_text ?? '' }))
+          if (action === 'save' || action === 'generate-copy' || action === 'rewrite-saved') setSavedTexts(current => ({ ...current, [data.item.id]: data.item.post_text ?? '' }))
         }
       }
       showToast(label, 'success')
@@ -238,6 +252,10 @@ export default function InsoCoveragePage() {
     if (result?.postText) setSavedContent(result.postText)
   }
 
+  const rewriteSavedContent = async (item: InsoCoverageItem) => {
+    await callAction('rewrite-saved', { id: item.id, title: item.title, postText: item.post_text }, 'تمت إعادة صياغة المنشور وحفظه')
+  }
+
   const deleteSavedContent = async () => {
     if (!deleteItem) return
     const removed = await callAction('delete-saved', { id: deleteItem.id }, 'تم حذف المحتوى المحفوظ')
@@ -272,7 +290,7 @@ export default function InsoCoveragePage() {
             const dayItems = items.filter(item => item.coverage_date === date)
             const phase = PHASES.find(entry => entry.id === dayItems[0]?.phase)
             const active = date === activeDate
-            return <button key={date} id={`day-tab-${date}`} role="tab" aria-selected={active} aria-controls={`day-panel-${date}`} onClick={() => { setActiveDate(date); setDesignNote('') }} className={`min-w-36 rounded-lg border p-3 text-right transition ${active ? 'border-teal-600 bg-teal-700 text-white shadow-sm' : 'border-border bg-card text-dark hover:bg-cream'}`}>
+            return <button key={date} id={`day-tab-${date}`} role="tab" aria-selected={active} aria-controls={`day-panel-${date}`} onClick={() => selectDay(date)} className={`min-w-36 rounded-lg border p-3 text-right transition ${active ? 'border-teal-600 bg-teal-700 text-white shadow-sm' : 'border-border bg-card text-dark hover:bg-cream'}`}>
               <span className="block text-xs font-bold opacity-80">{phase?.label}</span>
               <span className="mt-1 block text-sm font-black">{formatInsoDate(date)}</span>
               <span className="mt-1 block text-xs opacity-80">{dayItems.length} محطات</span>
@@ -299,7 +317,7 @@ export default function InsoCoveragePage() {
               return <article key={item.id} className="rounded-lg border border-teal-200 bg-teal-50/30 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 className="font-black text-dark">{item.title}</h4><p className="mt-1 text-xs text-muted">محفوظ ضمن محتوى {activeDate ? formatInsoDate(activeDate) : 'اليوم'}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${status.className}`}>{status.label}</span></div>
                 <textarea value={item.post_text ?? ''} onChange={event => replace({ ...item, post_text: event.target.value })} onBlur={() => { if (skipNextTextSave.current === item.id) { skipNextTextSave.current = null; return }; if (item.post_text?.trim()) void callAction('save', { id: item.id, postText: item.post_text }, 'تم حفظ النص ضمن محتوى اليوم') }} className="mt-3 min-h-32 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm leading-6 text-dark" />
-                <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openDesigner(item)}>🎨 توليد 3 تصاميم</Button>{hasApprovedDesign && <Button size="sm" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openPublishDialog(item)} loading={busy === `publish:${item.id}`}>نشر الآن</Button>}{hasApprovedDesign && <Button size="sm" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => { setScheduleItem(item); setScheduleWhen('') }}>جدولة</Button>}<Button size="sm" variant="ghost" onClick={() => setDeleteItem(item)} className="text-red-600 hover:text-red-700">حذف المحتوى</Button></div>
+                <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openDesigner(item)}>🎨 توليد 3 تصاميم</Button><Button size="sm" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => rewriteSavedContent(item)} loading={busy === `rewrite-saved:${item.id}`}>إعادة الصياغة</Button>{hasApprovedDesign && <Button size="sm" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openPublishDialog(item)} loading={busy === `publish:${item.id}`}>نشر الآن</Button>}{hasApprovedDesign && <Button size="sm" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => { setScheduleItem(item); setScheduleWhen('') }}>جدولة</Button>}<Button size="sm" variant="ghost" onClick={() => setDeleteItem(item)} className="text-red-600 hover:text-red-700">حذف المحتوى</Button></div>
                 {item.design_options?.length ? <div className="mt-4 grid gap-3 sm:grid-cols-3">{item.design_options.map(option => <div key={option.id} className={`overflow-hidden rounded-lg border ${option.selected ? 'border-teal-500 bg-teal-50/40' : 'border-border bg-white'}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={option.imageUrl} alt={`${item.title} - ${option.title}`} className="aspect-[4/5] w-full object-cover" />
@@ -311,12 +329,14 @@ export default function InsoCoveragePage() {
         </section>
       </section>
 
-      {designItem && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="توليد خيارات التصميم">
-        <div className="w-full max-w-lg space-y-4 rounded-lg bg-white p-5 shadow-xl"><div><h3 className="font-black text-dark">3 خيارات تصميم: {designItem.title}</h3><p className="mt-1 text-xs text-muted">أرفق صورة مرجعية عند الحاجة أو اختر أن المنشور مقطع فيديو.</p></div>
-          <textarea value={designNote} onChange={e => setDesignNote(e.target.value)} placeholder="توجيه إضافي للتصميم (اختياري)" className="min-h-24 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm" />
-          <div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-bold text-dark">صورة مرجعية<input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadDesignSource} className="mt-2 block w-full text-xs text-muted" /></label><label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-bold text-dark"><input type="checkbox" checked={designHasVideo} onChange={e => setDesignHasVideo(e.target.checked)} /> المنشور مقطع فيديو</label></div>
-          {designSource && <p className="text-xs font-bold text-teal-700">تم إرفاق الصورة المرجعية.</p>}
-          <div className="flex gap-2"><Button className="flex-1" onClick={generateDesignOptions} loading={busy === `generate-design-options:${designItem.id}`} disabled={designUploading || !designItem.post_text}>توليد الخيارات الثلاثة</Button><Button variant="outline" onClick={() => setDesignItem(null)}>إلغاء</Button></div>
+      {designItem && <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 md:items-center md:p-4" role="dialog" aria-modal="true" aria-label="توليد خيارات التصميم">
+        <div className="max-h-[calc(100dvh-0.75rem)] w-full max-w-lg overflow-y-auto rounded-t-lg bg-white shadow-xl md:max-h-[calc(100dvh-2rem)] md:rounded-lg">
+          <div className="space-y-4 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-5"><div><h3 className="font-black text-dark">3 خيارات تصميم: {designItem.title}</h3><p className="mt-1 text-xs text-muted">أرفق صورة مرجعية عند الحاجة أو اختر أن المنشور مقطع فيديو.</p></div>
+            <textarea value={designNote} onChange={e => setDesignNote(e.target.value)} placeholder="توجيه إضافي للتصميم (اختياري)" className="min-h-28 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm" />
+            <div className="grid gap-3 sm:grid-cols-2"><div><p className="mb-2 text-sm font-bold text-dark">صورة مرجعية</p><label className="flex h-11 cursor-pointer items-center justify-center rounded-lg border border-border bg-white px-3 text-sm font-bold text-dark hover:bg-cream"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadDesignSource} className="sr-only" />{designUploading ? 'جارٍ رفع الصورة...' : 'اختيار صورة'}</label></div><label className="flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-bold text-dark"><input type="checkbox" checked={designHasVideo} onChange={e => setDesignHasVideo(e.target.checked)} /> المنشور مقطع فيديو</label></div>
+            {designSource && <p className="text-xs font-bold text-teal-700">تم إرفاق الصورة المرجعية.</p>}
+          </div>
+          <div className="sticky bottom-0 flex gap-2 border-t border-border bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-5"><Button className="flex-1" onClick={generateDesignOptions} loading={busy === `generate-design-options:${designItem.id}`} disabled={designUploading || !designItem.post_text}>توليد الخيارات الثلاثة</Button><Button variant="outline" onClick={() => setDesignItem(null)}>إلغاء</Button></div>
         </div>
       </div>}
 

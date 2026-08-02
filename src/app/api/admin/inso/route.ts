@@ -171,7 +171,13 @@ export async function POST(request: Request) {
           { role: 'user', content: `${INSO_CORE_CONTEXT}\nعنوان المنشور: ${body.title?.trim() || 'منشور INSO'}\nالنص المراد إعادة صياغته:\n${body.postText.trim()}` },
         ],
       })
-      return NextResponse.json({ postText: enforceInsoFooter(completion.choices[0]?.message?.content ?? body.postText) })
+      const postText = enforceInsoFooter(completion.choices[0]?.message?.content ?? body.postText)
+      if (!body.id) return NextResponse.json({ postText })
+      const { data, error } = await service.from('event_coverage_items').update({
+        post_text: postText, publication_status: 'ready', updated_at: new Date().toISOString(),
+      }).eq('id', body.id).eq('campaign_key', INSO_CAMPAIGN_KEY).select('*').single()
+      if (error) throw error
+      return NextResponse.json({ item: data, postText })
     }
 
     if (!body.id) return NextResponse.json({ error: 'معرّف المنشور مطلوب' }, { status: 400 })
