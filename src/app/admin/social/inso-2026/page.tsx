@@ -26,14 +26,10 @@ export default function InsoCoveragePage() {
   const [items, setItems] = useState<InsoCoverageItem[]>([])
   const [loading, setLoading] = useState(true)
   const [activeDate, setActiveDate] = useState('')
-  const [selectedId, setSelectedId] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [designNote, setDesignNote] = useState('')
   const [scheduleItem, setScheduleItem] = useState<InsoCoverageItem | null>(null)
   const [scheduleWhen, setScheduleWhen] = useState('')
-  const [adding, setAdding] = useState(false)
-  const [newTitle, setNewTitle] = useState('')
-  const [newBrief, setNewBrief] = useState('')
   const [savedTexts, setSavedTexts] = useState<Record<string, string>>({})
   const [designItem, setDesignItem] = useState<InsoCoverageItem | null>(null)
   const [designSource, setDesignSource] = useState('')
@@ -55,7 +51,6 @@ export default function InsoCoveragePage() {
       setItems(incoming)
       setSavedTexts(Object.fromEntries(incoming.map((item: InsoCoverageItem) => [item.id, item.post_text ?? ''])))
       setActiveDate(current => current || incoming[0]?.coverage_date || '')
-      setSelectedId(current => current || incoming[0]?.id || '')
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'تعذّر تحميل الخطة', 'error')
     } finally {
@@ -70,14 +65,11 @@ export default function InsoCoveragePage() {
 
   const days = useMemo(() => [...new Set(items.map(item => item.coverage_date))], [items])
   const activeItems = items.filter(item => item.coverage_date === activeDate)
-  const selected = items.find(item => item.id === selectedId) ?? activeItems[0] ?? null
   const phaseForDate = activeItems[0]?.phase ?? 'during'
   const savedDayItems = activeItems.filter(item => savedTexts[item.id]?.trim())
-  const savedDayText = savedDayItems.map((item, index) => `${index + 1}. ${item.title}\n${savedTexts[item.id]}`).join('\n\n---\n\n')
 
   const replace = (item: InsoCoverageItem) => {
     setItems(current => current.map(entry => entry.id === item.id ? item : entry))
-    setSelectedId(item.id)
   }
 
   const skipTextSaveForAction = (itemId: string) => {
@@ -98,7 +90,6 @@ export default function InsoCoveragePage() {
       if (data.item) {
         if (action === 'add-saved') {
           setItems(current => [...current, data.item])
-          setSelectedId(data.item.id)
           setSavedTexts(current => ({ ...current, [data.item.id]: data.item.post_text ?? '' }))
         } else {
           replace(data.item)
@@ -112,20 +103,6 @@ export default function InsoCoveragePage() {
       return null
     } finally {
       setBusy(null)
-    }
-  }
-
-  const addPost = async () => {
-    if (!newTitle.trim() || !newBrief.trim() || !activeDate) {
-      showToast('أكمل عنوان المنشور ووصفه', 'error')
-      return
-    }
-    const data = await callAction('add', {
-      coverageDate: activeDate, phase: phaseForDate, title: newTitle, brief: newBrief,
-    }, 'تمت إضافة محطة جديدة لليوم')
-    if (data?.item) {
-      setItems(current => [...current, data.item])
-      setNewTitle(''); setNewBrief(''); setAdding(false)
     }
   }
 
@@ -183,7 +160,6 @@ export default function InsoCoveragePage() {
   }
 
   const openDesigner = (item: InsoCoverageItem) => {
-    setSelectedId(item.id)
     setDesignItem(item)
     setDesignSource('')
     setDesignNote('')
@@ -237,7 +213,7 @@ export default function InsoCoveragePage() {
             const dayItems = items.filter(item => item.coverage_date === date)
             const phase = PHASES.find(entry => entry.id === dayItems[0]?.phase)
             const active = date === activeDate
-            return <button key={date} id={`day-tab-${date}`} role="tab" aria-selected={active} aria-controls={`day-panel-${date}`} onClick={() => { setActiveDate(date); setSelectedId(dayItems[0]?.id ?? ''); setAdding(false); setDesignNote('') }} className={`min-w-36 rounded-lg border p-3 text-right transition ${active ? 'border-teal-600 bg-teal-700 text-white shadow-sm' : 'border-border bg-card text-dark hover:bg-cream'}`}>
+            return <button key={date} id={`day-tab-${date}`} role="tab" aria-selected={active} aria-controls={`day-panel-${date}`} onClick={() => { setActiveDate(date); setDesignNote('') }} className={`min-w-36 rounded-lg border p-3 text-right transition ${active ? 'border-teal-600 bg-teal-700 text-white shadow-sm' : 'border-border bg-card text-dark hover:bg-cream'}`}>
               <span className="block text-xs font-bold opacity-80">{phase?.label}</span>
               <span className="mt-1 block text-sm font-black">{formatInsoDate(date)}</span>
               <span className="mt-1 block text-xs opacity-80">{dayItems.length} محطات</span>
@@ -247,46 +223,11 @@ export default function InsoCoveragePage() {
       </section>
 
       <section id={`day-panel-${activeDate}`} role="tabpanel" aria-labelledby={`day-tab-${activeDate}`} className="space-y-5">
-        <section id="posts" className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><h3 className="font-black text-dark">منشورات اليوم</h3><p className="text-xs text-muted">كل نص يتضمن تلقائياً موهبة ووزارة التعليم والمنشنات المطلوبة.</p></div>
-            <Button size="sm" variant="outline" onClick={() => setAdding(current => !current)}>＋ منشور إضافي</Button>
-          </div>
-
-          {adding && <div className="space-y-3 rounded-lg border border-teal-200 bg-teal-50 p-4">
-            <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="عنوان المحطة أو المنشور" className="w-full rounded-lg border border-teal-200 bg-white px-3 py-2 text-sm" />
-            <textarea value={newBrief} onChange={e => setNewBrief(e.target.value)} placeholder="ما الذي تريد تغطيته؟" className="min-h-20 w-full resize-y rounded-lg border border-teal-200 bg-white px-3 py-2 text-sm" />
-            <div className="flex gap-2"><Button size="sm" onClick={addPost} loading={busy?.startsWith('add:')}>إضافة</Button><Button size="sm" variant="ghost" onClick={() => setAdding(false)}>إلغاء</Button></div>
-          </div>}
-
-          <div className="space-y-3">
-            {activeItems.map(item => {
-              const status = STATUS[item.publication_status]
-              const isSelected = item.id === selected?.id
-              return <article key={item.id} className={`border p-4 transition ${isSelected ? 'border-teal-500 bg-teal-50/40' : 'border-border bg-card'} rounded-lg`}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <button onClick={() => setSelectedId(item.id)} className="min-w-0 text-right"><h3 className="font-black text-dark">{item.title}</h3><p className="mt-1 text-xs text-muted">{item.brief}</p></button>
-                  <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${status.className}`}>{status.label}</span>
-                </div>
-                <textarea value={item.post_text ?? ''} onChange={e => replace({ ...item, post_text: e.target.value })} onFocus={() => setSelectedId(item.id)} onBlur={() => { if (skipNextTextSave.current === item.id) { skipNextTextSave.current = null; return }; if (item.post_text?.trim()) void callAction('save', { id: item.id, postText: item.post_text }, 'تم حفظ النص ضمن محتوى اليوم') }} placeholder="اضغط توليد المنشور أو اكتب الصياغة هنا..." className="mt-3 min-h-28 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm leading-6 text-dark" />
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button size="sm" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => callAction('generate-copy', { id: item.id }, 'تم توليد المنشور وحفظه ضمن محتوى اليوم')} loading={busy === `generate-copy:${item.id}`}>✨ توليد / إعادة توليد</Button>
-                  <Button size="sm" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openDesigner(item)} disabled={!item.post_text}>🎨 توليد 3 تصاميم</Button>
-                  <Button size="sm" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => publishNow(item)} loading={busy === `publish:${item.id}`} disabled={!item.post_text}>نشر الآن</Button>
-                  <Button size="sm" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => { setScheduleItem(item); setScheduleWhen('') }} disabled={!item.post_text}>جدولة</Button>
-                </div>
-                {item.design_options?.length ? <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  {item.design_options.map(option => <div key={option.id} className={`overflow-hidden rounded-lg border ${item.design_url === option.imageUrl ? 'border-teal-500 bg-teal-50/40' : 'border-border bg-white'}`}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={option.imageUrl} alt={`${item.title} - ${option.title}`} className="aspect-[4/5] w-full object-cover" />
-                    <div className="space-y-2 p-2"><p className="text-xs font-bold text-dark">{option.title}</p><p className="text-[11px] text-muted">{option.direction}</p>
-                      <div className="flex gap-2"><Button size="sm" className="flex-1" onClick={() => callAction('select-design-option', { id: item.id, optionId: option.id }, 'تم اختيار التصميم')} variant={item.design_url === option.imageUrl ? 'secondary' : 'outline'}>اختيار</Button><Button size="sm" variant="ghost" onClick={() => { setEditOption({ item, optionId: option.id }); setEditNote('') }}>تعديل</Button></div>
-                    </div>
-                  </div>)}
-                </div> : null}
-              </article>
-            })}
-          </div>
+        <section id="posts" className="space-y-2" aria-label="محطات توليد منشورات اليوم">
+          {activeItems.map(item => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-border py-3 last:border-b-0">
+            <div className="min-w-0"><h3 className="font-black text-dark">{item.title}</h3><p className="mt-1 text-xs text-muted">{item.brief}</p></div>
+            <Button size="sm" onClick={() => callAction('generate-copy', { id: item.id }, 'تم توليد المنشور وحفظه ضمن محتوى اليوم')} loading={busy === `generate-copy:${item.id}`}>✨ توليد / إعادة توليد</Button>
+          </div>)}
         </section>
 
         <section className="space-y-3 border-t border-border pt-5" aria-label="المحتوى المحفوظ لليوم">
@@ -299,7 +240,21 @@ export default function InsoCoveragePage() {
             <textarea value={savedContent} onChange={event => setSavedContent(event.target.value)} placeholder="اكتب النص الجاهز للنشر..." className="min-h-32 w-full resize-y rounded-lg border border-teal-200 bg-white p-3 text-sm leading-6" />
             <div className="flex flex-wrap gap-2"><Button size="sm" onClick={addSavedPost} loading={busy?.startsWith('add-saved:')}>حفظ وبدء التصميم</Button><Button size="sm" variant="ghost" onClick={() => setAddingSaved(false)}>إلغاء</Button></div>
           </div>}
-          {savedDayItems.length ? <textarea readOnly value={savedDayText} className="min-h-56 w-full resize-y rounded-lg border border-teal-200 bg-teal-50/40 p-4 text-sm leading-7 text-dark" /> : <div className="rounded-lg border border-dashed border-border bg-cream p-4 text-sm text-muted">تظهر هنا المنشورات فور توليدها أو عند حفظ تعديل يدوي على النص.</div>}
+          {savedDayItems.length ? <div className="space-y-3">
+            {savedDayItems.map(item => {
+              const status = STATUS[item.publication_status]
+              return <article key={item.id} className="rounded-lg border border-teal-200 bg-teal-50/30 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 className="font-black text-dark">{item.title}</h4><p className="mt-1 text-xs text-muted">محفوظ ضمن محتوى {activeDate ? formatInsoDate(activeDate) : 'اليوم'}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${status.className}`}>{status.label}</span></div>
+                <textarea value={item.post_text ?? ''} onChange={event => replace({ ...item, post_text: event.target.value })} onBlur={() => { if (skipNextTextSave.current === item.id) { skipNextTextSave.current = null; return }; if (item.post_text?.trim()) void callAction('save', { id: item.id, postText: item.post_text }, 'تم حفظ النص ضمن محتوى اليوم') }} className="mt-3 min-h-32 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm leading-6 text-dark" />
+                <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openDesigner(item)}>🎨 توليد 3 تصاميم</Button><Button size="sm" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => publishNow(item)} loading={busy === `publish:${item.id}`}>نشر الآن</Button><Button size="sm" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => { setScheduleItem(item); setScheduleWhen('') }}>جدولة</Button></div>
+                {item.design_options?.length ? <div className="mt-4 grid gap-3 sm:grid-cols-3">{item.design_options.map(option => <div key={option.id} className={`overflow-hidden rounded-lg border ${item.design_url === option.imageUrl ? 'border-teal-500 bg-teal-50/40' : 'border-border bg-white'}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={option.imageUrl} alt={`${item.title} - ${option.title}`} className="aspect-[4/5] w-full object-cover" />
+                  <div className="space-y-2 p-2"><p className="text-xs font-bold text-dark">{option.title}</p><p className="text-[11px] text-muted">{option.direction}</p><div className="flex gap-2"><Button size="sm" className="flex-1" onClick={() => callAction('select-design-option', { id: item.id, optionId: option.id }, 'تم اختيار التصميم')} variant={item.design_url === option.imageUrl ? 'secondary' : 'outline'}>اختيار</Button><Button size="sm" variant="ghost" onClick={() => { setEditOption({ item, optionId: option.id }); setEditNote('') }}>تعديل</Button></div></div>
+                </div>)}</div> : null}
+              </article>
+            })}
+          </div> : <div className="rounded-lg border border-dashed border-border bg-cream p-4 text-sm text-muted">تظهر هنا المنشورات فور توليدها أو عند حفظ تعديل يدوي على النص.</div>}
         </section>
       </section>
 
