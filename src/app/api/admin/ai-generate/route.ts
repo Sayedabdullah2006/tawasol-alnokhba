@@ -3,7 +3,7 @@ import OpenAI from 'openai'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives, buildTweetDirectives } from '@/lib/openai'
 import { logGeneratedDesign } from '@/lib/newsletter'
-import { generateImageWithOpenAI } from '@/lib/image-generation'
+import { generateImageWithOpenAI, imageGenerationErrorMessage } from '@/lib/image-generation'
 import { compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
 import { completeGenerationJob, failGenerationJob, startGenerationJob, throwIfGenerationCancelled } from '@/lib/generation-jobs'
 
@@ -408,8 +408,8 @@ export async function POST(req: Request) {
 
     return failure('خطوة غير معروفة')
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'خطأ غير معروف'
-    await failGenerationJob(jobId, err)
+    const message = imageGenerationErrorMessage(err)
+    await failGenerationJob(jobId, new Error(message))
     return NextResponse.json(
       { error: `فشل توليد الذكاء الاصطناعي: ${message}` },
       { status: 500 }

@@ -4,7 +4,7 @@ import path from 'path'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { getOpenAI, chatComplete, STUDIO_EDITORIAL_DESIGN_RULES } from '@/lib/openai'
 import { OPENAI_MODEL } from '@/lib/ai-studio'
-import { generateImageWithOpenAI } from '@/lib/image-generation'
+import { generateImageWithOpenAI, imageGenerationErrorMessage } from '@/lib/image-generation'
 import { compositeCampaignLogos, resizeToPoster } from '@/lib/logo-overlay'
 import { completeGenerationJob, failGenerationJob, startGenerationJob, throwIfGenerationCancelled } from '@/lib/generation-jobs'
 import { editDesign } from '@/lib/ai-studio'
@@ -355,7 +355,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ error: 'إجراء غير معروف' }, { status: 400 })
   } catch (error) {
-    await failGenerationJob(generationJobId, error)
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'تعذّر تنفيذ الإجراء' }, { status: 500 })
+    const message = imageGenerationErrorMessage(error)
+    await failGenerationJob(generationJobId, new Error(message))
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

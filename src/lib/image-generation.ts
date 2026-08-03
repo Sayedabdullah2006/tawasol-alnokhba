@@ -11,6 +11,7 @@ interface OpenAIImageOptions {
   quality?: 'low' | 'medium' | 'high' | 'auto'
   timeoutMs?: number
   retries?: number
+  allowSafetyFallback?: boolean
 }
 
 interface OpenAIImageResponse {
@@ -110,6 +111,30 @@ function postJsonOnce(
     req.write(body)
     req.end()
   })
+}
+
+function isModerationBlocked(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err)
+  return /moderation_blocked|rejected by the safety system|image_generation_user_error/i.test(message)
+}
+
+const SAFE_EDITORIAL_FALLBACK_PROMPT = [
+  'Create a polished vertical 4:5 editorial social-media graphic about learning, scientific curiosity, global collaboration, and achievement.',
+  'Use only abstract geometric science motifs, elegant light trails, a deep teal and turquoise palette with restrained gold accents, and a rich full-bleed composition.',
+  'Do not include people, faces, photographs, logos, brand names, flags, text, numbers, weapons, dangerous materials, medical imagery, politics, military content, or violence.',
+].join(' ')
+
+const SAFE_EDITORIAL_REFERENCE_FALLBACK_PROMPT = [
+  'Create a polished vertical 4:5 editorial social-media graphic about learning, scientific curiosity, global collaboration, and achievement.',
+  'Use the supplied reference image as an authentic editorial photo integrated naturally into the composition. Preserve every depicted person faithfully: do not alter their face, identity, body, clothing, or apparent age.',
+  'Use an abstract deep teal and turquoise scientific setting with restrained gold accents. Do not add logos, brand names, flags, text, numbers, weapons, dangerous materials, medical imagery, politics, military content, or violence.',
+].join(' ')
+
+export function imageGenerationErrorMessage(error: unknown): string {
+  if (isModerationBlocked(error)) {
+    return 'تعذّر توليد التصميم بعد محاولة آمنة تحفظ الصور المرجعية. أعد المحاولة بتوجيه بصري أبسط أو بصورة مرجعية مختلفة.'
+  }
+  return error instanceof Error ? error.message : 'تعذّر إكمال توليد التصميم'
 }
 
 function buildMultipartBody(fields: Record<string, string>, files: RefImage[]): { body: Buffer; contentType: string } {
@@ -230,6 +255,22 @@ async function createImageViaImageApi(
       await new Promise(r => setTimeout(r, waitMs))
     }
   }
+  // A safety rejection can be triggered by a complex prompt or a reference image.
+  // Retry once with a benign, text-free editorial composition instead of leaving the user with a raw provider error.
+  if (isModerationBlocked(lastErr) && opts.allowSafetyFallback !== false) {
+    console.warn('[OpenAI Images] moderation blocked the requested output; using a safe editorial fallback.')
+    try {
+      return await createImageViaImageApi(
+        refs.length ? SAFE_EDITORIAL_REFERENCE_FALLBACK_PROMPT : SAFE_EDITORIAL_FALLBACK_PROMPT,
+        refs,
+        { ...opts, retries: 0, allowSafetyFallback: false },
+      )
+    } catch (fallbackError) {
+      if (isModerationBlocked(fallbackError)) throw new Error(imageGenerationErrorMessage(fallbackError))
+      throw fallbackError
+    }
+  }
+  if (isModerationBlocked(lastErr)) throw new Error(imageGenerationErrorMessage(lastErr))
   throw lastErr
 }
 
