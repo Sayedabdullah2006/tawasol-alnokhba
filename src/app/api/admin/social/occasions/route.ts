@@ -15,6 +15,12 @@ async function requireAdmin() {
   return { user }
 }
 
+function currentRiyadhYear() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Riyadh', year: 'numeric' })
+    .formatToParts(new Date())
+    .find(part => part.type === 'year')?.value ?? String(new Date().getFullYear())
+}
+
 export async function GET() {
   const auth = await requireAdmin()
   if ('error' in auth) return auth.error
@@ -73,7 +79,11 @@ export async function POST(request: Request) {
   let body: { action?: 'generate-all' | 'regenerate'; occasionId?: string }
   try { body = await request.json() } catch { return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 }) }
   if (body.action !== 'generate-all' && body.action !== 'regenerate') return NextResponse.json({ error: 'إجراء غير صالح' }, { status: 400 })
-  const requested = body.action === 'regenerate' ? [String(body.occasionId ?? '')] : getFirst1Occasions().map(occasionKey)
+  const requested = body.action === 'regenerate'
+    ? [String(body.occasionId ?? '')]
+    : getFirst1Occasions()
+      .filter(occasion => occasion.date?.startsWith(`${currentRiyadhYear()}-`))
+      .map(occasionKey)
   if (!requested.every(Boolean)) return NextResponse.json({ error: 'حدد المناسبة المطلوبة' }, { status: 400 })
   const jobId = await startGenerationJob({ ownerId: auth.user.id, scope: 'social', operation: 'occasion-design' })
   try {

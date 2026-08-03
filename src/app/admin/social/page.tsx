@@ -762,6 +762,23 @@ function OccasionsTab({
   const kindLabel = (kind: OccasionMeta['kind']) => kind === 'official' ? 'مناسبة سعودية' : kind === 'religious' ? 'عيد رسمي' : 'يوم عالمي'
   const kindClass = (kind: OccasionMeta['kind']) => kind === 'official' ? 'bg-green/10 text-green' : kind === 'religious' ? 'bg-gold/15 text-dark' : 'bg-teal-100 text-teal-700'
   const hasGeneratedDesigns = items.some(item => !!item.design_image_url)
+  const currentYear = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Riyadh', year: 'numeric' }).format(new Date())
+  const [selectedYear, setSelectedYear] = useState(currentYear)
+  const [selectedMonth, setSelectedMonth] = useState('all')
+  const years = Array.from(new Set([
+    currentYear,
+    ...occasions.flatMap(occasion => occasion.date ? [occasion.date.slice(0, 4)] : []),
+    ...items.flatMap(item => item.batch_date && item.batch_date !== '2099-12-31' ? [item.batch_date.slice(0, 4)] : []),
+  ])).sort()
+  const months = [
+    ['01', 'يناير'], ['02', 'فبراير'], ['03', 'مارس'], ['04', 'أبريل'], ['05', 'مايو'], ['06', 'يونيو'],
+    ['07', 'يوليو'], ['08', 'أغسطس'], ['09', 'سبتمبر'], ['10', 'أكتوبر'], ['11', 'نوفمبر'], ['12', 'ديسمبر'],
+  ] as const
+  const visibleOccasions = occasions.filter(occasion => {
+    if (!occasion.date) return selectedMonth === 'all' && selectedYear === currentYear
+    const [year, month] = occasion.date.split('-')
+    return year === selectedYear && (selectedMonth === 'all' || month === selectedMonth)
+  })
 
   return (
     <section className="space-y-4" role="tabpanel">
@@ -772,11 +789,27 @@ function OccasionsTab({
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={onReload} disabled={loading || busy !== null || generatingAll} className="rounded-lg border border-border px-4 py-2 text-sm font-bold text-dark disabled:opacity-60">{loading ? 'جارٍ التحديث...' : 'تحديث'}</button>
-          <button type="button" onClick={onGenerateAll} disabled={busy !== null || generatingAll} className="rounded-lg bg-green px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60">{generatingAll ? 'جارٍ إعادة التوليد تباعاً...' : hasGeneratedDesigns ? 'إعادة توليد كل التصاميم' : 'توليد تصاميم كل المناسبات'}</button>
+          <button type="button" onClick={onGenerateAll} disabled={busy !== null || generatingAll || selectedYear !== currentYear} className="rounded-lg bg-green px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60">{generatingAll ? 'جارٍ إعادة التوليد تباعاً...' : selectedYear !== currentYear ? 'التوليد للسنة الحالية فقط' : hasGeneratedDesigns ? 'إعادة توليد كل التصاميم' : 'توليد تصاميم كل المناسبات'}</button>
         </div>
       </div>
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-cream p-3">
+        <label className="grid gap-1 text-sm font-bold text-dark">
+          السنة
+          <select value={selectedYear} onChange={event => setSelectedYear(event.target.value)} className="min-w-32 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-dark">
+            {years.map(year => <option key={year} value={year}>{year}</option>)}
+          </select>
+        </label>
+        <label className="grid gap-1 text-sm font-bold text-dark">
+          الشهر
+          <select value={selectedMonth} onChange={event => setSelectedMonth(event.target.value)} className="min-w-40 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-dark">
+            <option value="all">كل الشهور</option>
+            {months.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
+        <p className="pb-2 text-sm text-muted">{visibleOccasions.length} مناسبة</p>
+      </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {occasions.map(occasion => {
+        {visibleOccasions.map(occasion => {
           const item = itemFor(occasion)
           const itemBusy = busy === occasion.id
           const scheduleBusy = item ? busy === `schedule:${item.id}` : false
@@ -813,6 +846,7 @@ function OccasionsTab({
             </article>
           )
         })}
+        {!visibleOccasions.length && <div className="rounded-lg border border-dashed border-border bg-cream p-6 text-center text-sm text-muted">لا توجد مناسبات مطابقة للفلاتر المختارة.</div>}
       </div>
     </section>
   )

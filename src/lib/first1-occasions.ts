@@ -32,11 +32,11 @@ type SaudiAchievement = {
 const SAUDI_ACHIEVEMENTS: Record<string, SaudiAchievement> = {
   'women-science': {
     context: 'في 2023 أصبحت ريانة برناوي أول رائدة فضاء سعودية، ووصلت ضمن مهمة SSA-HSF1 إلى محطة الفضاء الدولية. كانت أخصائية أبحاث في المختبرات قبل رحلتها، ولذلك ترتبط قصتها مباشرة بالمرأة في العلوم.',
-    visualInstruction: 'Include a subtle, respectful Saudi women-in-science and space-research visual cue inspired by a laboratory-to-space journey. Do not portray a real person or claim a likeness.',
+    visualInstruction: 'Include a respectful, diverse group of Saudi women in science and space research, inspired by a laboratory-to-space journey. Do not portray a real person or claim a likeness.',
   },
   'space-flight': {
     context: 'انطلقت مهمة SSA-HSF1 في 21 مايو 2023 حاملة ريانة برناوي وعلي القرني إلى محطة الفضاء الدولية، مع 14 تجربة بحثية سعودية في بيئة الجاذبية الصغرى.',
-    visualInstruction: 'Show a credible Saudi human-spaceflight research journey: orbit, scientific experiment modules, and a small Saudi science cue. No fictional spacecraft, cities, or buildings.',
+    visualInstruction: 'Show a credible group of Saudi human-spaceflight researchers: orbit, scientific experiment modules, and a small Saudi science cue. No fictional spacecraft, cities, or buildings.',
   },
   'space-week': {
     context: 'انطلقت مهمة SSA-HSF1 في 2023 حاملة أول طاقم رائدة ورائد فضاء سعوديين إلى محطة الفضاء الدولية، مع تجارب بحثية في بيئة الجاذبية الصغرى.',
