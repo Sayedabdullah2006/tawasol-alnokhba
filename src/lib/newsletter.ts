@@ -365,7 +365,7 @@ export async function generateNewsletterPoster(opts?: {
   const prompt = buildNewsletterPrompt(window, items, direction)
   const refs = items.map(i => i.sourceImage || i.image).filter((u): u is string => !!u).slice(0, 8)
 
-  const { b64 } = await generateImageWithOpenAI(prompt, refs, { aspectRatio: '9:16' })
+  const { b64 } = await generateImageWithOpenAI(prompt, refs, { aspectRatio: '9:16', allowSafetyFallback: false })
   const raw = Buffer.from(b64, 'base64')
   const poster = await sharp(raw).resize(NL_WIDTH, NL_HEIGHT, { fit: 'cover', position: 'top' }).png().toBuffer()
   const withLogo = await compositeBrandLogo(poster)

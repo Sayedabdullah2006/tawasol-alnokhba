@@ -4,6 +4,7 @@ import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supab
 import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives, buildTweetDirectives } from '@/lib/openai'
 import { logGeneratedDesign } from '@/lib/newsletter'
 import { generateImageWithOpenAI, imageGenerationErrorMessage } from '@/lib/image-generation'
+import { buildStudioSafetyFallbackPrompt } from '@/lib/ai-studio'
 import { compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
 import { completeGenerationJob, failGenerationJob, startGenerationJob, throwIfGenerationCancelled } from '@/lib/generation-jobs'
 
@@ -355,7 +356,9 @@ export async function POST(req: Request) {
       const referenceImages = sourceImages
       // لا نفرض نسبة 4:5 على النموذج — فرضها يجعله يُعيد تكوين المشهد ويتجاهل الصورة الحقيقية.
       // المقاس النهائي يُضبط بـ sharp إلى 1080×1350 لاحقاً.
-      const { b64 } = await generateImageWithOpenAI(designPrompt, referenceImages)
+      const { b64 } = await generateImageWithOpenAI(designPrompt, referenceImages, {
+        safetyFallbackPrompt: buildStudioSafetyFallbackPrompt({ analysis: priorAnalysis, chosenConcept: String(chosenConcept ?? '') }),
+      })
 
       // 3) ضبط المقاس إلى 1080×1350 بالضبط، ثم تركيب لوقو أول سعودي أسفل اليمين (إن وُجد).
       const rawImage = Buffer.from(b64, 'base64')

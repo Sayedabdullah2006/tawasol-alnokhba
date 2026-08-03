@@ -163,6 +163,23 @@ export function conceptToString(c: Concept | undefined): string {
   return [c.title, c.mood].filter(Boolean).join(' — ') + (c.brief ? `\n${c.brief}` : '')
 }
 
+/** Keeps a moderation retry faithful to the selected studio direction instead of using a generic poster. */
+export function buildStudioSafetyFallbackPrompt(args: { analysis: unknown; chosenConcept: string; hasVideo?: boolean }): string {
+  const facts = JSON.stringify(args.analysis).slice(0, 5000)
+  return [
+    'Create a premium 4:5 Arabic editorial social-media poster for First1Saudi.',
+    `Use only these verified news facts: ${facts}`,
+    `The selected creative direction is mandatory: ${args.chosenConcept.slice(0, 2600)}`,
+    'Make that direction clearly visible through the composition, visual metaphor, palette, and hierarchy. Do not reduce the result to a portrait with a logo.',
+    'If reference photos are supplied, integrate them naturally and preserve every depicted person exactly: face, identity, apparent age, body, clothing, hairstyle, and accessories. Do not turn people into illustrations or lookalikes.',
+    'Turn the facts into a clear Arabic infographic: one concise Arabic headline and up to three short factual callouts. Do not copy the caption or use paragraphs.',
+    'Use a strict right-to-left Arabic hierarchy with accurate connected Arabic. Add a compact social footer with the recognizable icons for X, Instagram, LinkedIn, Facebook, and TikTok, followed by @First1Saudi.',
+    'Do not draw a First1Saudi logo; it is overlaid after generation. Keep the artwork full-bleed with no white panel, frame, or empty logo box.',
+    args.hasVideo ? 'Reserve a clean but visually integrated 16:9 opening-frame area for video near the upper portion.' : '',
+    'Avoid flags, politics, weapons, danger symbols, violence, unsafe material details, and invented factual claims.',
+  ].filter(Boolean).join('\n\n')
+}
+
 /** الخطوة 4 — توليد التصميم عبر OpenAI Images + تركيب اللوقو + الرفع إلى التخزين. */
 export async function generateDesign(
   openai: OpenAI,
@@ -205,7 +222,9 @@ export async function generateDesign(
   const imagePrompt = hasVideo
     ? `${FACE_LOCK}\n\n${designPrompt}\n\n${VIDEO_LAYOUT}\n\n${FACE_LOCK}`
     : `${FACE_LOCK}\n\n${designPrompt}\n\n${FACE_LOCK}`
-  const { b64 } = await generateImageWithOpenAI(imagePrompt, sourceImages)
+  const { b64 } = await generateImageWithOpenAI(imagePrompt, sourceImages, {
+    safetyFallbackPrompt: buildStudioSafetyFallbackPrompt({ analysis, chosenConcept, hasVideo }),
+  })
   const rawImage = Buffer.from(b64, 'base64')
   const posterBase = await resizeToPoster(rawImage)
   const { buffer: finalImage, mimeType } = logoUrl
@@ -249,7 +268,7 @@ export async function editDesign(args: { designImageUrl: string; note: string; e
     'Only modify what the requested change requires — but DO make that change; do not return the image unchanged.\n' +
     'Render Arabic text crisp and correctly shaped (RTL). Output the edited design as a portrait 1080×1350 (4:5) ultra-HD image.'
 
-  const { b64 } = await generateImageWithOpenAI(prompt, [designImageUrl, ...referenceImageUrls])
+  const { b64 } = await generateImageWithOpenAI(prompt, [designImageUrl, ...referenceImageUrls], { allowSafetyFallback: false })
   const posterBase = await resizeToPoster(Buffer.from(b64, 'base64'))
   const path = `studio-edit-${Date.now()}-${Math.random().toString(36).slice(2)}.png`
   const { error } = await service.storage.from('content-images').upload(path, posterBase, { contentType: 'image/png' })
@@ -323,7 +342,16 @@ export async function generateInfographic(
   ].filter(Boolean).join('\n')
 
   const imagePrompt = `${FACE_LOCK}\n\n${prompt}\n\n${FACE_LOCK}`
-  const { b64 } = await generateImageFromPartsWithOpenAI(imagePrompt, refs)
+  const safetyFallbackPrompt = [
+    'Create a premium 4:5 Arabic editorial infographic for First1Saudi about an accomplished Saudi figure or group.',
+    `Headline: ${title.slice(0, 220)}.`,
+    `Use these verified concise facts as callouts: ${people.slice(0, 4).map(person => `${person.name}: ${person.blurb}`).join(' | ')}`,
+    `Creative direction: ${direction.slice(0, 1800)}.`,
+    'Preserve every supplied reference person exactly in face, identity, body, clothing, apparent age, and hairstyle. Integrate them into the composition rather than producing a plain portrait.',
+    'Use strict RTL Arabic hierarchy. Add a compact footer with X, Instagram, LinkedIn, Facebook, and TikTok icons followed by @First1Saudi. Do not draw a logo; it is overlaid after generation.',
+    'Full-bleed artwork only, no white panel, no frame, no invented claims, flags, weapons, political or military imagery.',
+  ].join('\n\n')
+  const { b64 } = await generateImageFromPartsWithOpenAI(imagePrompt, refs, { safetyFallbackPrompt })
   const rawImage = Buffer.from(b64, 'base64')
   const posterBase = await resizeToPoster(rawImage)
   const { buffer: finalImage, mimeType } = logoUrl

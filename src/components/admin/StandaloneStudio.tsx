@@ -13,6 +13,15 @@ import { SECTION_NAMES } from '@/lib/showcase-sections'
 
 type StepKey = 'analyze' | 'tweets' | 'concepts' | 'image'
 interface ConceptItem { title?: string; mood?: string; brief?: string }
+interface StudioHistoryItem {
+  id: string
+  title: string | null
+  content: string | null
+  category: string | null
+  image_url: string
+  source_image_url: string | null
+  created_at: string
+}
 
 /**
  * استوديو الذكاء الاصطناعي المستقل (بلا طلب) — عديم الحالة.
@@ -39,7 +48,7 @@ export default function StandaloneStudio() {
   const [publishingCover, setPublishingCover] = useState<string | null>(null)
   const [publishedCover, setPublishedCover] = useState<string | null>(null)
   // تبويب الإنفوجرافيك (عدة أشخاص)
-  const [mode, setMode] = useState<'news' | 'info' | 'upload'>('news')
+  const [mode, setMode] = useState<'news' | 'info' | 'upload' | 'history'>('news')
   const [infoTitle, setInfoTitle] = useState('')
   const [infoExtra, setInfoExtra] = useState('')
   const [people, setPeople] = useState<{ imageUrl: string; name: string; blurb: string }[]>([{ imageUrl: '', name: '', blurb: '' }])
@@ -47,6 +56,27 @@ export default function StandaloneStudio() {
   const [infoBusy, setInfoBusy] = useState(false)
   const [infoResults, setInfoResults] = useState<{ imageUrl: string; direction: string }[]>([])
   const [infoTweets, setInfoTweets] = useState('')
+  const [history, setHistory] = useState<StudioHistoryItem[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+
+  const loadHistory = async () => {
+    setHistoryLoading(true)
+    try {
+      const response = await fetch('/api/admin/ai-studio/history', { cache: 'no-store' })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || 'تعذّر تحميل سجل الاستديو')
+      setHistory(Array.isArray(data.items) ? data.items : [])
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'تعذّر تحميل سجل الاستديو', 'error')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  const selectMode = (nextMode: 'news' | 'info' | 'upload' | 'history') => {
+    setMode(nextMode)
+    if (nextMode === 'history') void loadHistory()
+  }
 
   const updatePerson = (i: number, patch: Partial<{ imageUrl: string; name: string; blurb: string }>) =>
     setPeople(prev => prev.map((p, idx) => (idx === i ? { ...p, ...patch } : p)))
@@ -368,13 +398,33 @@ export default function StandaloneStudio() {
   return (
     <div className="space-y-4" dir="rtl">
       {/* تبويبات الاستوديو المستقل */}
-      <div className="flex rounded-xl border border-border overflow-hidden w-fit">
-        <button onClick={() => setMode('news')} className={`px-4 py-2 text-sm font-bold ${mode === 'news' ? 'bg-green text-white' : 'bg-card text-dark'}`}>📰 تصميم خبر</button>
-        <button onClick={() => setMode('info')} className={`px-4 py-2 text-sm font-bold ${mode === 'info' ? 'bg-green text-white' : 'bg-card text-dark'}`}>📊 إنفوجرافيك</button>
-        <button onClick={() => setMode('upload')} className={`px-4 py-2 text-sm font-bold ${mode === 'upload' ? 'bg-green text-white' : 'bg-card text-dark'}`}>✂️ رفع وتعديل صورة</button>
+      <div className="flex max-w-full overflow-x-auto rounded-xl border border-border overscroll-x-contain">
+        <button onClick={() => selectMode('news')} className={`shrink-0 px-4 py-2 text-sm font-bold ${mode === 'news' ? 'bg-green text-white' : 'bg-card text-dark'}`}>📰 تصميم خبر</button>
+        <button onClick={() => selectMode('info')} className={`shrink-0 px-4 py-2 text-sm font-bold ${mode === 'info' ? 'bg-green text-white' : 'bg-card text-dark'}`}>📊 إنفوجرافيك</button>
+        <button onClick={() => selectMode('upload')} className={`shrink-0 px-4 py-2 text-sm font-bold ${mode === 'upload' ? 'bg-green text-white' : 'bg-card text-dark'}`}>✂️ رفع وتعديل صورة</button>
+        <button onClick={() => selectMode('history')} className={`shrink-0 px-4 py-2 text-sm font-bold ${mode === 'history' ? 'bg-green text-white' : 'bg-card text-dark'}`}>سجل المنشورات</button>
       </div>
 
       {mode === 'upload' && <ImageEditSchedule />}
+
+      {mode === 'history' && <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h3 className="font-black text-dark">سجل الاستديو المستقل</h3><p className="mt-1 text-xs text-muted">كل التصاميم والنصوص التي تم توليدها سابقًا من هذا الاستديو.</p></div>
+          <Button size="sm" variant="outline" onClick={() => void loadHistory()} loading={historyLoading}>تحديث</Button>
+        </div>
+        {historyLoading ? <div className="py-10"><LoadingSpinner /></div> : history.length ? <div className="grid gap-4 sm:grid-cols-2">
+          {history.map(item => <article key={item.id} className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
+            <button type="button" onClick={() => setLightbox(item.image_url)} className="block w-full bg-cream" aria-label={`تكبير تصميم ${item.title || 'الاستديو'}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={item.image_url} alt={item.title || 'تصميم مولد من الاستديو'} className="aspect-[4/5] w-full object-cover" />
+            </button>
+            <div className="space-y-2 p-3"><div className="flex items-start justify-between gap-2"><h4 className="min-w-0 font-bold text-dark">{item.title || 'تصميم من الاستديو'}</h4>{item.category && <span className="shrink-0 rounded-full bg-teal-50 px-2 py-1 text-[11px] font-bold text-teal-800">{item.category}</span>}</div>
+              {item.content && <p className="line-clamp-4 whitespace-pre-wrap text-xs leading-5 text-muted">{item.content}</p>}
+              <div className="flex items-center justify-between gap-2 text-[11px] text-muted"><span>{new Intl.DateTimeFormat('ar-SA', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Riyadh' }).format(new Date(item.created_at))}</span>{item.content && <button type="button" onClick={() => void navigator.clipboard?.writeText(item.content ?? '').then(() => showToast('تم نسخ النص', 'success')).catch(() => showToast('تعذّر نسخ النص', 'error'))} className="font-bold text-green hover:underline">نسخ النص</button>}</div>
+            </div>
+          </article>)}
+        </div> : <div className="rounded-xl border border-dashed border-border bg-cream p-8 text-center text-sm text-muted">لا توجد منشورات مولدة في سجل الاستديو حتى الآن.</div>}
+      </div>}
 
       {mode === 'info' && (
         <div className="space-y-4">

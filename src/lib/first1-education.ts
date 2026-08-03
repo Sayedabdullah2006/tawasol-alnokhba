@@ -239,7 +239,16 @@ export async function generateEducationInfographic(content: GeneratedEducation, 
     'Add a compact, elegant social footer with the recognizable icons for X, Instagram, LinkedIn, Facebook, and TikTok followed by the exact handle @First1Saudi. Keep the footer small and readable.',
     'Do not draw any brand logo. The original First1Saudi logo will be overlaid directly within the artwork at the extreme lower-right. Keep only a compact text-free pocket there, about 150 by 100 pixels, while the same artwork, texture, and colour continue behind it. Never create a frame, box, panel, banner, border, blank area, or separate footer for the logo.',
   ].join('\n\n')
-  const { b64 } = await generateImageWithOpenAI(prompt, options.referenceImageUrls ?? [], { aspectRatio: '4:5' })
+  const safetyFallbackPrompt = [
+    'Create one premium 4:5 Arabic social infographic for First1Saudi.',
+    `Headline: ${content.infographicTitle}.`,
+    `Use exactly these three compact Arabic callouts: ${content.infographicPoints.map((point, index) => `${index + 1}. ${point}`).join(' | ')}`,
+    'Strict RTL: callout 1 on the far right, 2 in the centre, and 3 on the left. Use clearly connected Arabic letterforms.',
+    `Visual direction: ${content.visualDirection}.`,
+    options.referenceImageUrls?.length ? 'Preserve every supplied reference person faithfully and integrate them into the infographic, rather than making a plain portrait.' : '',
+    'Use a compact footer with X, Instagram, LinkedIn, Facebook, and TikTok icons followed by @First1Saudi. Do not draw the First1Saudi logo; it is overlaid after generation. Full-bleed artwork, no white panel, no logo frame, no unsupported claims, flags, weapons, political or military imagery.',
+  ].filter(Boolean).join('\n\n')
+  const { b64 } = await generateImageWithOpenAI(prompt, options.referenceImageUrls ?? [], { aspectRatio: '4:5', safetyFallbackPrompt })
   const poster = await resizeToPoster(Buffer.from(b64, 'base64'))
   const { buffer } = await compositeLogoBottomRight(poster, brand.first1saudi_logo_url, { widthRatio: 0.1 })
   const path = `${filePrefix}-${Date.now()}-${Math.random().toString(36).slice(2)}.png`

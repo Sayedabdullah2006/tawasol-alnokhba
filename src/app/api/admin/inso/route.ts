@@ -85,7 +85,23 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
     'Do not render event logos, brand logos, or hashtags. Add a compact social footer for First1Saudi with the official icons for X, Instagram, LinkedIn, Facebook, and TikTok, followed by the exact handle "@First1Saudi". All five icons are mandatory, equal in size, and must remain fully visible. Keep the artwork full-bleed to every edge. The original First1Saudi and Mawhiba lockups will be overlaid directly within the artwork at the extreme lower-right, approximately 300 by 130 pixels on the 1080 by 1350 canvas. Keep only text, people, numbers, and icons out of that small pocket while the exact same teal artwork and texture continue behind it. Never create a frame, box, panel, banner, border, blank area, or separate footer for the logos. The rest of the canvas must remain visually rich and balanced.',
     args.note?.trim() ? `Additional creative direction: ${args.note.trim()}` : '',
   ].filter(Boolean).join('\n\n')
-  const { b64 } = await generateImageWithOpenAI(prompt, args.sourceImages ?? [])
+  const safetyFallbackPrompt = [
+    'Create a premium 4:5 Arabic editorial social poster for the International Nuclear Science Olympiad 2026 in Jeddah.',
+    STUDIO_EDITORIAL_DESIGN_RULES,
+    REAL_ARCHITECTURE_RULE,
+    `Event moment and verified brief: ${item.title}. ${item.brief}`,
+    `Interpret these source-post facts visually: ${postText.slice(0, 3500)}.`,
+    `Mandatory creative direction: ${args.direction}.`,
+    args.sourceImages?.length
+      ? 'Use every supplied reference image and preserve all people exactly in face, identity, body, clothing, apparent age, and accessories. Integrate them creatively; do not make a plain portrait.'
+      : 'Use only authentic Jeddah context or abstract scientific elements. Omit any architecture whose authenticity is uncertain.',
+    'Use one concise Arabic headline and 2 to 4 short factual callouts in strict right-to-left hierarchy. Do not copy the whole caption.',
+    'Add a compact First1Saudi social footer with X, Instagram, LinkedIn, Facebook, and TikTok icons and the exact handle @First1Saudi. Do not draw logos or hashtags; they are overlaid after generation. Full-bleed artwork only, with no white panel or logo frame.',
+    args.exactText?.trim() ? `Add this exact Arabic phrase exactly as written: "${args.exactText.trim()}".` : '',
+    args.note?.trim() ? `Additional creative direction: ${args.note.trim()}` : '',
+    'Avoid flags, weapons, radiation-danger symbols, danger imagery, explosions, political messaging, military content, invented buildings, and invented claims.',
+  ].filter(Boolean).join('\n\n')
+  const { b64 } = await generateImageWithOpenAI(prompt, args.sourceImages ?? [], { safetyFallbackPrompt })
   const poster = await resizeToPoster(Buffer.from(b64, 'base64'))
   const response = await fetch(brand.first1saudi_logo_url)
   if (!response.ok) throw new Error('تعذّر تحميل شعار أول سعودي من إعدادات الهوية')

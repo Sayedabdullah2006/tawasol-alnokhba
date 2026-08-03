@@ -12,6 +12,7 @@ interface OpenAIImageOptions {
   timeoutMs?: number
   retries?: number
   allowSafetyFallback?: boolean
+  safetyFallbackPrompt?: string
 }
 
 interface OpenAIImageResponse {
@@ -121,13 +122,15 @@ function isModerationBlocked(err: unknown): boolean {
 const SAFE_EDITORIAL_FALLBACK_PROMPT = [
   'Create a polished vertical 4:5 editorial social-media graphic about learning, scientific curiosity, global collaboration, and achievement.',
   'Use only abstract geometric science motifs, elegant light trails, a deep teal and turquoise palette with restrained gold accents, and a rich full-bleed composition.',
-  'Do not include people, faces, photographs, logos, brand names, flags, text, numbers, weapons, dangerous materials, medical imagery, politics, military content, or violence.',
+  'Use a concise Arabic headline and no more than two short factual callouts. Add a compact footer with the recognizable icons for X, Instagram, LinkedIn, Facebook, and TikTok, followed by the exact handle @First1Saudi.',
+  'Do not include logos, brand names, flags, weapons, dangerous materials, medical imagery, politics, military content, or violence.',
 ].join(' ')
 
 const SAFE_EDITORIAL_REFERENCE_FALLBACK_PROMPT = [
   'Create a polished vertical 4:5 editorial social-media graphic about learning, scientific curiosity, global collaboration, and achievement.',
   'Use the supplied reference image as an authentic editorial photo integrated naturally into the composition. Preserve every depicted person faithfully: do not alter their face, identity, body, clothing, or apparent age.',
-  'Use an abstract deep teal and turquoise scientific setting with restrained gold accents. Do not add logos, brand names, flags, text, numbers, weapons, dangerous materials, medical imagery, politics, military content, or violence.',
+  'Use an abstract deep teal and turquoise scientific setting with restrained gold accents, a concise Arabic headline, and no more than two short factual callouts. Add a compact footer with the recognizable icons for X, Instagram, LinkedIn, Facebook, and TikTok, followed by the exact handle @First1Saudi.',
+  'Do not add logos, brand names, flags, weapons, dangerous materials, medical imagery, politics, military content, or violence.',
 ].join(' ')
 
 export function imageGenerationErrorMessage(error: unknown): string {
@@ -261,9 +264,9 @@ async function createImageViaImageApi(
     console.warn('[OpenAI Images] moderation blocked the requested output; using a safe editorial fallback.')
     try {
       return await createImageViaImageApi(
-        refs.length ? SAFE_EDITORIAL_REFERENCE_FALLBACK_PROMPT : SAFE_EDITORIAL_FALLBACK_PROMPT,
+        opts.safetyFallbackPrompt?.trim() || (refs.length ? SAFE_EDITORIAL_REFERENCE_FALLBACK_PROMPT : SAFE_EDITORIAL_FALLBACK_PROMPT),
         refs,
-        { ...opts, retries: 0, allowSafetyFallback: false },
+        { ...opts, retries: 0, allowSafetyFallback: false, safetyFallbackPrompt: undefined },
       )
     } catch (fallbackError) {
       if (isModerationBlocked(fallbackError)) throw new Error(imageGenerationErrorMessage(fallbackError))

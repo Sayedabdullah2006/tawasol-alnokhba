@@ -52,6 +52,7 @@ async function createSlide(slide: ReportSlide, logoUrl: string | null, includeMa
   ].filter(Boolean).join('\n\n')
   const { b64 } = await generateImageWithOpenAI(prompt, slide.references ?? [], {
     aspectRatio: '16:9', quality: 'medium', timeoutMs: 180_000, retries: 2,
+    allowSafetyFallback: false,
   })
   const base = await sharp(Buffer.from(b64, 'base64')).resize(WIDTH, HEIGHT, { fit: 'cover' }).png().toBuffer()
   if (!logoUrl) return base
