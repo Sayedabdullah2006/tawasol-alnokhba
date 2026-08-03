@@ -33,6 +33,7 @@ const CRON_API_KEY = process.env.CRON_API_KEY || 'nukhba-daily-reminders-2024'
 const ADMIN_EMAIL = 'first1saudi@gmail.com'
 // لا نعيد نشر نفس الخبر خلال هذه النافذة (أيام) — يضمن تدوير الأرشيف.
 const DEDUP_WINDOW_DAYS = Number(process.env.SOCIAL_DEDUP_WINDOW_DAYS) || 30
+const ENTITY_DEDUP_WINDOW_DAYS = Number(process.env.SOCIAL_ENTITY_DEDUP_WINDOW_DAYS) || 180
 const DEFAULT_COUNT = 5
 // أقل عدد مواضيع ليُعتبر القسم مؤهلاً للتنويع.
 const MIN_SECTION_POSTS = 10
@@ -41,6 +42,34 @@ const EXCLUDED_SECTIONS = new Set([
   'غير مصنف', 'Uncategorized', 'عام', 'الأخبار', 'الرصد الإعلامي', 'خزينة ناجحين',
   'قناة أول سعودى قريبا', 'جائزة أول سعودى قريبا', 'دورات تدريبية',
 ])
+
+const SUBJECT_STOP_WORDS = new Set([
+  'السعودي', 'السعودية', 'بالمملكة', 'المملكة', 'المملكه', 'سعودي', 'سعوديه', 'اول', 'اولي', 'اولى',
+  'يحقق', 'تحقق', 'يحققون', 'تفوز', 'يفوز', 'فاز', 'تفوق', 'نجاح', 'انجاز', 'انجازات', 'جائزة', 'جايزه', 'جوائز',
+  'ضمن', 'في', 'من', 'الى', 'على', 'عن', 'مع', 'بعد', 'قبل', 'هذا', 'هذه', 'ذلك', 'تعلن', 'اعلان', 'بن', 'بنت',
+  'الامير', 'الدكتور', 'دكتور', 'الدكتورة', 'الدكتوره', 'دكتورة', 'دكتوره', 'المهندس', 'مهندس', 'المهندسة', 'المهندسه', 'مهندسة', 'مهندسه',
+])
+
+function subjectFingerprint(value: string | null | undefined): string[] {
+  const normalized = String(value ?? '')
+    .toLowerCase()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/[\u064B-\u065F\u0670]/g, '')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+  return [...new Set(normalized.split(/\s+/).filter(token => token.length >= 3 && !SUBJECT_STOP_WORDS.has(token)))]
+}
+
+function isRepeatedSubject(candidate: string[], seen: string[][]): boolean {
+  if (!candidate.length) return false
+  return seen.some(previous => {
+    if (!previous.length) return false
+    const previousTokens = new Set(previous)
+    const shared = candidate.filter(token => previousTokens.has(token)).length
+    return shared >= 2 || (candidate.length === 1 && previous.length === 1 && shared === 1)
+  })
+}
 
 export async function GET(request: NextRequest) {
   return handle(request)
@@ -85,19 +114,24 @@ export async function runBatch(
 
     // ── 1) منع التكرار (لكل مصدر على حدة) خلال آخر N يوماً ──
     const since = new Date(Date.now() - DEDUP_WINDOW_DAYS * 86400000).toISOString().slice(0, 10)
+    const entitySince = new Date(Date.now() - ENTITY_DEDUP_WINDOW_DAYS * 86400000).toISOString().slice(0, 10)
     const { data: recent } = await sc
       .from('social_schedule')
-      .select('wp_post_id, source')
-      .gte('batch_date', since)
+      .select('wp_post_id, source, post_title, batch_date')
+      .gte('batch_date', entitySince)
     // منع التكرار لكل مصدر على حدة (المفتاح = اسم المصدر)
     const usedByKey = new Map<string, Set<number>>()
     for (const r of recent ?? []) {
+      if (String(r.batch_date) < since) continue
       const k = r.source || 'first1saudi'
       if (!usedByKey.has(k)) usedByKey.set(k, new Set())
       usedByKey.get(k)!.add(Number(r.wp_post_id))
     }
     const usedManhom = usedByKey.get('manhom') ?? new Set<number>()
     const usedFirst1 = usedByKey.get('first1saudi') ?? new Set<number>()
+    const usedSubjectFingerprints = (recent ?? [])
+      .map(row => subjectFingerprint(row.post_title))
+      .filter(tokens => tokens.length > 0)
 
     // كم عنصراً من كل مصدر — افتراضياً ~2 إنجازات + 1 manhom لكل 3.
     let manhomTarget =
@@ -164,11 +198,14 @@ export async function runBatch(
           if (achCount() >= achTarget) break
           if (selected.some(s => s.post.id === c.post.id && s.source === c.key)) continue
           if (preferDiverse && pickedKeys.has(c.key)) continue
+          const fingerprint = subjectFingerprint(c.post.title)
+          if (isRepeatedSubject(fingerprint, usedSubjectFingerprints)) continue
           const img = c.post.imageUrl ?? await resolveImageUrl(c.post)
           if (!img) continue
           c.post.imageUrl = img
           pickedKeys.add(c.key)
           selected.push({ post: c.post, source: c.key })
+          usedSubjectFingerprints.push(fingerprint)
         }
       }
     }
@@ -183,9 +220,12 @@ export async function runBatch(
       for (const p of shuffled) {
         if (countBySource('manhom') >= manhomTarget) break
         if (!p.imageUrl) continue
+        const fingerprint = subjectFingerprint(p.title)
+        if (isRepeatedSubject(fingerprint, usedSubjectFingerprints)) continue
         // صور المصدر رمادية — نضمن نسخة ملوّنة (تُلوَّن مرة وتُخزَّن).
         p.imageUrl = await ensureColorImage(p.id, p.imageUrl)
         selected.push({ post: p, source: 'manhom' })
+        usedSubjectFingerprints.push(fingerprint)
       }
     }
 
