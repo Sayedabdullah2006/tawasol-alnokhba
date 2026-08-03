@@ -54,6 +54,7 @@ export default function InsoCoveragePage() {
   const [designSources, setDesignSources] = useState<string[]>([])
   const [designHasVideo, setDesignHasVideo] = useState(false)
   const [designUploading, setDesignUploading] = useState(false)
+  const [designOptionsGenerating, setDesignOptionsGenerating] = useState(false)
   const [editOption, setEditOption] = useState<{ item: InsoCoverageItem; optionId: string } | null>(null)
   const [editNote, setEditNote] = useState('')
   const [editExactText, setEditExactText] = useState('')
@@ -370,10 +371,26 @@ export default function InsoCoveragePage() {
 
   const generateDesignOptions = async () => {
     if (!designItem) return
-    const result = await callAction('generate-design-options', {
-      id: designItem.id, postText: designItem.post_text, designNote, exactText: designExactText, sourceImages: designSources, hasVideo: designHasVideo,
-    }, 'تم توليد 3 خيارات للتصميم')
-    if (result?.item) setDesignItem(result.item)
+    setDesignOptionsGenerating(true)
+    try {
+      for (let optionIndex = 0; optionIndex < 3; optionIndex += 1) {
+        const result = await callAction('generate-design-option', {
+          id: designItem.id,
+          postText: designItem.post_text,
+          designNote,
+          exactText: designExactText,
+          sourceImages: designSources,
+          hasVideo: designHasVideo,
+          optionIndex,
+          resetDesignOptions: optionIndex === 0,
+        }, `ظهر الخيار ${optionIndex + 1} من 3`)
+        if (result?.item) {
+          setDesignItem(null)
+        }
+      }
+    } finally {
+      setDesignOptionsGenerating(false)
+    }
   }
 
   const addSavedPost = async () => {
@@ -581,7 +598,7 @@ export default function InsoCoveragePage() {
             {designSources.length > 0 && <div className="flex gap-2 overflow-x-auto pb-1" aria-label="الصور المرجعية المرفقة">{designSources.map((source, index) => <div key={source} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border"><img src={source} alt={`الصورة المرجعية ${index + 1}`} className="h-full w-full object-cover" /><button type="button" onClick={() => setDesignSources(current => current.filter(entry => entry !== source))} className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/70 text-xs text-white" aria-label={`حذف الصورة المرجعية ${index + 1}`}>×</button></div>)}</div>}
             <p className="rounded-lg border border-teal-200 bg-teal-50 p-3 text-xs leading-6 text-teal-900">تُدمج الصور بشكل إبداعي في التصميم مع الحفاظ الكامل على ملامح الوجه والهوية والهيئة والملبس كما هي، دون تعديل أو إعادة تشكيل.</p>
           </div>
-          <div className="sticky bottom-0 flex gap-2 border-t border-border bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-5"><Button className="flex-1" onClick={generateDesignOptions} loading={busy === `generate-design-options:${designItem.id}`} disabled={designUploading || !designItem.post_text}>توليد الخيارات الثلاثة</Button><Button variant="outline" onClick={() => setDesignItem(null)}>إلغاء</Button></div>
+          <div className="sticky bottom-0 flex gap-2 border-t border-border bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-5"><Button className="flex-1" onClick={generateDesignOptions} loading={designOptionsGenerating} disabled={designOptionsGenerating || designUploading || !designItem.post_text}>توليد الخيارات الثلاثة</Button><Button variant="outline" onClick={() => setDesignItem(null)}>إلغاء</Button></div>
         </div>
       </div>}
 

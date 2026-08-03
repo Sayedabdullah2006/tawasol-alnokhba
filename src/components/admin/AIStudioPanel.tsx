@@ -347,11 +347,17 @@ export default function AIStudioPanel({
         setAutoStage(`٤/٤ — توليد التصميم ${i + 1}/${concepts.length}…`)
         const brief = concepts[i].brief ?? concepts[i].title ?? ''
         const url = await generateOneDesign(brief)
-        if (url) results.push({ title: concepts[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief })
+        if (url) {
+          const result = { title: concepts[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief }
+          results.push(result)
+          setBatchResults(prev => {
+            const next = [...prev, result]
+            persistStudioState({ designs: next })
+            return next
+          })
+          setSelectedBatch(prev => new Set(prev).add(results.length - 1))
+        }
       }
-      setBatchResults(results)
-      setSelectedBatch(new Set(results.map((_, i) => i)))
-      persistStudioState({ designs: results })
       if (results.length) showToast(`اكتمل التوليد التلقائي — ${results.length} تصاميم جاهزة`, 'success')
     } catch {
       showToast('تعذّر إكمال التوليد التلقائي', 'error')
@@ -377,13 +383,18 @@ export default function AIStudioPanel({
         setBatchProgress(`جارٍ توليد ${i + 1}/${conceptItems.length}…`)
         const brief = conceptItems[i].brief ?? conceptItems[i].title ?? ''
         const url = await generateOneDesign(brief)
-        if (url) results.push({ title: conceptItems[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief })
+        if (url) {
+          const result = { title: conceptItems[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief }
+          results.push(result)
+          setBatchResults(prev => {
+            const next = [...prev, result]
+            persistStudioState({ designs: next })
+            return next
+          })
+          setSelectedBatch(prev => new Set(prev).add(results.length - 1))
+        }
       }
-      setBatchResults(results)
       setNoteByIndex({})
-      persistStudioState({ designs: results }) // حفظ ليبقى بعد إعادة التحميل
-      // كل التصاميم مختارة افتراضياً للإرسال للعميل
-      setSelectedBatch(new Set(results.map((_, i) => i)))
       if (results.length) showToast(`تم توليد ${results.length} تصاميم`, 'success')
     } catch {
       showToast('حدث خطأ أثناء التوليد المجمّع', 'error')

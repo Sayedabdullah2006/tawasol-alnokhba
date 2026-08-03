@@ -20,7 +20,7 @@ import {
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-type Action = 'generate-copy' | 'generate-design-options' | 'select-design-option' | 'edit-design-option' | 'save' | 'add' | 'add-saved' | 'rewrite-saved' | 'delete-saved' | 'mark-published' | 'mark-scheduled' | 'cancel-scheduled'
+type Action = 'generate-copy' | 'generate-design-options' | 'generate-design-option' | 'select-design-option' | 'edit-design-option' | 'save' | 'add' | 'add-saved' | 'rewrite-saved' | 'delete-saved' | 'mark-published' | 'mark-scheduled' | 'cancel-scheduled'
 
 const REAL_ARCHITECTURE_RULE = 'STRICT REAL-WORLD ARCHITECTURE RULE: never invent, redesign, exaggerate, or combine buildings, towers, skylines, landmarks, venues, or cityscapes. Do not use futuristic, imaginary, AI-looking, or generic foreign architecture. If a reference image contains a building, preserve it faithfully without changing its shape, height, facade, or surroundings. If no reference image is supplied, either use a clearly recognizable real Jeddah landmark only (Jeddah Corniche, King Fahd Fountain, Al-Balad heritage buildings, or an authentic Jeddah skyline) or omit buildings entirely and use science, people, sea, light, and abstract editorial elements instead. When accuracy is uncertain, omit the building rather than invent one.'
 
@@ -141,7 +141,7 @@ export async function POST(request: Request) {
   if ('error' in auth) return auth.error
   let body: {
     action?: Action; id?: string; title?: string; brief?: string; coverageDate?: string; phase?: 'before' | 'during' | 'after';
-    postText?: string; designNote?: string; exactText?: string; scheduledFor?: string; sourceImages?: string[]; hasVideo?: boolean; optionId?: string;
+    postText?: string; designNote?: string; exactText?: string; scheduledFor?: string; sourceImages?: string[]; hasVideo?: boolean; optionId?: string; optionIndex?: number; resetDesignOptions?: boolean;
   }
   try { body = await request.json() } catch { return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 }) }
   if (!body.action) return NextResponse.json({ error: 'الإجراء مطلوب' }, { status: 400 })
@@ -206,7 +206,7 @@ export async function POST(request: Request) {
     const { data: item, error: lookupError } = await service
       .from('event_coverage_items').select('*').eq('id', body.id).eq('campaign_key', INSO_CAMPAIGN_KEY).single()
     if (lookupError || !item) return NextResponse.json({ error: 'المنشور غير موجود' }, { status: 404 })
-    generationJobId = body.action === 'generate-copy' || body.action === 'generate-design-options' || body.action === 'edit-design-option'
+    generationJobId = body.action === 'generate-copy' || body.action === 'generate-design-options' || body.action === 'generate-design-option' || body.action === 'edit-design-option'
       ? await startGenerationJob({ ownerId: auth.user.id, scope: 'inso', operation: body.action, targetId: item.id })
       : null
     const success = async (payload: Record<string, unknown>) => {
@@ -248,7 +248,7 @@ export async function POST(request: Request) {
       return success({ item: data })
     }
 
-    if (body.action === 'generate-design-options') {
+    if (body.action === 'generate-design-options' || body.action === 'generate-design-option') {
       const postText = enforceInsoFooter(body.postText ?? item.post_text ?? '')
       const sourceImages = Array.isArray(body.sourceImages)
         ? body.sourceImages.filter((url): url is string => typeof url === 'string' && url.startsWith('http')).slice(0, 5)
@@ -258,18 +258,29 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'ولّد أو اكتب نص المنشور أولاً' }, { status: 400 })
       }
       const directions = ['منظور علمي تحريري جريء', 'لقطة إنسانية دولية دافئة', 'تكوين بصري مستقبلي مستلهم من العلوم النووية السلمية']
-      const options = await Promise.all(directions.map(async (direction, index) => ({
-        id: `${Date.now()}-${index}`,
-        title: `الخيار ${index + 1}`,
-        direction,
-        imageUrl: await generateInsoDesign(item, postText, { direction, note: body.designNote, exactText: body.exactText, sourceImages, hasVideo: body.hasVideo }),
-        hasVideo: Boolean(body.hasVideo),
-        selected: false,
-        createdAt: new Date().toISOString(),
-      })))
+      const optionIndex = Number.isInteger(body.optionIndex) ? Number(body.optionIndex) : 0
+      if (optionIndex < 0 || optionIndex >= directions.length) {
+        await failGenerationJob(generationJobId, new Error('خيار التصميم غير صالح'))
+        return NextResponse.json({ error: 'خيار التصميم غير صالح' }, { status: 400 })
+      }
+      const directionsToGenerate = body.action === 'generate-design-options' ? directions : [directions[optionIndex]]
+      const createdOptions = [] as Array<{ id: string; title: string; direction: string; imageUrl: string; hasVideo: boolean; selected: boolean; createdAt: string }>
+      for (const direction of directionsToGenerate) {
+        const index = directions.indexOf(direction)
+        createdOptions.push({
+          id: `${Date.now()}-${index}`,
+          title: `الخيار ${index + 1}`,
+          direction,
+          imageUrl: await generateInsoDesign(item, postText, { direction, note: body.designNote, exactText: body.exactText, sourceImages, hasVideo: body.hasVideo }),
+          hasVideo: Boolean(body.hasVideo),
+          selected: false,
+          createdAt: new Date().toISOString(),
+        })
+      }
       await throwIfGenerationCancelled(generationJobId)
+      const existingOptions = body.resetDesignOptions ? [] : (Array.isArray(item.design_options) ? item.design_options : [])
       const { data, error } = await service.from('event_coverage_items').update({
-        post_text: postText, design_url: null, design_options: options, design_brief: body.designNote?.trim() || null,
+        post_text: postText, design_url: body.resetDesignOptions ? null : item.design_url, design_options: [...existingOptions, ...createdOptions], design_brief: body.designNote?.trim() || null,
         publication_status: 'ready', updated_at: new Date().toISOString(),
       }).eq('id', item.id).select('*').single()
       if (error) throw error

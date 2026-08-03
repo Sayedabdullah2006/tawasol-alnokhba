@@ -242,9 +242,12 @@ export default function StandaloneStudio() {
         setAutoStage(`④ توليد التصميم ${i + 1}/${concepts.length}…`)
         const brief = concepts[i].brief ?? concepts[i].title ?? ''
         const url = await genOneWith(brief, a)
-        if (url) results.push({ title: concepts[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief })
+        if (url) {
+          const result = { title: concepts[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief }
+          results.push(result)
+          setBatchResults(prev => [...prev, result])
+        }
       }
-      setBatchResults(results)
       showToast(results.length ? `اكتمل التوليد التلقائي — ${results.length} تصاميم ✅` : 'لم يُولَّد أي تصميم', results.length ? 'success' : 'error')
     } finally {
       setAutoBusy(false); setAutoStage('')
@@ -261,9 +264,12 @@ export default function StandaloneStudio() {
         setBatchProgress(`جارٍ توليد ${i + 1}/${conceptItems.length}…`)
         const brief = conceptItems[i].brief ?? conceptItems[i].title ?? ''
         const url = await genOne(brief)
-        if (url) results.push({ title: conceptItems[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief })
+        if (url) {
+          const result = { title: conceptItems[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief }
+          results.push(result)
+          setBatchResults(prev => [...prev, result])
+        }
       }
-      setBatchResults(results)
       if (results.length) showToast(`تم توليد ${results.length} تصاميم`, 'success')
     } finally { setBatchLoading(false); setBatchProgress('') }
   }
