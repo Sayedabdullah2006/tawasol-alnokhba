@@ -12,7 +12,8 @@ import ImageEditSchedule from '@/components/admin/ImageEditSchedule'
 import { SECTION_NAMES } from '@/lib/showcase-sections'
 
 type StepKey = 'analyze' | 'tweets' | 'concepts' | 'image'
-interface ConceptItem { title?: string; mood?: string; brief?: string }
+interface ConceptItem { title?: string; mood?: string; brief?: string; imagePrompt?: string }
+interface DesignResult { title: string; imageUrl: string; brief: string; preparedPrompt?: string }
 interface StudioHistoryItem {
   id: string
   title: string | null
@@ -124,9 +125,10 @@ export default function StandaloneStudio() {
   const [selectedTweet, setSelectedTweet] = useState('')
   const [conceptItems, setConceptItems] = useState<ConceptItem[]>([])
   const [chosenConcept, setChosenConcept] = useState('')
+  const [chosenPreparedPrompt, setChosenPreparedPrompt] = useState<string | undefined>()
   const [loadingStep, setLoadingStep] = useState<StepKey | null>(null)
 
-  const [batchResults, setBatchResults] = useState<{ title: string; imageUrl: string; brief: string }[]>([])
+  const [batchResults, setBatchResults] = useState<DesignResult[]>([])
   const [batchLoading, setBatchLoading] = useState(false)
   const [batchProgress, setBatchProgress] = useState('')
   const designResultsRef = useRef<HTMLDivElement | null>(null)
@@ -195,6 +197,7 @@ export default function StandaloneStudio() {
       const data = await post({
         step, title, content, sourceImages: selectedImages, extraInfo, analysis,
         chosenConcept: step === 'image' ? chosenConcept : undefined,
+        preparedPrompt: step === 'image' ? chosenPreparedPrompt : undefined,
         hasVideo,
         // عند إعادة اقتراح الاتجاهات: استبعد الحالية لتأتي بدائل مختلفة
         previousConcepts: step === 'concepts' ? conceptItems.map(c => c.title ?? '').filter(Boolean) : undefined,
@@ -204,18 +207,18 @@ export default function StandaloneStudio() {
       else if (step === 'tweets') { setTweets(data.tweets); setSelectedTweet(data.tweets); showToast('تم توليد التغريدات', 'success') }
       else if (step === 'concepts') { setConceptItems(Array.isArray(data.concepts) ? data.concepts : []); showToast('تم اقتراح الاتجاهات', 'success') }
       else if (step === 'image') {
-        setBatchResults(prev => [...prev, { title: 'تصميم مفرد', imageUrl: data.imageUrl, brief: chosenConcept }])
+        setBatchResults(prev => [...prev, { title: 'تصميم مفرد', imageUrl: data.imageUrl, brief: chosenConcept, preparedPrompt: chosenPreparedPrompt }])
         showToast('تم توليد التصميم', 'success')
       }
     } finally { setLoadingStep(null) }
   }
 
   // توليد تصميم واحد بقيمة تحليل صريحة (لاستخدامه في المسار التلقائي قبل تحديث الحالة)
-  const genOneWith = async (brief: string, analysisVal: any, note?: string): Promise<string | null> => {
-    const data = await post({ step: 'image', title, content, sourceImages: selectedImages, extraInfo, analysis: analysisVal, chosenConcept: brief, note, hasVideo })
+  const genOneWith = async (brief: string, analysisVal: any, note?: string, preparedPrompt?: string): Promise<string | null> => {
+    const data = await post({ step: 'image', title, content, sourceImages: selectedImages, extraInfo, analysis: analysisVal, chosenConcept: brief, note, hasVideo, preparedPrompt })
     return data?.imageUrl ?? null
   }
-  const genOne = (brief: string, note?: string) => genOneWith(brief, analysis, note)
+  const genOne = (brief: string, note?: string, preparedPrompt?: string) => genOneWith(brief, analysis, note, preparedPrompt)
 
   // ⚡ التوليد التلقائي لكل الخطوات: تحليل → تغريدات → اتجاهات → تصميم الاتجاهات الثلاثة.
   // يمرّر التحليل محلياً (لا ينتظر تحديث الحالة) لتسلسل موثوق.
@@ -244,13 +247,13 @@ export default function StandaloneStudio() {
       setConceptItems(concepts)
       if (!concepts.length) { showToast('تعذّر اقتراح الاتجاهات', 'error'); return }
 
-      const results: { title: string; imageUrl: string; brief: string }[] = []
+      const results: DesignResult[] = []
       for (let i = 0; i < concepts.length; i++) {
         setAutoStage(`④ توليد التصميم ${i + 1}/${concepts.length}…`)
         const brief = concepts[i].brief ?? concepts[i].title ?? ''
-        const url = await genOneWith(brief, a)
+        const url = await genOneWith(brief, a, undefined, concepts[i].imagePrompt)
         if (url) {
-          const result = { title: concepts[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief }
+          const result = { title: concepts[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief, preparedPrompt: concepts[i].imagePrompt }
           results.push(result)
           setBatchResults(prev => [...prev, result])
         }
@@ -266,13 +269,13 @@ export default function StandaloneStudio() {
     if (!selectedImages.length) { showToast('ارفع صورة المصدر أولاً', 'error'); return }
     setBatchLoading(true); setBatchResults([]); setNoteByIndex({})
     try {
-      const results: { title: string; imageUrl: string; brief: string }[] = []
+      const results: DesignResult[] = []
       for (let i = 0; i < conceptItems.length; i++) {
         setBatchProgress(`جارٍ توليد ${i + 1}/${conceptItems.length}…`)
         const brief = conceptItems[i].brief ?? conceptItems[i].title ?? ''
-        const url = await genOne(brief)
+        const url = await genOneWith(brief, analysis, undefined, conceptItems[i].imagePrompt)
         if (url) {
-          const result = { title: conceptItems[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief }
+          const result = { title: conceptItems[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief, preparedPrompt: conceptItems[i].imagePrompt }
           results.push(result)
           setBatchResults(prev => [...prev, result])
         }
@@ -286,7 +289,7 @@ export default function StandaloneStudio() {
     if (!r || !note) { showToast('اكتب ملاحظة لإعادة التوليد', 'error'); return }
     setRegenIndex(i)
     try {
-      const url = await genOne(r.brief, note)
+      const url = await genOne(r.brief, note, r.preparedPrompt)
       if (url) { setBatchResults(prev => prev.map((x, idx) => idx === i ? { ...x, imageUrl: url } : x)); showToast('تم إعادة التوليد', 'success') }
     } finally { setRegenIndex(null) }
   }
@@ -317,7 +320,7 @@ export default function StandaloneStudio() {
     try {
       for (let i = 0; i < batchResults.length; i++) {
         setBulkProgress(`جارٍ إعادة التوليد ${i + 1}/${batchResults.length}…`)
-        const url = await genOne(batchResults[i].brief, note)
+        const url = await genOne(batchResults[i].brief, note, batchResults[i].preparedPrompt)
         if (url) setBatchResults(prev => prev.map((x, idx) => idx === i ? { ...x, imageUrl: url } : x))
       }
       showToast('تم إعادة توليد كل التصاميم بالملاحظة ✅', 'success')
@@ -621,7 +624,7 @@ export default function StandaloneStudio() {
                   <div className="font-bold text-dark">{c.title ?? `اتجاه ${i + 1}`}</div>
                   {c.mood && <div className="text-[11px] text-green-700">{c.mood}</div>}
                   <p className="text-[11px] text-muted whitespace-pre-wrap max-h-32 overflow-y-auto">{brief}</p>
-                  <button type="button" onClick={() => setChosenConcept(brief)}
+                  <button type="button" onClick={() => { setChosenConcept(brief); setChosenPreparedPrompt(c.imagePrompt) }}
                     className={`mt-1 w-full rounded-lg py-1 text-[11px] font-bold ${on ? 'bg-green text-white' : 'bg-white border border-border text-dark hover:border-green'}`}>
                     {on ? '✓ معتمد' : 'اعتمد'}
                   </button>
@@ -630,7 +633,7 @@ export default function StandaloneStudio() {
             })}
           </div>
         )}
-        <textarea value={chosenConcept} onChange={e => setChosenConcept(e.target.value)} placeholder="الاتجاه المعتمد (اعتمد أحد الاتجاهات أو اكتب يدوياً)"
+        <textarea value={chosenConcept} onChange={e => { setChosenConcept(e.target.value); setChosenPreparedPrompt(undefined) }} placeholder="الاتجاه المعتمد (اعتمد أحد الاتجاهات أو اكتب يدوياً)"
           className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[70px] resize-y" />
       </div>
 

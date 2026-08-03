@@ -62,9 +62,11 @@ export interface Concept {
   title?: string
   mood?: string
   brief?: string
+  /** A complete image-model prompt prepared once with the three concepts. */
+  imagePrompt?: string
 }
 
-const REQUIRED_STUDIO_CONCEPTS: Array<Required<Concept>> = [
+const REQUIRED_STUDIO_CONCEPTS: Array<Required<Omit<Concept, 'imagePrompt'>>> = [
   {
     title: 'بطل تحريري سينمائي',
     mood: 'فخر وطاقة بصرية مركزة',
@@ -83,13 +85,14 @@ const REQUIRED_STUDIO_CONCEPTS: Array<Required<Concept>> = [
 ]
 
 function requireThreeConcepts(value: unknown): Concept[] {
-  const supplied = Array.isArray(value)
+  const supplied: Concept[] = Array.isArray(value)
     ? value
       .filter((entry): entry is Concept => Boolean(entry) && typeof entry === 'object')
       .map(entry => ({
         title: typeof entry.title === 'string' ? entry.title.trim() : '',
         mood: typeof entry.mood === 'string' ? entry.mood.trim() : '',
         brief: typeof entry.brief === 'string' ? entry.brief.trim() : '',
+        imagePrompt: typeof entry.imagePrompt === 'string' ? entry.imagePrompt.trim() : '',
       }))
       .filter(entry => entry.title || entry.brief)
       .slice(0, 3)
@@ -106,6 +109,49 @@ function requireThreeConcepts(value: unknown): Concept[] {
     }
   }
   return supplied.slice(0, 3)
+}
+
+export async function prepareConceptImagePrompts(
+  openai: OpenAI,
+  args: { analysis: unknown; concepts: Concept[]; sourceImageCount: number; hasVideo?: boolean },
+): Promise<Concept[]> {
+  if (!args.concepts.length) return args.concepts
+
+  try {
+    const completion = await chatComplete(openai, {
+      model: OPENAI_MODEL,
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content: `${SYS_IMAGE}\n\nBATCH OVERRIDE: Produce a JSON object only: {"prompts":["...","...","..."]}. Create one complete, production-ready English image-editing prompt for each supplied direction, in the same order. Each prompt must preserve the supplied real reference people, use the exact verified Arabic facts only, make its direction visibly distinct, retain the First1Saudi identity and social footer requirements, and be ready for the image model without any further prompt-writing call.`,
+        },
+        {
+          role: 'user',
+          content: JSON.stringify({
+            analysis: args.analysis,
+            reference_image_count: args.sourceImageCount,
+            has_video: Boolean(args.hasVideo),
+            directions: args.concepts.map((concept, index) => ({
+              index,
+              title: concept.title,
+              mood: concept.mood,
+              brief: concept.brief,
+            })),
+          }),
+        },
+      ],
+    })
+    const raw = completion.choices[0]?.message?.content ?? '{}'
+    const parsed = JSON.parse(raw) as { prompts?: unknown }
+    const prompts = Array.isArray(parsed.prompts)
+      ? parsed.prompts.map(prompt => typeof prompt === 'string' ? prompt.trim() : '')
+      : []
+    return args.concepts.map((concept, index) => ({ ...concept, imagePrompt: prompts[index] || undefined }))
+  } catch {
+    // Directions remain usable through the on-demand prompt path if preparation fails.
+    return args.concepts
+  }
 }
 
 /**
@@ -179,7 +225,7 @@ export async function generateTweets(
 /** الخطوة 3 — اقتراح 3 اتجاهات تصميم. */
 export async function generateConcepts(
   openai: OpenAI,
-  args: { analysis: unknown; newsText: string; sourceImages: string[]; excludeTitles?: string[] },
+  args: { analysis: unknown; newsText: string; sourceImages: string[]; excludeTitles?: string[]; hasVideo?: boolean },
 ): Promise<Concept[]> {
   // توجيهات التنويع: مجموعة عشوائية من عائلات الاتجاه + محاور التنويع + استبعاد السابق
   const directives = buildConceptDirectives({ exclude: args.excludeTitles })
@@ -195,10 +241,20 @@ export async function generateConcepts(
   const raw = completion.choices[0]?.message?.content ?? '{}'
   try {
     const p = JSON.parse(raw)
-    if (Array.isArray(p?.concepts)) return requireThreeConcepts(p.concepts)
-    if (Array.isArray(p)) return requireThreeConcepts(p)
+    if (Array.isArray(p?.concepts)) {
+      return prepareConceptImagePrompts(openai, {
+        analysis: args.analysis, concepts: requireThreeConcepts(p.concepts), sourceImageCount: args.sourceImages.length, hasVideo: args.hasVideo,
+      })
+    }
+    if (Array.isArray(p)) {
+      return prepareConceptImagePrompts(openai, {
+        analysis: args.analysis, concepts: requireThreeConcepts(p), sourceImageCount: args.sourceImages.length, hasVideo: args.hasVideo,
+      })
+    }
   } catch { /* تجاهل */ }
-  return requireThreeConcepts([])
+  return prepareConceptImagePrompts(openai, {
+    analysis: args.analysis, concepts: requireThreeConcepts([]), sourceImageCount: args.sourceImages.length, hasVideo: args.hasVideo,
+  })
 }
 
 /** يحوّل اتجاهاً مختاراً إلى نص الموجّه (chosenConcept) المُمرَّر لخطوة الصورة. */
@@ -227,22 +283,24 @@ export function buildStudioSafetyFallbackPrompt(args: { analysis: unknown; chose
 /** الخطوة 4 — توليد التصميم عبر OpenAI Images + تركيب اللوقو + الرفع إلى التخزين. */
 export async function generateDesign(
   openai: OpenAI,
-  args: { analysis: unknown; chosenConcept: string; sourceImages: string[]; note?: string; extra?: string; hasVideo?: boolean },
+  args: { analysis: unknown; chosenConcept: string; sourceImages: string[]; note?: string; extra?: string; hasVideo?: boolean; preparedPrompt?: string },
 ): Promise<{ imageUrl: string; prompt: string }> {
-  const { analysis, chosenConcept, sourceImages, note, extra, hasVideo } = args
+  const { analysis, chosenConcept, sourceImages, note, extra, hasVideo, preparedPrompt } = args
   const primarySource = sourceImages[0] ?? null
 
   const service = await createServiceRoleClient()
   const { data: brand } = await service.from('brand_settings').select('first1saudi_logo_url').eq('id', 1).single()
   const logoUrl: string | null = brand?.first1saudi_logo_url ?? null
 
-  const promptCompletion = await chatComplete(openai, {
-    model: OPENAI_MODEL,
-    messages: [
-      { role: 'system', content: SYS_IMAGE },
-      {
-        role: 'user',
-        content:
+  const promptCompletion = preparedPrompt?.trim()
+    ? null
+    : await chatComplete(openai, {
+      model: OPENAI_MODEL,
+      messages: [
+        { role: 'system', content: SYS_IMAGE },
+        {
+          role: 'user',
+          content:
           `بيانات الخبر (JSON):\n${JSON.stringify(analysis)}\n\n` +
           `الاتجاه المعتمد:\n${chosenConcept}\n\n` +
           (sourceImages.length > 1
@@ -256,10 +314,14 @@ export async function generateDesign(
             ? `\n‼️ ملاحظات الأدمن على التصميم (طبّقها بدقّة مع الحفاظ على ثوابت الهوية والصورة الحقيقية): ${note.trim()}\n`
             : '') +
           (extra && extra.trim() ? `\n${extra.trim()}\n` : ''),
-      },
-    ],
-  })
-  const designPrompt = promptCompletion.choices[0]?.message?.content ?? ''
+        },
+      ],
+    })
+  const designPrompt = [
+    preparedPrompt?.trim() || promptCompletion?.choices[0]?.message?.content || '',
+    preparedPrompt?.trim() && note?.trim() ? `ADMIN DESIGN NOTE — apply this exactly while preserving every established design requirement: ${note.trim()}` : '',
+    preparedPrompt?.trim() ? extra?.trim() || '' : '',
+  ].filter(Boolean).join('\n\n')
 
   // قفل الوجه: يُحاط به موجّه الصورة من الطرفين (بداية ونهاية) لتقليل إعادة رسم الوجه.
   // عند وجود فيديو: نُلحق توجيه تخطيط الفيديو في النهاية (أولوية قصوى).
@@ -497,6 +559,7 @@ export async function runStudioPipeline(input: {
     sourceImages,
     note: input.note,
     extra: [EVERGREEN_NOTE, styleNote].filter(Boolean).join('\n\n'),
+    preparedPrompt: concepts[0]?.imagePrompt,
   })
 
   return { analysis, tweets, concepts, chosenConcept, imageUrl, prompt, sourceImages }

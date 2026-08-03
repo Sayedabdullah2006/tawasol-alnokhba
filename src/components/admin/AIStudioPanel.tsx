@@ -12,7 +12,9 @@ interface ConceptItem {
   title?: string
   mood?: string
   brief?: string
+  imagePrompt?: string
 }
+interface DesignResult { title: string; imageUrl: string; brief: string; preparedPrompt?: string }
 
 interface Props {
   request: any
@@ -139,6 +141,7 @@ export default function AIStudioPanel({
     Array.isArray(saved.concepts?.items) ? saved.concepts.items : []
   )
   const [chosenConcept, setChosenConcept] = useState<string>(saved.chosenConcept?.text ?? '')
+  const [chosenPreparedPrompt, setChosenPreparedPrompt] = useState<string | undefined>()
   const [imageUrl, setImageUrl] = useState<string>(saved.imageUrl ?? '')
   const [imagePrompt, setImagePrompt] = useState<string>(saved.imagePrompt ?? '')
 
@@ -218,10 +221,10 @@ export default function AIStudioPanel({
 
   // توليد الاتجاهات الثلاثة دفعة واحدة + الاختيار منها للإرسال
   // تُعاد تهيئتها من الحالة المحفوظة (saved.designs) فتبقى بعد إعادة التحميل
-  const initialDesigns: { title: string; imageUrl: string; brief: string }[] = (saved.designs as any[]).map(
-    (d, i) => ({ title: d.title ?? `تصميم ${i + 1}`, imageUrl: d.imageUrl ?? d.url ?? '', brief: d.brief ?? '' })
+  const initialDesigns: DesignResult[] = (saved.designs as any[]).map(
+    (d, i) => ({ title: d.title ?? `تصميم ${i + 1}`, imageUrl: d.imageUrl ?? d.url ?? '', brief: d.brief ?? '', preparedPrompt: d.preparedPrompt })
   ).filter(d => d.imageUrl)
-  const [batchResults, setBatchResults] = useState<{ title: string; imageUrl: string; brief: string }[]>(initialDesigns)
+  const [batchResults, setBatchResults] = useState<DesignResult[]>(initialDesigns)
   const [batchLoading, setBatchLoading] = useState(false)
   const [batchProgress, setBatchProgress] = useState('')
   const designResultsRef = useRef<HTMLDivElement | null>(null)
@@ -256,6 +259,7 @@ export default function AIStudioPanel({
           sourceImages: selectedImages,
           extraInfo,
           chosenConcept: step === 'image' ? chosenConcept : undefined,
+          preparedPrompt: step === 'image' ? chosenPreparedPrompt : undefined,
           postIndex: isPost ? postIndex : undefined,
         }),
       })
@@ -280,7 +284,7 @@ export default function AIStudioPanel({
         setImagePrompt(data.prompt)
         // أضِف التصميم المفرد إلى القائمة المحفوظة ليبقى بعد إعادة التحميل
         setBatchResults(prev => {
-          const next = [...prev, { title: 'تصميم مفرد', imageUrl: data.imageUrl, brief: chosenConcept }]
+          const next = [...prev, { title: 'تصميم مفرد', imageUrl: data.imageUrl, brief: chosenConcept, preparedPrompt: chosenPreparedPrompt }]
           persistStudioState({ designs: next })
           return next
         })
@@ -301,7 +305,7 @@ export default function AIStudioPanel({
   }
 
   // يولّد تصميماً واحداً لاتجاه محدّد ويعيد رابط الصورة (يُستخدم في التوليد المجمّع وإعادة التوليد بالملاحظة)
-  const generateOneDesign = async (conceptBrief: string, note?: string): Promise<string | null> => {
+  const generateOneDesign = async (conceptBrief: string, note?: string, preparedPrompt?: string): Promise<string | null> => {
     const res = await fetch('/api/admin/ai-generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -311,6 +315,7 @@ export default function AIStudioPanel({
         sourceImages: selectedImages,
         extraInfo,
         chosenConcept: conceptBrief,
+        preparedPrompt,
         note: note?.trim() || undefined,
         postIndex: isPost ? postIndex : undefined,
       }),
@@ -349,13 +354,13 @@ export default function AIStudioPanel({
       // 4) توليد تصميم لكل اتجاه
       setBatchResults([])
       setSelectedBatch(new Set())
-      const results: { title: string; imageUrl: string; brief: string }[] = []
+      const results: DesignResult[] = []
       for (let i = 0; i < concepts.length; i++) {
         setAutoStage(`٤/٤ — توليد التصميم ${i + 1}/${concepts.length}…`)
         const brief = concepts[i].brief ?? concepts[i].title ?? ''
-        const url = await generateOneDesign(brief)
+        const url = await generateOneDesign(brief, undefined, concepts[i].imagePrompt)
         if (url) {
-          const result = { title: concepts[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief }
+          const result = { title: concepts[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief, preparedPrompt: concepts[i].imagePrompt }
           results.push(result)
           setBatchResults(prev => {
             const next = [...prev, result]
@@ -385,13 +390,13 @@ export default function AIStudioPanel({
     setBatchResults([])
     setSelectedBatch(new Set())
     try {
-      const results: { title: string; imageUrl: string; brief: string }[] = []
+      const results: DesignResult[] = []
       for (let i = 0; i < conceptItems.length; i++) {
         setBatchProgress(`جارٍ توليد ${i + 1}/${conceptItems.length}…`)
         const brief = conceptItems[i].brief ?? conceptItems[i].title ?? ''
-        const url = await generateOneDesign(brief)
+        const url = await generateOneDesign(brief, undefined, conceptItems[i].imagePrompt)
         if (url) {
-          const result = { title: conceptItems[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief }
+          const result = { title: conceptItems[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief, preparedPrompt: conceptItems[i].imagePrompt }
           results.push(result)
           setBatchResults(prev => {
             const next = [...prev, result]
@@ -428,7 +433,7 @@ export default function AIStudioPanel({
     if (!note) { showToast('اكتب ملاحظة لإعادة التوليد', 'error'); return }
     setRegenIndex(i)
     try {
-      const url = await generateOneDesign(r.brief, note)
+      const url = await generateOneDesign(r.brief, note, r.preparedPrompt)
       if (url) {
         setBatchResults(prev => {
           const next = prev.map((x, idx) => (idx === i ? { ...x, imageUrl: url } : x))
@@ -479,7 +484,7 @@ export default function AIStudioPanel({
       const updated = [...batchResults]
       for (let i = 0; i < updated.length; i++) {
         setBulkProgress(`جارٍ إعادة التوليد ${i + 1}/${updated.length}…`)
-        const url = await generateOneDesign(updated[i].brief, note)
+        const url = await generateOneDesign(updated[i].brief, note, updated[i].preparedPrompt)
         if (url) {
           updated[i] = { ...updated[i], imageUrl: url }
           setBatchResults(prev => prev.map((x, idx) => idx === i ? { ...x, imageUrl: url } : x))
@@ -500,7 +505,7 @@ export default function AIStudioPanel({
     if (!chosenConcept.trim()) { showToast('لا يوجد اتجاه معتمد', 'error'); return }
     setRegenSingle(true)
     try {
-      const url = await generateOneDesign(chosenConcept, note)
+      const url = await generateOneDesign(chosenConcept, note, chosenPreparedPrompt)
       if (url) { setImageUrl(url); showToast('تم إعادة توليد التصميم بناءً على ملاحظتك', 'success') }
     } finally {
       setRegenSingle(false)
@@ -695,7 +700,7 @@ export default function AIStudioPanel({
                   </p>
                   <button
                     type="button"
-                    onClick={() => setChosenConcept(brief)}
+                    onClick={() => { setChosenConcept(brief); setChosenPreparedPrompt(c.imagePrompt) }}
                     className={`mt-1 w-full rounded-lg py-1 text-[11px] font-bold transition-colors ${
                       isChosen ? 'bg-green text-white' : 'bg-white border border-border text-dark hover:border-green'
                     }`}
@@ -712,7 +717,7 @@ export default function AIStudioPanel({
         </label>
         <textarea
           value={chosenConcept}
-          onChange={(e) => setChosenConcept(e.target.value)}
+          onChange={(e) => { setChosenConcept(e.target.value); setChosenPreparedPrompt(undefined) }}
           placeholder="اضغط «اعتمد للمفرد» على أحد الاتجاهات أعلاه، أو اكتب اتجاهاً يدوياً."
           className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[80px] resize-y"
         />

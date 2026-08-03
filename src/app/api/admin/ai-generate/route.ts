@@ -4,7 +4,7 @@ import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supab
 import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives, buildTweetDirectives } from '@/lib/openai'
 import { logGeneratedDesign } from '@/lib/newsletter'
 import { generateImageWithOpenAI, imageGenerationErrorMessage } from '@/lib/image-generation'
-import { buildStudioSafetyFallbackPrompt } from '@/lib/ai-studio'
+import { buildStudioSafetyFallbackPrompt, prepareConceptImagePrompts } from '@/lib/ai-studio'
 import { compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
 import { completeGenerationJob, failGenerationJob, startGenerationJob, throwIfGenerationCancelled } from '@/lib/generation-jobs'
 
@@ -32,6 +32,7 @@ export async function POST(req: Request) {
     sourceImages?: string[]
     extraInfo?: string
     chosenConcept?: string
+    preparedPrompt?: string
     postIndex?: number
     note?: string
   }
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 })
   }
 
-  const { requestId, step, sourceImage, chosenConcept, postIndex, note, extraInfo } = body
+  const { requestId, step, sourceImage, chosenConcept, preparedPrompt, postIndex, note, extraInfo } = body
   if (!requestId || !step) {
     return NextResponse.json({ error: 'بيانات ناقصة (requestId/step)' }, { status: 400 })
   }
@@ -295,6 +296,12 @@ export async function POST(req: Request) {
         items = []
       }
 
+      items = await prepareConceptImagePrompts(openai, {
+        analysis: priorAnalysis,
+        concepts: items,
+        sourceImageCount: sourceImages.length,
+      })
+
       await saveStep({ concepts: { items, raw: rawText } })
 
       return success({ concepts: items, raw: rawText })
@@ -323,8 +330,11 @@ export async function POST(req: Request) {
       // Persist the chosen concept immediately.
       await saveStep({ chosenConcept: { text: chosenConcept } })
 
-      // 1) Generate the detailed design prompt.
-      const promptCompletion = await chatComplete(openai, {
+      // Use a prompt prepared alongside the three concepts when it is available.
+      // Manual or historical concepts keep the existing on-demand prompt path.
+      const promptCompletion = typeof preparedPrompt === 'string' && preparedPrompt.trim()
+        ? null
+        : await chatComplete(openai, {
         model: OPENAI_MODEL,
         messages: [
           { role: 'system', content: SYS_IMAGE },
@@ -344,9 +354,15 @@ export async function POST(req: Request) {
                 : ''),
           },
         ],
-      })
+        })
 
-      const designPrompt = promptCompletion.choices[0]?.message?.content ?? ''
+      const designPrompt = [
+        typeof preparedPrompt === 'string' ? preparedPrompt.trim() : '',
+        promptCompletion?.choices[0]?.message?.content ?? '',
+        typeof preparedPrompt === 'string' && preparedPrompt.trim() && note?.trim()
+          ? `ADMIN DESIGN NOTE — apply this exactly while preserving every established design requirement: ${note.trim()}`
+          : '',
+      ].filter(Boolean).join('\n\n')
 
       await saveStep({ imagePrompt: designPrompt })
 

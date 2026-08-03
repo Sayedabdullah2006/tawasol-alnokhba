@@ -42,10 +42,11 @@ export async function POST(req: Request) {
     note?: string
     hasVideo?: boolean
     previousConcepts?: string[]
+    preparedPrompt?: string
   }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 }) }
 
-  const { step, title, content, sourceImage, analysis, chosenConcept, note, extraInfo, hasVideo } = body
+  const { step, title, content, sourceImage, analysis, chosenConcept, note, extraInfo, hasVideo, preparedPrompt } = body
   if (!step) return NextResponse.json({ error: 'الخطوة مطلوبة' }, { status: 400 })
   const jobId = await startGenerationJob({ ownerId: user.id, scope: 'standalone', operation: step })
   const success = async (payload: Record<string, unknown>) => {
@@ -88,7 +89,7 @@ export async function POST(req: Request) {
     if (step === 'concepts') {
       if (!analysis) { await failGenerationJob(jobId, new Error('حلّل الخبر أولاً')); return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 }) }
       const excludeTitles = Array.isArray(body.previousConcepts) ? body.previousConcepts : []
-      const items = await generateConcepts(openai, { analysis, newsText, sourceImages, excludeTitles })
+      const items = await generateConcepts(openai, { analysis, newsText, sourceImages, excludeTitles, hasVideo })
       return success({ concepts: items })
     }
 
@@ -98,7 +99,7 @@ export async function POST(req: Request) {
       if (!chosenConcept) { await failGenerationJob(jobId, new Error('اختر اتجاه التصميم أولاً')); return NextResponse.json({ error: 'اختر اتجاه التصميم أولاً' }, { status: 400 }) }
       if (!sourceImages.length) { await failGenerationJob(jobId, new Error('ارفع صورة المصدر أولاً')); return NextResponse.json({ error: 'ارفع صورة المصدر أولاً' }, { status: 400 }) }
 
-      const { imageUrl, prompt } = await generateDesign(openai, { analysis, chosenConcept, sourceImages, note, hasVideo })
+      const { imageUrl, prompt } = await generateDesign(openai, { analysis, chosenConcept, sourceImages, note, hasVideo, preparedPrompt: typeof preparedPrompt === 'string' ? preparedPrompt : undefined })
       // تسجيل التصميم في السجلّ الموحّد (مرشّحي نشرة «النخبة في ٧»)
       await logGeneratedDesign({
         source: 'standalone',
