@@ -21,6 +21,11 @@ const STATUS: Record<InsoCoverageItem['publication_status'], { label: string; cl
 }
 
 const ACTIVE_DAY_STORAGE_KEY = 'inso-2026-active-day'
+const MANUAL_SCHEDULE_HOURS = Array.from({ length: 14 }, (_, index) => index + 9)
+
+type ScheduledCalendarItem = { when: string; status: string }
+
+const isActiveScheduleStatus = (status: string) => !['failed', 'cancelled', 'canceled', 'draft', 'media_import_failed'].includes(status.toLowerCase())
 
 export default function InsoCoveragePage() {
   const { showToast } = useToast()
@@ -35,6 +40,10 @@ export default function InsoCoveragePage() {
   const [scheduleWhen, setScheduleWhen] = useState('')
   const [scheduleText, setScheduleText] = useState('')
   const [scheduleImageUrl, setScheduleImageUrl] = useState('')
+  const [scheduleDate, setScheduleDate] = useState('')
+  const [scheduledCalendarItems, setScheduledCalendarItems] = useState<ScheduledCalendarItem[]>([])
+  const [scheduleAvailabilityLoading, setScheduleAvailabilityLoading] = useState(false)
+  const [scheduleOpenedAt, setScheduleOpenedAt] = useState(0)
   const [cancelScheduleItem, setCancelScheduleItem] = useState<InsoCoverageItem | null>(null)
   const [publishItem, setPublishItem] = useState<InsoCoverageItem | null>(null)
   const [publishText, setPublishText] = useState('')
@@ -95,6 +104,20 @@ export default function InsoCoveragePage() {
   const activeItems = items.filter(item => item.coverage_date === activeDate)
   const phaseForDate = activeItems[0]?.phase ?? 'during'
   const savedDayItems = activeItems.filter(item => savedTexts[item.id]?.trim())
+  const availableManualTimes = useMemo(() => {
+    if (!scheduleDate) return []
+    const booked = scheduledCalendarItems
+      .filter(item => isActiveScheduleStatus(item.status))
+      .map(item => new Date(item.when).getTime())
+      .filter(Number.isFinite)
+    return MANUAL_SCHEDULE_HOURS.map(hour => {
+      const local = `${scheduleDate}T${String(hour).padStart(2, '0')}:00`
+      const timestamp = new Date(`${local}:00+03:00`).getTime()
+      const isFuture = timestamp >= scheduleOpenedAt + 60 * 1000
+      const isFree = booked.every(time => Math.abs(time - timestamp) >= 60 * 60 * 1000)
+      return { local, hour, available: isFuture && isFree }
+    }).filter(slot => slot.available)
+  }, [scheduleDate, scheduledCalendarItems, scheduleOpenedAt])
 
   useEffect(() => {
     if (!activeDate) return
@@ -173,6 +196,14 @@ export default function InsoCoveragePage() {
     setScheduleText(postText)
     setScheduleImageUrl(imageUrl)
     setScheduleWhen('')
+    setScheduleDate(item.coverage_date)
+    setScheduleOpenedAt(Date.now())
+    setScheduleAvailabilityLoading(true)
+    void fetch('/api/admin/schedule')
+      .then(response => response.ok ? response.json() : Promise.reject())
+      .then(data => setScheduledCalendarItems(Array.isArray(data.items) ? data.items : []))
+      .catch(() => showToast('تعذّر جلب المواعيد المجدولة، راجع الوقت قبل التأكيد', 'error'))
+      .finally(() => setScheduleAvailabilityLoading(false))
   }
 
   const shareToWhatsApp = async (item: InsoCoverageItem, imageUrl: string) => {
@@ -527,7 +558,8 @@ export default function InsoCoveragePage() {
         <div className="max-h-[calc(100svh-0.75rem)] w-screen max-w-none space-y-4 overflow-y-auto rounded-t-lg bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl md:max-h-[calc(100dvh-2rem)] md:w-full md:max-w-lg md:rounded-lg md:p-5"><div><h3 className="font-black text-dark">مراجعة وجدولة «{scheduleItem.title}»</h3><p className="mt-1 text-xs text-muted">راجع النص والتصميم المعتمد ثم اختر الموعد بتوقيت السعودية.</p></div>
           {scheduleImageUrl && <div className="overflow-hidden rounded-lg border border-border bg-cream"><img src={scheduleImageUrl} alt={`التصميم المعتمد لمنشور ${scheduleItem.title}`} className="max-h-52 w-full object-contain" /></div>}
           <textarea value={scheduleText} onChange={event => setScheduleText(event.target.value)} className="min-h-36 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm leading-6 text-dark" aria-label="نص المنشور قبل الجدولة" />
-          <input type="datetime-local" value={scheduleWhen} onChange={e => setScheduleWhen(e.target.value)} className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm" />
+          <div className="space-y-2"><label className="block text-xs font-bold text-dark">اليوم</label><input type="date" value={scheduleDate} onChange={e => { setScheduleDate(e.target.value); setScheduleWhen('') }} className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm" /></div>
+          <div className="space-y-2"><div className="flex items-center justify-between gap-2"><label className="block text-xs font-bold text-dark">الأوقات المتاحة</label><span className="text-[11px] text-muted">فاصل ساعة على الأقل</span></div>{scheduleAvailabilityLoading ? <div className="flex items-center gap-2 rounded-lg bg-cream p-3 text-sm text-muted"><LoadingSpinner size="sm" /> جارٍ فحص التقويم...</div> : availableManualTimes.length ? <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">{availableManualTimes.map(slot => <button key={slot.local} type="button" onClick={() => setScheduleWhen(slot.local)} className={`rounded-lg border px-2 py-2 text-sm font-bold transition ${scheduleWhen === slot.local ? 'border-teal-600 bg-teal-600 text-white' : 'border-border bg-white text-dark hover:border-teal-400'}`}>{String(slot.hour).padStart(2, '0')}:00</button>)}</div> : <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">لا توجد أوقات متاحة لهذا اليوم بفاصل ساعة كاملة. اختر يوماً آخر.</p>}</div>
           <div className="flex gap-2"><Button className="flex-1" onClick={schedule} loading={busy === `schedule:${scheduleItem.id}`} disabled={!scheduleText.trim() || !scheduleWhen}>تأكيد الجدولة</Button><Button className="flex-1" variant="outline" onClick={() => { setScheduleItem(null); setScheduleText(''); setScheduleImageUrl('') }}>إلغاء</Button></div>
         </div>
       </div>}

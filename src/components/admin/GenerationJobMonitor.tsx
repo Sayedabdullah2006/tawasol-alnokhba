@@ -8,6 +8,7 @@ interface Job { id: string; scope: string; operation: string; status: 'running' 
 const LABELS: Record<string, string> = {
   analyze: 'تحليل المحتوى', tweets: 'توليد المنشورات', concepts: 'اقتراح الاتجاهات', image: 'توليد التصميم',
   'generate-copy': 'توليد المنشور', 'generate-design': 'توليد التصميم', infographic: 'توليد الإنفوجرافيك', edit: 'تعديل التصميم',
+  'occasion-design': 'توليد تصاميم المناسبات',
 }
 
 export default function GenerationJobMonitor() {

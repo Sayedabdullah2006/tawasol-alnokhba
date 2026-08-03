@@ -23,6 +23,26 @@ interface ScheduleItem {
 }
 
 type ScheduleFilter = 'all' | 'scheduled' | 'unscheduled'
+type SocialTab = 'daily' | 'occasions'
+
+interface OccasionMeta {
+  id: string
+  date: string | null
+  dateLabel: string
+  kind: 'official' | 'global' | 'religious'
+  category: string
+}
+
+interface OccasionItem {
+  id: string
+  post_url: string
+  post_title: string
+  category: string | null
+  design_image_url: string | null
+  tweets: string | null
+  batch_date: string
+  status: string
+}
 
 function formatArabicDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-').map(Number)
@@ -103,6 +123,58 @@ export default function AdminSocialPage() {
   const [cancelScheduleItem, setCancelScheduleItem] = useState<ScheduleItem | null>(null)
   const [cancelScheduleBusy, setCancelScheduleBusy] = useState(false)
   const [scheduleFilter, setScheduleFilter] = useState<ScheduleFilter>('all')
+  const [activeTab, setActiveTab] = useState<SocialTab>('daily')
+  const [occasions, setOccasions] = useState<OccasionMeta[]>([])
+  const [occasionItems, setOccasionItems] = useState<OccasionItem[]>([])
+  const [occasionsLoading, setOccasionsLoading] = useState(false)
+  const [occasionBusy, setOccasionBusy] = useState<string | null>(null)
+  const [occasionText, setOccasionText] = useState<Record<string, string>>({})
+
+  const loadOccasions = async () => {
+    const res = await fetch('/api/admin/social/occasions', { cache: 'no-store' })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json.error || 'تعذر تحميل مناسبات أول سعودي')
+    setOccasions(Array.isArray(json.occasions) ? json.occasions : [])
+    setOccasionItems(Array.isArray(json.items) ? json.items : [])
+  }
+
+  const generateOccasions = async (occasionId?: string) => {
+    const key = occasionId ?? 'all'
+    setOccasionBusy(key)
+    try {
+      const res = await fetch('/api/admin/social/occasions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(occasionId ? { action: 'regenerate', occasionId } : { action: 'generate-all' }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'تعذر توليد المناسبة')
+      await loadOccasions()
+      alert(occasionId ? 'تمت إعادة توليد المنشور والتصميم' : `تم توليد ${json.generated?.length ?? 0} مناسبة وحفظها`)
+    } catch (cause) {
+      alert(cause instanceof Error ? cause.message : 'تعذر التوليد')
+    } finally {
+      setOccasionBusy(null)
+    }
+  }
+
+  const scheduleOccasion = async (item: OccasionItem) => {
+    setOccasionBusy(`schedule:${item.id}`)
+    try {
+      const res = await fetch('/api/admin/social/occasions/schedule', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, content: occasionText[item.id] ?? item.tweets ?? '' }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'تعذرت الجدولة')
+      await loadOccasions()
+      const time = new Intl.DateTimeFormat('ar-SA', { timeZone: 'Asia/Riyadh', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(json.scheduledFor))
+      alert(`تمت الجدولة في ${time} بتوقيت السعودية`)
+    } catch (cause) {
+      alert(cause instanceof Error ? cause.message : 'تعذرت الجدولة')
+    } finally {
+      setOccasionBusy(null)
+    }
+  }
 
   const generateEducation = async () => {
     setEducationBusy(true)
@@ -111,7 +183,7 @@ export default function AdminSocialPage() {
       const res = await fetch('/api/admin/social/education', { method: 'POST' })
       const json = await res.json().catch(() => ({}))
       if (!res.ok || json.success === false) throw new Error(json.error || 'فشل توليد المحتوى التثقيفي')
-      await load()
+      await Promise.all([load(), loadOccasions()])
       alert(json.created ? 'تم توليد 3 منشورات تثقيفية وجدولتها في المواعيد الشاغرة' : 'دفعة المحتوى التثقيفي الحالية موجودة بالفعل')
     } catch (e) {
       alert(e instanceof Error ? e.message : 'فشل توليد المحتوى التثقيفي')
@@ -282,7 +354,7 @@ export default function AdminSocialPage() {
           <h1 className="text-2xl font-black text-dark">🗓️ خطة النشر اليومية</h1>
           <p className="text-sm text-muted mt-0.5">الأخبار المولّدة آلياً من first1saudi.net، مرتّبة بتاريخ كل يوم.</p>
         </div>
-        <div className="shrink-0 flex flex-wrap items-center gap-2">
+        {activeTab === 'daily' && <div className="shrink-0 flex flex-wrap items-center gap-2">
           {/* توليد يدوي لمنشورات إضافية لنفس اليوم */}
           <select
             value={genCount}
@@ -307,8 +379,13 @@ export default function AdminSocialPage() {
           >
             تحديث
           </button>
-        </div>
+        </div>}
       </div>
+      <div className="flex w-full gap-2 overflow-x-auto border-b border-border pb-2" role="tablist" aria-label="أقسام خطة النشر">
+        <button type="button" role="tab" aria-selected={activeTab === 'daily'} onClick={() => setActiveTab('daily')} className={`shrink-0 rounded-lg px-4 py-2 text-sm font-bold transition ${activeTab === 'daily' ? 'bg-dark text-white' : 'text-muted hover:bg-cream hover:text-dark'}`}>خطة النشر والمحتوى التثقيفي</button>
+        <button type="button" role="tab" aria-selected={activeTab === 'occasions'} onClick={() => setActiveTab('occasions')} className={`shrink-0 rounded-lg px-4 py-2 text-sm font-bold transition ${activeTab === 'occasions' ? 'bg-dark text-white' : 'text-muted hover:bg-cream hover:text-dark'}`}>مناسبات أول سعودي</button>
+      </div>
+      {activeTab === 'daily' && <>
       {genBusy && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-3 text-sm flex items-center gap-2">
           <LoadingSpinner size="sm" />
@@ -588,6 +665,99 @@ export default function AdminSocialPage() {
           </div>
         )
       })}
+      </>}
+
+      {activeTab === 'occasions' && (
+        <OccasionsTab
+          occasions={occasions}
+          items={occasionItems}
+          loading={occasionsLoading}
+          busy={occasionBusy}
+          textByItem={occasionText}
+          onTextChange={(id, value) => setOccasionText(current => ({ ...current, [id]: value }))}
+          onGenerateAll={() => generateOccasions()}
+          onRegenerate={generateOccasions}
+          onSchedule={scheduleOccasion}
+          onReload={async () => {
+            setOccasionsLoading(true)
+            try { await loadOccasions() } catch (cause) { alert(cause instanceof Error ? cause.message : 'تعذر التحديث') } finally { setOccasionsLoading(false) }
+          }}
+          onCancel={setCancelScheduleItem}
+        />
+      )}
     </div>
+  )
+}
+
+function OccasionsTab({
+  occasions, items, loading, busy, textByItem, onTextChange, onGenerateAll, onRegenerate, onSchedule, onReload, onCancel,
+}: {
+  occasions: OccasionMeta[]
+  items: OccasionItem[]
+  loading: boolean
+  busy: string | null
+  textByItem: Record<string, string>
+  onTextChange: (id: string, value: string) => void
+  onGenerateAll: () => void
+  onRegenerate: (occasionId: string) => void
+  onSchedule: (item: OccasionItem) => void
+  onReload: () => void
+  onCancel: (item: ScheduleItem) => void
+}) {
+  const itemFor = (occasion: OccasionMeta) => items.find(item => item.post_url === `occasion:${occasion.id}-${occasion.date ?? 'hijri'}`)
+  const kindLabel = (kind: OccasionMeta['kind']) => kind === 'official' ? 'مناسبة سعودية' : kind === 'religious' ? 'عيد رسمي' : 'يوم عالمي'
+  const kindClass = (kind: OccasionMeta['kind']) => kind === 'official' ? 'bg-green/10 text-green' : kind === 'religious' ? 'bg-gold/15 text-dark' : 'bg-teal-100 text-teal-700'
+
+  return (
+    <section className="space-y-4" role="tabpanel">
+      <div className="flex flex-col gap-3 border-b border-green/25 pb-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-xl font-black text-dark">مناسبات أول سعودي</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">منشور واحد وتصميم واحد لكل مناسبة. لا تُجدول أي مناسبة تلقائياً؛ زر الجدولة يختار وقتاً مناسباً في تاريخها مع ترك 90 دقيقة عن أي منشور آخر.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={onReload} disabled={loading || busy !== null} className="rounded-lg border border-border px-4 py-2 text-sm font-bold text-dark disabled:opacity-60">{loading ? 'جارٍ التحديث...' : 'تحديث'}</button>
+          <button type="button" onClick={onGenerateAll} disabled={busy !== null} className="rounded-lg bg-green px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60">{busy === 'all' ? 'جارٍ توليد كل المناسبات...' : 'توليد تصاميم كل المناسبات'}</button>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {occasions.map(occasion => {
+          const item = itemFor(occasion)
+          const itemBusy = busy === occasion.id
+          const scheduleBusy = item ? busy === `schedule:${item.id}` : false
+          return (
+            <article key={`${occasion.id}-${occasion.date}`} className="overflow-hidden rounded-xl border border-border bg-card">
+              {item?.design_image_url && (
+                <a href={item.design_image_url} target="_blank" rel="noreferrer" className="block bg-cream">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={item.design_image_url} alt={item.post_title} className="mx-auto aspect-[4/5] w-full max-w-sm object-cover" />
+                </a>
+              )}
+              <div className="space-y-3 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${kindClass(occasion.kind)}`}>{kindLabel(occasion.kind)}</span>
+                  <span className="text-xs font-bold text-muted">{occasion.date ? formatArabicDate(occasion.date) : 'يُحدد بالتاريخ الهجري'}</span>
+                  {item?.status === 'scheduled' && <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700">مجدول</span>}
+                </div>
+                <div>
+                  <h3 className="font-black text-dark">{occasion.category}</h3>
+                  <p className="mt-1 text-sm text-muted">{occasion.dateLabel}</p>
+                </div>
+                {item ? (
+                  <textarea value={textByItem[item.id] ?? item.tweets ?? ''} onChange={event => onTextChange(item.id, event.target.value)} rows={6} className="w-full resize-y rounded-lg border border-border bg-cream px-3 py-2 text-sm leading-6 text-dark" aria-label={`نص ${occasion.category}`} />
+                ) : (
+                  <div className="rounded-lg bg-cream p-3 text-sm text-muted">لم يتم توليد المنشور والتصميم بعد.</div>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => onRegenerate(`${occasion.id}-${occasion.date ?? 'hijri'}`)} disabled={busy !== null} className="rounded-lg border border-green/35 px-3 py-2 text-sm font-bold text-green disabled:opacity-60">{itemBusy ? 'جارٍ التوليد...' : item ? 'إعادة التوليد' : 'توليد المناسبة'}</button>
+                  {item && item.status !== 'scheduled' && <button type="button" onClick={() => onSchedule(item)} disabled={busy !== null || !occasion.date} className="rounded-lg bg-dark px-3 py-2 text-sm font-bold text-white disabled:opacity-60">{scheduleBusy ? 'جارٍ الجدولة...' : occasion.date ? 'جدولة في وقت مناسب' : 'بانتظار اعتماد التاريخ'}</button>}
+                  {item?.status === 'scheduled' && <button type="button" onClick={() => onCancel(item as ScheduleItem)} className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-bold text-blue-700">إلغاء الجدولة</button>}
+                </div>
+              </div>
+            </article>
+          )
+        })}
+      </div>
+    </section>
   )
 }

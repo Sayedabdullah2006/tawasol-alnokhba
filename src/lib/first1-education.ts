@@ -7,7 +7,7 @@ import { createServiceRoleClient } from '@/lib/supabase-server'
 
 export const FIRST1_EDUCATION_SOURCE = 'first1saudi-educational'
 
-type EducationTopic = {
+export type EducationTopic = {
   id: string
   title: string
   category: string
@@ -16,7 +16,7 @@ type EducationTopic = {
   contentTags: string[]
 }
 
-type GeneratedEducation = {
+export type GeneratedEducation = {
   title: string
   caption: string
   infographicTitle: string
@@ -122,7 +122,7 @@ function normalizeTag(value: string): string | null {
   return tag ? `#${tag}` : null
 }
 
-async function generateCopy(topic: EducationTopic): Promise<GeneratedEducation> {
+export async function generateEducationCopy(topic: EducationTopic): Promise<GeneratedEducation> {
   const completion = await chatComplete(getOpenAI(), {
     model: OPENAI_MODEL,
     response_format: { type: 'json_object' },
@@ -159,7 +159,7 @@ async function generateCopy(topic: EducationTopic): Promise<GeneratedEducation> 
   }
 }
 
-async function generateInfographic(content: GeneratedEducation): Promise<string> {
+export async function generateEducationInfographic(content: GeneratedEducation, filePrefix = 'first1-education'): Promise<string> {
   const service = await createServiceRoleClient()
   const { data: brand } = await service.from('brand_settings').select('first1saudi_logo_url').eq('id', 1).single()
   if (!brand?.first1saudi_logo_url) throw new Error('أضف شعار أول سعودي من إعدادات الهوية أولاً')
@@ -178,7 +178,7 @@ async function generateInfographic(content: GeneratedEducation): Promise<string>
   const { b64 } = await generateImageWithOpenAI(prompt, [], { aspectRatio: '4:5' })
   const poster = await resizeToPoster(Buffer.from(b64, 'base64'))
   const { buffer } = await compositeLogoBottomRight(poster, brand.first1saudi_logo_url, { widthRatio: 0.1 })
-  const path = `first1-education-${Date.now()}-${Math.random().toString(36).slice(2)}.png`
+  const path = `${filePrefix}-${Date.now()}-${Math.random().toString(36).slice(2)}.png`
   const { error } = await service.storage.from('content-images').upload(path, buffer, { contentType: 'image/png' })
   if (error) throw new Error(`تعذّر حفظ التصميم: ${error.message}`)
   return service.storage.from('content-images').getPublicUrl(path).data.publicUrl
@@ -187,8 +187,8 @@ async function generateInfographic(content: GeneratedEducation): Promise<string>
 /** معاينة غير منشورة: تنشئ نصاً وتصميماً واحداً من دون سجل أو جدولة. */
 export async function previewFirst1Education(): Promise<{ title: string; caption: string; designUrl: string }> {
   const topic = topicForDay(riyadhDay())
-  const content = await generateCopy(topic)
-  return { title: content.title, caption: content.caption, designUrl: await generateInfographic(content) }
+  const content = await generateEducationCopy(topic)
+  return { title: content.title, caption: content.caption, designUrl: await generateEducationInfographic(content) }
 }
 
 function isActiveStatus(status: unknown): boolean {
@@ -257,8 +257,8 @@ export async function ensureDailyFirst1Education(): Promise<{ created: boolean; 
 
   const topics = [0, 1, 2].map(offset => topicForDay(dayOffset(today, offset)))
   const prepared = await Promise.all(topics.map(async topic => {
-    const content = await generateCopy(topic)
-    return { topic, content, designUrl: await generateInfographic(content) }
+    const content = await generateEducationCopy(topic)
+    return { topic, content, designUrl: await generateEducationInfographic(content) }
   }))
   const { times: occupied, educationalDays } = await schedulingOccupancy()
   const slots = prepared.map(() => {

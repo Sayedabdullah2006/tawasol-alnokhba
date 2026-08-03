@@ -1,6 +1,6 @@
 import { createServiceRoleClient } from '@/lib/supabase-server'
 
-export type GenerationScope = 'standalone' | 'request' | 'inso'
+export type GenerationScope = 'standalone' | 'request' | 'inso' | 'social'
 
 export async function startGenerationJob(args: {
   ownerId: string

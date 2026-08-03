@@ -5,7 +5,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
-import { uploadMediaFromUrl, publishNow } from '@/lib/postpulse'
+import { listScheduledPosts, uploadMediaFromUrl, publishNow } from '@/lib/postpulse'
 import { sendEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
@@ -35,6 +35,26 @@ export async function POST(req: Request) {
   if (scheduledTime.getTime() < Date.now() + 60 * 1000) {
     return NextResponse.json({ error: 'اختر وقتاً مستقبلياً (بعد الآن بدقيقة على الأقل)' }, { status: 400 })
   }
+
+  // لا نسمح بتزاحم الجدولة اليدوية: ساعة كاملة على الأقل بين أي منشورين.
+  const isActive = (status: unknown) => !['failed', 'cancelled', 'canceled', 'draft', 'media_import_failed'].includes(String(status ?? '').toLowerCase())
+  try {
+    const service = await createServiceRoleClient()
+    const { data: localPosts } = await service
+      .from('postpulse_posts')
+      .select('scheduled_for,status')
+      .gte('scheduled_for', new Date(Date.now() - 60 * 60 * 1000).toISOString())
+    const times = (localPosts ?? [])
+      .filter(post => isActive(post.status) && post.scheduled_for)
+      .map(post => new Date(String(post.scheduled_for)).getTime())
+    try {
+      const remote = await listScheduledPosts()
+      times.push(...remote.filter(post => isActive(post.status)).map(post => new Date(post.when).getTime()))
+    } catch { /* سجلنا المحلي يبقى مرجعاً احتياطياً */ }
+    if (times.some(time => Number.isFinite(time) && Math.abs(time - scheduledTime.getTime()) < 60 * 60 * 1000)) {
+      return NextResponse.json({ error: 'اختر وقتاً يبعد ساعة كاملة على الأقل عن أي منشور مجدول.' }, { status: 409 })
+    }
+  } catch { /* لا نمنع الجدولة عند تعذّر قراءة التقويم، وPostPulse سيبقى المرجع النهائي */ }
 
   try {
     const attachmentPaths: string[] = []
