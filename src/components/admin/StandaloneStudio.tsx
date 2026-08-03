@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
@@ -129,6 +129,7 @@ export default function StandaloneStudio() {
   const [batchResults, setBatchResults] = useState<{ title: string; imageUrl: string; brief: string }[]>([])
   const [batchLoading, setBatchLoading] = useState(false)
   const [batchProgress, setBatchProgress] = useState('')
+  const designResultsRef = useRef<HTMLDivElement | null>(null)
   const [noteByIndex, setNoteByIndex] = useState<Record<number, string>>({})
   const [regenIndex, setRegenIndex] = useState<number | null>(null)
   const [editIndex, setEditIndex] = useState<number | null>(null)
@@ -146,6 +147,12 @@ export default function StandaloneStudio() {
   const [scheduleWhen, setScheduleWhen] = useState('')
   const [schedulingCover, setSchedulingCover] = useState<string | null>(null)
   const [scheduledCover, setScheduledCover] = useState<string | null>(null)
+
+  useEffect(() => {
+    if ((autoBusy || batchLoading) && batchResults.length > 0) {
+      designResultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [autoBusy, batchLoading, batchResults.length])
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -638,7 +645,7 @@ export default function StandaloneStudio() {
         </div>
 
         {batchResults.length > 0 && (
-          <div className="space-y-3 pt-2">
+          <div ref={designResultsRef} className="space-y-3 pt-2">
             {/* إعادة توليد كل التصاميم بملاحظة واحدة (حذف نص/إضافة نص/تعديل عام) */}
             <div className="rounded-xl border border-green/40 bg-green/5 p-3 space-y-2">
               <p className="text-[11px] text-muted">✍️ ملاحظة تُطبَّق على كل التصاميم الثلاثة معاً — مثل: احذف نص «كذا»، أضِف «كذا»، أو تعديل عام على التصميم.</p>

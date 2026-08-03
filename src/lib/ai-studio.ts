@@ -64,6 +64,50 @@ export interface Concept {
   brief?: string
 }
 
+const REQUIRED_STUDIO_CONCEPTS: Array<Required<Concept>> = [
+  {
+    title: 'بطل تحريري سينمائي',
+    mood: 'فخر وطاقة بصرية مركزة',
+    brief: 'لقطة بطولية للصورة المرجعية مع قصّ جريء وإضاءة تحريرية عميقة، عنوان عربي مختصر وكتلة حقائق واضحة ضمن تكوين عمودي ديناميكي.',
+  },
+  {
+    title: 'خريطة إنجاز معلوماتية',
+    mood: 'دقة وحداثة ووضوح',
+    brief: 'تحويل الخبر إلى إنفوجرافيك عربي من اليمين إلى اليسار: الصورة عنصر حي داخل شبكة معلوماتية، مع 3 حقائق قصيرة وأيقونات وخطوط تنظيمية أنيقة.',
+  },
+  {
+    title: 'كولاج مجلة معاصر',
+    mood: 'إلهام وحركة وعمق',
+    brief: 'تكوين تحريري غير متماثل بطبقات وقصّات مائلة ومسار حركة بصري؛ تظهر الصورة ضمن قصة بصرية حديثة مع عنوان قوي وحقائق محدودة.',
+  },
+]
+
+function requireThreeConcepts(value: unknown): Concept[] {
+  const supplied = Array.isArray(value)
+    ? value
+      .filter((entry): entry is Concept => Boolean(entry) && typeof entry === 'object')
+      .map(entry => ({
+        title: typeof entry.title === 'string' ? entry.title.trim() : '',
+        mood: typeof entry.mood === 'string' ? entry.mood.trim() : '',
+        brief: typeof entry.brief === 'string' ? entry.brief.trim() : '',
+      }))
+      .filter(entry => entry.title || entry.brief)
+      .slice(0, 3)
+    : []
+
+  const normalizedTitle = (title?: string) => title?.toLocaleLowerCase('ar-SA') ?? ''
+  const titles = new Set(supplied.map(entry => normalizedTitle(entry.title)).filter(Boolean))
+  for (const fallback of REQUIRED_STUDIO_CONCEPTS) {
+    if (supplied.length === 3) break
+    const fallbackTitle = normalizedTitle(fallback.title)
+    if (!titles.has(fallbackTitle)) {
+      supplied.push(fallback)
+      titles.add(fallbackTitle)
+    }
+  }
+  return supplied.slice(0, 3)
+}
+
 /**
  * أنماط تصميم متمايزة — تُوزَّع على منشورات الدفعة اليومية (نمط مختلف لكل منشور)
  * لضمان تنوّع بصري واضح بدل نمط واحد متكرّر، مع الحفاظ على ثوابت هوية First1Saudi.
@@ -151,10 +195,10 @@ export async function generateConcepts(
   const raw = completion.choices[0]?.message?.content ?? '{}'
   try {
     const p = JSON.parse(raw)
-    if (Array.isArray(p?.concepts)) return p.concepts
-    if (Array.isArray(p)) return p
+    if (Array.isArray(p?.concepts)) return requireThreeConcepts(p.concepts)
+    if (Array.isArray(p)) return requireThreeConcepts(p)
   } catch { /* تجاهل */ }
-  return []
+  return requireThreeConcepts([])
 }
 
 /** يحوّل اتجاهاً مختاراً إلى نص الموجّه (chosenConcept) المُمرَّر لخطوة الصورة. */

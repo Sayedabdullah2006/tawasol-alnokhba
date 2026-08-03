@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
@@ -224,6 +224,7 @@ export default function AIStudioPanel({
   const [batchResults, setBatchResults] = useState<{ title: string; imageUrl: string; brief: string }[]>(initialDesigns)
   const [batchLoading, setBatchLoading] = useState(false)
   const [batchProgress, setBatchProgress] = useState('')
+  const designResultsRef = useRef<HTMLDivElement | null>(null)
   const [selectedBatch, setSelectedBatch] = useState<Set<number>>(new Set(initialDesigns.map((_, i) => i)))
   const [lightbox, setLightbox] = useState<string | null>(null)
   // ملاحظات وإعادة توليد التصاميم
@@ -236,6 +237,12 @@ export default function AIStudioPanel({
   const [bulkNote, setBulkNote] = useState('')
   const [bulkBusy, setBulkBusy] = useState(false)
   const [bulkProgress, setBulkProgress] = useState('')
+
+  useEffect(() => {
+    if ((autoRunning || batchLoading) && batchResults.length > 0) {
+      designResultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [autoRunning, batchLoading, batchResults.length])
 
   const callStep = async (step: StepKey) => {
     setLoadingStep(step)
@@ -732,7 +739,7 @@ export default function AIStudioPanel({
             </div>
           )}
           {batchResults.length > 0 && (
-            <div className="space-y-3">
+            <div ref={designResultsRef} className="space-y-3">
               <p className="text-xs text-muted">اختر التصاميم لإرسالها للعميل، أو اكتب ملاحظة وأعد توليد أي تصميم:</p>
               {/* إعادة توليد كل التصاميم بملاحظة واحدة (حذف نص/إضافة نص/تعديل عام) */}
               <div className="rounded-xl border border-green/40 bg-green/5 p-3 space-y-2">
