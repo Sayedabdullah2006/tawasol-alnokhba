@@ -738,6 +738,12 @@ export default function AIStudioPanel({
               <span>{batchProgress || 'جارٍ التوليد المجمّع…'}</span>
             </div>
           )}
+          {autoRunning && autoStage.includes('توليد التصميم') && (
+            <div className="flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 p-3 text-sm font-bold text-teal-900">
+              <LoadingSpinner size="sm" />
+              <span>{autoStage}</span>
+            </div>
+          )}
           {batchResults.length > 0 && (
             <div ref={designResultsRef} className="space-y-3">
               <p className="text-xs text-muted">اختر التصاميم لإرسالها للعميل، أو اكتب ملاحظة وأعد توليد أي تصميم:</p>

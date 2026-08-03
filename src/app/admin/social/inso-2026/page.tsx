@@ -55,6 +55,7 @@ export default function InsoCoveragePage() {
   const [designHasVideo, setDesignHasVideo] = useState(false)
   const [designUploading, setDesignUploading] = useState(false)
   const [designOptionsGenerating, setDesignOptionsGenerating] = useState(false)
+  const [generatingDesignItemId, setGeneratingDesignItemId] = useState<string | null>(null)
   const [designRevealTarget, setDesignRevealTarget] = useState<string | null>(null)
   const [editOption, setEditOption] = useState<{ item: InsoCoverageItem; optionId: string } | null>(null)
   const [editNote, setEditNote] = useState('')
@@ -379,6 +380,7 @@ export default function InsoCoveragePage() {
   const generateDesignOptions = async () => {
     if (!designItem) return
     setDesignOptionsGenerating(true)
+    setGeneratingDesignItemId(designItem.id)
     try {
       for (let optionIndex = 0; optionIndex < 3; optionIndex += 1) {
         const result = await callAction('generate-design-option', {
@@ -398,6 +400,7 @@ export default function InsoCoveragePage() {
       }
     } finally {
       setDesignOptionsGenerating(false)
+      setGeneratingDesignItemId(null)
     }
   }
 
@@ -579,10 +582,11 @@ export default function InsoCoveragePage() {
             {savedDayItems.map(item => {
               const status = STATUS[item.publication_status]
               const hasApprovedDesign = Boolean(item.design_options?.some(option => option.selected))
+              const isGeneratingDesign = generatingDesignItemId === item.id
               return <article id={`inso-item-${item.id}`} key={item.id} className="w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-teal-200 bg-teal-50/30 p-3 sm:p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h4 className="font-black text-dark">{item.title}</h4><p className="mt-1 text-xs text-muted">محفوظ ضمن محتوى {activeDate ? formatInsoDate(activeDate) : 'اليوم'}</p></div>{item.publication_status === 'scheduled' ? <button type="button" onClick={() => setCancelScheduleItem(item)} className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold transition hover:ring-2 hover:ring-blue-200 ${status.className}`} title="إلغاء الجدولة">{status.label}</button> : <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${status.className}`}>{status.label}</span>}</div>
+                <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h4 className="font-black text-dark">{item.title}</h4><p className="mt-1 text-xs text-muted">محفوظ ضمن محتوى {activeDate ? formatInsoDate(activeDate) : 'اليوم'}</p>{isGeneratingDesign && <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800"><LoadingSpinner size="sm" /> جارٍ توليد التصاميم تباعًا</div>}</div>{item.publication_status === 'scheduled' ? <button type="button" onClick={() => setCancelScheduleItem(item)} className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold transition hover:ring-2 hover:ring-blue-200 ${status.className}`} title="إلغاء الجدولة">{status.label}</button> : <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${status.className}`}>{status.label}</span>}</div>
                 <textarea value={item.post_text ?? ''} onChange={event => replace({ ...item, post_text: event.target.value })} onBlur={() => { if (skipNextTextSave.current === item.id) { skipNextTextSave.current = null; return }; if (item.post_text?.trim()) void callAction('save', { id: item.id, postText: item.post_text }, 'تم حفظ النص ضمن محتوى اليوم') }} className="mt-3 min-h-40 w-full resize-y rounded-lg border border-border bg-white p-3 text-base leading-7 text-dark sm:min-h-32 sm:text-sm sm:leading-6" />
-                <div className="mt-3 flex w-full min-w-0 max-w-full flex-nowrap gap-2 overflow-x-auto overscroll-x-contain pb-1 touch-pan-x sm:flex-wrap sm:overflow-visible"><Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openDesigner(item)}>🎨 توليد 3 تصاميم</Button><Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => rewriteSavedContent(item)} loading={busy === `rewrite-saved:${item.id}`}>إعادة الصياغة</Button>{hasApprovedDesign && <Button size="sm" className="shrink-0" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openPublishDialog(item)} loading={busy === `publish:${item.id}`}>نشر الآن</Button>}<Button size="sm" className="shrink-0 text-red-600 hover:text-red-700" variant="ghost" onClick={() => setDeleteItem(item)}>حذف المحتوى</Button></div>
+                <div className="mt-3 flex w-full min-w-0 max-w-full flex-nowrap gap-2 overflow-x-auto overscroll-x-contain pb-1 touch-pan-x sm:flex-wrap sm:overflow-visible"><Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openDesigner(item)} disabled={isGeneratingDesign}>🎨 توليد 3 تصاميم</Button><Button size="sm" className="shrink-0" variant="outline" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => rewriteSavedContent(item)} loading={busy === `rewrite-saved:${item.id}`}>إعادة الصياغة</Button>{hasApprovedDesign && <Button size="sm" className="shrink-0" variant="ghost" onPointerDown={() => skipTextSaveForAction(item.id)} onClick={() => openPublishDialog(item)} loading={busy === `publish:${item.id}`}>نشر الآن</Button>}<Button size="sm" className="shrink-0 text-red-600 hover:text-red-700" variant="ghost" onClick={() => setDeleteItem(item)}>حذف المحتوى</Button></div>
                 {item.design_options?.length ? <div className="mt-4 flex w-full min-w-0 max-w-full snap-x snap-proximity gap-3 overflow-x-auto overscroll-x-contain pb-2 touch-pan-x lg:grid lg:grid-cols-3 lg:overflow-visible">{item.design_options.map(option => { const isScheduledOption = item.publication_status === 'scheduled' && (Boolean(option.scheduledFor) || option.imageUrl === item.design_url); return <div key={option.id} className={`w-[62vw] max-w-56 shrink-0 snap-start overflow-hidden rounded-lg border lg:w-auto lg:max-w-none ${option.selected ? 'border-teal-500 bg-teal-50/40' : 'border-border bg-white'}`}>
                   <button type="button" onClick={() => setDesignPreview({ title: `${item.title} - ${option.title}`, imageUrl: option.imageUrl })} className="relative block w-full" title="تكبير التصميم" aria-label={`تكبير ${option.title}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -639,6 +639,7 @@ export default function StandaloneStudio() {
         <StepHead n={4} title="التصاميم" subtitle="صمّم الاتجاهات أو الاتجاه المعتمد" done={batchResults.length > 0} />
         <Button onClick={designAll} loading={batchLoading} disabled={autoBusy || batchLoading || loadingStep !== null || !analysis || !selectedImages.length || conceptItems.length === 0} size="sm">🎨 صمّم الاتجاهات الثلاثة</Button>
         {batchLoading && <div className="flex items-center gap-2 text-sm text-muted"><LoadingSpinner size="sm" /><span>{batchProgress || 'جارٍ التوليد…'}</span></div>}
+        {autoBusy && autoStage.includes('توليد التصميم') && <div className="mt-3 flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 p-3 text-sm font-bold text-teal-900"><LoadingSpinner size="sm" /><span>{autoStage}</span></div>}
         <div className="border-t border-border pt-3">
           <p className="text-xs text-muted mb-2">أو صمّم الاتجاه المعتمد (تصميم واحد):</p>
           <Button onClick={() => callStep('image')} loading={loadingStep === 'image'} disabled={autoBusy || loadingStep !== null || batchLoading || !analysis || !selectedImages.length || !chosenConcept.trim()} variant="outline" size="sm">صمّم الصورة (مفرد)</Button>
