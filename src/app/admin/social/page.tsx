@@ -129,6 +129,7 @@ export default function AdminSocialPage() {
   const [occasionsLoading, setOccasionsLoading] = useState(false)
   const [occasionBusy, setOccasionBusy] = useState<string | null>(null)
   const [generatingAllOccasions, setGeneratingAllOccasions] = useState(false)
+  const [occasionGenerationProgress, setOccasionGenerationProgress] = useState({ completed: 0, total: 0 })
   const [occasionText, setOccasionText] = useState<Record<string, string>>({})
   const [occasionDates, setOccasionDates] = useState<Record<string, string>>({})
 
@@ -178,25 +179,34 @@ export default function AdminSocialPage() {
       alert(cause instanceof Error ? cause.message : 'تعذر تحميل قائمة المناسبات')
       return
     }
+    const currentYear = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Riyadh', year: 'numeric' }).format(new Date())
+    queue = queue.filter(occasion => occasion.date?.startsWith(`${currentYear}-`))
     if (!queue.length) {
       setGeneratingAllOccasions(false)
-      alert('تعذر تحميل قائمة المناسبات. حدّث الصفحة ثم حاول مرة أخرى.')
+      alert('لا توجد مناسبات متبقية للسنة الحالية لتوليدها.')
       return
     }
-    for (const occasion of queue) {
-      const occasionId = `${occasion.id}-${occasion.date ?? 'hijri'}`
-      setOccasionBusy(occasionId)
-      try {
-        await requestOccasionGeneration(occasionId)
-        completed += 1
-        await loadOccasions()
-      } catch {
-        failed += 1
-      } finally {
-        setOccasionBusy(null)
+    setOccasionGenerationProgress({ completed: 0, total: queue.length })
+    let nextIndex = 0
+    const worker = async () => {
+      while (nextIndex < queue.length) {
+        const occasion = queue[nextIndex]
+        nextIndex += 1
+        const occasionId = `${occasion.id}-${occasion.date ?? 'hijri'}`
+        try {
+          await requestOccasionGeneration(occasionId)
+          completed += 1
+          await loadOccasions()
+        } catch {
+          failed += 1
+        } finally {
+          setOccasionGenerationProgress({ completed: completed + failed, total: queue.length })
+        }
       }
     }
+    await Promise.all([worker(), worker()])
     setGeneratingAllOccasions(false)
+    setOccasionGenerationProgress({ completed: 0, total: 0 })
     alert(failed ? `تم توليد ${completed} مناسبة، وتعذر توليد ${failed}` : `تم توليد ${completed} مناسبة وحفظها`)
   }
 
@@ -722,6 +732,7 @@ export default function AdminSocialPage() {
           loading={occasionsLoading}
           busy={occasionBusy}
           generatingAll={generatingAllOccasions}
+          generationProgress={occasionGenerationProgress}
           textByItem={occasionText}
           onTextChange={(id, value) => setOccasionText(current => ({ ...current, [id]: value }))}
           dateByItem={occasionDates}
@@ -741,13 +752,14 @@ export default function AdminSocialPage() {
 }
 
 function OccasionsTab({
-  occasions, items, loading, busy, generatingAll, textByItem, onTextChange, dateByItem, onDateChange, onGenerateAll, onRegenerate, onSchedule, onReload, onCancel,
+  occasions, items, loading, busy, generatingAll, generationProgress, textByItem, onTextChange, dateByItem, onDateChange, onGenerateAll, onRegenerate, onSchedule, onReload, onCancel,
 }: {
   occasions: OccasionMeta[]
   items: OccasionItem[]
   loading: boolean
   busy: string | null
   generatingAll: boolean
+  generationProgress: { completed: number; total: number }
   textByItem: Record<string, string>
   onTextChange: (id: string, value: string) => void
   dateByItem: Record<string, string>
@@ -789,7 +801,7 @@ function OccasionsTab({
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={onReload} disabled={loading || busy !== null || generatingAll} className="rounded-lg border border-border px-4 py-2 text-sm font-bold text-dark disabled:opacity-60">{loading ? 'جارٍ التحديث...' : 'تحديث'}</button>
-          <button type="button" onClick={onGenerateAll} disabled={busy !== null || generatingAll || selectedYear !== currentYear} className="rounded-lg bg-green px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60">{generatingAll ? 'جارٍ إعادة التوليد تباعاً...' : selectedYear !== currentYear ? 'التوليد للسنة الحالية فقط' : hasGeneratedDesigns ? 'إعادة توليد كل التصاميم' : 'توليد تصاميم كل المناسبات'}</button>
+          <button type="button" onClick={onGenerateAll} disabled={busy !== null || generatingAll || selectedYear !== currentYear} className="rounded-lg bg-green px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60">{generatingAll ? `جارٍ التوليد: ${generationProgress.completed} من ${generationProgress.total}` : selectedYear !== currentYear ? 'التوليد للسنة الحالية فقط' : hasGeneratedDesigns ? 'إعادة توليد كل التصاميم' : 'توليد تصاميم كل المناسبات'}</button>
         </div>
       </div>
       <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-cream p-3">
