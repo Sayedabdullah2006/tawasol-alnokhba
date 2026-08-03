@@ -1,6 +1,6 @@
 /**
  * جدولة منشور في موعد محدّد (بتوقيت السعودية) لكل القنوات عبر Post-Pulse.
- * أدمن فقط. body: { content, imageUrl?, scheduledLocal: "YYYY-MM-DDTHH:mm", accountIds?, socialScheduleId? }
+ * أدمن فقط. body: { content, imageUrl?, mediaType?: 'video', scheduledLocal: "YYYY-MM-DDTHH:mm", accountIds?, socialScheduleId? }
  * scheduledLocal يُفسَّر كتوقيت السعودية (UTC+3).
  */
 import { NextResponse } from 'next/server'
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
 
-  let body: { content?: string; imageUrl?: string; scheduledLocal?: string; accountIds?: number[]; requestId?: string; notifyClient?: boolean; socialScheduleId?: string }
+  let body: { content?: string; imageUrl?: string; mediaType?: 'video'; scheduledLocal?: string; accountIds?: number[]; requestId?: string; notifyClient?: boolean; socialScheduleId?: string }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 }) }
 
   const content = (body.content ?? '').trim()
@@ -67,6 +67,7 @@ export async function POST(req: Request) {
       attachmentPaths,
       accountIds: Array.isArray(body.accountIds) && body.accountIds.length ? body.accountIds : undefined,
       scheduledTime: scheduledTime.toISOString(),
+      mediaType: body.mediaType === 'video' ? 'video' : undefined,
     })
 
     // تسجيل المنشور المجدول للتتبّع

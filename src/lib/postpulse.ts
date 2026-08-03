@@ -133,28 +133,39 @@ function extractMediaPath(confirm: unknown, fallbackKey: string): string {
 }
 
 /**
- * يرفع صورة إلى Post-Pulse عبر الرابط (presign → PUT → confirm). لا ينشر شيئاً.
+ * يرفع صورة أو فيديو إلى Post-Pulse عبر الرابط (presign → PUT → confirm). لا ينشر شيئاً.
  * يعيد { path, raw }: path هو مسار الوسائط المستخدم في attachmentPaths.
  */
-export async function uploadMediaFromUrl(imageUrl: string): Promise<{ path: string; raw: unknown }> {
+export async function uploadMediaFromUrl(mediaUrl: string): Promise<{ path: string; raw: unknown }> {
   const token = await getValidAccessToken()
 
-  // 1) جلب بايتات الصورة من تخزيننا
-  const imgRes = await fetch(imageUrl)
-  if (!imgRes.ok) throw new Error(`تعذّر جلب الصورة: ${imgRes.status}`)
-  const contentType = imgRes.headers.get('content-type') || 'image/png'
-  let bytes: Buffer = Buffer.from(await imgRes.arrayBuffer())
+  // 1) جلب بايتات الوسيط من تخزيننا
+  const mediaRes = await fetch(mediaUrl)
+  if (!mediaRes.ok) throw new Error(`تعذّر جلب الملف: ${mediaRes.status}`)
+  const contentType = (mediaRes.headers.get('content-type') || 'application/octet-stream').split(';')[0].toLowerCase()
+  let bytes: Buffer = Buffer.from(await mediaRes.arrayBuffer())
   // بعض المنصّات (تيك توك) ترفض أي صورة يتجاوز أحد أبعادها 1080px.
   // نصغّر أطول ضلع إلى 1080 مع الحفاظ على النسبة (بلا تكبير) لتقبلها كل القنوات.
-  try {
-    const meta = await sharp(bytes).metadata()
-    if (Math.max(meta.width ?? 0, meta.height ?? 0) > 1080) {
-      bytes = await sharp(bytes)
-        .resize({ width: 1080, height: 1080, fit: 'inside', withoutEnlargement: true })
-        .toBuffer()
-    }
-  } catch { /* إن تعذّر التصغير نُبقي الصورة الأصلية */ }
-  const ext = contentType.includes('jpeg') || contentType.includes('jpg') ? 'jpg' : contentType.includes('webp') ? 'webp' : 'png'
+  if (contentType.startsWith('image/')) {
+    try {
+      const meta = await sharp(bytes).metadata()
+      if (Math.max(meta.width ?? 0, meta.height ?? 0) > 1080) {
+        bytes = await sharp(bytes)
+          .resize({ width: 1080, height: 1080, fit: 'inside', withoutEnlargement: true })
+          .toBuffer()
+      }
+    } catch { /* إن تعذّر التصغير نُبقي الصورة الأصلية */ }
+  }
+  const extensionByType: Record<string, string> = {
+    'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
+    'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov',
+  }
+  const ext = extensionByType[contentType] || (() => {
+    try {
+      const candidate = new URL(mediaUrl).pathname.split('.').pop()?.toLowerCase()
+      return candidate && /^[a-z0-9]{2,5}$/.test(candidate) ? candidate : 'bin'
+    } catch { return 'bin' }
+  })()
   const filename = `nukhba-${Date.now()}.${ext}`
 
   // 2) طلب رابط رفع موقّع
@@ -228,10 +239,10 @@ export async function uploadMediaFromUrl(imageUrl: string): Promise<{ path: stri
 
 // إعدادات المنصّة المطلوبة لكل قناة (لكل منصّة حقول إلزامية مختلفة).
 // title يُمرَّر لمنصّات تتطلّبه (TikTok/YouTube) حيث يكون content وصفاً.
-function platformSettingsFor(platform: string, title: string): Record<string, unknown> {
+function platformSettingsFor(platform: string, title: string, mediaType?: 'video'): Record<string, unknown> {
   switch ((platform || '').toUpperCase()) {
     case 'INSTAGRAM':
-      return { type: 'INSTAGRAM', publicationType: 'FEED' }
+      return { type: 'INSTAGRAM', publicationType: mediaType === 'video' ? 'REELS' : 'FEED' }
     case 'TIKTOK':
       return {
         type: 'TIKTOK',
@@ -246,7 +257,7 @@ function platformSettingsFor(platform: string, title: string): Record<string, un
     case 'LINKEDIN':
       return { type: 'LINKEDIN' }
     case 'FACEBOOK':
-      return { type: 'FACEBOOK' }
+      return mediaType === 'video' ? { type: 'FACEBOOK', publicationType: 'REELS' } : { type: 'FACEBOOK' }
     case 'YOUTUBE':
       return { type: 'YOUTUBE', title }
     default:
@@ -275,6 +286,7 @@ export async function publishNow(args: {
   accountIds?: number[]
   platforms?: string[] // قصر النشر على منصّات بعينها (مثل ['X_TWITTER'])
   scheduledTime?: string // ISO UTC — افتراضياً الآن (نشر فوري)
+  mediaType?: 'video'
 }): Promise<{ result: unknown; accountIds: number[]; scheduleId: string | null }> {
   const token = await getValidAccessToken()
 
@@ -304,7 +316,7 @@ export async function publishNow(args: {
       isDraft: false,
       publications: targets.map((a) => ({
         socialMediaAccountId: Number(a.id),
-        platformSettings: platformSettingsFor(String(a.platform ?? ''), title),
+        platformSettings: platformSettingsFor(String(a.platform ?? ''), title, args.mediaType),
         posts: [post],
       })),
     }),

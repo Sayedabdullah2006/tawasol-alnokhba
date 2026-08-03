@@ -1,7 +1,7 @@
 /**
  * النشر الفعلي عبر Post-Pulse: يرفع التصميم ثم ينشر النص + التصميم إلى الحسابات
  * المربوطة (كلها افتراضياً). أدمن فقط.
- * body: { content, imageUrl, accountIds?, requestId?, postIndex? }
+ * body: { content, imageUrl, mediaType?: 'video', accountIds?, requestId?, postIndex? }
  */
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
 
-  let body: { content?: string; imageUrl?: string; accountIds?: number[]; requestId?: string; postIndex?: number }
+  let body: { content?: string; imageUrl?: string; mediaType?: 'video'; accountIds?: number[]; requestId?: string; postIndex?: number }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 }) }
 
   const content = (body.content ?? '').trim()
@@ -39,6 +39,7 @@ export async function POST(req: Request) {
       content: content || ' ',
       attachmentPaths,
       accountIds: Array.isArray(body.accountIds) && body.accountIds.length ? body.accountIds : undefined,
+      mediaType: body.mediaType === 'video' ? 'video' : undefined,
     })
 
     // 3) تسجيل المنشور لتتبّع حالته عبر الـ webhook

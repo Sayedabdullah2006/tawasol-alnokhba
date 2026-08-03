@@ -62,6 +62,13 @@ export default function InsoCoveragePage() {
   const [addingSaved, setAddingSaved] = useState(false)
   const [savedTitle, setSavedTitle] = useState('')
   const [savedContent, setSavedContent] = useState('')
+  const [videoDialogOpen, setVideoDialogOpen] = useState(false)
+  const [videoText, setVideoText] = useState('')
+  const [videoUrl, setVideoUrl] = useState('')
+  const [videoName, setVideoName] = useState('')
+  const [videoScheduleWhen, setVideoScheduleWhen] = useState('')
+  const [videoUploading, setVideoUploading] = useState(false)
+  const [videoPublishing, setVideoPublishing] = useState<'publish' | 'schedule' | null>(null)
   const [generatingPending, setGeneratingPending] = useState(false)
   const [exportingReport, setExportingReport] = useState(false)
   const skipNextTextSave = useRef<string | null>(null)
@@ -409,6 +416,61 @@ export default function InsoCoveragePage() {
     if (removed) setDeleteItem(null)
   }
 
+  const openVideoDialog = () => {
+    setVideoText('')
+    setVideoUrl('')
+    setVideoName('')
+    setVideoScheduleWhen('')
+    setVideoDialogOpen(true)
+  }
+
+  const uploadVideo = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    const allowed = ['video/mp4', 'video/webm', 'video/quicktime'].includes(file.type) || /\.(mp4|webm|mov)$/i.test(file.name)
+    if (!allowed) { showToast('ارفق مقطع MP4 أو MOV أو WEBM', 'error'); return }
+    if (file.size > 100 * 1024 * 1024) { showToast('الحد الأقصى لحجم الفيديو 100 ميجابايت', 'error'); return }
+    setVideoUploading(true)
+    try {
+      const extension = file.name.split('.').pop()?.toLowerCase() || 'mp4'
+      const path = `inso-video-${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`
+      const { error } = await supabase.storage.from('content-images').upload(path, file, { contentType: file.type || 'video/mp4' })
+      if (error) throw error
+      const { data } = supabase.storage.from('content-images').getPublicUrl(path)
+      setVideoUrl(data.publicUrl)
+      setVideoName(file.name)
+      showToast('تم رفع الفيديو وجاهز للمراجعة', 'success')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'تعذّر رفع الفيديو', 'error')
+    } finally {
+      setVideoUploading(false)
+    }
+  }
+
+  const submitVideo = async (mode: 'publish' | 'schedule') => {
+    if (!videoText.trim() || !videoUrl) { showToast('أدخل النص وارفع مقطع الفيديو أولاً', 'error'); return }
+    if (mode === 'schedule' && !videoScheduleWhen) { showToast('حدّد تاريخ ووقت الجدولة', 'error'); return }
+    setVideoPublishing(mode)
+    try {
+      const response = await fetch(mode === 'publish' ? '/api/postpulse/publish' : '/api/postpulse/schedule', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: videoText.trim(), imageUrl: videoUrl, mediaType: 'video',
+          ...(mode === 'schedule' ? { scheduledLocal: videoScheduleWhen } : {}),
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || (mode === 'publish' ? 'فشل نشر الفيديو' : 'فشلت جدولة الفيديو'))
+      showToast(mode === 'publish' ? 'تم نشر الفيديو عبر القنوات المتصلة' : 'تمت جدولة الفيديو عبر القنوات المتصلة', 'success')
+      setVideoDialogOpen(false)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'تعذّر تنفيذ العملية', 'error')
+    } finally {
+      setVideoPublishing(null)
+    }
+  }
+
   const exportCampaignReport = async () => {
     setExportingReport(true)
     try {
@@ -471,12 +533,22 @@ export default function InsoCoveragePage() {
         <section className="space-y-3 border-t border-border pt-5" aria-label="المحتوى المحفوظ لليوم">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div><h3 className="font-black text-dark">المحتوى المحفوظ لليوم</h3><p className="text-xs text-muted">تظهر هنا النصوص التي تم حفظها من منشورات هذا التبويب.</p></div>
-            <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800">{savedDayItems.length} نصوص محفوظة</span>{activeItems.some(item => !item.post_text?.trim()) && <Button size="sm" variant="outline" onClick={generatePendingPosts} loading={generatingPending}>✨ توليد المنشورات المتبقية</Button>}<Button size="sm" variant="outline" onClick={() => setAddingSaved(current => !current)}>＋ إضافة منشور محفوظ</Button></div>
+            <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800">{savedDayItems.length} نصوص محفوظة</span>{activeItems.some(item => !item.post_text?.trim()) && <Button size="sm" variant="outline" onClick={generatePendingPosts} loading={generatingPending}>✨ توليد المنشورات المتبقية</Button>}<Button size="sm" variant="outline" onClick={() => setAddingSaved(current => !current)}>＋ إضافة منشور محفوظ</Button><Button size="sm" variant="outline" onClick={openVideoDialog}>نشر فيديو</Button></div>
           </div>
           {addingSaved && <div className="space-y-3 rounded-lg border border-teal-200 bg-teal-50 p-4">
             <input value={savedTitle} onChange={event => setSavedTitle(event.target.value)} placeholder="عنوان المنشور" className="w-full rounded-lg border border-teal-200 bg-white px-3 py-2 text-sm" />
             <textarea value={savedContent} onChange={event => setSavedContent(event.target.value)} placeholder="اكتب النص الجاهز للنشر..." className="min-h-32 w-full resize-y rounded-lg border border-teal-200 bg-white p-3 text-sm leading-6" />
             <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={rewriteSavedPost} loading={busy === 'rewrite-saved:'} disabled={!savedContent.trim()}>إعادة الصياغة</Button><Button size="sm" onClick={addSavedPost} loading={busy?.startsWith('add-saved:')}>حفظ وبدء التصميم</Button><Button size="sm" variant="ghost" onClick={() => setAddingSaved(false)}>إلغاء</Button></div>
+          </div>}
+          {videoDialogOpen && <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 md:items-center md:p-4" role="dialog" aria-modal="true" aria-label="نشر فيديو">
+            <div className="max-h-[calc(100svh-0.75rem)] w-screen max-w-none space-y-4 overflow-y-auto rounded-t-lg bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl md:max-h-[calc(100dvh-2rem)] md:w-full md:max-w-xl md:rounded-lg md:p-5">
+              <div><h3 className="font-black text-dark">نشر فيديو</h3><p className="mt-1 text-xs leading-5 text-muted">اكتب النص وارفع المقطع، ثم انشره الآن أو حدّد موعدًا للنشر بتوقيت السعودية.</p></div>
+              <textarea value={videoText} onChange={event => setVideoText(event.target.value)} placeholder="نص المنشور المصاحب للفيديو..." className="min-h-36 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm leading-6 text-dark" />
+              <div className="space-y-2"><p className="text-sm font-bold text-dark">مقطع الفيديو</p><label className="flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-border bg-white px-3 text-sm font-bold text-dark hover:bg-cream"><input type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" onChange={uploadVideo} disabled={videoUploading} className="sr-only" />{videoUploading ? 'جارٍ رفع الفيديو...' : videoName || 'اختيار فيديو (MP4 / MOV / WEBM)'}</label><p className="text-[11px] text-muted">حتى 100 ميجابايت.</p></div>
+              {videoUrl && <video src={videoUrl} controls playsInline className="max-h-64 w-full rounded-lg border border-border bg-black" />}
+              <div className="space-y-2"><label className="block text-sm font-bold text-dark">موعد الجدولة (اختياري)</label><input type="datetime-local" value={videoScheduleWhen} onChange={event => setVideoScheduleWhen(event.target.value)} className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-dark" /><p className="text-[11px] text-muted">عند الجدولة يحافظ النظام على فارق ساعة على الأقل عن أي منشور آخر.</p></div>
+              <div className="flex flex-wrap gap-2"><Button className="flex-1" onClick={() => submitVideo('publish')} loading={videoPublishing === 'publish'} disabled={videoUploading || !!videoPublishing || !videoText.trim() || !videoUrl}>نشر الآن</Button><Button className="flex-1" variant="outline" onClick={() => submitVideo('schedule')} loading={videoPublishing === 'schedule'} disabled={videoUploading || !!videoPublishing || !videoText.trim() || !videoUrl || !videoScheduleWhen}>جدولة الفيديو</Button><Button variant="ghost" onClick={() => setVideoDialogOpen(false)} disabled={!!videoPublishing}>إلغاء</Button></div>
+            </div>
           </div>}
           {savedDayItems.length ? <div className="space-y-3">
             {savedDayItems.map(item => {
