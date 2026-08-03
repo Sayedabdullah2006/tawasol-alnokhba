@@ -78,14 +78,20 @@ export async function POST(request: Request) {
   const jobId = await startGenerationJob({ ownerId: auth.user.id, scope: 'social', operation: 'occasion-design' })
   try {
     const done: { id: string; title: string }[] = []
-    const failed: string[] = []
+    const failed: { id: string; error: string }[] = []
     for (let index = 0; index < requested.length; index += 3) {
       await throwIfGenerationCancelled(jobId)
       const results = await Promise.allSettled(requested.slice(index, index + 3).map(async occasionId => ({ occasionId, ...(await saveOccasion(occasionId)) })))
       results.forEach((result, offset) => {
         if (result.status === 'fulfilled') done.push({ id: result.value.occasionId, title: result.value.title })
-        else failed.push(requested[index + offset])
+        else failed.push({
+          id: requested[index + offset],
+          error: result.reason instanceof Error ? result.reason.message : 'تعذر توليد المناسبة',
+        })
       })
+    }
+    if (body.action === 'regenerate' && !done.length) {
+      throw new Error(failed[0]?.error ?? 'تعذر توليد المناسبة')
     }
     await completeGenerationJob(jobId, { generated: done.length, failed: failed.length })
     return NextResponse.json({ ok: true, generated: done, failed })
