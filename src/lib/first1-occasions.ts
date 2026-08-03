@@ -23,6 +23,31 @@ const CROWN_PRINCE_REFERENCE = 'https://cc-cdn.spa.gov.sa/mashaa/media/fqmjddb0/
 const NATIONAL_DESIGN = 'The two supplied official portraits are mandatory. Keep King Salman bin Abdulaziz and Crown Prince Mohammed bin Salman recognizably faithful to their exact facial identities, age, attire, and dignified appearance. Do not redraw, alter, beautify, swap, crop, or omit either portrait. Present both as respectful photographic portraits in a balanced national celebratory composition with Saudi green, elegant gold, subtle heritage patterns, and a refined national mood. Do not use flags incorrectly, fake seals, fictional architecture, or unrelated people.'
 const EID_DESIGN = 'Create a warm, premium Saudi Eid greeting design inspired by the occasion: an elegant crescent, soft lantern light, subtle Saudi geometric and palm motifs, and a refined festive atmosphere. No people, no portraits, no fake logos, no large empty panels, and no excessive decoration. The design must feel like a sincere modern Eid greeting, not an infographic.'
 
+type SaudiAchievement = {
+  context: string
+  visualInstruction: string
+}
+
+// Curated, source-backed connections only. Occasions without a genuine Saudi link remain global.
+const SAUDI_ACHIEVEMENTS: Record<string, SaudiAchievement> = {
+  'women-science': {
+    context: 'في 2023 أصبحت ريانة برناوي أول رائدة فضاء سعودية، ووصلت ضمن مهمة SSA-HSF1 إلى محطة الفضاء الدولية. كانت أخصائية أبحاث في المختبرات قبل رحلتها، ولذلك ترتبط قصتها مباشرة بالمرأة في العلوم.',
+    visualInstruction: 'Include a subtle, respectful Saudi women-in-science and space-research visual cue inspired by a laboratory-to-space journey. Do not portray a real person or claim a likeness.',
+  },
+  'space-flight': {
+    context: 'انطلقت مهمة SSA-HSF1 في 21 مايو 2023 حاملة ريانة برناوي وعلي القرني إلى محطة الفضاء الدولية، مع 14 تجربة بحثية سعودية في بيئة الجاذبية الصغرى.',
+    visualInstruction: 'Show a credible Saudi human-spaceflight research journey: orbit, scientific experiment modules, and a small Saudi science cue. No fictional spacecraft, cities, or buildings.',
+  },
+  'space-week': {
+    context: 'انطلقت مهمة SSA-HSF1 في 2023 حاملة أول طاقم رائدة ورائد فضاء سعوديين إلى محطة الفضاء الدولية، مع تجارب بحثية في بيئة الجاذبية الصغرى.',
+    visualInstruction: 'Show credible space-science visual language with a Saudi research cue, orbit and experiment motifs. Avoid fictional architecture and do not depict real astronauts as identifiable portraits.',
+  },
+  'ip-day': {
+    context: 'أطلقت المملكة الاستراتيجية الوطنية للملكية الفكرية عام 2022، وهي أحد ممكنات رؤية السعودية 2030 لبناء منظومة تدعم الاقتصاد القائم على الابتكار وتحفز تنافسية الإبداع.',
+    visualInstruction: 'Connect the intellectual-property theme to Saudi innovation through an elegant patent, protected idea and national innovation ecosystem visual. Do not use official seals or fake logos.',
+  },
+}
+
 const OCCASIONS: AnnualOccasion[] = [
   { id: 'education-day', month: 1, day: 24, dateLabel: '24 يناير', kind: 'global', title: 'المعرفة هي أول اختراع', category: 'اليوم الدولي للتعليم', sourceUrl: 'https://www.un.org/en/observances/international-day-education', facts: ['التعليم يفتح باب اكتساب المعرفة والمهارات اللازمة للمستقبل.', 'كل رحلة إنجاز تبدأ بسؤال جيد ورغبة حقيقية في التعلم.'], contentTags: ['#التعليم', '#تمكين_المواهب'] },
   { id: 'women-science', month: 2, day: 11, dateLabel: '11 فبراير', kind: 'global', title: 'العلم يتسع لكل موهبة', category: 'اليوم الدولي للمرأة والفتاة في العلوم', sourceUrl: 'https://www.un.org/en/observances/women-and-girls-in-science-day', facts: ['مشاركة الفتيات والنساء في العلوم توسع دائرة الحلول والأفكار.', 'الموهبة العلمية تكبر بالفرص والتجربة والثقة.'], contentTags: ['#المرأة_في_العلوم', '#موهبة'] },
@@ -55,7 +80,12 @@ function nextAnnualDate(month: number, day: number): string {
 }
 
 export function getFirst1Occasions(): First1Occasion[] {
-  return OCCASIONS.map(occasion => ({ ...occasion, date: occasion.month && occasion.day ? nextAnnualDate(occasion.month, occasion.day) : null }))
+  return OCCASIONS.map(occasion => ({
+    ...occasion,
+    generationContext: SAUDI_ACHIEVEMENTS[occasion.id]?.context,
+    designInstructions: [occasion.designInstructions, SAUDI_ACHIEVEMENTS[occasion.id]?.visualInstruction].filter(Boolean).join(' '),
+    date: occasion.month && occasion.day ? nextAnnualDate(occasion.month, occasion.day) : null,
+  }))
 }
 
 export function occasionKey(occasion: First1Occasion): string {
@@ -67,7 +97,15 @@ export async function generateFirst1Occasion(occasion: First1Occasion) {
     ? eidGreeting(occasion)
     : occasion.kind === 'official'
       ? nationalGreeting(occasion)
-      : await generateEducationCopy({ id: occasionKey(occasion), title: occasion.title, category: occasion.category, sourceUrl: occasion.sourceUrl, facts: occasion.facts, contentTags: occasion.contentTags })
+      : await generateEducationCopy({
+        id: occasionKey(occasion),
+        title: occasion.title,
+        category: occasion.category,
+        sourceUrl: occasion.sourceUrl,
+        facts: occasion.facts,
+        contentTags: occasion.contentTags,
+        generationContext: occasion.generationContext,
+      })
   return {
     content,
     designUrl: await generateEducationInfographic(content, 'first1-occasion', {

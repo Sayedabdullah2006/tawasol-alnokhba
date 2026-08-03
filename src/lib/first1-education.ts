@@ -15,6 +15,7 @@ export type EducationTopic = {
   facts: string[]
   contentTags: string[]
   format?: 'insight' | 'how-to'
+  generationContext?: string
 }
 
 export type GeneratedEducation = {
@@ -195,7 +196,7 @@ export async function generateEducationCopy(topic: EducationTopic): Promise<Gene
       },
       {
         role: 'user',
-        content: `الموضوع: ${topic.title}\nالتصنيف: ${topic.category}\nالحقائق المسموح بها فقط:\n- ${topic.facts.join('\n- ')}`,
+        content: `الموضوع: ${topic.title}\nالتصنيف: ${topic.category}\nالحقائق المسموح بها فقط:\n- ${topic.facts.join('\n- ')}${topic.generationContext ? `\n\nسياق سعودي إضافي موثّق: ${topic.generationContext}\nاربطه بالموضوع ربطاً طبيعياً وواضحاً، ولا تذكره إلا وفق هذه الصياغة والحقائق. لا تضف أرقاماً أو إنجازات أو أسماء أخرى من عندك.` : ''}`,
       },
     ],
   })
