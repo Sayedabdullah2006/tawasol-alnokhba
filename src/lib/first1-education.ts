@@ -14,6 +14,7 @@ export type EducationTopic = {
   sourceUrl: string
   facts: string[]
   contentTags: string[]
+  format?: 'insight' | 'how-to'
 }
 
 export type GeneratedEducation = {
@@ -23,6 +24,11 @@ export type GeneratedEducation = {
   infographicPoints: string[]
   visualDirection: string
   contentTags: string[]
+}
+
+type InfographicOptions = {
+  visualInstructions?: string
+  referenceImageUrls?: string[]
 }
 
 const TOPICS: EducationTopic[] = [
@@ -83,6 +89,57 @@ const TOPICS: EducationTopic[] = [
   },
 ]
 
+const HOW_TO_TOPICS: EducationTopic[] = [
+  {
+    id: 'how-to-validate-problem', title: 'كيف تتأكد أن فكرتك تحل مشكلة حقيقية؟', category: 'كيف تبدأ؟ الابتكار',
+    sourceUrl: 'https://www.monshaat.gov.sa/ar/node/15493',
+    facts: ['دراسة السوق تساعد على فهم العميل والسوق قبل اتخاذ قرارات المشروع.', 'البحث المنظم يرفع جودة القرارات المرتبطة بالفكرة والفرصة.'],
+    contentTags: ['#ابتكار', '#دراسة_السوق'], format: 'how-to',
+  },
+  {
+    id: 'how-to-patent-search', title: 'كيف تبحث عن براءة قبل بناء اختراعك؟', category: 'كيف تبدأ؟ الملكية الفكرية',
+    sourceUrl: 'https://www.saip.gov.sa/ar/services/patents/pages/patentsearch.aspx',
+    facts: ['توفر الهيئة السعودية للملكية الفكرية خدمة بحث في وثائق البراءات الوطنية.', 'الخدمة متاحة للأفراد والمنشآت، ونتيجتها فورية ومجانية وفق وصف الخدمة.'],
+    contentTags: ['#براءات_اختراع', '#بحث_البراءات'], format: 'how-to',
+  },
+  {
+    id: 'how-to-document-idea', title: 'كيف توثّق فكرتك قبل أن تشاركها؟', category: 'كيف تبدأ؟ اختراع',
+    sourceUrl: 'https://www.saip.gov.sa/ar/services/patents/pages/patentregistration.aspx',
+    facts: ['تتطلب براءة الاختراع الجدة والخطوة الابتكارية والقابلية للتطبيق الصناعي.', 'الإفصاح العلني عن الاختراع قبل الإيداع قد يؤثر في شرط الجدة.'],
+    contentTags: ['#اختراع', '#ملكية_فكرية'], format: 'how-to',
+  },
+  {
+    id: 'how-to-build-mvp', title: 'كيف تصنع نموذجاً أولياً بدون تعقيد؟', category: 'كيف تبدأ؟ ريادة الأعمال',
+    sourceUrl: 'https://www.monshaat.gov.sa/ar/node/12046',
+    facts: ['الحد الأدنى من المنتج القابل للتطبيق يساعد على اختبار الفكرة في السوق.', 'اختبار الفكرة مبكراً يقلل تكلفة بناء منتج كامل قبل التحقق من الحاجة إليه.'],
+    contentTags: ['#نموذج_أولي', '#ريادة_الأعمال'], format: 'how-to',
+  },
+  {
+    id: 'how-to-interview-customer', title: 'كيف تسأل عميلك قبل أن تبني الحل؟', category: 'كيف تبدأ؟ ريادة الأعمال',
+    sourceUrl: 'https://www.monshaat.gov.sa/ar/node/15493',
+    facts: ['دراسة السوق تساعد على فهم العميل والسوق قبل اتخاذ قرارات المشروع.', 'فهم العميل والسوق يسبق اتخاذ قرارات المشروع.'],
+    contentTags: ['#فهم_العميل', '#ريادة_الأعمال'], format: 'how-to',
+  },
+  {
+    id: 'how-to-improve-prototype', title: 'كيف تطور نموذجك من أول ملاحظة؟', category: 'كيف تبدأ؟ تطوير المنتجات',
+    sourceUrl: 'https://www.monshaat.gov.sa/ar/node/12046',
+    facts: ['يمكن استخدام النموذج الأولي لاختبار الفكرة قبل التوسع في التنفيذ.', 'التعلم من المستخدمين في المراحل المبكرة جزء من تحسين الحل.'],
+    contentTags: ['#تطوير_المنتجات', '#ابتكار'], format: 'how-to',
+  },
+  {
+    id: 'how-to-test-market', title: 'كيف تختبر السوق قبل أن تصرف على المنتج؟', category: 'كيف تبدأ؟ السوق',
+    sourceUrl: 'https://www.monshaat.gov.sa/ar/node/12046',
+    facts: ['الحد الأدنى من المنتج القابل للتطبيق يساعد على اختبار الفكرة في السوق.', 'اختبار الفكرة مبكراً يقلل تكلفة بناء منتج كامل قبل التحقق من الحاجة إليه.'],
+    contentTags: ['#اختبار_السوق', '#مشاريع_ناشئة'], format: 'how-to',
+  },
+  {
+    id: 'how-to-prepare-patent', title: 'كيف تجهز فكرتك لرحلة البراءة؟', category: 'كيف تبدأ؟ براءات الاختراع',
+    sourceUrl: 'https://www.saip.gov.sa/ar/services/patents/pages/patentregistration.aspx',
+    facts: ['تتطلب براءة الاختراع الجدة والخطوة الابتكارية والقابلية للتطبيق الصناعي.', 'الإفصاح العلني عن الاختراع قبل الإيداع قد يؤثر في شرط الجدة.'],
+    contentTags: ['#براءات_اختراع', '#مخترعون'], format: 'how-to',
+  },
+]
+
 const MAX_EDUCATIONAL_POSTS_PER_DAY = 1
 
 function riyadhDateParts(date = new Date()) {
@@ -101,6 +158,8 @@ export function riyadhDay(date = new Date()): string {
 function topicForDay(day: string): EducationTopic {
   const [year, month, date] = day.split('-').map(Number)
   const serial = Math.floor(Date.UTC(year, month - 1, date) / 86_400_000)
+  // كل دفعة من ثلاثة أيام تتضمن دليلاً عملياً واحداً قابلًا للحفظ.
+  if (Math.abs(serial) % 3 === 1) return HOW_TO_TOPICS[Math.abs(serial) % HOW_TO_TOPICS.length]
   return TOPICS[Math.abs(serial) % TOPICS.length]
 }
 
@@ -123,13 +182,16 @@ function normalizeTag(value: string): string | null {
 }
 
 export async function generateEducationCopy(topic: EducationTopic): Promise<GeneratedEducation> {
+  const howToDirective = topic.format === 'how-to'
+    ? 'هذا منشور «كيف تبدأ؟». اجعله دليلاً عملياً بثلاث خطوات فعلية مرتبة، لا نصيحة عامة. يبدأ العنوان وصياغة المنشور بكلمة «كيف»، وتكون كل نقطة في التصميم خطوة قصيرة قابلة للتنفيذ. لا تخترع أدوات أو أرقاماً أو متطلبات غير موجودة في الحقائق.'
+    : 'هذا منشور تثقيفي من نوع معلومة أو إضاءة عملية.'
   const completion = await chatComplete(getOpenAI(), {
     model: OPENAI_MODEL,
     response_format: { type: 'json_object' },
     messages: [
       {
         role: 'system',
-        content: 'أنت كاتب محتوى لحساب أول سعودي. اكتب منشوراً عربياً واحداً فقط، عملياً ومشوقاً ومفيداً للمبتكرين والمخترعين ورواد الأعمال في السعودية. اكتب بأسلوب عفوي ذكي بلهجة سعودية خفيفة ومفهومة، كأنك تفتح سالفة مفيدة مع شخص طموح؛ تجنب الفصحى الرسمية والتقريرية والعبارات المعلبة. ابدأ بخطاف قصير يثير الفضول، واجعل القارئ يشعر أن المعلومة تستحق الحفظ وإعادة النشر. حافظ على الدقة ولا تضف حقائق خارج المعطيات. ممنوع ذكر المصدر أو الرابط أو اسم الجهة داخل المنشور. لا تستخدم Markdown أو النجوم أو التعداد الشكلي. أعد JSON فقط بالمفاتيح: title, caption, infographicTitle, infographicPoints, visualDirection, contentTags. caption بين 55 و100 كلمة ومن دون أي هاشتاق. contentTags مصفوفة من هاشتاقين عربيين فقط، مرتبطين مباشرة بموضوع المنشور. لا تستخدم #First1Saudi. infographicPoints مصفوفة من 3 نقاط عربية قصيرة جداً.',
+        content: `أنت كاتب محتوى لحساب أول سعودي. اكتب منشوراً عربياً واحداً فقط، عملياً ومشوقاً ومفيداً للمبتكرين والمخترعين ورواد الأعمال في السعودية. اكتب بأسلوب عفوي ذكي بلهجة سعودية خفيفة ومفهومة، كأنك تفتح سالفة مفيدة مع شخص طموح؛ تجنب الفصحى الرسمية والتقريرية والعبارات المعلبة. ابدأ بخطاف قصير يثير الفضول، واجعل القارئ يشعر أن المعلومة تستحق الحفظ وإعادة النشر. حافظ على الدقة ولا تضف حقائق خارج المعطيات. ممنوع ذكر المصدر أو الرابط أو اسم الجهة داخل المنشور. لا تستخدم Markdown أو النجوم أو التعداد الشكلي. أعد JSON فقط بالمفاتيح: title, caption, infographicTitle, infographicPoints, visualDirection, contentTags. caption بين 55 و100 كلمة ومن دون أي هاشتاق. contentTags مصفوفة من هاشتاقين عربيين فقط، مرتبطين مباشرة بموضوع المنشور. لا تستخدم #First1Saudi. infographicPoints مصفوفة من 3 نقاط عربية قصيرة جداً. ${howToDirective}`,
       },
       {
         role: 'user',
@@ -159,7 +221,7 @@ export async function generateEducationCopy(topic: EducationTopic): Promise<Gene
   }
 }
 
-export async function generateEducationInfographic(content: GeneratedEducation, filePrefix = 'first1-education'): Promise<string> {
+export async function generateEducationInfographic(content: GeneratedEducation, filePrefix = 'first1-education', options: InfographicOptions = {}): Promise<string> {
   const service = await createServiceRoleClient()
   const { data: brand } = await service.from('brand_settings').select('first1saudi_logo_url').eq('id', 1).single()
   if (!brand?.first1saudi_logo_url) throw new Error('أضف شعار أول سعودي من إعدادات الهوية أولاً')
@@ -171,11 +233,11 @@ export async function generateEducationInfographic(content: GeneratedEducation, 
     `Use exactly these three compact Arabic callouts, each visually distinct with a simple icon or data mark: ${content.infographicPoints.map((point, index) => `${index + 1}. ${point}`).join(' | ')}`,
     'STRICT RIGHT-TO-LEFT ARABIC LAYOUT: every Arabic text block must be right-aligned and read from right to left. For the three callouts, place number 1 on the FAR RIGHT, number 2 in the center, and number 3 on the LEFT. The visual journey must flow right-to-left; never put 1 on the left or arrange the numbered steps left-to-right. Use correctly connected Arabic letterforms and clear RTL hierarchy.',
     `Visual direction: ${content.visualDirection}.`,
-    'Use symbolic innovation visuals such as a patent document, magnifier, prototype, blueprint, light path, or idea-to-market journey. Do not use people, flags, official seals, fake logos, sources, URLs, citations, or long paragraphs.',
+    options.visualInstructions ?? 'Use symbolic innovation visuals such as a patent document, magnifier, prototype, blueprint, light path, or idea-to-market journey. Do not use people, flags, official seals, fake logos, sources, URLs, citations, or long paragraphs.',
     'Add a compact, elegant social footer with the recognizable icons for X, Instagram, LinkedIn, Facebook, and TikTok followed by the exact handle @First1Saudi. Keep the footer small and readable.',
     'Do not draw any brand logo. Reserve only a subtle compact safe zone at the extreme lower-right, about 150 by 100 pixels, clear of text and icons for the original First1Saudi logo overlay. It must blend with the artwork rather than look like an empty panel.',
   ].join('\n\n')
-  const { b64 } = await generateImageWithOpenAI(prompt, [], { aspectRatio: '4:5' })
+  const { b64 } = await generateImageWithOpenAI(prompt, options.referenceImageUrls ?? [], { aspectRatio: '4:5' })
   const poster = await resizeToPoster(Buffer.from(b64, 'base64'))
   const { buffer } = await compositeLogoBottomRight(poster, brand.first1saudi_logo_url, { widthRatio: 0.1 })
   const path = `${filePrefix}-${Date.now()}-${Math.random().toString(36).slice(2)}.png`

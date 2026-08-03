@@ -12,15 +12,22 @@ type AnnualOccasion = Omit<EducationTopic, 'id'> & {
   day?: number
   dateLabel: string
   kind: 'official' | 'global' | 'religious'
+  designInstructions?: string
+  referenceImageUrls?: string[]
 }
 
 export type First1Occasion = AnnualOccasion & { date: string | null }
 
+const KING_SALMAN_REFERENCE = 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2d/%D8%A7%D9%84%D8%B5%D9%88%D8%B1%D8%A9_%D8%A7%D9%84%D8%B1%D8%B3%D9%85%D9%8A%D8%A9_%D9%84%D8%AE%D8%A7%D8%AF%D9%85_%D8%A7%D9%84%D8%AD%D8%B1%D9%85%D9%8A%D9%86_%D8%A7%D9%84%D8%B4%D8%B1%D9%8A%D9%81%D9%8A%D9%86_%D8%A7%D9%84%D9%85%D9%84%D9%83_%D8%B3%D9%84%D9%85%D8%A7%D9%86_%D8%A8%D9%86_%D8%B9%D8%A8%D8%AF%D8%A7%D9%84%D8%B9%D8%B2%D9%8A%D8%B2_%D8%A2%D9%84_%D8%B3%D8%B9%D9%88%D8%AF.jpg/500px-%D8%A7%D9%84%D8%B5%D9%88%D8%B1%D8%A9_%D8%A7%D9%84%D8%B1%D8%B3%D9%85%D9%8A%D8%A9_%D9%84%D8%AE%D8%A7%D8%AF%D9%85_%D8%A7%D9%84%D8%AD%D8%B1%D9%85%D9%8A%D9%86_%D8%A7%D9%84%D8%B4%D8%B1%D9%8A%D9%81%D9%8A%D9%86_%D8%A7%D9%84%D9%85%D9%84%D9%83_%D8%B3%D9%84%D9%85%D8%A7%D9%86_%D8%A8%D9%86_%D8%B9%D8%A8%D8%AF%D8%A7%D9%84%D8%B9%D8%B2%D9%8A%D8%B2_%D8%A2%D9%84_%D8%B3%D8%B9%D9%88%D8%AF.jpg'
+const CROWN_PRINCE_REFERENCE = 'https://cc-cdn.spa.gov.sa/mashaa/media/fqmjddb0/7395381.png'
+const NATIONAL_DESIGN = 'The two supplied official portraits are mandatory. Keep King Salman bin Abdulaziz and Crown Prince Mohammed bin Salman recognizably faithful to their exact facial identities, age, attire, and dignified appearance. Do not redraw, alter, beautify, swap, crop, or omit either portrait. Present both as respectful photographic portraits in a balanced national celebratory composition with Saudi green, elegant gold, subtle heritage patterns, and a refined national mood. Do not use flags incorrectly, fake seals, fictional architecture, or unrelated people.'
+const EID_DESIGN = 'Create a warm, premium Saudi Eid greeting design inspired by the occasion: an elegant crescent, soft lantern light, subtle Saudi geometric and palm motifs, and a refined festive atmosphere. No people, no portraits, no fake logos, no large empty panels, and no excessive decoration. The design must feel like a sincere modern Eid greeting, not an infographic.'
+
 const OCCASIONS: AnnualOccasion[] = [
   { id: 'education-day', month: 1, day: 24, dateLabel: '24 يناير', kind: 'global', title: 'المعرفة هي أول اختراع', category: 'اليوم الدولي للتعليم', sourceUrl: 'https://www.un.org/en/observances/international-day-education', facts: ['التعليم يفتح باب اكتساب المعرفة والمهارات اللازمة للمستقبل.', 'كل رحلة إنجاز تبدأ بسؤال جيد ورغبة حقيقية في التعلم.'], contentTags: ['#التعليم', '#تمكين_المواهب'] },
   { id: 'women-science', month: 2, day: 11, dateLabel: '11 فبراير', kind: 'global', title: 'العلم يتسع لكل موهبة', category: 'اليوم الدولي للمرأة والفتاة في العلوم', sourceUrl: 'https://www.un.org/en/observances/women-and-girls-in-science-day', facts: ['مشاركة الفتيات والنساء في العلوم توسع دائرة الحلول والأفكار.', 'الموهبة العلمية تكبر بالفرص والتجربة والثقة.'], contentTags: ['#المرأة_في_العلوم', '#موهبة'] },
-  { id: 'founding-day', month: 2, day: 22, dateLabel: '22 فبراير', kind: 'official', title: 'من الجذور إلى المستقبل', category: 'يوم التأسيس', sourceUrl: 'https://www.spa.gov.sa/', facts: ['يوم التأسيس مناسبة وطنية للاعتزاز بجذور الدولة السعودية التي تأسست عام 1727م.', 'الهوية الراسخة تمنح الطموح مساحة أوسع لبناء المستقبل.'], contentTags: ['#يوم_التأسيس', '#السعودية'] },
-  { id: 'flag-day', month: 3, day: 11, dateLabel: '11 مارس', kind: 'official', title: 'علمنا يحمل قصة طموح', category: 'يوم العلم السعودي', sourceUrl: 'https://www.spa.gov.sa/w1863066', facts: ['يُحتفى بيوم العلم السعودي في 11 مارس من كل عام.', 'يرمز العلم السعودي إلى التوحيد والعدل والقوة والنماء والرخاء.'], contentTags: ['#يوم_العلم', '#السعودية'] },
+  { id: 'founding-day', month: 2, day: 22, dateLabel: '22 فبراير', kind: 'official', title: 'من الجذور إلى المستقبل', category: 'يوم التأسيس', sourceUrl: 'https://www.spa.gov.sa/', facts: ['يوم التأسيس مناسبة وطنية للاعتزاز بجذور الدولة السعودية التي تأسست عام 1727م.', 'الهوية الراسخة تمنح الطموح مساحة أوسع لبناء المستقبل.'], contentTags: ['#يوم_التأسيس', '#السعودية'], designInstructions: NATIONAL_DESIGN, referenceImageUrls: [KING_SALMAN_REFERENCE, CROWN_PRINCE_REFERENCE] },
+  { id: 'flag-day', month: 3, day: 11, dateLabel: '11 مارس', kind: 'official', title: 'علمنا يحمل قصة طموح', category: 'يوم العلم السعودي', sourceUrl: 'https://www.spa.gov.sa/w1863066', facts: ['يُحتفى بيوم العلم السعودي في 11 مارس من كل عام.', 'يرمز العلم السعودي إلى التوحيد والعدل والقوة والنماء والرخاء.'], contentTags: ['#يوم_العلم', '#السعودية'], designInstructions: NATIONAL_DESIGN, referenceImageUrls: [KING_SALMAN_REFERENCE, CROWN_PRINCE_REFERENCE] },
   { id: 'space-flight', month: 4, day: 12, dateLabel: '12 أبريل', kind: 'global', title: 'الفضاء يبدأ بسؤال', category: 'اليوم الدولي للرحلات البشرية إلى الفضاء', sourceUrl: 'https://www.un.org/en/observances/human-spaceflight-day', facts: ['الرحلات البشرية إلى الفضاء تذكرنا بأن الأسئلة الكبيرة تحتاج علماً وتجربة.', 'كل إنجاز تقني كبير يبدأ بخيال منضبط بالمعرفة.'], contentTags: ['#علوم_الفضاء', '#ابتكار'] },
   { id: 'creativity-innovation', month: 4, day: 21, dateLabel: '21 أبريل', kind: 'global', title: 'فكرتك قد تحل مشكلة كبيرة', category: 'اليوم العالمي للإبداع والابتكار', sourceUrl: 'https://www.un.org/en/observances/creativity-and-innovation-day', facts: ['الإبداع والابتكار يقدمان حلولاً جديدة للتحديات اليومية.', 'الفكرة الأقوى هي التي تربط الخيال بحل حاجة حقيقية.'], contentTags: ['#إبداع', '#ابتكار'] },
   { id: 'ip-day', month: 4, day: 26, dateLabel: '26 أبريل', kind: 'global', title: 'الفكرة تستحق أن تُحمى', category: 'اليوم العالمي للملكية الفكرية', sourceUrl: 'https://www.wipo.int/en/web/ipday', facts: ['الملكية الفكرية تساعد المبدعين والمبتكرين على حماية نتاجهم.', 'التوثيق والبحث المبكر جزء مهم من رحلة الفكرة.'], contentTags: ['#ملكية_فكرية', '#براءات_اختراع'] },
@@ -29,13 +36,13 @@ const OCCASIONS: AnnualOccasion[] = [
   { id: 'youth-skills', month: 7, day: 15, dateLabel: '15 يوليو', kind: 'global', title: 'المهارة تعطي الموهبة صوتاً', category: 'اليوم العالمي لمهارات الشباب', sourceUrl: 'https://www.un.org/en/observances/world-youth-skills-day', facts: ['المهارات العملية تساعد الشباب على الانتقال من الفكرة إلى الأثر.', 'التعلم المستمر يصنع فارقاً في رحلة الموهبة والعمل.'], contentTags: ['#مهارات_الشباب', '#تمكين'] },
   { id: 'youth-day', month: 8, day: 12, dateLabel: '12 أغسطس', kind: 'global', title: 'ابدأ من المشكلة', category: 'اليوم الدولي للشباب', sourceUrl: 'https://www.un.org/en/observances/youth-day', facts: ['الشباب يملكون قدرة كبيرة على تحويل التحديات إلى فرص.', 'البداية الذكية لأي مشروع هي فهم المشكلة التي يحلها.'], contentTags: ['#الشباب', '#ريادة_الأعمال'] },
   { id: 'literacy-day', month: 9, day: 8, dateLabel: '8 سبتمبر', kind: 'global', title: 'اقرأ أكثر لتبني أبعد', category: 'اليوم الدولي لمحو الأمية', sourceUrl: 'https://www.unesco.org/en/days/literacy', facts: ['يُحتفل باليوم الدولي لمحو الأمية في 8 سبتمبر من كل عام.', 'القراءة والكتابة أساس لاكتساب معرفة أوسع ومهارات جديدة.'], contentTags: ['#محو_الأمية', '#معرفة'] },
-  { id: 'national-day', month: 9, day: 23, dateLabel: '23 سبتمبر', kind: 'official', title: 'وطن يصنع الممكن', category: 'اليوم الوطني السعودي', sourceUrl: 'https://www.mofa.gov.sa/en/ksa/Pages/saudiNationalDay.aspx', facts: ['يوافق اليوم الوطني السعودي 23 سبتمبر من كل عام.', 'الطموح الوطني يترجم إلى فرص للمعرفة والابتكار والإنجاز.'], contentTags: ['#اليوم_الوطني', '#السعودية'] },
+  { id: 'national-day', month: 9, day: 23, dateLabel: '23 سبتمبر', kind: 'official', title: 'وطن يصنع الممكن', category: 'اليوم الوطني السعودي', sourceUrl: 'https://www.mofa.gov.sa/en/ksa/Pages/saudiNationalDay.aspx', facts: ['يوافق اليوم الوطني السعودي 23 سبتمبر من كل عام.', 'الطموح الوطني يترجم إلى فرص للمعرفة والابتكار والإنجاز.'], contentTags: ['#اليوم_الوطني', '#السعودية'], designInstructions: NATIONAL_DESIGN, referenceImageUrls: [KING_SALMAN_REFERENCE, CROWN_PRINCE_REFERENCE] },
   { id: 'space-week', month: 10, day: 4, dateLabel: '4 أكتوبر', kind: 'global', title: 'للسماء مسارات تبدأ من الأرض', category: 'أسبوع الفضاء العالمي', sourceUrl: 'https://www.un.org/en/observances/world-space-week', facts: ['يقام أسبوع الفضاء العالمي سنوياً من 4 إلى 10 أكتوبر.', 'علوم الفضاء تجمع بين الفيزياء والهندسة والخيال العلمي المنهجي.'], contentTags: ['#أسبوع_الفضاء', '#علوم_الفضاء'] },
   { id: 'teachers-day', month: 10, day: 5, dateLabel: '5 أكتوبر', kind: 'global', title: 'خلف كل موهبة من يفتح باباً', category: 'اليوم العالمي للمعلمين', sourceUrl: 'https://www.unesco.org/en/days/teachers', facts: ['يُحتفل باليوم العالمي للمعلمين في 5 أكتوبر.', 'المعلم يصنع بيئة تمنح الأسئلة والموهبة فرصة للنمو.'], contentTags: ['#يوم_المعلم', '#تعليم'] },
   { id: 'science-day', month: 11, day: 10, dateLabel: '10 نوفمبر', kind: 'global', title: 'العلم حلٌّ قابل للمشاركة', category: 'اليوم العالمي للعلوم من أجل السلام والتنمية', sourceUrl: 'https://www.unesco.org/en/days/science', facts: ['العلم أداة لفهم العالم وبناء حلول تخدم التنمية.', 'تبادل المعرفة والتعاون العلمي يزيدان أثر الابتكار.'], contentTags: ['#اليوم_العالمي_للعلوم', '#ابتكار'] },
   { id: 'arabic-day', month: 12, day: 18, dateLabel: '18 ديسمبر', kind: 'global', title: 'العربية لغة فكرة وهوية', category: 'اليوم العالمي للغة العربية', sourceUrl: 'https://www.unesco.org/en/days/arabic-language', facts: ['يُحتفل باليوم العالمي للغة العربية في 18 ديسمبر.', 'اللغة العربية وعاء غني للمعرفة والتواصل والإبداع.'], contentTags: ['#اللغة_العربية', '#معرفة'] },
-  { id: 'eid-fitr', dateLabel: 'عيد الفطر', kind: 'religious', title: 'عيدٌ يليق بفرحة الإنجاز', category: 'عيد الفطر', sourceUrl: 'https://www.sama.gov.sa/', facts: ['يُحدد موعد عيد الفطر وفق التقويم الهجري والإعلان الرسمي.', 'العيد مناسبة للفرح والامتنان وبداية جديدة.'], contentTags: ['#عيد_الفطر', '#السعودية'] },
-  { id: 'eid-adha', dateLabel: 'عيد الأضحى', kind: 'religious', title: 'عيد مبارك وطموح مستمر', category: 'عيد الأضحى', sourceUrl: 'https://www.sama.gov.sa/', facts: ['يُحدد موعد عيد الأضحى وفق التقويم الهجري والإعلان الرسمي.', 'العيد مناسبة للفرح والتواصل وتقدير ما تحقق.'], contentTags: ['#عيد_الأضحى', '#السعودية'] },
+  { id: 'eid-fitr', dateLabel: 'عيد الفطر', kind: 'religious', title: 'عيدٌ يليق بفرحة الإنجاز', category: 'عيد الفطر', sourceUrl: 'https://www.sama.gov.sa/', facts: ['يُحدد موعد عيد الفطر وفق التقويم الهجري والإعلان الرسمي.', 'العيد مناسبة للفرح والامتنان وبداية جديدة.'], contentTags: ['#عيد_الفطر', '#السعودية'], designInstructions: EID_DESIGN },
+  { id: 'eid-adha', dateLabel: 'عيد الأضحى', kind: 'religious', title: 'عيد مبارك وطموح مستمر', category: 'عيد الأضحى', sourceUrl: 'https://www.sama.gov.sa/', facts: ['يُحدد موعد عيد الأضحى وفق التقويم الهجري والإعلان الرسمي.', 'العيد مناسبة للفرح والتواصل وتقدير ما تحقق.'], contentTags: ['#عيد_الأضحى', '#السعودية'], designInstructions: EID_DESIGN },
 ]
 
 function nextAnnualDate(month: number, day: number): string {
@@ -56,6 +63,39 @@ export function occasionKey(occasion: First1Occasion): string {
 }
 
 export async function generateFirst1Occasion(occasion: First1Occasion) {
-  const content = await generateEducationCopy({ id: occasionKey(occasion), title: occasion.title, category: occasion.category, sourceUrl: occasion.sourceUrl, facts: occasion.facts, contentTags: occasion.contentTags })
-  return { content, designUrl: await generateEducationInfographic(content, 'first1-occasion') }
+  const content = occasion.kind === 'religious'
+    ? eidGreeting(occasion)
+    : occasion.kind === 'official'
+      ? nationalGreeting(occasion)
+      : await generateEducationCopy({ id: occasionKey(occasion), title: occasion.title, category: occasion.category, sourceUrl: occasion.sourceUrl, facts: occasion.facts, contentTags: occasion.contentTags })
+  return {
+    content,
+    designUrl: await generateEducationInfographic(content, 'first1-occasion', {
+      visualInstructions: occasion.designInstructions,
+      referenceImageUrls: occasion.referenceImageUrls,
+    }),
+  }
+}
+
+function eidGreeting(occasion: First1Occasion) {
+  const name = occasion.category === 'عيد الفطر' ? 'عيد الفطر المبارك' : 'عيد الأضحى المبارك'
+  return {
+    title: `تهنئة بمناسبة ${name}`,
+    caption: `بمناسبة ${name}، نبارك لكم هذه الأيام السعيدة، ونسأل الله أن يعيده على وطننا الغالي بالخير والبركة والازدهار. عيدكم مبارك، وعساكم من عواده.\n\n${occasion.contentTags.join(' ')}`,
+    infographicTitle: `${name} مبارك`,
+    infographicPoints: ['فرحة وطن', 'أيام مباركة', 'عيدكم مبارك'],
+    visualDirection: 'تهنئة عيدية سعودية أنيقة ودافئة',
+    contentTags: occasion.contentTags,
+  }
+}
+
+function nationalGreeting(occasion: First1Occasion) {
+  return {
+    title: `تهنئة بمناسبة ${occasion.category}`,
+    caption: `بمناسبة ${occasion.category}، نرفع أسمى آيات التهاني والتبريكات إلى مقام خادم الحرمين الشريفين الملك سلمان بن عبدالعزيز آل سعود، وإلى صاحب السمو الملكي الأمير محمد بن سلمان بن عبدالعزيز ولي العهد رئيس مجلس الوزراء، وإلى شعب المملكة الكريم. دامت السعودية عزيزة شامخة، وماضية بطموحها نحو مستقبلٍ يصنعه العلم والإنجاز.\n\n${occasion.contentTags.join(' ')}`,
+    infographicTitle: `${occasion.category} مبارك`,
+    infographicPoints: ['قيادة ملهمة', 'وطن طموح', 'مستقبل مزدهر'],
+    visualDirection: 'تهنئة وطنية رسمية راقية بصور القيادة السعودية',
+    contentTags: occasion.contentTags,
+  }
 }
