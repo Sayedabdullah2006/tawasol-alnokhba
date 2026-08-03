@@ -128,6 +128,7 @@ export default function AdminSocialPage() {
   const [occasionItems, setOccasionItems] = useState<OccasionItem[]>([])
   const [occasionsLoading, setOccasionsLoading] = useState(false)
   const [occasionBusy, setOccasionBusy] = useState<string | null>(null)
+  const [generatingAllOccasions, setGeneratingAllOccasions] = useState(false)
   const [occasionText, setOccasionText] = useState<Record<string, string>>({})
 
   const loadOccasions = async () => {
@@ -138,23 +139,47 @@ export default function AdminSocialPage() {
     setOccasionItems(Array.isArray(json.items) ? json.items : [])
   }
 
-  const generateOccasions = async (occasionId?: string) => {
-    const key = occasionId ?? 'all'
-    setOccasionBusy(key)
+  const requestOccasionGeneration = async (occasionId: string) => {
+    const res = await fetch('/api/admin/social/occasions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'regenerate', occasionId }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json.error || 'تعذر توليد المناسبة')
+  }
+
+  const generateOccasion = async (occasionId: string) => {
+    setOccasionBusy(occasionId)
     try {
-      const res = await fetch('/api/admin/social/occasions', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(occasionId ? { action: 'regenerate', occasionId } : { action: 'generate-all' }),
-      })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'تعذر توليد المناسبة')
+      await requestOccasionGeneration(occasionId)
       await loadOccasions()
-      alert(occasionId ? 'تمت إعادة توليد المنشور والتصميم' : `تم توليد ${json.generated?.length ?? 0} مناسبة وحفظها`)
+      alert('تمت إعادة توليد المنشور والتصميم')
     } catch (cause) {
       alert(cause instanceof Error ? cause.message : 'تعذر التوليد')
     } finally {
       setOccasionBusy(null)
     }
+  }
+
+  const generateAllOccasions = async () => {
+    setGeneratingAllOccasions(true)
+    let completed = 0
+    let failed = 0
+    for (const occasion of occasions) {
+      const occasionId = `${occasion.id}-${occasion.date ?? 'hijri'}`
+      setOccasionBusy(occasionId)
+      try {
+        await requestOccasionGeneration(occasionId)
+        completed += 1
+        await loadOccasions()
+      } catch {
+        failed += 1
+      } finally {
+        setOccasionBusy(null)
+      }
+    }
+    setGeneratingAllOccasions(false)
+    alert(failed ? `تم توليد ${completed} مناسبة، وتعذر توليد ${failed}` : `تم توليد ${completed} مناسبة وحفظها`)
   }
 
   const scheduleOccasion = async (item: OccasionItem) => {
@@ -216,7 +241,11 @@ export default function AdminSocialPage() {
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok || !json.ok) throw new Error(json.error || 'تعذّر إلغاء الجدولة')
-      setItems(current => current.map(item => item.id === cancelScheduleItem.id ? { ...item, status: 'suggested' } : item))
+      if (cancelScheduleItem.source === 'first1saudi-occasion') {
+        setOccasionItems(current => current.map(item => item.id === cancelScheduleItem.id ? { ...item, status: 'suggested' } : item))
+      } else {
+        setItems(current => current.map(item => item.id === cancelScheduleItem.id ? { ...item, status: 'suggested' } : item))
+      }
       setCancelScheduleItem(null)
       alert('تم إلغاء الجدولة من PostPulse')
     } catch (e) {
@@ -326,9 +355,10 @@ export default function AdminSocialPage() {
 
   if (loading) return <LoadingSpinner size="lg" />
 
-  const scheduledItems = items.filter(item => item.status === 'scheduled')
-  const unscheduledItems = items.filter(item => item.status !== 'scheduled')
-  const visibleItems = items.filter(item => {
+  const dailyItems = items.filter(item => item.source !== 'first1saudi-occasion')
+  const scheduledItems = dailyItems.filter(item => item.status === 'scheduled')
+  const unscheduledItems = dailyItems.filter(item => item.status !== 'scheduled')
+  const visibleItems = dailyItems.filter(item => {
     if (scheduleFilter === 'scheduled') return item.status === 'scheduled'
     if (scheduleFilter === 'unscheduled') return item.status !== 'scheduled'
     return true
@@ -342,7 +372,7 @@ export default function AdminSocialPage() {
   }
   const dates = [...byDate.keys()].sort((a, b) => (a < b ? 1 : -1))
   const filterOptions: Array<{ value: ScheduleFilter; label: string; count: number }> = [
-    { value: 'all', label: 'الكل', count: items.length },
+    { value: 'all', label: 'الكل', count: dailyItems.length },
     { value: 'scheduled', label: 'المجدولة', count: scheduledItems.length },
     { value: 'unscheduled', label: 'غير المجدولة', count: unscheduledItems.length },
   ]
@@ -673,10 +703,11 @@ export default function AdminSocialPage() {
           items={occasionItems}
           loading={occasionsLoading}
           busy={occasionBusy}
+          generatingAll={generatingAllOccasions}
           textByItem={occasionText}
           onTextChange={(id, value) => setOccasionText(current => ({ ...current, [id]: value }))}
-          onGenerateAll={() => generateOccasions()}
-          onRegenerate={generateOccasions}
+          onGenerateAll={generateAllOccasions}
+          onRegenerate={generateOccasion}
           onSchedule={scheduleOccasion}
           onReload={async () => {
             setOccasionsLoading(true)
@@ -690,12 +721,13 @@ export default function AdminSocialPage() {
 }
 
 function OccasionsTab({
-  occasions, items, loading, busy, textByItem, onTextChange, onGenerateAll, onRegenerate, onSchedule, onReload, onCancel,
+  occasions, items, loading, busy, generatingAll, textByItem, onTextChange, onGenerateAll, onRegenerate, onSchedule, onReload, onCancel,
 }: {
   occasions: OccasionMeta[]
   items: OccasionItem[]
   loading: boolean
   busy: string | null
+  generatingAll: boolean
   textByItem: Record<string, string>
   onTextChange: (id: string, value: string) => void
   onGenerateAll: () => void
@@ -716,8 +748,8 @@ function OccasionsTab({
           <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">منشور واحد وتصميم واحد لكل مناسبة. لا تُجدول أي مناسبة تلقائياً؛ زر الجدولة يختار وقتاً مناسباً في تاريخها مع ترك 90 دقيقة عن أي منشور آخر.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={onReload} disabled={loading || busy !== null} className="rounded-lg border border-border px-4 py-2 text-sm font-bold text-dark disabled:opacity-60">{loading ? 'جارٍ التحديث...' : 'تحديث'}</button>
-          <button type="button" onClick={onGenerateAll} disabled={busy !== null} className="rounded-lg bg-green px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60">{busy === 'all' ? 'جارٍ توليد كل المناسبات...' : 'توليد تصاميم كل المناسبات'}</button>
+          <button type="button" onClick={onReload} disabled={loading || busy !== null || generatingAll} className="rounded-lg border border-border px-4 py-2 text-sm font-bold text-dark disabled:opacity-60">{loading ? 'جارٍ التحديث...' : 'تحديث'}</button>
+          <button type="button" onClick={onGenerateAll} disabled={busy !== null || generatingAll} className="rounded-lg bg-green px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60">{generatingAll ? 'جارٍ توليد التصاميم تباعاً...' : 'توليد تصاميم كل المناسبات'}</button>
         </div>
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -749,8 +781,8 @@ function OccasionsTab({
                   <div className="rounded-lg bg-cream p-3 text-sm text-muted">لم يتم توليد المنشور والتصميم بعد.</div>
                 )}
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => onRegenerate(`${occasion.id}-${occasion.date ?? 'hijri'}`)} disabled={busy !== null} className="rounded-lg border border-green/35 px-3 py-2 text-sm font-bold text-green disabled:opacity-60">{itemBusy ? 'جارٍ التوليد...' : item ? 'إعادة التوليد' : 'توليد المناسبة'}</button>
-                  {item && item.status !== 'scheduled' && <button type="button" onClick={() => onSchedule(item)} disabled={busy !== null || !occasion.date} className="rounded-lg bg-dark px-3 py-2 text-sm font-bold text-white disabled:opacity-60">{scheduleBusy ? 'جارٍ الجدولة...' : occasion.date ? 'جدولة في وقت مناسب' : 'بانتظار اعتماد التاريخ'}</button>}
+                  <button type="button" onClick={() => onRegenerate(`${occasion.id}-${occasion.date ?? 'hijri'}`)} disabled={busy !== null || generatingAll} className="rounded-lg border border-green/35 px-3 py-2 text-sm font-bold text-green disabled:opacity-60">{itemBusy ? 'جارٍ التوليد...' : item ? 'إعادة التوليد' : 'توليد المناسبة'}</button>
+                  {item && item.status !== 'scheduled' && <button type="button" onClick={() => onSchedule(item)} disabled={busy !== null || generatingAll || !occasion.date} className="rounded-lg bg-dark px-3 py-2 text-sm font-bold text-white disabled:opacity-60">{scheduleBusy ? 'جارٍ الجدولة...' : occasion.date ? 'جدولة في وقت مناسب' : 'بانتظار اعتماد التاريخ'}</button>}
                   {item?.status === 'scheduled' && <button type="button" onClick={() => onCancel(item as ScheduleItem)} className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-bold text-blue-700">إلغاء الجدولة</button>}
                 </div>
               </div>
