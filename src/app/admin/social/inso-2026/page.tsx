@@ -53,6 +53,7 @@ export default function InsoCoveragePage() {
   const [designItem, setDesignItem] = useState<InsoCoverageItem | null>(null)
   const [designSources, setDesignSources] = useState<string[]>([])
   const [designHasVideo, setDesignHasVideo] = useState(false)
+  const [designVideoOrientation, setDesignVideoOrientation] = useState<'landscape' | 'portrait'>('landscape')
   const [designUploading, setDesignUploading] = useState(false)
   const [designOptionsGenerating, setDesignOptionsGenerating] = useState(false)
   const [generatingDesignItemId, setGeneratingDesignItemId] = useState<string | null>(null)
@@ -375,6 +376,7 @@ export default function InsoCoveragePage() {
     setDesignNote('')
     setDesignExactText('')
     setDesignHasVideo(false)
+    setDesignVideoOrientation('landscape')
   }
 
   const generateDesignOptions = async () => {
@@ -390,6 +392,7 @@ export default function InsoCoveragePage() {
           exactText: designExactText,
           sourceImages: designSources,
           hasVideo: designHasVideo,
+          videoOrientation: designVideoOrientation,
           optionIndex,
           resetDesignOptions: optionIndex === 0,
         }, `ظهر الخيار ${optionIndex + 1} من 3`)
@@ -607,6 +610,7 @@ export default function InsoCoveragePage() {
             <textarea value={designNote} onChange={e => setDesignNote(e.target.value)} placeholder="توجيه إضافي للتصميم (اختياري)" className="min-h-28 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm" />
             <input value={designExactText} onChange={e => setDesignExactText(e.target.value)} placeholder="عبارة تظهر حرفيا بخط صغير (اختياري)" className="h-11 w-full rounded-lg border border-border bg-white px-3 text-sm" />
             <div className="grid gap-3 sm:grid-cols-2"><div><p className="mb-2 text-sm font-bold text-dark">صور مرجعية ({designSources.length}/5)</p><label className="flex h-11 cursor-pointer items-center justify-center rounded-lg border border-border bg-white px-3 text-sm font-bold text-dark hover:bg-cream"><input type="file" multiple accept="image/png,image/jpeg,image/webp" onChange={uploadDesignSources} className="sr-only" />{designUploading ? 'جارٍ رفع الصور...' : 'اختيار صور'}</label></div><label className="flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-bold text-dark"><input type="checkbox" checked={designHasVideo} onChange={e => setDesignHasVideo(e.target.checked)} /> المنشور مقطع فيديو</label></div>
+            {designHasVideo && <div className="grid grid-cols-2 gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2" role="group" aria-label="اتجاه مقطع الفيديو"><button type="button" onClick={() => setDesignVideoOrientation('portrait')} className={`rounded-lg border px-3 py-2 text-sm font-bold ${designVideoOrientation === 'portrait' ? 'border-amber-500 bg-amber-500 text-white' : 'border-amber-200 bg-white text-dark'}`}>عمودي 9:16</button><button type="button" onClick={() => setDesignVideoOrientation('landscape')} className={`rounded-lg border px-3 py-2 text-sm font-bold ${designVideoOrientation === 'landscape' ? 'border-amber-500 bg-amber-500 text-white' : 'border-amber-200 bg-white text-dark'}`}>أفقي 16:9</button></div>}
             {designSources.length > 0 && <div className="flex gap-2 overflow-x-auto pb-1" aria-label="الصور المرجعية المرفقة">{designSources.map((source, index) => <div key={source} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border"><img src={source} alt={`الصورة المرجعية ${index + 1}`} className="h-full w-full object-cover" /><button type="button" onClick={() => setDesignSources(current => current.filter(entry => entry !== source))} className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/70 text-xs text-white" aria-label={`حذف الصورة المرجعية ${index + 1}`}>×</button></div>)}</div>}
             <p className="rounded-lg border border-teal-200 bg-teal-50 p-3 text-xs leading-6 text-teal-900">تُدمج الصور بشكل إبداعي في التصميم مع الحفاظ الكامل على ملامح الوجه والهوية والهيئة والملبس كما هي، دون تعديل أو إعادة تشكيل.</p>
           </div>

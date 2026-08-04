@@ -31,15 +31,16 @@ export const FACE_LOCK =
  * توجيه تخطيط الفيديو — يُلحق فقط عند تفعيل "الخبر يتضمّن فيديو" في الاستوديو.
  * يُعيد هيكلة التصميم: مساحة فيديو أفقية كبيرة فارغة + صورة الشخص في إطار احترافي.
  */
-export const VIDEO_LAYOUT =
-  '=== 🎬 VIDEO LAYOUT OVERRIDE (أولوية قصوى — يُعيد هيكلة التخطيط) ===\n' +
-  'هذا المنشور يتضمّن فيديو. أعِد هيكلة التكوين على النحو التالي مع الحفاظ على هوية First1Saudi والمقاس 1080×1350 (4:5):\n' +
-  '1) خصّص «مساحة فيديو» مستطيلة أفقية كبيرة بنسبة 16:9 تمتد بعرض التصميم بالكامل في الجزء العلوي (تشغل تقريباً النصف العلوي). ' +
-  'اتركها فارغة تماماً كحاوية انتظار: مستطيل بزوايا دائرية بلون تيل عميق (#0A2D35) بإطار ذهبي رفيع (#FFD700) وأيقونة تشغيل (مثلث Play) شفافة في وسطه. ' +
-  '⛔ لا تضع أي صورة أو شخص أو نص داخل مساحة الفيديو — ستُملأ بفيديو لاحقاً. اجعلها عريضة وواضحة وبارزة.\n' +
-  '2) ضع صورة الشخص الحقيقية (من الصورة المرفقة) في «إطار احترافي» أصغر (إطار بزوايا دائرية بحدود ذهبية رفيعة وظل ناعم) أسفل مساحة الفيديو أو إلى جانبها، مع الحفاظ على الوجه كما هو تماماً.\n' +
-  '3) أسفل ذلك: الاسم وسطر الإنجاز ونقاط الحقائق + الفوتر المنحني مع @First1Saudi، كالمعتاد.\n' +
-  'الأولوية للوضوح: مساحة الفيديو هي العنصر الأبرز، وصورة الشخص في إطار ثانوي.'
+export type VideoOrientation = 'landscape' | 'portrait'
+
+export function videoLayoutFor(orientation: VideoOrientation = 'landscape'): string {
+  if (orientation === 'portrait') {
+    return '=== VIDEO LAYOUT OVERRIDE — PORTRAIT 9:16 (highest priority) ===\n' +
+      'This post contains a vertical video. On the 1080×1350 portrait canvas, reserve one large empty 9:16 video window, approximately 56% of canvas width and 85% of its height, aligned to the right side. Keep this video window visibly dominant with a slim gold outline, subtle play icon, and a continuous integrated background; it must be empty inside with no person, image, words, numbers, or icons. Arrange the Arabic headline, factual callouts, and any reference photo in a clear vertical information column on the left, without covering the video window. Do not convert the 9:16 window into a horizontal frame or place a video inside it.'
+  }
+  return '=== VIDEO LAYOUT OVERRIDE — LANDSCAPE 16:9 (highest priority) ===\n' +
+    'This post contains a horizontal video. On the 1080×1350 portrait canvas, reserve one large empty 16:9 video window spanning almost the full width across the upper half. Keep it visibly dominant with a slim gold outline, subtle play icon, and a continuous integrated background; it must be empty inside with no person, image, words, numbers, or icons. Place the Arabic headline, factual callouts, and any reference photo below or around the video window without covering it. Do not convert the 16:9 window into a vertical frame or place a video inside it.'
+}
 
 /**
  * توجيه "الصياغة الدائمة" — يُحقَن في الأتمتة (إعادة نشر الأرشيف) فقط.
@@ -113,7 +114,7 @@ function requireThreeConcepts(value: unknown): Concept[] {
 
 export async function prepareConceptImagePrompts(
   openai: OpenAI,
-  args: { analysis: unknown; concepts: Concept[]; sourceImageCount: number; hasVideo?: boolean },
+  args: { analysis: unknown; concepts: Concept[]; sourceImageCount: number; hasVideo?: boolean; videoOrientation?: VideoOrientation },
 ): Promise<Concept[]> {
   if (!args.concepts.length) return args.concepts
 
@@ -132,6 +133,7 @@ export async function prepareConceptImagePrompts(
             analysis: args.analysis,
             reference_image_count: args.sourceImageCount,
             has_video: Boolean(args.hasVideo),
+            video_orientation: args.hasVideo ? (args.videoOrientation ?? 'landscape') : null,
             directions: args.concepts.map((concept, index) => ({
               index,
               title: concept.title,
@@ -225,7 +227,7 @@ export async function generateTweets(
 /** الخطوة 3 — اقتراح 3 اتجاهات تصميم. */
 export async function generateConcepts(
   openai: OpenAI,
-  args: { analysis: unknown; newsText: string; sourceImages: string[]; excludeTitles?: string[]; hasVideo?: boolean },
+  args: { analysis: unknown; newsText: string; sourceImages: string[]; excludeTitles?: string[]; hasVideo?: boolean; videoOrientation?: VideoOrientation },
 ): Promise<Concept[]> {
   // توجيهات التنويع: مجموعة عشوائية من عائلات الاتجاه + محاور التنويع + استبعاد السابق
   const directives = buildConceptDirectives({ exclude: args.excludeTitles })
@@ -243,17 +245,17 @@ export async function generateConcepts(
     const p = JSON.parse(raw)
     if (Array.isArray(p?.concepts)) {
       return prepareConceptImagePrompts(openai, {
-        analysis: args.analysis, concepts: requireThreeConcepts(p.concepts), sourceImageCount: args.sourceImages.length, hasVideo: args.hasVideo,
+        analysis: args.analysis, concepts: requireThreeConcepts(p.concepts), sourceImageCount: args.sourceImages.length, hasVideo: args.hasVideo, videoOrientation: args.videoOrientation,
       })
     }
     if (Array.isArray(p)) {
       return prepareConceptImagePrompts(openai, {
-        analysis: args.analysis, concepts: requireThreeConcepts(p), sourceImageCount: args.sourceImages.length, hasVideo: args.hasVideo,
+        analysis: args.analysis, concepts: requireThreeConcepts(p), sourceImageCount: args.sourceImages.length, hasVideo: args.hasVideo, videoOrientation: args.videoOrientation,
       })
     }
   } catch { /* تجاهل */ }
   return prepareConceptImagePrompts(openai, {
-    analysis: args.analysis, concepts: requireThreeConcepts([]), sourceImageCount: args.sourceImages.length, hasVideo: args.hasVideo,
+    analysis: args.analysis, concepts: requireThreeConcepts([]), sourceImageCount: args.sourceImages.length, hasVideo: args.hasVideo, videoOrientation: args.videoOrientation,
   })
 }
 
@@ -264,7 +266,7 @@ export function conceptToString(c: Concept | undefined): string {
 }
 
 /** Keeps a moderation retry faithful to the selected studio direction instead of using a generic poster. */
-export function buildStudioSafetyFallbackPrompt(args: { analysis: unknown; chosenConcept: string; hasVideo?: boolean }): string {
+export function buildStudioSafetyFallbackPrompt(args: { analysis: unknown; chosenConcept: string; hasVideo?: boolean; videoOrientation?: VideoOrientation }): string {
   const facts = JSON.stringify(args.analysis).slice(0, 5000)
   return [
     'Create a premium 4:5 Arabic editorial social-media poster for First1Saudi.',
@@ -275,7 +277,7 @@ export function buildStudioSafetyFallbackPrompt(args: { analysis: unknown; chose
     'Turn the facts into a clear Arabic infographic: one concise Arabic headline and up to three short factual callouts. Do not copy the caption or use paragraphs.',
     'Use a strict right-to-left Arabic hierarchy with accurate connected Arabic. Add a compact social footer with the recognizable icons for X, Instagram, LinkedIn, Facebook, and TikTok, followed by @First1Saudi.',
     'Do not draw a First1Saudi logo; it is overlaid after generation. Keep the artwork full-bleed with no white panel, frame, or empty logo box.',
-    args.hasVideo ? 'Reserve a clean but visually integrated 16:9 opening-frame area for video near the upper portion.' : '',
+    args.hasVideo ? videoLayoutFor(args.videoOrientation) : '',
     'Avoid flags, politics, weapons, danger symbols, violence, unsafe material details, and invented factual claims.',
   ].filter(Boolean).join('\n\n')
 }
@@ -283,9 +285,9 @@ export function buildStudioSafetyFallbackPrompt(args: { analysis: unknown; chose
 /** الخطوة 4 — توليد التصميم عبر OpenAI Images + تركيب اللوقو + الرفع إلى التخزين. */
 export async function generateDesign(
   openai: OpenAI,
-  args: { analysis: unknown; chosenConcept: string; sourceImages: string[]; note?: string; extra?: string; hasVideo?: boolean; preparedPrompt?: string },
+  args: { analysis: unknown; chosenConcept: string; sourceImages: string[]; note?: string; extra?: string; hasVideo?: boolean; videoOrientation?: VideoOrientation; preparedPrompt?: string },
 ): Promise<{ imageUrl: string; prompt: string }> {
-  const { analysis, chosenConcept, sourceImages, note, extra, hasVideo, preparedPrompt } = args
+  const { analysis, chosenConcept, sourceImages, note, extra, hasVideo, videoOrientation, preparedPrompt } = args
   const primarySource = sourceImages[0] ?? null
 
   const service = await createServiceRoleClient()
@@ -307,9 +309,7 @@ export async function generateDesign(
             ? `الصور الحقيقية المرفقة (${sourceImages.length}) على الروابط التالية — ادمجها جميعاً بتكوين متناسق داخل التصميم الواحد مع الحفاظ على واقعيتها:\n${sourceImages.map((u, i) => `${i + 1}. ${u}`).join('\n')}\n`
             : `الصورة الحقيقية المرفقة هي على الرابط: ${primarySource}\n`) +
           `سيُضاف الشعار لاحقاً برمجياً مباشرة فوق التصميم في أسفل اليمين. لا ترسم أي شعار هناك، وأبقِ الخلفية ممتدة وطبيعية بلا إطار أو مربع أو مساحة فارغة؛ فقط لا تضع نصاً أو أرقاماً أو أيقونات في تلك الزاوية الصغيرة.\n` +
-          (hasVideo
-            ? `\n‼️ هذا الخبر يتضمّن فيديو: صمّم التخطيط حول «مساحة فيديو أفقية كبيرة فارغة» (نسبة 16:9) في الجزء العلوي تُملأ لاحقاً، وضع صورة الشخص في «إطار احترافي» أصغر تحتها أو بجانبها. اترك مساحة الفيديو فارغة تماماً دون أي صورة بداخلها.\n`
-            : '') +
+          (hasVideo ? `\n${videoLayoutFor(videoOrientation)}\n` : '') +
           (note && note.trim()
             ? `\n‼️ ملاحظات الأدمن على التصميم (طبّقها بدقّة مع الحفاظ على ثوابت الهوية والصورة الحقيقية): ${note.trim()}\n`
             : '') +
@@ -326,10 +326,10 @@ export async function generateDesign(
   // قفل الوجه: يُحاط به موجّه الصورة من الطرفين (بداية ونهاية) لتقليل إعادة رسم الوجه.
   // عند وجود فيديو: نُلحق توجيه تخطيط الفيديو في النهاية (أولوية قصوى).
   const imagePrompt = hasVideo
-    ? `${FACE_LOCK}\n\n${designPrompt}\n\n${VIDEO_LAYOUT}\n\n${FACE_LOCK}`
+    ? `${FACE_LOCK}\n\n${designPrompt}\n\n${videoLayoutFor(videoOrientation)}\n\n${FACE_LOCK}`
     : `${FACE_LOCK}\n\n${designPrompt}\n\n${FACE_LOCK}`
   const { b64 } = await generateImageWithOpenAI(imagePrompt, sourceImages, {
-    safetyFallbackPrompt: buildStudioSafetyFallbackPrompt({ analysis, chosenConcept, hasVideo }),
+    safetyFallbackPrompt: buildStudioSafetyFallbackPrompt({ analysis, chosenConcept, hasVideo, videoOrientation }),
   })
   const rawImage = Buffer.from(b64, 'base64')
   const posterBase = await resizeToPoster(rawImage)

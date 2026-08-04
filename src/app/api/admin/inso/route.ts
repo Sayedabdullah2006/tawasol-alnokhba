@@ -62,7 +62,7 @@ async function generateInsoCopy(item: InsoCoverageSeed, extra?: string) {
   return enforceInsoFooter(completion.choices[0]?.message?.content ?? '')
 }
 
-async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args: { note?: string; exactText?: string; direction: string; sourceImages?: string[]; hasVideo?: boolean }) {
+async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args: { note?: string; exactText?: string; direction: string; sourceImages?: string[]; hasVideo?: boolean; videoOrientation?: 'landscape' | 'portrait' }) {
   const service = await createServiceRoleClient()
   const { data: brand } = await service.from('brand_settings').select('first1saudi_logo_url').eq('id', 1).single()
   if (!brand?.first1saudi_logo_url) {
@@ -79,7 +79,11 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
     args.sourceImages?.length
       ? `Use all ${args.sourceImages.length} supplied reference images as editorial visual sources and integrate them into one creative composition. Treat every depicted person as identity-critical: preserve their exact facial identity and features, skin tone, apparent age, body proportions, hairstyle, clothing, uniforms, accessories, and overall appearance. Do not beautify, restyle, swap, invent, alter, or regenerate their face, body, clothes, or identity. Do not turn the people into illustrations, avatars, or lookalikes. Keep them recognizably faithful while designing the surrounding composition creatively.`
       : 'No reference image was supplied. Make Jeddah unmistakable and authentic through the Red Sea waterfront, people, event details, science, or a real verified landmark only. Never use a generic foreign city, invented tower, fictional venue, or imaginary cityscape.',
-    args.hasVideo ? 'This is the cover for a short event video. Build a dynamic visual opening frame with space for motion cues, while remaining a polished 4:5 static poster.' : '',
+    args.hasVideo
+      ? args.videoOrientation === 'portrait'
+        ? 'This is a cover for a vertical 9:16 event video. On the 1080×1350 canvas reserve one large, empty 9:16 video window aligned to the right, around 56% of the canvas width and 85% of its height. It must be the dominant element, with a slim gold outline and subtle play icon only. Keep the window empty: no people, photos, words, numbers, or icons inside it. Build a clear Arabic RTL information column on the left, with all content and reference imagery arranged around the portrait video window. Never turn it into a horizontal frame.'
+        : 'This is a cover for a horizontal 16:9 event video. On the 1080×1350 canvas reserve one large, empty 16:9 video window spanning almost the full width across the upper half. It must be the dominant element, with a slim gold outline and subtle play icon only. Keep the window empty: no people, photos, words, numbers, or icons inside it. Arrange the Arabic RTL title, facts, and reference imagery below or around it. Never turn it into a vertical frame.'
+      : '',
     'Turn the facts into an original visual infographic hierarchy: use a concise Arabic headline only when it can be rendered accurately, then 2 to 4 short factual callouts, numbers, icons, data marks, or a small timeline. Never use long paragraphs, never repeat the full post caption, and never make the design look like a screenshot of a social post.',
     args.exactText?.trim() ? `Add this exact Arabic phrase in a small, readable line: "${args.exactText.trim()}". Copy every character exactly as supplied with correct connected RTL shaping. Do not invent, shorten, translate, spell-correct, or alter it.` : '',
     'Do not render event logos, brand logos, or hashtags. Add a compact social footer for First1Saudi with the official icons for X, Instagram, LinkedIn, Facebook, and TikTok, followed by the exact handle "@First1Saudi". All five icons are mandatory, equal in size, and must remain fully visible. Keep the artwork full-bleed to every edge. The original First1Saudi and Mawhiba lockups will be overlaid directly within the artwork at the extreme lower-right, approximately 300 by 130 pixels on the 1080 by 1350 canvas. Keep only text, people, numbers, and icons out of that small pocket while the exact same teal artwork and texture continue behind it. Never create a frame, box, panel, banner, border, blank area, or separate footer for the logos. The rest of the canvas must remain visually rich and balanced.',
@@ -141,7 +145,7 @@ export async function POST(request: Request) {
   if ('error' in auth) return auth.error
   let body: {
     action?: Action; id?: string; title?: string; brief?: string; coverageDate?: string; phase?: 'before' | 'during' | 'after';
-    postText?: string; designNote?: string; exactText?: string; scheduledFor?: string; sourceImages?: string[]; hasVideo?: boolean; optionId?: string; optionIndex?: number; resetDesignOptions?: boolean;
+    postText?: string; designNote?: string; exactText?: string; scheduledFor?: string; sourceImages?: string[]; hasVideo?: boolean; videoOrientation?: 'landscape' | 'portrait'; optionId?: string; optionIndex?: number; resetDesignOptions?: boolean;
   }
   try { body = await request.json() } catch { return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 }) }
   if (!body.action) return NextResponse.json({ error: 'الإجراء مطلوب' }, { status: 400 })
@@ -264,15 +268,16 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'خيار التصميم غير صالح' }, { status: 400 })
       }
       const directionsToGenerate = body.action === 'generate-design-options' ? directions : [directions[optionIndex]]
-      const createdOptions = [] as Array<{ id: string; title: string; direction: string; imageUrl: string; hasVideo: boolean; selected: boolean; createdAt: string }>
+      const createdOptions = [] as Array<{ id: string; title: string; direction: string; imageUrl: string; hasVideo: boolean; videoOrientation?: 'landscape' | 'portrait'; selected: boolean; createdAt: string }>
       for (const direction of directionsToGenerate) {
         const index = directions.indexOf(direction)
         createdOptions.push({
           id: `${Date.now()}-${index}`,
           title: `الخيار ${index + 1}`,
           direction,
-          imageUrl: await generateInsoDesign(item, postText, { direction, note: body.designNote, exactText: body.exactText, sourceImages, hasVideo: body.hasVideo }),
+          imageUrl: await generateInsoDesign(item, postText, { direction, note: body.designNote, exactText: body.exactText, sourceImages, hasVideo: body.hasVideo, videoOrientation: body.videoOrientation }),
           hasVideo: Boolean(body.hasVideo),
+          videoOrientation: body.hasVideo ? (body.videoOrientation ?? 'landscape') : undefined,
           selected: false,
           createdAt: new Date().toISOString(),
         })

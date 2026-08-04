@@ -38,6 +38,7 @@ export default function StandaloneStudio() {
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [extraInfo, setExtraInfo] = useState('')
   const [hasVideo, setHasVideo] = useState(false)
+  const [videoOrientation, setVideoOrientation] = useState<'landscape' | 'portrait'>('landscape')
   const [uploading, setUploading] = useState(false)
   // تضمين تصميم مميّز في «مجلة المبدعين»
   const [magazineCategory, setMagazineCategory] = useState('')
@@ -199,6 +200,7 @@ export default function StandaloneStudio() {
         chosenConcept: step === 'image' ? chosenConcept : undefined,
         preparedPrompt: step === 'image' ? chosenPreparedPrompt : undefined,
         hasVideo,
+        videoOrientation,
         // عند إعادة اقتراح الاتجاهات: استبعد الحالية لتأتي بدائل مختلفة
         previousConcepts: step === 'concepts' ? conceptItems.map(c => c.title ?? '').filter(Boolean) : undefined,
       })
@@ -215,7 +217,7 @@ export default function StandaloneStudio() {
 
   // توليد تصميم واحد بقيمة تحليل صريحة (لاستخدامه في المسار التلقائي قبل تحديث الحالة)
   const genOneWith = async (brief: string, analysisVal: any, note?: string, preparedPrompt?: string): Promise<string | null> => {
-    const data = await post({ step: 'image', title, content, sourceImages: selectedImages, extraInfo, analysis: analysisVal, chosenConcept: brief, note, hasVideo, preparedPrompt })
+    const data = await post({ step: 'image', title, content, sourceImages: selectedImages, extraInfo, analysis: analysisVal, chosenConcept: brief, note, hasVideo, videoOrientation, preparedPrompt })
     return data?.imageUrl ?? null
   }
   const genOne = (brief: string, note?: string, preparedPrompt?: string) => genOneWith(brief, analysis, note, preparedPrompt)
@@ -229,7 +231,7 @@ export default function StandaloneStudio() {
     setBatchResults([]); setNoteByIndex({})
     setTweets(''); setConceptItems([])
     try {
-      const base = { title, content, sourceImages: selectedImages, extraInfo, hasVideo }
+      const base = { title, content, sourceImages: selectedImages, extraInfo, hasVideo, videoOrientation }
 
       setAutoStage('① تحليل الخبر…')
       const aRes = await post({ step: 'analyze', ...base })
@@ -569,9 +571,13 @@ export default function StandaloneStudio() {
           <input type="checkbox" checked={hasVideo} onChange={e => setHasVideo(e.target.checked)} className="mt-0.5 w-4 h-4 accent-amber-500" />
           <span className="text-sm">
             <span className="font-bold text-dark">🎬 الخبر يتضمّن فيديو</span>
-            <span className="block text-[11px] text-muted mt-0.5">يولّد التصميم بمساحة فيديو عريضة فارغة (تضيف الفيديو لاحقاً) + صورة الشخص في إطار احترافي.</span>
+            <span className="block text-[11px] text-muted mt-0.5">يُحجز قالب كبير للمقطع، مع ترتيب المحتوى حوله وفق اتجاهه.</span>
           </span>
         </label>
+        {hasVideo && <div className="grid grid-cols-2 gap-2 rounded-xl border border-amber-200 bg-amber-50/70 p-2" role="group" aria-label="اتجاه مقطع الفيديو">
+          <button type="button" onClick={() => setVideoOrientation('portrait')} className={`rounded-lg border px-3 py-2 text-sm font-bold ${videoOrientation === 'portrait' ? 'border-amber-500 bg-amber-500 text-white' : 'border-amber-200 bg-white text-dark'}`}>عمودي 9:16</button>
+          <button type="button" onClick={() => setVideoOrientation('landscape')} className={`rounded-lg border px-3 py-2 text-sm font-bold ${videoOrientation === 'landscape' ? 'border-amber-500 bg-amber-500 text-white' : 'border-amber-200 bg-white text-dark'}`}>أفقي 16:9</button>
+        </div>}
       </div>
 
       {/* ⚡ التوليد التلقائي لكل الخطوات دفعة واحدة */}

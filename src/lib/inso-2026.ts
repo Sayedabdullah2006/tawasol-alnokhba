@@ -15,7 +15,7 @@ export interface InsoCoverageItem extends InsoCoverageSeed {
   post_text: string | null
   design_url: string | null
   design_brief: string | null
-  design_options: Array<{ id: string; title: string; imageUrl: string; direction: string; hasVideo: boolean; createdAt: string; selected?: boolean; editHistory?: string[]; scheduledFor?: string }>
+  design_options: Array<{ id: string; title: string; imageUrl: string; direction: string; hasVideo: boolean; videoOrientation?: 'landscape' | 'portrait'; createdAt: string; selected?: boolean; editHistory?: string[]; scheduledFor?: string }>
   publication_status: 'draft' | 'ready' | 'scheduled' | 'published'
   scheduled_for: string | null
   published_at: string | null
