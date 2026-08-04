@@ -21,6 +21,7 @@ import { fetchSayidatyCandidates, SAYIDATY_SOURCES } from '@/lib/sayidaty-news'
 import { runStudioPipeline, shuffledPosterStyles } from '@/lib/ai-studio'
 import { classifySection } from '@/lib/showcase-sections'
 import { sendEmail } from '@/lib/email'
+import { isSocialNewsEligible } from '@/lib/social-news-selection'
 
 // المصدر: 'first1saudi' | 'manhom' | مفتاح مصدر RSS (مثل 'alarabiya')
 type SourceKind = string
@@ -35,6 +36,10 @@ const ADMIN_EMAIL = 'first1saudi@gmail.com'
 const DEDUP_WINDOW_DAYS = Number(process.env.SOCIAL_DEDUP_WINDOW_DAYS) || 30
 const ENTITY_DEDUP_WINDOW_DAYS = Number(process.env.SOCIAL_ENTITY_DEDUP_WINDOW_DAYS) || 180
 const DEFAULT_COUNT = 5
+// The archive search keeps daily generation from being limited to the newest posts.
+const FIRST1_ARCHIVE_SECTIONS = 4
+const FIRST1_ARCHIVE_PAGES = 3
+const FIRST1_ARCHIVE_PER_PAGE = 12
 // أقل عدد مواضيع ليُعتبر القسم مؤهلاً للتنويع.
 const MIN_SECTION_POSTS = 10
 // أقسام نستبعدها من التنويع (عامة/تشغيلية/فارغة).
@@ -140,6 +145,9 @@ export async function runBatch(
     const achTarget = count - manhomTarget
 
     const selected: SelectedItem[] = []
+    const sourceDiagnostics = {
+      first1: { fetched: 0, unseen: 0 },
+    }
     const countBySource = (s: string) => selected.filter(x => x.source === s).length
     const achCount = () => selected.filter(x => x.source !== 'manhom').length
 
@@ -153,13 +161,24 @@ export async function runBatch(
         const sections = (await fetchCategories()).filter(
           c => c.count >= MIN_SECTION_POSTS && !EXCLUDED_SECTIONS.has(c.name),
         )
-        let attempts = 0
-        for (const sec of [...sections].sort(() => Math.random() - 0.5)) {
-          if (attempts++ >= 8) break
-          const posts = await fetchPostsByCategory(sec.id, 8)
+        const archiveSections = [...sections]
+          .sort(() => Math.random() - 0.5)
+          .slice(0, FIRST1_ARCHIVE_SECTIONS)
+        const archivePages = await Promise.all(
+          archiveSections.flatMap(section =>
+            Array.from({ length: FIRST1_ARCHIVE_PAGES }, (_, index) =>
+              fetchPostsByCategory(section.id, FIRST1_ARCHIVE_PER_PAGE, index + 1)
+                .then(posts => ({ section, posts })),
+            ),
+          ),
+        )
+        for (const { section, posts } of archivePages) {
+          sourceDiagnostics.first1.fetched += posts.length
           for (const p of posts) {
             if (usedFirst1.has(p.id)) continue
-            p.categoryNames = [sec.name]
+            if (!isSocialNewsEligible(p.title, p.content)) continue
+            sourceDiagnostics.first1.unseen++
+            p.categoryNames = [section.name]
             pool.push({ post: p, key: 'first1saudi' })
           }
         }
@@ -198,6 +217,7 @@ export async function runBatch(
           if (achCount() >= achTarget) break
           if (selected.some(s => s.post.id === c.post.id && s.source === c.key)) continue
           if (preferDiverse && pickedKeys.has(c.key)) continue
+          if (!isSocialNewsEligible(c.post.title, c.post.content)) continue
           const fingerprint = subjectFingerprint(c.post.title)
           if (isRepeatedSubject(fingerprint, usedSubjectFingerprints)) continue
           const img = c.post.imageUrl ?? await resolveImageUrl(c.post)
@@ -230,6 +250,10 @@ export async function runBatch(
     }
 
     if (selected.length === 0) {
+      console.warn('[daily-social] No eligible candidates', {
+        ...sourceDiagnostics,
+        selected: 0,
+      })
       return NextResponse.json(
         { success: false, error: 'لا توجد عناصر صالحة من المصادر' },
         { status: 502 },
@@ -239,6 +263,11 @@ export async function runBatch(
     // ── 4) تمرير كل عنصر في الاستوديو (بالتوازي للبقاء ضمن حد المهلة) ──
     // نوزّع نمط تصميم مختلفاً على كل منشور لضمان تنوّع بصري (لا نمط واحد متكرّر).
     const styles = shuffledPosterStyles()
+    console.info('[daily-social] Candidate selection', {
+      ...sourceDiagnostics,
+      selected: selected.length,
+      selectedFirst1: selected.filter(item => item.source === 'first1saudi').length,
+    })
     const settled = await Promise.allSettled(
       selected.map(({ post, source }, i) =>
         runStudioPipeline({

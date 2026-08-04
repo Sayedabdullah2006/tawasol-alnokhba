@@ -4,6 +4,7 @@
  * للسعوديين (أوائل/اختراعات/جوائز/مسابقات عالمية…) مع صورة.
  */
 import { htmlToPlainText, type NewsPost } from './first1-news'
+import { isSocialNewsEligible } from './social-news-selection'
 
 export interface RssSource { key: string; label: string; url: string }
 
@@ -75,7 +76,7 @@ export async function fetchRssCandidates(src: RssSource): Promise<NewsPost[]> {
     const img = extractImage(block)
     const pub = (tagText(block, 'pubDate') || '').trim()
     if (!title || !link || !img) continue
-    if (!isAchievement(`${title} ${content}`)) continue
+    if (!isAchievement(`${title} ${content}`) || !isSocialNewsEligible(title, content)) continue
     out.push({
       id: hashId(link),
       url: link,

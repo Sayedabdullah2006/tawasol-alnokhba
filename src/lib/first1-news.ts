@@ -166,9 +166,9 @@ export async function fetchPostById(id: number): Promise<NewsPost | null> {
 }
 
 /** يجلب أحدث منشورات قسم معيّن (خفيف، بلا صور بعد). */
-export async function fetchPostsByCategory(categoryId: number, perPage = 12): Promise<NewsPost[]> {
+export async function fetchPostsByCategory(categoryId: number, perPage = 12, page = 1): Promise<NewsPost[]> {
   const data = await wpFetchJson(
-    `${WP_BASE}/posts?categories=${categoryId}&per_page=${perPage}&orderby=date&order=desc&_fields=${POST_FIELDS}`,
+    `${WP_BASE}/posts?categories=${categoryId}&per_page=${perPage}&page=${page}&orderby=date&order=desc&_fields=${POST_FIELDS}`,
   )
   if (!Array.isArray(data)) return []
   return (data as WPPostLite[]).map(normalizeLite).filter((p): p is NewsPost => p !== null)
