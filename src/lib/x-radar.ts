@@ -4,7 +4,7 @@ import { chatComplete, getOpenAI } from '@/lib/openai'
 
 type XTweet = { id: string; text: string; author_id?: string; conversation_id?: string; created_at?: string }
 type XUser = { id: string; username?: string; name?: string; description?: string; location?: string; verified?: boolean }
-type XSearch = { data?: XTweet[]; includes?: { users?: XUser[] }; meta?: { result_count?: number } }
+type XSearch = { data?: XTweet[]; includes?: { users?: XUser[] }; meta?: { result_count?: number; next_token?: string } }
 
 const TOPIC_QUERY = '(ابتكار OR اختراع OR تقنية OR "بحث علمي" OR ريادة OR "إنجاز سعودي" OR "رؤية السعودية 2030" OR "اختراع سعودي" OR "براءة اختراع سعودية" OR "موهبة سعودية" OR "رقم قياسي سعودي" OR "السعودية موسوعة غينيس" OR "سعودي يحقق جائزة" OR "عالم سعودي" OR "عالمة سعودية") lang:ar -is:retweet'
 const SAUDI_ACHIEVEMENT_QUERY = '(السعودية OR سعودي OR سعودية OR المملكة OR سعوديون OR سعوديات) (حقق OR حققت OR فاز OR فازت OR جائزة OR ميدالية OR تتويج OR "براءة اختراع" OR "رقم قياسي" OR غينيس OR إنجاز) lang:ar -is:retweet'
@@ -34,16 +34,31 @@ function relevance(text: string, isReply: boolean) {
   return Math.min(78, 52 + domainMatches * 6)
 }
 
-async function search(query: string, startTime: string): Promise<XSearch> {
-  const params = new URLSearchParams({
-    query,
-    max_results: '100',
-    start_time: startTime,
-    'tweet.fields': 'author_id,conversation_id,created_at',
-    expansions: 'author_id',
-    'user.fields': 'verified,username,name,description,location',
-  })
-  return xApiFetch<XSearch>(`/tweets/search/recent?${params.toString()}`)
+async function search(query: string, startTime: string, pages = 1): Promise<XSearch> {
+  const posts = new Map<string, XTweet>()
+  const users = new Map<string, XUser>()
+  let resultCount = 0
+  let nextToken: string | undefined
+
+  for (let page = 0; page < pages; page++) {
+    const params = new URLSearchParams({
+      query,
+      max_results: '100',
+      start_time: startTime,
+      'tweet.fields': 'author_id,conversation_id,created_at',
+      expansions: 'author_id',
+      'user.fields': 'verified,username,name,description,location',
+    })
+    if (nextToken) params.set('next_token', nextToken)
+    const result = await xApiFetch<XSearch>(`/tweets/search/recent?${params.toString()}`)
+    for (const post of result.data ?? []) posts.set(post.id, post)
+    for (const user of result.includes?.users ?? []) users.set(user.id, user)
+    resultCount += result.meta?.result_count ?? result.data?.length ?? 0
+    nextToken = result.meta?.next_token
+    if (!nextToken) break
+  }
+
+  return { data: [...posts.values()], includes: { users: [...users.values()] }, meta: { result_count: resultCount, next_token: nextToken } }
 }
 
 function mergeSearchResults(...results: XSearch[]): XSearch {
@@ -121,9 +136,9 @@ export async function scanXRadar(trigger: 'manual' | 'scheduled' = 'scheduled') 
   const ownPostIds = new Set((ownPosts.data ?? []).map(post => post.id))
   const [replyResult, topicResult, achievementResult, knowledgeResult, governmentResult, cabinetResult] = await Promise.all([
     search(`to:${connection.x_username} is:reply -from:${connection.x_username} -is:retweet`, startTime),
-    search(TOPIC_QUERY, startTime),
-    search(SAUDI_ACHIEVEMENT_QUERY, startTime),
-    search(SAUDI_KNOWLEDGE_QUERY, startTime),
+    search(TOPIC_QUERY, startTime, 3),
+    search(SAUDI_ACHIEVEMENT_QUERY, startTime, 3),
+    search(SAUDI_KNOWLEDGE_QUERY, startTime, 3),
     search(GOVERNMENT_QUERY, startTime),
     search(CABINET_QUERY, startTime),
   ])
