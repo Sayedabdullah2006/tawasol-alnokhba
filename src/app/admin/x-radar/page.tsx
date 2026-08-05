@@ -70,7 +70,7 @@ export default function XRadarPage() {
       }
       showToast(type === 'scan'
         ? data.found
-          ? `تم الفحص: ${data.found} منشور موثق`
+          ? `تم الفحص: ${data.found} منشن موثق وتوليد ${data.drafts?.generated ?? 0} مسودة`
           : `لم تظهر ردود أو منشنات موثقة للحساب خلال آخر 48 ساعة. تم فحص ${data.matchingMentions ?? data.matchingReplies ?? 0} منشن.`
         : type === 'generate' ? 'تم توليد المسودة. راجع النص ثم اعتمده.'
         : type === 'generate_all' ? `تم تقييم ${data.inspected ?? 0} منشور وتوليد ${data.generated ?? 0} مسودة`

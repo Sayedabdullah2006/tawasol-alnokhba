@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
-import { createRadarDraft, publishRadarDraft, scanXRadar } from '@/lib/x-radar'
+import { createRadarDraft, generateRadarDraftsForScan, publishRadarDraft, scanXRadar } from '@/lib/x-radar'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -57,7 +57,11 @@ export async function POST(request: Request) {
   if (!await authorize()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await request.json().catch(() => ({})) as { action?: string; id?: string; ids?: string[]; draft?: string; recommendation?: string; status?: string }
   if (body.action === 'scan') {
-    try { return NextResponse.json(await scanXRadar('manual')) }
+    try {
+      const scan = await scanXRadar('manual')
+      const drafts = await generateRadarDraftsForScan(scan.scanId)
+      return NextResponse.json({ ...scan, drafts })
+    }
     catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Scan failed' }, { status: 500 }) }
   }
   const service = await createServiceRoleClient()

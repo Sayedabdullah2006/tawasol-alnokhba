@@ -156,6 +156,36 @@ export async function createRadarDraft(item: { post_text: string; source_type: s
   }
 }
 
+export async function generateRadarDraftsForScan(scanId: string) {
+  const service = await createServiceRoleClient()
+  const { data, error } = await service.from('x_radar_items')
+    .select('id,post_text,source_type,relevance_score,draft_text,status')
+    .eq('last_seen_scan_id', scanId)
+    .eq('status', 'pending')
+    .order('posted_at', { ascending: false })
+    .limit(24)
+  if (error) throw new Error(`Unable to load X radar items: ${error.message}`)
+
+  const pending = (data ?? []).filter(item => !item.draft_text?.trim())
+  let generated = 0
+  let failed = 0
+  for (let index = 0; index < pending.length; index += 3) {
+    const batch = pending.slice(index, index + 3)
+    const results = await Promise.allSettled(batch.map(async item => {
+      const draft = await createRadarDraft(item)
+      const { error: updateError } = await service.from('x_radar_items').update({
+        draft_text: draft.draft,
+        recommendation: 'reply',
+        updated_at: new Date().toISOString(),
+      }).eq('id', item.id)
+      if (updateError) throw updateError
+    }))
+    generated += results.filter(result => result.status === 'fulfilled').length
+    failed += results.filter(result => result.status === 'rejected').length
+  }
+  return { inspected: pending.length, generated, failed }
+}
+
 export async function publishRadarDraft(item: { x_post_id: string; draft_text: string; recommendation: string }) {
   const text = item.draft_text.trim()
   if (!text) throw new Error('اكتب مسودة قبل النشر')

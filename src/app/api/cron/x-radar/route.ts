@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { scanXRadar } from '@/lib/x-radar'
+import { generateRadarDraftsForScan, scanXRadar } from '@/lib/x-radar'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -13,7 +13,9 @@ async function handle(request: NextRequest) {
   if (key !== CRON_API_KEY) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    return NextResponse.json(await scanXRadar('scheduled'))
+    const scan = await scanXRadar('scheduled')
+    const drafts = await generateRadarDraftsForScan(scan.scanId)
+    return NextResponse.json({ ...scan, drafts })
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'X radar scan failed' }, { status: 500 })
   }
