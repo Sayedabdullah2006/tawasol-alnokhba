@@ -8,14 +8,16 @@ type XSearch = { data?: XTweet[]; includes?: { users?: XUser[] }; meta?: { resul
 
 const TOPIC_QUERY = '(ابتكار OR اختراع OR تقنية OR "بحث علمي" OR ريادة OR "إنجاز سعودي" OR "رؤية السعودية 2030") lang:ar -is:retweet'
 const CABINET_QUERY = 'from:spagov -is:retweet'
+const GOVERNMENT_QUERY = '(from:SaudiRDI OR from:CST_KSA OR from:MCITspokesman OR from:SaudiNIIC OR from:KSAlmudaifer OR from:moe_gov_sa OR from:MOFKSA) -is:retweet'
 const SAUDI_CONTEXT_SIGNALS = ['السعودية', 'سعودي', 'سعودية', 'المملكة', 'رؤية 2030', 'أول سعودي', 'أول سعودية']
 const FIRST1_FOCUS_SIGNALS = ['ابتكار', 'اختراع', 'براءة', 'مخترع', 'مخترعة', 'إبداع', 'صناعة', 'بحث علمي', 'باحث', 'باحثة', 'تقنية', 'علوم', 'ريادة', 'ريادي', 'ريادية', 'موهبة', 'جائزة', 'ميدالية']
 const ACHIEVEMENT_SIGNALS = ['حقق', 'حققت', 'إنجاز', 'نجاح', 'فاز', 'فازت', 'حصل', 'حصلت', 'تتويج', 'تصنيف', 'مركز', 'الأول', 'الأولى', 'تميز', 'ريادة', 'تدشين']
 const LEADERSHIP_SIGNALS = ['خادم الحرمين الشريفين', 'سمو ولي العهد', 'الأمير محمد بن سلمان', 'الملك سلمان']
+const NATIONAL_IMPACT_SIGNALS = ['خدمة ضيوف الرحمن', 'الحج', 'العمرة', 'صندوق النقد الدولي', 'مرونة اقتصاد', 'اقتصاد المملكة', 'البنية التحتية', 'التخطيط المالي', 'التحول الرقمي', 'جودة الحياة']
 const CABINET_EXCLUDED_SIGNALS = ['سياسي', 'سياسة', 'انتخابات', 'حرب', 'نزاع', 'صراع', 'دفاع', 'عسكري', 'أمنية', 'إرهاب', 'خارجية', 'فلسطين', 'إسرائيل', 'غزة', 'إيران', 'اليمن', 'سوريا', 'لبنان', 'العراق', 'إدانة', 'عقوبات', 'مجلس الأمن', 'طائفي', 'طائفية', 'مذهب', 'مذهبي', 'سني', 'شيعي', 'خلاف', 'جدل', 'احتجاج', 'اتهام']
 const SAUDI_AUTHOR_SIGNALS = ['السعودية', 'السعودي', 'المملكة', 'saudi arabia', 'ksa']
 const GOVERNMENT_AUTHOR_SIGNALS = ['الحساب الرسمي', 'جهة حكومية', 'وزارة', 'هيئة', 'المركز الوطني', 'برنامج', 'جامعة', 'مسؤول', 'وزير', 'معالي', 'سمو', 'government', 'official', 'ministry', 'authority']
-const TRUSTED_SAUDI_ACCOUNTS = new Set(['spagov'])
+const TRUSTED_SAUDI_ACCOUNTS = new Set(['spagov', 'saudirdi', 'cst_ksa', 'mcitspokesman', 'saudiniic', 'ksalmudaifer', 'moe_gov_sa', 'mofksa'])
 
 function relevance(text: string, isReply: boolean) {
   const domainMatches = ['ابتكار', 'اختراع', 'تقنية', 'بحث', 'ريادة', 'إنجاز', 'علم', 'موهبة', 'مخترع', 'براءة'].filter(word => text.includes(word)).length
@@ -74,8 +76,8 @@ function hasSignal(text: string, signals: string[]) {
   return signals.some(signal => text.includes(signal))
 }
 
-function isEligibleTopicItem(text: string) {
-  return hasSignal(text, SAUDI_CONTEXT_SIGNALS)
+function isEligibleTopicItem(text: string, fromTrustedSaudiSource = false) {
+  return (fromTrustedSaudiSource || hasSignal(text, SAUDI_CONTEXT_SIGNALS))
     && hasSignal(text, FIRST1_FOCUS_SIGNALS)
     && !hasSignal(text, CABINET_EXCLUDED_SIGNALS)
 }
@@ -85,7 +87,8 @@ function isEligibleCabinetItem(text: string) {
   const hasNationalAchievement = hasSignal(text, ACHIEVEMENT_SIGNALS)
   const hasAccountFocus = hasSignal(text, FIRST1_FOCUS_SIGNALS)
   const hasLeadershipLink = hasSignal(text, LEADERSHIP_SIGNALS)
-  return hasNationalAchievement && (hasAccountFocus || hasLeadershipLink)
+  const hasNationalImpact = hasSignal(text, NATIONAL_IMPACT_SIGNALS)
+  return hasNationalAchievement && (hasAccountFocus || hasLeadershipLink || hasNationalImpact)
 }
 
 export async function scanXRadar(trigger: 'manual' | 'scheduled' = 'scheduled') {
@@ -104,18 +107,26 @@ export async function scanXRadar(trigger: 'manual' | 'scheduled' = 'scheduled') 
   const topicResult = await search(TOPIC_QUERY, startTime)
   const topics = verifiedItems(topicResult, 'verified_topic', true)
     .filter(item => isEligibleTopicItem(item.post_text))
+  const governmentResult = await search(GOVERNMENT_QUERY, startTime)
+  const government = verifiedItems(governmentResult, 'verified_topic', true)
+    .filter(item => isEligibleTopicItem(item.post_text, true))
   const cabinetResult = await search(CABINET_QUERY, startTime)
   const cabinet = verifiedItems(cabinetResult, 'saudi_cabinet')
     .filter(item => isEligibleCabinetItem(item.post_text))
-  const rows = [...replies, ...topics, ...cabinet]
+    .map(item => ({ ...item, relevance_score: Math.max(item.relevance_score, 86) }))
+  const rows = Array.from(new Map(
+    [...replies, ...topics, ...government, ...cabinet].map(row => [row.x_post_id, row]),
+  ).values())
 
   const summary = {
     verifiedReplies: replies.length,
     verifiedTopics: topics.length,
+    verifiedGovernmentPosts: government.length,
     eligibleCabinetPosts: cabinet.length,
     scannedOwnPosts: ownPosts.data?.length ?? 0,
     matchingReplies: replyResult.meta?.result_count ?? replyResult.data?.length ?? 0,
     matchingTopics: topicResult.meta?.result_count ?? topicResult.data?.length ?? 0,
+    matchingGovernmentPosts: governmentResult.meta?.result_count ?? governmentResult.data?.length ?? 0,
     matchingCabinetPosts: cabinetResult.meta?.result_count ?? cabinetResult.data?.length ?? 0,
   }
   const { data: scan, error: scanError } = await service.from('x_radar_scans').insert({
@@ -158,7 +169,7 @@ export async function createRadarDraft(item: { post_text: string; source_type: s
   const completion = await chatComplete(getOpenAI(), {
     model: process.env.OPENAI_TEXT_MODEL || 'gpt-5.2',
     messages: [
-      { role: 'system', content: 'Return JSON only with recommendation (reply, quote, ignore) and draft. You write for First1Saudi as a real Saudi social-media editor: warm, proud, conversational and concise. The account focuses on Saudi achievers, inventors, innovation, science, technology, research, entrepreneurship and national accomplishments. Write one or two short natural sentences, maximum 240 Arabic characters. Start from one specific detail in the post and add a human observation; do not summarize the announcement or turn it into a formal press release. Avoid institutional AI phrases and abstractions such as "يعكس أثر", "رافعة مهمة", "نموذج وطني", "التحسين المستمر", "منظومة", "تمكين", and "تُعد". Prefer natural Saudi phrasing such as "الخبر يفتح النفس" or "هنا يبان الفرق" only when it genuinely fits, and vary the rhythm between drafts. Do not use emojis or hashtags, never request engagement, and never make unverified claims. Only interact when the post has a clear Saudi achievement, Saudi inventor or innovator, Saudi industry, Saudi patent, national accomplishment, First Saudi or First Saudi Woman angle, or a directly related response to First1Saudi. Do not write a generic bridge to Saudi innovation for an unrelated global invention. Never use sarcasm, superiority, mockery, or unsupported comparison. Recommend quote only for an independent substantive perspective. Never write about politics, sectarianism, conflicts, wars, or controversy. For Saudi Cabinet news, interact only when there is both a clear national achievement and a relevant First1Saudi focus or leadership-linked achievement. If unsuitable, return ignore with an empty draft.' },
+      { role: 'system', content: 'Return JSON only with recommendation (reply, quote, ignore) and draft. You write for First1Saudi as a real Saudi social-media editor: warm, proud, conversational and concise. The account focuses on Saudi achievers, inventors, innovation, science, technology, research, entrepreneurship and national accomplishments. Write one or two short natural sentences, maximum 240 Arabic characters. Start from one specific detail in the post and add a human observation; do not summarize the announcement or turn it into a formal press release. Avoid institutional AI phrases and abstractions such as "يعكس أثر", "رافعة مهمة", "نموذج وطني", "التحسين المستمر", "منظومة", "تمكين", and "تُعد". Prefer natural Saudi phrasing such as "الخبر يفتح النفس" or "هنا يبان الفرق" only when it genuinely fits, and vary the rhythm between drafts. Do not use emojis or hashtags, never request engagement, and never make unverified claims. Only interact when the post has a clear Saudi achievement, Saudi inventor or innovator, Saudi industry, Saudi patent, national accomplishment, First Saudi or First Saudi Woman angle, or a directly related response to First1Saudi. Do not write a generic bridge to Saudi innovation for an unrelated global invention. Never use sarcasm, superiority, mockery, or unsupported comparison. Recommend quote only for an independent substantive perspective. Never write about politics, sectarianism, conflicts, wars, or controversy. For Saudi Cabinet news, a verified national achievement in the economy, infrastructure, digital transformation, quality of life, or service to pilgrims is relevant when the reply can connect its concrete impact naturally to opportunity, innovation, or the people behind the work. If unsuitable, return ignore with an empty draft.' },
       { role: 'user', content: `Source type: ${item.source_type}\nRelevance score: ${item.relevance_score ?? 0}\nPost:\n${item.post_text}` },
     ],
     response_format: { type: 'json_object' },
