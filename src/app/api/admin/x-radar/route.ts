@@ -41,7 +41,6 @@ export async function GET(request: Request) {
   if (!latestScan) return NextResponse.json({ items: [], latestScan: null, automationApproved: process.env.X_AI_REPLY_AUTOMATION_APPROVED === 'true' })
   const { data, error } = await service.from('x_radar_items')
     .select('*')
-    .or('source_type.eq.verified_reply_to_first1,relevance_score.gte.80,status.eq.published')
     .eq('last_seen_scan_id', latestScan.id)
     .order('posted_at', { ascending: false, nullsFirst: false })
     .limit(100)
