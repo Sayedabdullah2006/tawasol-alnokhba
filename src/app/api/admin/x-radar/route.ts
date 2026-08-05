@@ -27,15 +27,79 @@ export async function GET() {
 
 export async function POST(request: Request) {
   if (!await authorize()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const body = await request.json().catch(() => ({})) as { action?: string; id?: string; draft?: string; recommendation?: string; status?: string }
+  const body = await request.json().catch(() => ({})) as { action?: string; id?: string; ids?: string[]; draft?: string; recommendation?: string; status?: string }
   if (body.action === 'scan') {
     try { return NextResponse.json(await scanXRadar()) }
     catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Scan failed' }, { status: 500 }) }
   }
-  if (!body.id) return NextResponse.json({ error: 'Missing item id' }, { status: 400 })
   const service = await createServiceRoleClient()
+  const ids = [...new Set((body.ids ?? []).filter(id => typeof id === 'string'))]
+  if (body.action === 'generate_all') {
+    const { data: items, error } = await service
+      .from('x_radar_items')
+      .select('id,post_text,source_type,relevance_score')
+      .eq('status', 'pending')
+      .order('posted_at', { ascending: false })
+      .limit(30)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    let generated = 0
+    for (let index = 0; index < (items ?? []).length; index += 3) {
+      const batch = (items ?? []).slice(index, index + 3)
+      const results = await Promise.allSettled(batch.map(async item => {
+        const draft = await createRadarDraft(item)
+        const { error: updateError } = await service.from('x_radar_items').update({
+          draft_text: draft.draft,
+          recommendation: draft.recommendation,
+          updated_at: new Date().toISOString(),
+        }).eq('id', item.id)
+        if (updateError) throw updateError
+      }))
+      generated += results.filter(result => result.status === 'fulfilled').length
+    }
+    return NextResponse.json({ generated, inspected: items?.length ?? 0 })
+  }
+  if (body.action === 'approve_selected') {
+    if (!ids.length) return NextResponse.json({ error: 'اختر مسودة واحدة على الأقل' }, { status: 400 })
+    const { data: items, error } = await service.from('x_radar_items')
+      .select('id,draft_text,recommendation,status').in('id', ids)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    const approvable = (items ?? []).filter(item => item.status !== 'published' && item.draft_text?.trim() && ['reply', 'quote'].includes(item.recommendation))
+    if (approvable.length) {
+      const { error: updateError } = await service.from('x_radar_items')
+        .update({ status: 'approved', updated_at: new Date().toISOString() })
+        .in('id', approvable.map(item => item.id))
+      if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
+    }
+    return NextResponse.json({ approved: approvable.length, skipped: ids.length - approvable.length })
+  }
+  if (body.action === 'publish_selected') {
+    if (!ids.length) return NextResponse.json({ error: 'اختر مسودة واحدة على الأقل' }, { status: 400 })
+    const { data: items, error } = await service.from('x_radar_items')
+      .select('id,x_post_id,draft_text,recommendation,status').in('id', ids).eq('status', 'approved')
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    let published = 0
+    const failures: string[] = []
+    for (const item of items ?? []) {
+      try {
+        await publishRadarDraft({
+          x_post_id: item.x_post_id,
+          draft_text: item.draft_text ?? '',
+          recommendation: item.recommendation,
+        })
+        const { error: updateError } = await service.from('x_radar_items')
+          .update({ status: 'published', updated_at: new Date().toISOString() })
+          .eq('id', item.id)
+        if (updateError) throw updateError
+        published++
+      } catch (error) {
+        failures.push(error instanceof Error ? error.message : 'تعذر النشر')
+      }
+    }
+    return NextResponse.json({ published, skipped: ids.length - (items?.length ?? 0), failures })
+  }
+  if (!body.id) return NextResponse.json({ error: 'Missing item id' }, { status: 400 })
   if (body.action === 'generate') {
-    const { data: item, error } = await service.from('x_radar_items').select('post_text,source_type').eq('id', body.id).single()
+    const { data: item, error } = await service.from('x_radar_items').select('post_text,source_type,relevance_score').eq('id', body.id).single()
     if (error || !item) return NextResponse.json({ error: 'Item not found' }, { status: 404 })
     const generated = await createRadarDraft(item)
     const { data, error: updateError } = await service.from('x_radar_items').update({
