@@ -18,6 +18,7 @@ export async function GET(request: Request) {
   const service = await createServiceRoleClient()
   const url = new URL(request.url)
   const scanId = url.searchParams.get('scanId')
+  const currentScanId = url.searchParams.get('currentScanId')
   if (scanId) {
     const { data, error } = await service.from('x_radar_scan_items')
       .select('*').eq('scan_id', scanId).order('relevance_score', { ascending: false })
@@ -32,11 +33,11 @@ export async function GET(request: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ scans: data ?? [] })
   }
-  const { data: latestScan, error: latestScanError } = await service.from('x_radar_scans')
+  const latestScanRequest = service.from('x_radar_scans')
     .select('id,trigger,window_start,window_end,found,stats,triggered_at')
-    .order('triggered_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const { data: latestScan, error: latestScanError } = currentScanId
+    ? await latestScanRequest.eq('id', currentScanId).maybeSingle()
+    : await latestScanRequest.order('triggered_at', { ascending: false }).limit(1).maybeSingle()
   if (latestScanError) return NextResponse.json({ error: latestScanError.message }, { status: 500 })
   if (!latestScan) return NextResponse.json({ items: [], latestScan: null, automationApproved: process.env.X_AI_REPLY_AUTOMATION_APPROVED === 'true' })
   const { data, error } = await service.from('x_radar_items')

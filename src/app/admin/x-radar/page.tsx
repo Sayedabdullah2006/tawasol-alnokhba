@@ -30,8 +30,8 @@ export default function XRadarPage() {
   const [historyItems, setHistoryItems] = useState<RadarHistoryItem[]>([])
   const [historyBusy, setHistoryBusy] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    const response = await fetch('/api/admin/x-radar')
+  const load = useCallback(async (scanId?: string) => {
+    const response = await fetch(scanId ? `/api/admin/x-radar?currentScanId=${encodeURIComponent(scanId)}` : '/api/admin/x-radar')
     const data = await response.json().catch(() => ({}))
     if (!response.ok) throw new Error(data.error ?? 'تعذر تحميل الرادار')
     const nextItems = data.items ?? []
@@ -53,25 +53,26 @@ export default function XRadarPage() {
   }, [load, router, showToast, supabase])
 
   const action = async (id: string | null, type: 'scan' | 'generate' | 'generate_all' | 'update' | 'approve_selected' | 'publish' | 'publish_selected', patch: Record<string, unknown> = {}) => {
+    if (type === 'scan') {
+      setItems([])
+      setSelectedIds(new Set())
+      setActiveTab('current')
+    }
     setBusy(id ?? type)
     try {
       const response = await fetch('/api/admin/x-radar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: type, id, ...patch }) })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error ?? 'تعذر تنفيذ الطلب')
-      if (type === 'scan') setActiveTab('current')
       if (data.item?.id) {
         setItems(current => current.map(item => item.id === data.item.id ? data.item as RadarItem : item))
       } else {
-        await load()
+        await load(type === 'scan' ? data.scanId : undefined)
       }
       showToast(type === 'scan'
         ? data.found
           ? `تم الفحص: ${data.found} منشور موثق`
           : `لم تظهر نتائج موثقة بعد. نتائج مطابقة: ${data.matchingTopics ?? 0} منشور و${data.matchingReplies ?? 0} رد و${data.matchingCabinetPosts ?? 0} خبر رسمي`
-        : type === 'generate'
-          ? data.item?.draft_text
-            ? 'تم توليد المسودة. راجع النص ثم اعتمده.'
-            : 'لم يُقترح تفاعل لهذا المنشور. يمكنك كتابة مسودة يدوية إن رغبت.'
+        : type === 'generate' ? 'تم توليد المسودة. راجع النص ثم اعتمده.'
         : type === 'generate_all' ? `تم تقييم ${data.inspected ?? 0} منشور وتوليد ${data.generated ?? 0} مسودة`
           : type === 'approve_selected' ? `تم اعتماد ${data.approved ?? 0} مسودة للنشر`
             : type === 'publish_selected' ? `تم نشر ${data.published ?? 0} تفاعل في X`

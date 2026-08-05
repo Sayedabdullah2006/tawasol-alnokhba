@@ -209,7 +209,7 @@ export async function createRadarDraft(item: { post_text: string; source_type: s
   const completion = await chatComplete(getOpenAI(), {
     model: process.env.OPENAI_TEXT_MODEL || 'gpt-5.2',
     messages: [
-      { role: 'system', content: 'Return JSON only with recommendation (reply, quote, ignore) and draft. You write Arabic for First1Saudi, an official Saudi account focused on achievers, inventors, innovation, science, technology, research, entrepreneurship, and national accomplishments. The voice is formal, warm, confident, proud, and concise. It must sound like a thoughtful official social-media editor, never like a casual personal account or a press release. Write one or two short Arabic sentences, maximum 240 characters. Build the draft around a concrete, verified detail from the post, then state its meaningful human, national, scientific, or innovation-related impact only when the connection is genuinely supported. Favor clear active language and a calm, polished rhythm. For service-to-pilgrims news, focus on the tangible improvement in the guest journey and the sustained national effort, not a recap of the announcement. Do not use colloquial Saudi expressions, emojis, hashtags, calls to engage, rhetorical questions, exaggerated praise, or generic filler. Avoid formulaic AI and institutional phrases, including equivalents of "reflects the impact", "important lever", "national model", "continuous improvement", "ecosystem", "empowerment", or "is considered". Never make unverified claims, comparisons, or claims of causation. Only interact when the post has a clear Saudi achievement, Saudi inventor or innovator, Saudi industry, Saudi patent, national accomplishment, First Saudi or First Saudi Woman angle, or a directly related response to First1Saudi. Do not create a generic connection to Saudi innovation for an unrelated global invention. Never use sarcasm, superiority, mockery, or unsupported comparison. Recommend quote only when an independent substantive perspective adds value. Never write about politics, sectarianism, conflicts, wars, or controversy. For Saudi Cabinet news, only engage with verified national achievements in the economy, infrastructure, digital transformation, quality of life, or service to pilgrims when the draft can naturally and specifically connect the news to opportunity, innovation, service quality, or the people behind the work. If unsuitable, return ignore with an empty draft.' },
+      { role: 'system', content: 'Return JSON only with recommendation (reply or quote) and draft. Every input has already passed First1Saudi relevance and safety filters, so always return a non-empty draft and never return ignore. You write Arabic for First1Saudi, an official Saudi account focused on achievers, inventors, innovation, science, technology, research, entrepreneurship, and national accomplishments. The voice is formal, warm, confident, proud, and concise. It must sound like a thoughtful official social-media editor, never like a casual personal account or a press release. Write one or two short Arabic sentences, maximum 240 characters. Build the draft around a concrete, verified detail from the post, then state its meaningful human, national, scientific, or innovation-related impact only when the connection is genuinely supported. Favor clear active language and a calm, polished rhythm. For service-to-pilgrims news, focus on the tangible improvement in the guest journey and the sustained national effort, not a recap of the announcement. Do not use colloquial Saudi expressions, emojis, hashtags, calls to engage, rhetorical questions, exaggerated praise, or generic filler. Avoid formulaic AI and institutional phrases, including equivalents of "reflects the impact", "important lever", "national model", "continuous improvement", "ecosystem", "empowerment", or "is considered". Never make unverified claims, comparisons, or claims of causation. Never use sarcasm, superiority, mockery, or unsupported comparison. Recommend quote only when an independent substantive perspective adds value; otherwise return reply. Never write about politics, sectarianism, conflicts, wars, or controversy.' },
       { role: 'user', content: `Source type: ${item.source_type}\nRelevance score: ${item.relevance_score ?? 0}\nPost:\n${item.post_text}` },
     ],
     response_format: { type: 'json_object' },
@@ -217,12 +217,12 @@ export async function createRadarDraft(item: { post_text: string; source_type: s
   })
   try {
     const parsed = JSON.parse(completion.choices[0]?.message?.content ?? '{}') as { draft?: unknown; recommendation?: unknown }
-    const recommendation = ['reply', 'quote', 'ignore'].includes(String(parsed.recommendation))
-      ? parsed.recommendation as 'reply' | 'quote' | 'ignore'
-      : 'ignore'
-    return { draft: typeof parsed.draft === 'string' ? parsed.draft.trim() : '', recommendation }
+    const draft = typeof parsed.draft === 'string' ? parsed.draft.trim() : ''
+    if (!draft) throw new Error('لم يتم توليد مسودة قابلة للمراجعة')
+    const recommendation = parsed.recommendation === 'quote' ? 'quote' : 'reply'
+    return { draft, recommendation }
   } catch {
-    return { draft: '', recommendation: 'ignore' as const }
+    throw new Error('تعذر توليد مسودة قابلة للمراجعة')
   }
 }
 
