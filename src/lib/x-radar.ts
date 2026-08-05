@@ -4,9 +4,9 @@ import { chatComplete, getOpenAI } from '@/lib/openai'
 
 type XTweet = { id: string; text: string; author_id?: string; conversation_id?: string; created_at?: string }
 type XUser = { id: string; username?: string; name?: string; verified?: boolean }
-type XSearch = { data?: XTweet[]; includes?: { users?: XUser[] } }
+type XSearch = { data?: XTweet[]; includes?: { users?: XUser[] }; meta?: { result_count?: number } }
 
-const TOPIC_QUERY = '(ابتكار OR اختراع OR تقنية OR بحث علمي OR ريادة OR إنجاز سعودي) lang:ar -is:retweet'
+const TOPIC_QUERY = '(ابتكار OR اختراع OR تقنية OR "بحث علمي" OR ريادة OR "إنجاز سعودي" OR "رؤية السعودية 2030") lang:ar -is:retweet'
 
 function relevance(text: string, isReply: boolean) {
   const matches = ['ابتكار', 'اختراع', 'تقنية', 'بحث', 'ريادة', 'إنجاز', 'علم'].filter(word => text.includes(word)).length
@@ -16,7 +16,7 @@ function relevance(text: string, isReply: boolean) {
 async function search(query: string): Promise<XSearch> {
   const params = new URLSearchParams({
     query,
-    max_results: '25',
+    max_results: '100',
     'tweet.fields': 'author_id,conversation_id,created_at',
     expansions: 'author_id',
     'user.fields': 'verified,username,name',
@@ -54,18 +54,26 @@ export async function scanXRadar() {
     .select('x_user_id,x_username').eq('id', true).maybeSingle()
   if (!connection?.x_user_id || !connection.x_username) throw new Error('X account is not connected')
 
-  const ownPosts = await xApiFetch<{ data?: XTweet[] }>(`/users/${connection.x_user_id}/tweets?max_results=10&tweet.fields=created_at,conversation_id`)
+  const ownPosts = await xApiFetch<{ data?: XTweet[] }>(`/users/${connection.x_user_id}/tweets?max_results=5&tweet.fields=created_at,conversation_id`)
   const replyResults = await Promise.all((ownPosts.data ?? []).map(post =>
     search(`conversation_id:${post.id} -from:${connection.x_username} -is:retweet`),
   ))
   const replies = replyResults.flatMap(result => verifiedItems(result, 'verified_reply_to_first1'))
-  const topics = verifiedItems(await search(TOPIC_QUERY), 'verified_topic')
+  const topicResult = await search(TOPIC_QUERY)
+  const topics = verifiedItems(topicResult, 'verified_topic')
   const rows = [...replies, ...topics]
   if (rows.length) {
     const { error } = await service.from('x_radar_items').upsert(rows, { onConflict: 'x_post_id', ignoreDuplicates: true })
     if (error) throw new Error(`Unable to save X radar items: ${error.message}`)
   }
-  return { found: rows.length, verifiedReplies: replies.length, verifiedTopics: topics.length }
+  return {
+    found: rows.length,
+    verifiedReplies: replies.length,
+    verifiedTopics: topics.length,
+    scannedOwnPosts: ownPosts.data?.length ?? 0,
+    matchingReplies: replyResults.reduce((total, result) => total + (result.meta?.result_count ?? result.data?.length ?? 0), 0),
+    matchingTopics: topicResult.meta?.result_count ?? topicResult.data?.length ?? 0,
+  }
 }
 
 export async function createRadarDraft(item: { post_text: string; source_type: string }) {

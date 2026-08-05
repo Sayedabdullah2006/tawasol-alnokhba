@@ -49,7 +49,11 @@ export default function XRadarPage() {
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error ?? 'تعذر تنفيذ الطلب')
       await load()
-      showToast(type === 'scan' ? `تم الفحص: ${data.found ?? 0} منشور` : type === 'publish' ? 'تم النشر في X' : 'تم الحفظ', 'success')
+      showToast(type === 'scan'
+        ? data.found
+          ? `تم الفحص: ${data.found} منشور موثق`
+          : `لم تظهر نتائج موثقة بعد. نتائج مطابقة: ${data.matchingTopics ?? 0} منشور و${data.matchingReplies ?? 0} رد`
+        : type === 'publish' ? 'تم النشر في X' : 'تم الحفظ', 'success')
     } catch (error) { showToast(error instanceof Error ? error.message : 'تعذر تنفيذ الطلب', 'error') }
     finally { setBusy(null) }
   }
