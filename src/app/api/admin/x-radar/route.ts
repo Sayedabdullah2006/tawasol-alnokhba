@@ -13,14 +13,42 @@ async function authorize() {
   return profile?.role === 'admin'
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!await authorize()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const service = await createServiceRoleClient()
+  const url = new URL(request.url)
+  const scanId = url.searchParams.get('scanId')
+  if (scanId) {
+    const { data, error } = await service.from('x_radar_scan_items')
+      .select('*').eq('scan_id', scanId).order('relevance_score', { ascending: false })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ items: data ?? [] })
+  }
+  if (url.searchParams.get('view') === 'history') {
+    const { data, error } = await service.from('x_radar_scans')
+      .select('id,trigger,window_start,window_end,found,stats,triggered_at')
+      .order('triggered_at', { ascending: false })
+      .limit(50)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ scans: data ?? [] })
+  }
+  const { data: latestScan, error: latestScanError } = await service.from('x_radar_scans')
+    .select('id,trigger,window_start,window_end,found,stats,triggered_at')
+    .order('triggered_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (latestScanError) return NextResponse.json({ error: latestScanError.message }, { status: 500 })
+  if (!latestScan) return NextResponse.json({ items: [], latestScan: null, automationApproved: process.env.X_AI_REPLY_AUTOMATION_APPROVED === 'true' })
   const { data, error } = await service.from('x_radar_items')
-    .select('*').order('posted_at', { ascending: false, nullsFirst: false }).limit(100)
+    .select('*')
+    .or('source_type.eq.verified_reply_to_first1,relevance_score.gte.80,status.eq.published')
+    .eq('last_seen_scan_id', latestScan.id)
+    .order('posted_at', { ascending: false, nullsFirst: false })
+    .limit(100)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({
     items: data ?? [],
+    latestScan,
     automationApproved: process.env.X_AI_REPLY_AUTOMATION_APPROVED === 'true',
   })
 }
@@ -29,7 +57,7 @@ export async function POST(request: Request) {
   if (!await authorize()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await request.json().catch(() => ({})) as { action?: string; id?: string; ids?: string[]; draft?: string; recommendation?: string; status?: string }
   if (body.action === 'scan') {
-    try { return NextResponse.json(await scanXRadar()) }
+    try { return NextResponse.json(await scanXRadar('manual')) }
     catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Scan failed' }, { status: 500 }) }
   }
   const service = await createServiceRoleClient()
@@ -126,14 +154,17 @@ export async function POST(request: Request) {
     if (error || !item) return NextResponse.json({ error: 'Item not found' }, { status: 404 })
     if (item.status === 'published') return NextResponse.json({ error: 'تم نشر هذه المسودة مسبقاً' }, { status: 409 })
     try {
+      const recommendation = ['reply', 'quote'].includes(String(body.recommendation))
+        ? String(body.recommendation)
+        : item.recommendation
       const result = await publishRadarDraft({
         x_post_id: item.x_post_id,
         draft_text: item.draft_text ?? '',
-        recommendation: item.recommendation,
+        recommendation,
       })
       const { data, error: updateError } = await service
         .from('x_radar_items')
-        .update({ status: 'published', updated_at: new Date().toISOString() })
+        .update({ status: 'published', recommendation, updated_at: new Date().toISOString() })
         .eq('id', body.id)
         .select()
         .single()

@@ -13,7 +13,7 @@ async function handle(request: NextRequest) {
   if (key !== CRON_API_KEY) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    return NextResponse.json(await scanXRadar())
+    return NextResponse.json(await scanXRadar('scheduled'))
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'X radar scan failed' }, { status: 500 })
   }
