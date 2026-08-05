@@ -7,6 +7,8 @@ type XUser = { id: string; username?: string; name?: string; description?: strin
 type XSearch = { data?: XTweet[]; includes?: { users?: XUser[] }; meta?: { result_count?: number } }
 
 const TOPIC_QUERY = '(ابتكار OR اختراع OR تقنية OR "بحث علمي" OR ريادة OR "إنجاز سعودي" OR "رؤية السعودية 2030" OR "اختراع سعودي" OR "براءة اختراع سعودية" OR "موهبة سعودية" OR "رقم قياسي سعودي" OR "السعودية موسوعة غينيس" OR "سعودي يحقق جائزة" OR "عالم سعودي" OR "عالمة سعودية") lang:ar -is:retweet'
+const SAUDI_ACHIEVEMENT_QUERY = '(السعودية OR سعودي OR سعودية OR المملكة OR سعوديون OR سعوديات) (حقق OR حققت OR فاز OR فازت OR جائزة OR ميدالية OR تتويج OR "براءة اختراع" OR "رقم قياسي" OR غينيس OR إنجاز) lang:ar -is:retweet'
+const SAUDI_KNOWLEDGE_QUERY = '(السعودية OR سعودي OR سعودية OR المملكة OR سعوديون OR سعوديات) (باحث OR باحثة OR عالم OR عالمة OR مخترع OR مخترعة OR موهبة OR ابتكار OR إبداع OR تقنية OR علوم OR "بحث علمي" OR ريادة) lang:ar -is:retweet'
 const CABINET_QUERY = 'from:spagov -is:retweet'
 const GOVERNMENT_QUERY = '(from:SaudiRDI OR from:CST_KSA OR from:MCITspokesman OR from:SaudiNIIC OR from:KSAlmudaifer OR from:moe_gov_sa OR from:MOFKSA) -is:retweet'
 const SAUDI_CONTEXT_SIGNALS = ['السعودية', 'سعودي', 'سعودية', 'المملكة', 'رؤية 2030', 'أول سعودي', 'أول سعودية']
@@ -42,6 +44,18 @@ async function search(query: string, startTime: string): Promise<XSearch> {
     'user.fields': 'verified,username,name,description,location',
   })
   return xApiFetch<XSearch>(`/tweets/search/recent?${params.toString()}`)
+}
+
+function mergeSearchResults(...results: XSearch[]): XSearch {
+  const posts = new Map<string, XTweet>()
+  const users = new Map<string, XUser>()
+  let resultCount = 0
+  for (const result of results) {
+    for (const post of result.data ?? []) posts.set(post.id, post)
+    for (const user of result.includes?.users ?? []) users.set(user.id, user)
+    resultCount += result.meta?.result_count ?? result.data?.length ?? 0
+  }
+  return { data: [...posts.values()], includes: { users: [...users.values()] }, meta: { result_count: resultCount } }
 }
 
 function isSaudiOrGovernmentAuthor(author: XUser) {
@@ -105,16 +119,21 @@ export async function scanXRadar(trigger: 'manual' | 'scheduled' = 'scheduled') 
   const endTime = new Date().toISOString()
   const ownPosts = await xApiFetch<{ data?: XTweet[] }>(`/users/${connection.x_user_id}/tweets?max_results=100&start_time=${encodeURIComponent(startTime)}&tweet.fields=created_at,conversation_id`)
   const ownPostIds = new Set((ownPosts.data ?? []).map(post => post.id))
-  const replyResult = await search(`to:${connection.x_username} is:reply -from:${connection.x_username} -is:retweet`, startTime)
+  const [replyResult, topicResult, achievementResult, knowledgeResult, governmentResult, cabinetResult] = await Promise.all([
+    search(`to:${connection.x_username} is:reply -from:${connection.x_username} -is:retweet`, startTime),
+    search(TOPIC_QUERY, startTime),
+    search(SAUDI_ACHIEVEMENT_QUERY, startTime),
+    search(SAUDI_KNOWLEDGE_QUERY, startTime),
+    search(GOVERNMENT_QUERY, startTime),
+    search(CABINET_QUERY, startTime),
+  ])
   const replies = verifiedItems(replyResult, 'verified_reply_to_first1')
     .filter(reply => reply.parent_post_id && ownPostIds.has(reply.parent_post_id))
-  const topicResult = await search(TOPIC_QUERY, startTime)
-  const topics = verifiedItems(topicResult, 'verified_topic', true)
+  const topicCandidates = mergeSearchResults(topicResult, achievementResult, knowledgeResult)
+  const topics = verifiedItems(topicCandidates, 'verified_topic')
     .filter(item => isEligibleTopicItem(item.post_text))
-  const governmentResult = await search(GOVERNMENT_QUERY, startTime)
   const government = verifiedItems(governmentResult, 'verified_topic', true)
     .filter(item => isEligibleTopicItem(item.post_text, true))
-  const cabinetResult = await search(CABINET_QUERY, startTime)
   const cabinet = verifiedItems(cabinetResult, 'saudi_cabinet')
     .filter(item => isEligibleCabinetItem(item.post_text))
     .map(item => ({ ...item, relevance_score: Math.max(item.relevance_score, 86) }))
@@ -129,7 +148,9 @@ export async function scanXRadar(trigger: 'manual' | 'scheduled' = 'scheduled') 
     eligibleCabinetPosts: cabinet.length,
     scannedOwnPosts: ownPosts.data?.length ?? 0,
     matchingReplies: replyResult.meta?.result_count ?? replyResult.data?.length ?? 0,
-    matchingTopics: topicResult.meta?.result_count ?? topicResult.data?.length ?? 0,
+    matchingTopics: topicCandidates.meta?.result_count ?? topicCandidates.data?.length ?? 0,
+    matchingSaudiAchievements: achievementResult.meta?.result_count ?? achievementResult.data?.length ?? 0,
+    matchingSaudiKnowledge: knowledgeResult.meta?.result_count ?? knowledgeResult.data?.length ?? 0,
     matchingGovernmentPosts: governmentResult.meta?.result_count ?? governmentResult.data?.length ?? 0,
     matchingCabinetPosts: cabinetResult.meta?.result_count ?? cabinetResult.data?.length ?? 0,
   }
