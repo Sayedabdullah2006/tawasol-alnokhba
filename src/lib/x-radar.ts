@@ -6,11 +6,12 @@ type XTweet = { id: string; text: string; author_id?: string; conversation_id?: 
 type XUser = { id: string; username?: string; name?: string; description?: string; location?: string; verified?: boolean }
 type XSearch = { data?: XTweet[]; includes?: { users?: XUser[] }; meta?: { result_count?: number } }
 
-const TOPIC_QUERY = '(ابتكار OR اختراع OR تقنية OR "بحث علمي" OR ريادة OR "إنجاز سعودي" OR "رؤية السعودية 2030") lang:ar -is:retweet'
+const TOPIC_QUERY = '(ابتكار OR اختراع OR تقنية OR "بحث علمي" OR ريادة OR "إنجاز سعودي" OR "رؤية السعودية 2030" OR "اختراع سعودي" OR "براءة اختراع سعودية" OR "موهبة سعودية" OR "رقم قياسي سعودي" OR "السعودية موسوعة غينيس" OR "سعودي يحقق جائزة" OR "عالم سعودي" OR "عالمة سعودية") lang:ar -is:retweet'
 const CABINET_QUERY = 'from:spagov -is:retweet'
 const GOVERNMENT_QUERY = '(from:SaudiRDI OR from:CST_KSA OR from:MCITspokesman OR from:SaudiNIIC OR from:KSAlmudaifer OR from:moe_gov_sa OR from:MOFKSA) -is:retweet'
 const SAUDI_CONTEXT_SIGNALS = ['السعودية', 'سعودي', 'سعودية', 'المملكة', 'رؤية 2030', 'أول سعودي', 'أول سعودية']
-const FIRST1_FOCUS_SIGNALS = ['ابتكار', 'اختراع', 'براءة', 'مخترع', 'مخترعة', 'إبداع', 'صناعة', 'بحث علمي', 'باحث', 'باحثة', 'تقنية', 'علوم', 'ريادة', 'ريادي', 'ريادية', 'موهبة', 'جائزة', 'ميدالية']
+const FIRST1_FOCUS_SIGNALS = ['ابتكار', 'اختراع', 'اختراع سعودي', 'براءة', 'براءة اختراع سعودية', 'مخترع', 'مخترعة', 'إبداع', 'صناعة', 'بحث علمي', 'باحث', 'باحثة', 'تقنية', 'علوم', 'ريادة', 'ريادي', 'ريادية', 'موهبة', 'موهبة سعودية', 'جائزة', 'ميدالية', 'رقم قياسي سعودي', 'موسوعة غينيس', 'السعودية موسوعة غينيس', 'عالم سعودي', 'عالمة سعودية', 'سعودي يحقق جائزة', 'سعوديات', 'سعوديون']
+const DIRECT_SAUDI_ACHIEVEMENT_SIGNALS = ['اختراع سعودي', 'براءة اختراع سعودية', 'موهبة سعودية', 'رقم قياسي سعودي', 'السعودية موسوعة غينيس', 'بحمد الله حصلت على براءة اختراع', 'سعودي يحقق جائزة', 'عالم سعودي', 'عالمة سعودية']
 const ACHIEVEMENT_SIGNALS = ['حقق', 'حققت', 'إنجاز', 'نجاح', 'فاز', 'فازت', 'حصل', 'حصلت', 'تتويج', 'تصنيف', 'مركز', 'الأول', 'الأولى', 'تميز', 'ريادة', 'تدشين']
 const LEADERSHIP_SIGNALS = ['خادم الحرمين الشريفين', 'سمو ولي العهد', 'الأمير محمد بن سلمان', 'الملك سلمان']
 const NATIONAL_IMPACT_SIGNALS = ['خدمة ضيوف الرحمن', 'الحج', 'العمرة', 'صندوق النقد الدولي', 'مرونة اقتصاد', 'اقتصاد المملكة', 'البنية التحتية', 'التخطيط المالي', 'التحول الرقمي', 'جودة الحياة']
@@ -22,6 +23,8 @@ const TRUSTED_SAUDI_ACCOUNTS = new Set(['spagov', 'saudirdi', 'cst_ksa', 'mcitsp
 function relevance(text: string, isReply: boolean) {
   const domainMatches = ['ابتكار', 'اختراع', 'تقنية', 'بحث', 'ريادة', 'إنجاز', 'علم', 'موهبة', 'مخترع', 'براءة'].filter(word => text.includes(word)).length
   const saudiContext = ['السعودية', 'سعودي', 'المملكة', 'رؤية 2030', 'ولي العهد', 'الملك سلمان'].some(word => text.includes(word))
+  const directSaudiAchievement = hasSignal(text, DIRECT_SAUDI_ACHIEVEMENT_SIGNALS)
+  if (directSaudiAchievement) return Math.min(100, 90 + domainMatches * 2)
   if (saudiContext && domainMatches) return Math.min(100, 82 + domainMatches * 3)
   if (isReply) return Math.min(100, 70 + domainMatches * 3)
   // General innovation posts are opportunities to connect readers with Saudi achievers,
@@ -77,8 +80,9 @@ function hasSignal(text: string, signals: string[]) {
 }
 
 function isEligibleTopicItem(text: string, fromTrustedSaudiSource = false) {
-  return (fromTrustedSaudiSource || hasSignal(text, SAUDI_CONTEXT_SIGNALS))
-    && hasSignal(text, FIRST1_FOCUS_SIGNALS)
+  const directSaudiAchievement = hasSignal(text, DIRECT_SAUDI_ACHIEVEMENT_SIGNALS)
+  return (fromTrustedSaudiSource || hasSignal(text, SAUDI_CONTEXT_SIGNALS) || directSaudiAchievement)
+    && (hasSignal(text, FIRST1_FOCUS_SIGNALS) || directSaudiAchievement)
     && !hasSignal(text, CABINET_EXCLUDED_SIGNALS)
 }
 
@@ -169,11 +173,11 @@ export async function createRadarDraft(item: { post_text: string; source_type: s
   const completion = await chatComplete(getOpenAI(), {
     model: process.env.OPENAI_TEXT_MODEL || 'gpt-5.2',
     messages: [
-      { role: 'system', content: 'Return JSON only with recommendation (reply, quote, ignore) and draft. You write for First1Saudi as a real Saudi social-media editor: warm, proud, conversational and concise. The account focuses on Saudi achievers, inventors, innovation, science, technology, research, entrepreneurship and national accomplishments. Write one or two short natural sentences, maximum 240 Arabic characters. Start from one specific detail in the post and add a human observation; do not summarize the announcement or turn it into a formal press release. Avoid institutional AI phrases and abstractions such as "يعكس أثر", "رافعة مهمة", "نموذج وطني", "التحسين المستمر", "منظومة", "تمكين", and "تُعد". Prefer natural Saudi phrasing such as "الخبر يفتح النفس" or "هنا يبان الفرق" only when it genuinely fits, and vary the rhythm between drafts. Do not use emojis or hashtags, never request engagement, and never make unverified claims. Only interact when the post has a clear Saudi achievement, Saudi inventor or innovator, Saudi industry, Saudi patent, national accomplishment, First Saudi or First Saudi Woman angle, or a directly related response to First1Saudi. Do not write a generic bridge to Saudi innovation for an unrelated global invention. Never use sarcasm, superiority, mockery, or unsupported comparison. Recommend quote only for an independent substantive perspective. Never write about politics, sectarianism, conflicts, wars, or controversy. For Saudi Cabinet news, a verified national achievement in the economy, infrastructure, digital transformation, quality of life, or service to pilgrims is relevant when the reply can connect its concrete impact naturally to opportunity, innovation, or the people behind the work. If unsuitable, return ignore with an empty draft.' },
+      { role: 'system', content: 'Return JSON only with recommendation (reply, quote, ignore) and draft. You write Arabic for First1Saudi, an official Saudi account focused on achievers, inventors, innovation, science, technology, research, entrepreneurship, and national accomplishments. The voice is formal, warm, confident, proud, and concise. It must sound like a thoughtful official social-media editor, never like a casual personal account or a press release. Write one or two short Arabic sentences, maximum 240 characters. Build the draft around a concrete, verified detail from the post, then state its meaningful human, national, scientific, or innovation-related impact only when the connection is genuinely supported. Favor clear active language and a calm, polished rhythm. For service-to-pilgrims news, focus on the tangible improvement in the guest journey and the sustained national effort, not a recap of the announcement. Do not use colloquial Saudi expressions, emojis, hashtags, calls to engage, rhetorical questions, exaggerated praise, or generic filler. Avoid formulaic AI and institutional phrases, including equivalents of "reflects the impact", "important lever", "national model", "continuous improvement", "ecosystem", "empowerment", or "is considered". Never make unverified claims, comparisons, or claims of causation. Only interact when the post has a clear Saudi achievement, Saudi inventor or innovator, Saudi industry, Saudi patent, national accomplishment, First Saudi or First Saudi Woman angle, or a directly related response to First1Saudi. Do not create a generic connection to Saudi innovation for an unrelated global invention. Never use sarcasm, superiority, mockery, or unsupported comparison. Recommend quote only when an independent substantive perspective adds value. Never write about politics, sectarianism, conflicts, wars, or controversy. For Saudi Cabinet news, only engage with verified national achievements in the economy, infrastructure, digital transformation, quality of life, or service to pilgrims when the draft can naturally and specifically connect the news to opportunity, innovation, service quality, or the people behind the work. If unsuitable, return ignore with an empty draft.' },
       { role: 'user', content: `Source type: ${item.source_type}\nRelevance score: ${item.relevance_score ?? 0}\nPost:\n${item.post_text}` },
     ],
     response_format: { type: 'json_object' },
-    temperature: 0.9,
+    temperature: 0.65,
   })
   try {
     const parsed = JSON.parse(completion.choices[0]?.message?.content ?? '{}') as { draft?: unknown; recommendation?: unknown }
