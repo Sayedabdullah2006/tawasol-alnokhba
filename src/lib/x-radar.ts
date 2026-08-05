@@ -61,6 +61,32 @@ async function search(query: string, startTime: string, pages = 1): Promise<XSea
   return { data: [...posts.values()], includes: { users: [...users.values()] }, meta: { result_count: resultCount, next_token: nextToken } }
 }
 
+async function getMentions(userId: string, startTime: string, pages = 3): Promise<XSearch> {
+  const posts = new Map<string, XTweet>()
+  const users = new Map<string, XUser>()
+  let resultCount = 0
+  let nextToken: string | undefined
+
+  for (let page = 0; page < pages; page++) {
+    const params = new URLSearchParams({
+      max_results: '100',
+      start_time: startTime,
+      'tweet.fields': 'author_id,conversation_id,created_at',
+      expansions: 'author_id',
+      'user.fields': 'verified,username,name,description,location',
+    })
+    if (nextToken) params.set('pagination_token', nextToken)
+    const result = await xApiFetch<XSearch>(`/users/${userId}/mentions?${params.toString()}`)
+    for (const post of result.data ?? []) posts.set(post.id, post)
+    for (const user of result.includes?.users ?? []) users.set(user.id, user)
+    resultCount += result.meta?.result_count ?? result.data?.length ?? 0
+    nextToken = result.meta?.next_token
+    if (!nextToken) break
+  }
+
+  return { data: [...posts.values()], includes: { users: [...users.values()] }, meta: { result_count: resultCount, next_token: nextToken } }
+}
+
 function mergeSearchResults(...results: XSearch[]): XSearch {
   const posts = new Map<string, XTweet>()
   const users = new Map<string, XUser>()
@@ -132,18 +158,15 @@ export async function scanXRadar(trigger: 'manual' | 'scheduled' = 'scheduled') 
 
   const startTime = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
   const endTime = new Date().toISOString()
-  const ownPosts = await xApiFetch<{ data?: XTweet[] }>(`/users/${connection.x_user_id}/tweets?max_results=100&start_time=${encodeURIComponent(startTime)}&tweet.fields=created_at,conversation_id`)
-  const ownPostIds = new Set((ownPosts.data ?? []).map(post => post.id))
-  const [replyResult, topicResult, achievementResult, knowledgeResult, governmentResult, cabinetResult] = await Promise.all([
-    search(`to:${connection.x_username} is:reply -from:${connection.x_username} -is:retweet`, startTime),
+  const [mentionResult, topicResult, achievementResult, knowledgeResult, governmentResult, cabinetResult] = await Promise.all([
+    getMentions(connection.x_user_id, startTime),
     search(TOPIC_QUERY, startTime, 3),
     search(SAUDI_ACHIEVEMENT_QUERY, startTime, 3),
     search(SAUDI_KNOWLEDGE_QUERY, startTime, 3),
     search(GOVERNMENT_QUERY, startTime),
     search(CABINET_QUERY, startTime),
   ])
-  const replies = verifiedItems(replyResult, 'verified_reply_to_first1')
-    .filter(reply => reply.parent_post_id && ownPostIds.has(reply.parent_post_id))
+  const replies = verifiedItems(mentionResult, 'verified_reply_to_first1')
   const topicCandidates = mergeSearchResults(topicResult, achievementResult, knowledgeResult)
   const topics = verifiedItems(topicCandidates, 'verified_topic')
     .filter(item => isEligibleTopicItem(item.post_text))
@@ -161,8 +184,9 @@ export async function scanXRadar(trigger: 'manual' | 'scheduled' = 'scheduled') 
     verifiedTopics: topics.length,
     verifiedGovernmentPosts: government.length,
     eligibleCabinetPosts: cabinet.length,
-    scannedOwnPosts: ownPosts.data?.length ?? 0,
-    matchingReplies: replyResult.meta?.result_count ?? replyResult.data?.length ?? 0,
+    scannedOwnPosts: 0,
+    matchingReplies: mentionResult.meta?.result_count ?? mentionResult.data?.length ?? 0,
+    matchingMentions: mentionResult.meta?.result_count ?? mentionResult.data?.length ?? 0,
     matchingTopics: topicCandidates.meta?.result_count ?? topicCandidates.data?.length ?? 0,
     matchingSaudiAchievements: achievementResult.meta?.result_count ?? achievementResult.data?.length ?? 0,
     matchingSaudiKnowledge: knowledgeResult.meta?.result_count ?? knowledgeResult.data?.length ?? 0,
@@ -209,7 +233,7 @@ export async function createRadarDraft(item: { post_text: string; source_type: s
   const completion = await chatComplete(getOpenAI(), {
     model: process.env.OPENAI_TEXT_MODEL || 'gpt-5.2',
     messages: [
-      { role: 'system', content: 'Return JSON only with recommendation (reply or quote) and draft. Every input has already passed First1Saudi relevance and safety filters, so always return a non-empty draft and never return ignore. You write Arabic for First1Saudi, an official Saudi account focused on achievers, inventors, innovation, science, technology, research, entrepreneurship, and national accomplishments. The voice is formal, warm, confident, proud, and concise. It must sound like a thoughtful official social-media editor, never like a casual personal account or a press release. Write one or two short Arabic sentences, maximum 240 characters. Do not summarize, paraphrase, or repeat the source post. Before writing, identify one fresh editorial angle that the source supports: the future opportunity, the human outcome, the scientific meaning, the value of collaboration, or the path it opens for Saudi talent. Lead with that angle, then use at most one concrete source detail only when it strengthens the point. Do not repeat the source names, date, location, participating entities, or statistics unless they are essential to the new angle. Use substantially different wording from the source; never reuse a full phrase or make the draft read like a shortened news announcement. Favor clear active language and a calm, polished rhythm. For service-to-pilgrims news, focus on the tangible improvement in the guest journey and the sustained national effort, not a recap of the announcement. Do not use colloquial Saudi expressions, emojis, hashtags, calls to engage, rhetorical questions, exaggerated praise, or generic filler. Avoid formulaic AI and institutional phrases, including equivalents of "reflects the impact", "important lever", "national model", "continuous improvement", "ecosystem", "empowerment", or "is considered". Never make unverified claims, comparisons, or claims of causation. Never use sarcasm, superiority, mockery, or unsupported comparison. Recommend quote only when an independent substantive perspective adds value; otherwise return reply. Never write about politics, sectarianism, conflicts, wars, or controversy.' },
+      { role: 'system', content: 'Return JSON only with recommendation (reply) and draft. Every input is a verified mention of First1Saudi and has already passed relevance and safety filters, so always return a non-empty draft with recommendation reply. You write Arabic for First1Saudi, an official Saudi account focused on achievers, inventors, innovation, science, technology, research, entrepreneurship, and national accomplishments. The voice is formal, warm, confident, proud, and concise. It must sound like a thoughtful official social-media editor, never like a casual personal account or a press release. Write one or two short Arabic sentences, maximum 240 characters. Do not summarize, paraphrase, or repeat the source post. Before writing, identify one fresh editorial angle that the source supports: the future opportunity, the human outcome, the scientific meaning, the value of collaboration, or the path it opens for Saudi talent. Lead with that angle, then use at most one concrete source detail only when it strengthens the point. Do not repeat the source names, date, location, participating entities, or statistics unless they are essential to the new angle. Use substantially different wording from the source; never reuse a full phrase or make the draft read like a shortened news announcement. Favor clear active language and a calm, polished rhythm. Do not use colloquial Saudi expressions, emojis, hashtags, calls to engage, rhetorical questions, exaggerated praise, or generic filler. Avoid formulaic AI and institutional phrases, including equivalents of "reflects the impact", "important lever", "national model", "continuous improvement", "ecosystem", "empowerment", or "is considered". Never make unverified claims, comparisons, or claims of causation. Never use sarcasm, superiority, mockery, or unsupported comparison. Never write about politics, sectarianism, conflicts, wars, or controversy.' },
       { role: 'user', content: `Source type: ${item.source_type}\nRelevance score: ${item.relevance_score ?? 0}\nPost:\n${item.post_text}` },
     ],
     response_format: { type: 'json_object' },
@@ -219,8 +243,7 @@ export async function createRadarDraft(item: { post_text: string; source_type: s
     const parsed = JSON.parse(completion.choices[0]?.message?.content ?? '{}') as { draft?: unknown; recommendation?: unknown }
     const draft = typeof parsed.draft === 'string' ? parsed.draft.trim() : ''
     if (!draft) throw new Error('لم يتم توليد مسودة قابلة للمراجعة')
-    const recommendation = parsed.recommendation === 'quote' ? 'quote' : 'reply'
-    return { draft, recommendation }
+    return { draft, recommendation: 'reply' as const }
   } catch {
     throw new Error('تعذر توليد مسودة قابلة للمراجعة')
   }

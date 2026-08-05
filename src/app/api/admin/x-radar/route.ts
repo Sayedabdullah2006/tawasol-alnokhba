@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     const { data: items, error } = await service.from('x_radar_items')
       .select('id,draft_text,recommendation,status').in('id', ids)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    const approvable = (items ?? []).filter(item => item.status !== 'published' && item.draft_text?.trim() && ['reply', 'quote'].includes(item.recommendation))
+    const approvable = (items ?? []).filter(item => item.status !== 'published' && item.draft_text?.trim() && item.recommendation === 'reply')
     if (approvable.length) {
       const { error: updateError } = await service.from('x_radar_items')
         .update({ status: 'approved', updated_at: new Date().toISOString() })
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
   if (body.action === 'update') {
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
     if (typeof body.draft === 'string') patch.draft_text = body.draft
-    if (['reply', 'quote', 'ignore'].includes(String(body.recommendation))) patch.recommendation = body.recommendation
+    if (['reply', 'ignore'].includes(String(body.recommendation))) patch.recommendation = body.recommendation
     if (['pending', 'approved', 'ignored'].includes(String(body.status))) patch.status = body.status
     const { data, error } = await service.from('x_radar_items').update(patch).eq('id', body.id).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -154,9 +154,7 @@ export async function POST(request: Request) {
     if (error || !item) return NextResponse.json({ error: 'Item not found' }, { status: 404 })
     if (item.status === 'published') return NextResponse.json({ error: 'تم نشر هذه المسودة مسبقاً' }, { status: 409 })
     try {
-      const recommendation = ['reply', 'quote'].includes(String(body.recommendation))
-        ? String(body.recommendation)
-        : item.recommendation
+      const recommendation = 'reply'
       const result = await publishRadarDraft({
         x_post_id: item.x_post_id,
         draft_text: item.draft_text ?? '',
