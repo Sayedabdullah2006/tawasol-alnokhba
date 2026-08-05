@@ -25,6 +25,7 @@ const adminNav: NavEntry[] = [
       { href: '/admin/social/inso-2026', label: 'تغطية INSO 2026', icon: '⚛️' },
       { href: '/admin/newsletter', label: 'النخبة في ٧', icon: '🗞️' },
       { href: '/admin/social/calendar', label: 'تقويم الجدولة', icon: '📆' },
+      { href: '/admin/x-radar', label: 'رادار X', icon: '📡' },
       { href: '/admin/integrations', label: 'النشر للقنوات', icon: '🔗' },
       { href: '/showcase', label: 'مجلة المبدعين', icon: '🎬' },
     ],

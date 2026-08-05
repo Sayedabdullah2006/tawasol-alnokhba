@@ -1,0 +1,16 @@
+name: X Radar
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan verified X activity
+        run: |
+          curl --fail --silent --show-error --request POST \
+            --header "x-api-key: ${{ secrets.CRON_API_KEY }}" \
+            "${{ secrets.APP_BASE_URL }}/api/cron/x-radar"

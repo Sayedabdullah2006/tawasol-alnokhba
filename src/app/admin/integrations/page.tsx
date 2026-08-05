@@ -16,6 +16,8 @@ function IntegrationsInner() {
   const [loading, setLoading] = useState(true)
   const [connected, setConnected] = useState<boolean | null>(null)
   const [accounts, setAccounts] = useState<unknown>(null)
+  const [xConfigured, setXConfigured] = useState<boolean | null>(null)
+  const [xConnection, setXConnection] = useState<{ x_username?: string | null; x_name?: string | null } | null>(null)
   const [busy, setBusy] = useState<'accounts' | 'upload' | 'schedule' | null>(null)
   const [testImageUrl, setTestImageUrl] = useState('')
   const [uploadResult, setUploadResult] = useState<unknown>(null)
@@ -40,6 +42,14 @@ function IntegrationsInner() {
     } finally { setBusy(null) }
   }, [showToast])
 
+  const checkXConnection = useCallback(async () => {
+    const res = await fetch('/api/integrations/x/status')
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) return
+    setXConfigured(Boolean(data.configured))
+    setXConnection(data.connection ?? null)
+  }, [])
+
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -50,15 +60,19 @@ function IntegrationsInner() {
       const res = await fetch('/api/postpulse/accounts')
       setConnected(res.ok)
       if (res.ok) { const d = await res.json().catch(() => ({})); setAccounts(d.accounts ?? null) }
+      await checkXConnection()
       setLoading(false)
     }
     init()
-  }, [supabase, router])
+  }, [supabase, router, checkXConnection])
 
   useEffect(() => {
     if (params.get('connected') === '1') showToast('تم ربط Post-Pulse بنجاح ✅', 'success')
+    if (params.get('x_connected') === '1') showToast('تم ربط حساب X بنجاح', 'success')
     const err = params.get('error')
     if (err) showToast(`تعذّر الربط: ${err}`, 'error')
+    const xError = params.get('x_error')
+    if (xError) showToast(`تعذّر ربط X: ${xError}`, 'error')
   }, [params, showToast])
 
   const testUpload = async () => {
@@ -120,6 +134,34 @@ function IntegrationsInner() {
         <p className="text-[11px] text-muted">
           يتطلب ضبط متغيّرات البيئة: POSTPULSE_CLIENT_ID و POSTPULSE_CLIENT_SECRET و POSTPULSE_REDIRECT_URI.
         </p>
+      </div>
+
+      <div className={card}>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="font-bold text-dark">ربط حساب أول سعودي في X</h2>
+            <p className={`text-sm font-bold ${xConnection ? 'text-green' : 'text-amber-600'}`}>
+              {xConnection
+                ? `مرتبط: @${xConnection.x_username ?? xConnection.x_name ?? 'X'}`
+                : xConfigured === false ? 'إعدادات X ناقصة' : 'غير مربوط'}
+            </p>
+          </div>
+          {xConfigured === false ? (
+            <Button size="sm" disabled>ربط X</Button>
+          ) : (
+            <a href="/api/integrations/x/authorize">
+              <Button size="sm" variant={xConnection ? 'outline' : 'primary'}>
+                {xConnection ? 'إعادة الربط' : 'ربط X'}
+              </Button>
+            </a>
+          )}
+        </div>
+        <p className="text-[11px] text-muted">
+          يستخدم الربط OAuth 2.0 بصلاحيات قراءة ونشر فقط. لن يُنشر أي رد أو اقتباس تلقائياً.
+        </p>
+        {xConfigured === false && (
+          <p className="text-[11px] text-amber-600">أضف X_CLIENT_ID و X_CLIENT_SECRET و X_REDIRECT_URI و X_TOKEN_ENCRYPTION_KEY في Railway.</p>
+        )}
       </div>
 
       {/* اختبار الحسابات */}
