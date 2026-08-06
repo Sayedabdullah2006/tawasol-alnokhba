@@ -5,7 +5,8 @@ import type { NewsPost } from '@/lib/first1-news'
 const ARCHIVE_SOURCE = 'first1saudi_x_archive'
 const ARCHIVE_START = '2017-01-01'
 const ARCHIVE_END = '2025-12-31'
-const WINDOW_DAYS = Math.max(1, Math.min(31, Number(process.env.X_ARCHIVE_WINDOW_DAYS) || 7))
+// نافذة شهرية: تقدّم يومي مع عدد طلبات معقول، وتُضبط عند الحاجة عبر البيئة.
+const WINDOW_DAYS = Math.max(1, Math.min(31, Number(process.env.X_ARCHIVE_WINDOW_DAYS) || 31))
 const MAX_PAGES_PER_WINDOW = 10
 
 type XMedia = { media_key?: string; type?: string; url?: string; preview_image_url?: string; alt_text?: string }
