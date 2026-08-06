@@ -141,7 +141,8 @@ const HOW_TO_TOPICS: EducationTopic[] = [
   },
 ]
 
-const MAX_EDUCATIONAL_POSTS_PER_DAY = 1
+const EDUCATIONAL_BATCH_INTERVAL_DAYS = 7
+const MIN_EDUCATIONAL_DAY_GAP = 2
 
 function riyadhDateParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -303,7 +304,9 @@ function nextAvailableSlot(occupied: string[], educationalDays: Set<string>): Da
   for (let offset = 0; offset < 60; offset++) {
     const dayStart = new Date(Date.UTC(start.year, start.month - 1, start.day + offset))
     const dayKey = riyadhDay(dayStart)
-    if (educationalDays.has(dayKey) && MAX_EDUCATIONAL_POSTS_PER_DAY <= 1) continue
+    const hasNearbyEducationalPost = [...educationalDays]
+      .some(educationDay => Math.abs(dayDistance(educationDay, dayKey)) < MIN_EDUCATIONAL_DAY_GAP)
+    if (hasNearbyEducationalPost) continue
     for (const hour of hours) {
       const candidate = new Date(Date.UTC(dayStart.getUTCFullYear(), dayStart.getUTCMonth(), dayStart.getUTCDate(), hour - 3, 0, 0))
       if (candidate.getTime() < now) continue
@@ -324,15 +327,27 @@ export async function ensureDailyFirst1Education(): Promise<{ created: boolean; 
     .limit(1)
     .maybeSingle()
   if (existingError) throw new Error(`تعذّر التحقق من دفعة المحتوى: ${existingError.message}`)
-  if (existing && dayDistance(String(existing.batch_date), today) < 3) {
+  if (existing && dayDistance(String(existing.batch_date), today) < EDUCATIONAL_BATCH_INTERVAL_DAYS) {
     return { created: false, scheduledFor: [], itemIds: [String(existing.id)], titles: [String(existing.post_title)] }
   }
 
+  const { error: reservationError } = await service.from('first1_education_batches').insert({ batch_date: today })
+  if (reservationError?.code === '23505') {
+    return { created: false, scheduledFor: [], itemIds: [], titles: [] }
+  }
+  if (reservationError) throw new Error(`تعذّر حجز الدفعة التثقيفية: ${reservationError.message}`)
+
   const topics = [0, 1, 2].map(offset => topicForDay(dayOffset(today, offset)))
-  const prepared = await Promise.all(topics.map(async topic => {
-    const content = await generateEducationCopy(topic)
-    return { topic, content, designUrl: await generateEducationInfographic(content) }
-  }))
+  let prepared: Array<{ topic: EducationTopic; content: GeneratedEducation; designUrl: string }>
+  try {
+    prepared = await Promise.all(topics.map(async topic => {
+      const content = await generateEducationCopy(topic)
+      return { topic, content, designUrl: await generateEducationInfographic(content) }
+    }))
+  } catch (error) {
+    await service.from('first1_education_batches').update({ state: 'failed', updated_at: new Date().toISOString() }).eq('batch_date', today)
+    throw error
+  }
   const { times: occupied, educationalDays } = await schedulingOccupancy()
   const slots = prepared.map(() => {
     const slot = nextAvailableSlot(occupied, educationalDays)
@@ -355,7 +370,10 @@ export async function ensureDailyFirst1Education(): Promise<{ created: boolean; 
     status: 'suggested',
     email_sent: false,
   }))).select('id')
-  if (insertError || !inserted?.length) throw new Error(`تعذّر حفظ دفعة المحتوى التثقيفي: ${insertError?.message ?? 'خطأ غير معروف'}`)
+  if (insertError || !inserted?.length) {
+    await service.from('first1_education_batches').update({ state: 'failed', updated_at: new Date().toISOString() }).eq('batch_date', today)
+    throw new Error(`تعذّر حفظ دفعة المحتوى التثقيفي: ${insertError?.message ?? 'خطأ غير معروف'}`)
+  }
 
   // كل تصميم يدخل السجل الموحد، ليصبح مرشحاً للنشرة ومتاحاً للمراجعة لاحقاً.
   try {
@@ -393,7 +411,13 @@ export async function ensureDailyFirst1Education(): Promise<{ created: boolean; 
     }
   }
   if (failures.length) {
+    await service.from('first1_education_batches').update({
+      state: 'partial', scheduled_count: scheduledFor.length, updated_at: new Date().toISOString(),
+    }).eq('batch_date', today)
     throw new Error(`تم حفظ دفعة المحتوى، لكن تعذّرت جدولة: ${failures.join('، ')}`)
   }
+  await service.from('first1_education_batches').update({
+    state: 'scheduled', scheduled_count: scheduledFor.length, updated_at: new Date().toISOString(),
+  }).eq('batch_date', today)
   return { created: true, scheduledFor, itemIds: inserted.map(row => String(row.id)), titles: prepared.map(entry => entry.content.title) }
 }
