@@ -2,7 +2,7 @@ import { OPENAI_MODEL } from '@/lib/ai-studio'
 import { generateImageWithOpenAI } from '@/lib/image-generation'
 import { compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
 import { chatComplete, getOpenAI } from '@/lib/openai'
-import { listScheduledPosts, publishNow, uploadMediaFromUrl } from '@/lib/postpulse'
+import { cancelScheduledPost, listScheduledPosts, publishNow, uploadMediaFromUrl } from '@/lib/postpulse'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 
 export const FIRST1_EDUCATION_SOURCE = 'first1saudi-educational'
@@ -420,4 +420,86 @@ export async function ensureDailyFirst1Education(): Promise<{ created: boolean; 
     state: 'scheduled', scheduled_count: scheduledFor.length, updated_at: new Date().toISOString(),
   }).eq('batch_date', today)
   return { created: true, scheduledFor, itemIds: inserted.map(row => String(row.id)), titles: prepared.map(entry => entry.content.title) }
+}
+
+/** يعيد توزيع المنشورات التثقيفية المستقبلية فقط، من دون المساس بما نُشر فعلياً. */
+export async function rebalanceScheduledFirst1Education(): Promise<{ rescheduled: number; scheduledFor: string[]; titles: string[] }> {
+  const service = await createServiceRoleClient()
+  const now = new Date()
+  const { data: items, error: itemError } = await service
+    .from('social_schedule')
+    .select('id,post_title,tweets,design_image_url')
+    .eq('source', FIRST1_EDUCATION_SOURCE)
+    .eq('status', 'scheduled')
+  if (itemError) throw new Error(`تعذّر قراءة المنشورات التثقيفية: ${itemError.message}`)
+
+  const byContentAndDesign = new Map(
+    (items ?? []).map(item => [`${item.tweets ?? ''}\u0000${item.design_image_url ?? ''}`, item]),
+  )
+  const { data: posts, error: postsError } = await service
+    .from('postpulse_posts')
+    .select('id,schedule_id,content,design_url,status,scheduled_for,accounts')
+    .gte('scheduled_for', now.toISOString())
+    .eq('status', 'scheduled')
+  if (postsError) throw new Error(`تعذّر قراءة مواعيد PostPulse: ${postsError.message}`)
+
+  const scheduled = (posts ?? [])
+    .map(post => ({ post, item: byContentAndDesign.get(`${post.content ?? ''}\u0000${post.design_url ?? ''}`) }))
+    .filter((entry): entry is { post: NonNullable<typeof posts>[number]; item: NonNullable<typeof items>[number] } => Boolean(entry.item && entry.post.schedule_id))
+    .sort((a, b) => new Date(String(a.post.scheduled_for)).getTime() - new Date(String(b.post.scheduled_for)).getTime())
+  if (!scheduled.length) return { rescheduled: 0, scheduledFor: [], titles: [] }
+
+  // نحتفظ بآخر يوم تثقيفي نُشر، حتى لا تأتي أول جدولة جديدة في اليوم التالي له.
+  const educationDesigns = new Set((items ?? []).map(item => String(item.design_image_url ?? '')).filter(Boolean))
+  const { data: previousPosts, error: previousError } = await service
+    .from('postpulse_posts')
+    .select('design_url,status,scheduled_for')
+    .lt('scheduled_for', now.toISOString())
+  if (previousError) throw new Error(`تعذّر قراءة سجل النشر التثقيفي: ${previousError.message}`)
+  const educationalDays = new Set(
+    (previousPosts ?? [])
+      .filter(post => educationDesigns.has(String(post.design_url ?? '')) && isActiveStatus(post.status))
+      .map(post => riyadhDay(new Date(String(post.scheduled_for)))),
+  )
+
+  const cancelled: typeof scheduled = []
+  for (const entry of scheduled) {
+    try {
+      await cancelScheduledPost(String(entry.post.schedule_id))
+      await service.from('postpulse_posts').update({ status: 'cancelled' }).eq('id', entry.post.id)
+      await service.from('social_schedule').update({ status: 'suggested' }).eq('id', entry.item.id)
+      cancelled.push(entry)
+    } catch (error) {
+      throw new Error(`تعذّر إلغاء جدولة «${entry.item.post_title}»: ${error instanceof Error ? error.message : 'خطأ غير معروف'}`)
+    }
+  }
+
+  const { times: occupied } = await schedulingOccupancy()
+  const scheduledFor: string[] = []
+  const titles: string[] = []
+  for (const entry of cancelled) {
+    const slot = nextAvailableSlot(occupied, educationalDays)
+    const media = await uploadMediaFromUrl(String(entry.item.design_image_url))
+    const published = await publishNow({
+      content: String(entry.item.tweets ?? ''),
+      attachmentPaths: media.path ? [media.path] : [],
+      accountIds: Array.isArray(entry.post.accounts) ? entry.post.accounts as number[] : undefined,
+      scheduledTime: slot.toISOString(),
+    })
+    await service.from('postpulse_posts').insert({
+      schedule_id: published.scheduleId,
+      content: entry.item.tweets,
+      design_url: entry.item.design_image_url,
+      accounts: published.accountIds,
+      status: 'scheduled',
+      scheduled_for: slot.toISOString(),
+      event_raw: published.result as object,
+    })
+    await service.from('social_schedule').update({ status: 'scheduled' }).eq('id', entry.item.id)
+    occupied.push(slot.toISOString())
+    educationalDays.add(riyadhDay(slot))
+    scheduledFor.push(slot.toISOString())
+    titles.push(String(entry.item.post_title))
+  }
+  return { rescheduled: cancelled.length, scheduledFor, titles }
 }
