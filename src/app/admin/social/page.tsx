@@ -410,7 +410,7 @@ export default function AdminSocialPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-black text-dark">🗓️ خطة النشر اليومية</h1>
-          <p className="text-sm text-muted mt-0.5">الأخبار المولّدة آلياً من first1saudi.net، مرتّبة بتاريخ كل يوم.</p>
+          <p className="text-sm text-muted mt-0.5">مقترحات يومية من المصادر الموثوقة وأرشيف أول سعودي في X، مرتّبة بتاريخ كل يوم.</p>
         </div>
         {activeTab === 'daily' && <div className="shrink-0 flex flex-wrap items-center gap-2">
           {/* توليد يدوي لمنشورات إضافية لنفس اليوم */}
@@ -458,7 +458,7 @@ export default function AdminSocialPage() {
       <section className="flex flex-col gap-3 rounded-2xl border border-green/25 bg-green/5 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-black text-dark">محتوى أول سعودي التثقيفي</h2>
-          <p className="mt-1 text-sm text-muted">كل ثلاثة أيام: 3 منشورات سعودية مفيدة، مع إنفوجرافيك وجدولة تلقائية في المواعيد الشاغرة.</p>
+          <p className="mt-1 text-sm text-muted">3 منشورات أسبوعياً: يوم نشر ثم يوم خال، مع إنفوجرافيك وجدولة تلقائية في المواعيد الشاغرة.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -579,8 +579,8 @@ export default function AdminSocialPage() {
                   <div className="p-4 flex flex-col gap-3 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <ScheduleStatusBadge status={item.status} onCancel={item.status === 'scheduled' ? () => setCancelScheduleItem(item) : undefined} />
-                      <span className={`text-xs font-bold rounded-full px-2.5 py-0.5 ${item.source === 'manhom' ? 'bg-purple-100 text-purple-700' : item.source === 'first1saudi-educational' ? 'bg-green/10 text-green' : 'bg-teal-100 text-teal-700'}`}>
-                        {item.source === 'manhom' ? 'السعوديات الأوائل' : item.source === 'first1saudi-educational' ? 'محتوى تثقيفي' : 'first1saudi'}
+                      <span className={`text-xs font-bold rounded-full px-2.5 py-0.5 ${item.source === 'manhom' ? 'bg-purple-100 text-purple-700' : item.source === 'first1saudi-educational' ? 'bg-green/10 text-green' : item.source === 'first1saudi-x-archive' ? 'bg-sky-100 text-sky-800' : 'bg-teal-100 text-teal-700'}`}>
+                        {item.source === 'manhom' ? 'السعوديات الأوائل' : item.source === 'first1saudi-educational' ? 'محتوى تثقيفي' : item.source === 'first1saudi-x-archive' ? 'من أرشيف أول سعودي في X' : 'first1saudi'}
                       </span>
                       {item.category && (
                         <span className="text-xs bg-gold/15 text-dark font-bold rounded-full px-2.5 py-0.5">{item.category}</span>
@@ -612,7 +612,7 @@ export default function AdminSocialPage() {
 
                     <div className="flex items-center gap-3 text-xs text-muted pt-1">
                       {item.post_url && (
-                        <a href={item.post_url} target="_blank" rel="noreferrer" className="hover:text-green">{item.source === 'first1saudi-educational' ? 'مرجع داخلي' : '🔗 الخبر الأصلي'}</a>
+                        <a href={item.post_url} target="_blank" rel="noreferrer" className="hover:text-green">{item.source === 'first1saudi-educational' ? 'مرجع داخلي' : item.source === 'first1saudi-x-archive' ? 'عرض منشور X الأصلي' : '🔗 الخبر الأصلي'}</a>
                       )}
                       {item.design_image_url && (
                         <a href={item.design_image_url} target="_blank" rel="noreferrer" className="hover:text-green">🖼️ التصميم</a>

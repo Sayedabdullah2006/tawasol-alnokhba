@@ -1,0 +1,16 @@
+name: First1Saudi X Archive Import
+
+on:
+  schedule:
+    - cron: '15 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  import-x-archive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Import the next historical X window
+        run: |
+          response=$(curl -sS -X POST "${{ secrets.APP_BASE_URL }}/api/cron/x-archive" -H "x-api-key: ${{ secrets.CRON_API_KEY }}" --max-time 115)
+          echo "$response"
+          echo "$response" | grep -q '"success":true'

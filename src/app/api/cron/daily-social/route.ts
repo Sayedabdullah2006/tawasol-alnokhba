@@ -18,6 +18,7 @@ import { fetchManhomCandidates, ensureColorImage, MANHOM_NOTE } from '@/lib/manh
 import { fetchRssCandidates, RSS_SOURCES } from '@/lib/rss-news'
 import { fetchSaudipediaCandidates } from '@/lib/saudipedia-news'
 import { fetchSayidatyCandidates, SAYIDATY_SOURCES } from '@/lib/sayidaty-news'
+import { getFirst1XArchiveCandidates } from '@/lib/first1-x-archive'
 import { runStudioPipeline, shuffledPosterStyles } from '@/lib/ai-studio'
 import { classifySection } from '@/lib/showcase-sections'
 import { sendEmail } from '@/lib/email'
@@ -122,7 +123,7 @@ export async function runBatch(
     const entitySince = new Date(Date.now() - ENTITY_DEDUP_WINDOW_DAYS * 86400000).toISOString().slice(0, 10)
     const { data: recent } = await sc
       .from('social_schedule')
-      .select('wp_post_id, source, post_title, batch_date')
+      .select('wp_post_id, source, post_url, post_title, batch_date')
       .gte('batch_date', entitySince)
     // منع التكرار لكل مصدر على حدة (المفتاح = اسم المصدر)
     const usedByKey = new Map<string, Set<number>>()
@@ -134,6 +135,9 @@ export async function runBatch(
     }
     const usedManhom = usedByKey.get('manhom') ?? new Set<number>()
     const usedFirst1 = usedByKey.get('first1saudi') ?? new Set<number>()
+    const usedXArchiveUrls = new Set(
+      (recent ?? []).filter(row => row.source === 'first1saudi-x-archive' && String(row.batch_date) >= since).map(row => String(row.post_url)),
+    )
     const usedSubjectFingerprints = (recent ?? [])
       .map(row => subjectFingerprint(row.post_title))
       .filter(tokens => tokens.length > 0)
@@ -147,6 +151,7 @@ export async function runBatch(
     const selected: SelectedItem[] = []
     const sourceDiagnostics = {
       first1: { fetched: 0, unseen: 0 },
+      xArchive: { fetched: 0, unseen: 0 },
     }
     const countBySource = (s: string) => selected.filter(x => x.source === s).length
     const achCount = () => selected.filter(x => x.source !== 'manhom').length
@@ -183,6 +188,17 @@ export async function runBatch(
           }
         }
       } catch { /* الموقع قد يتعذّر — نكمل من RSS */ }
+
+      // مواد أرشيفية أصلية من حساب أول سعودي في X؛ تبقى دائما مقترحات غير مجدولة.
+      try {
+        const archivedPosts = await getFirst1XArchiveCandidates(usedXArchiveUrls)
+        sourceDiagnostics.xArchive.fetched = archivedPosts.length
+        for (const post of archivedPosts) {
+          if (usedXArchiveUrls.has(post.url) || !isSocialNewsEligible(post.title, post.content)) continue
+          sourceDiagnostics.xArchive.unseen++
+          pool.push({ post, key: 'first1saudi-x-archive' })
+        }
+      } catch { /* لا نوقف الخطة اليومية إن لم يكتمل الاستيراد بعد. */ }
 
       // مصادر RSS (العربية…): مفلترة على إنجازات السعوديين
       for (const src of RSS_SOURCES) {
