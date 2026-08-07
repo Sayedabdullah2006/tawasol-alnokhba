@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import * as tus from 'tus-js-client'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useToast } from '@/components/ui/Toast'
@@ -22,6 +23,8 @@ const STATUS: Record<InsoCoverageItem['publication_status'], { label: string; cl
 
 const ACTIVE_DAY_STORAGE_KEY = 'inso-2026-active-day'
 const MANUAL_SCHEDULE_HOURS = Array.from({ length: 14 }, (_, index) => index + 9)
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024
+const TUS_CHUNK_SIZE = 6 * 1024 * 1024
 
 type ScheduledCalendarItem = { when: string; status: string }
 
@@ -72,6 +75,7 @@ export default function InsoCoveragePage() {
   const [videoName, setVideoName] = useState('')
   const [videoScheduleWhen, setVideoScheduleWhen] = useState('')
   const [videoUploading, setVideoUploading] = useState(false)
+  const [videoUploadProgress, setVideoUploadProgress] = useState<number | null>(null)
   const [videoPublishing, setVideoPublishing] = useState<'publish' | 'schedule' | null>(null)
   const [generatingPending, setGeneratingPending] = useState(false)
   const [exportingReport, setExportingReport] = useState(false)
@@ -452,6 +456,7 @@ export default function InsoCoveragePage() {
     setVideoUrl('')
     setVideoName('')
     setVideoScheduleWhen('')
+    setVideoUploadProgress(null)
     setVideoDialogOpen(true)
   }
 
@@ -461,13 +466,46 @@ export default function InsoCoveragePage() {
     if (!file) return
     const allowed = ['video/mp4', 'video/webm', 'video/quicktime'].includes(file.type) || /\.(mp4|webm|mov)$/i.test(file.name)
     if (!allowed) { showToast('ارفق مقطع MP4 أو MOV أو WEBM', 'error'); return }
-    if (file.size > 100 * 1024 * 1024) { showToast('الحد الأقصى لحجم الفيديو 100 ميجابايت', 'error'); return }
+    if (file.size > MAX_VIDEO_BYTES) { showToast('الحد الأقصى لحجم الفيديو 200 ميجابايت', 'error'); return }
     setVideoUploading(true)
+    setVideoUploadProgress(0)
     try {
       const extension = file.name.split('.').pop()?.toLowerCase() || 'mp4'
       const path = `inso-video-${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`
-      const { error } = await supabase.storage.from('content-images').upload(path, file, { contentType: file.type || 'video/mp4' })
-      if (error) throw error
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('انتهت الجلسة، سجّل الدخول مجدداً ثم حاول الرفع')
+      const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const apiKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      if (!projectUrl || !apiKey) throw new Error('تعذّر تهيئة رفع الفيديو')
+      const hostname = new URL(projectUrl).hostname
+      const storageHostname = hostname.endsWith('.supabase.co') ? hostname.replace(/\.supabase\.co$/, '.storage.supabase.co') : hostname
+
+      // TUS streams the original file in 6MB chunks. Nothing is decoded, transcoded, or compressed here.
+      await new Promise<void>((resolve, reject) => {
+        const upload = new tus.Upload(file, {
+          endpoint: `https://${storageHostname}/storage/v1/upload/resumable`,
+          retryDelays: [0, 3000, 5000, 10000, 20000],
+          headers: { authorization: `Bearer ${session.access_token}`, apikey: apiKey },
+          uploadDataDuringCreation: true,
+          removeFingerprintOnSuccess: true,
+          chunkSize: TUS_CHUNK_SIZE,
+          metadata: {
+            bucketName: 'content-images',
+            objectName: path,
+            contentType: file.type || 'video/mp4',
+            cacheControl: '3600',
+          },
+          onError: reject,
+          onProgress: (uploaded, total) => setVideoUploadProgress(total ? Math.round((uploaded / total) * 100) : 0),
+          onSuccess: () => resolve(),
+        })
+        upload.findPreviousUploads()
+          .then(previous => {
+            if (previous.length) upload.resumeFromPreviousUpload(previous[0])
+            upload.start()
+          })
+          .catch(reject)
+      })
       const { data } = supabase.storage.from('content-images').getPublicUrl(path)
       setVideoUrl(data.publicUrl)
       setVideoName(file.name)
@@ -476,6 +514,7 @@ export default function InsoCoveragePage() {
       showToast(error instanceof Error ? error.message : 'تعذّر رفع الفيديو', 'error')
     } finally {
       setVideoUploading(false)
+      setVideoUploadProgress(null)
     }
   }
 
@@ -575,7 +614,7 @@ export default function InsoCoveragePage() {
             <div className="max-h-[calc(100svh-0.75rem)] w-screen max-w-none space-y-4 overflow-y-auto rounded-t-lg bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl md:max-h-[calc(100dvh-2rem)] md:w-full md:max-w-xl md:rounded-lg md:p-5">
               <div><h3 className="font-black text-dark">نشر فيديو</h3><p className="mt-1 text-xs leading-5 text-muted">اكتب النص وارفع المقطع، ثم انشره الآن أو حدّد موعدًا للنشر بتوقيت السعودية.</p></div>
               <textarea value={videoText} onChange={event => setVideoText(event.target.value)} placeholder="نص المنشور المصاحب للفيديو..." className="min-h-36 w-full resize-y rounded-lg border border-border bg-white p-3 text-sm leading-6 text-dark" />
-              <div className="space-y-2"><p className="text-sm font-bold text-dark">مقطع الفيديو</p><label className="flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-border bg-white px-3 text-sm font-bold text-dark hover:bg-cream"><input type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" onChange={uploadVideo} disabled={videoUploading} className="sr-only" />{videoUploading ? 'جارٍ رفع الفيديو...' : videoName || 'اختيار فيديو (MP4 / MOV / WEBM)'}</label><p className="text-[11px] text-muted">حتى 100 ميجابايت.</p></div>
+              <div className="space-y-2"><p className="text-sm font-bold text-dark">مقطع الفيديو</p><label className="flex min-h-12 cursor-pointer items-center justify-center rounded-lg border border-border bg-white px-3 text-sm font-bold text-dark hover:bg-cream"><input type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" onChange={uploadVideo} disabled={videoUploading} className="sr-only" />{videoUploading ? `جارٍ رفع الفيديو${videoUploadProgress !== null ? ` (${videoUploadProgress}%)` : '...'}` : videoName || 'اختيار فيديو (MP4 / MOV / WEBM)'}</label><p className="text-[11px] text-muted">حتى 200 ميجابايت. يُرفع الملف الأصلي كما هو، بلا ضغط أو خفض دقة.</p></div>
               {videoUrl && <video src={videoUrl} controls playsInline className="max-h-64 w-full rounded-lg border border-border bg-black" />}
               <div className="space-y-2"><label className="block text-sm font-bold text-dark">موعد الجدولة (اختياري)</label><input type="datetime-local" value={videoScheduleWhen} onChange={event => setVideoScheduleWhen(event.target.value)} className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-dark" /><p className="text-[11px] text-muted">عند الجدولة يحافظ النظام على فارق ساعة على الأقل عن أي منشور آخر.</p></div>
               <div className="flex flex-wrap gap-2"><Button className="flex-1" onClick={() => submitVideo('publish')} loading={videoPublishing === 'publish'} disabled={videoUploading || !!videoPublishing || !videoText.trim() || !videoUrl}>نشر الآن</Button><Button className="flex-1" variant="outline" onClick={() => submitVideo('schedule')} loading={videoPublishing === 'schedule'} disabled={videoUploading || !!videoPublishing || !videoText.trim() || !videoUrl || !videoScheduleWhen}>جدولة الفيديو</Button><Button variant="ghost" onClick={() => setVideoDialogOpen(false)} disabled={!!videoPublishing}>إلغاء</Button></div>
