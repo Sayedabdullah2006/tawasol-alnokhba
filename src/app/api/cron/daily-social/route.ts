@@ -151,7 +151,7 @@ export async function runBatch(
     const selected: SelectedItem[] = []
     const sourceDiagnostics = {
       first1: { fetched: 0, unseen: 0 },
-      xArchive: { fetched: 0, unseen: 0 },
+      xArchive: { fetched: 0, unseen: 0, selected: 0 },
     }
     const countBySource = (s: string) => selected.filter(x => x.source === s).length
     const achCount = () => selected.filter(x => x.source !== 'manhom').length
@@ -226,6 +226,20 @@ export async function runBatch(
       }
 
       pool.sort(() => Math.random() - 0.5)
+      // Once archive material exists, reserve one eligible historical First1Saudi post for
+      // the daily mix. Archive posts remain suggested only; they are never auto-scheduled.
+      for (const c of pool) {
+        if (c.key !== 'first1saudi-x-archive' || achCount() >= achTarget) continue
+        const fingerprint = subjectFingerprint(c.post.title)
+        if (isRepeatedSubject(fingerprint, usedSubjectFingerprints)) continue
+        const img = c.post.imageUrl ?? await resolveImageUrl(c.post)
+        if (!img) continue
+        c.post.imageUrl = img
+        selected.push({ post: c.post, source: c.key })
+        usedSubjectFingerprints.push(fingerprint)
+        sourceDiagnostics.xArchive.selected++
+        break
+      }
       // تمريرة أولى: مصدر مختلف لكل عنصر (تنويع)؛ ثم تمريرة ثانية للتعبئة.
       for (const preferDiverse of [true, false]) {
         const pickedKeys = new Set(selected.filter(s => s.source !== 'manhom').map(s => s.source))

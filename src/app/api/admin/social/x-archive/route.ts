@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { getFirst1XArchiveStatus, importNextFirst1XArchiveWindow } from '@/lib/first1-x-archive'
+import { getFirst1XArchiveStatus, importFirst1XArchiveBatch } from '@/lib/first1-x-archive'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120
+export const maxDuration = 300
 
 async function requireAdmin() {
   const supabase = await createServerSupabaseClient()
@@ -21,7 +21,7 @@ export async function GET() {
 export async function POST() {
   if (!await requireAdmin()) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
   try {
-    return NextResponse.json({ success: true, ...(await importNextFirst1XArchiveWindow()) })
+    return NextResponse.json({ success: true, ...(await importFirst1XArchiveBatch()) })
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'تعذّر استيراد أرشيف X' }, { status: 500 })
   }

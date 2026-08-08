@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { importNextFirst1XArchiveWindow } from '@/lib/first1-x-archive'
+import { importFirst1XArchiveBatch } from '@/lib/first1-x-archive'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120
+export const maxDuration = 300
 
 const CRON_API_KEY = process.env.CRON_API_KEY || 'nukhba-daily-reminders-2024'
 
@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
   const key = request.headers.get('x-api-key') || request.nextUrl.searchParams.get('key')
   if (key !== CRON_API_KEY) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   try {
-    return NextResponse.json({ success: true, ...(await importNextFirst1XArchiveWindow()) })
+    return NextResponse.json({ success: true, ...(await importFirst1XArchiveBatch()) })
   } catch (error) {
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'تعذّر استيراد أرشيف X' }, { status: 500 })
   }

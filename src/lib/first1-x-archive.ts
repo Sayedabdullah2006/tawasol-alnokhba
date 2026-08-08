@@ -8,6 +8,9 @@ const ARCHIVE_END = '2025-12-31'
 // نافذة شهرية: تقدّم يومي مع عدد طلبات معقول، وتُضبط عند الحاجة عبر البيئة.
 const WINDOW_DAYS = Math.max(1, Math.min(31, Number(process.env.X_ARCHIVE_WINDOW_DAYS) || 31))
 const MAX_PAGES_PER_WINDOW = 10
+// Empty historical months are common before an account becomes active. Process a bounded
+// catch-up batch so the archive becomes usable in days, not several months.
+const WINDOWS_PER_RUN = Math.max(1, Math.min(24, Number(process.env.X_ARCHIVE_WINDOWS_PER_RUN) || 24))
 
 type XMedia = { media_key?: string; type?: string; url?: string; preview_image_url?: string; alt_text?: string }
 type XPost = {
@@ -49,6 +52,10 @@ export type XArchiveImportResult = {
   windowEnd: string
   nextStartDate: string | null
   completed: boolean
+}
+
+export type XArchiveBatchImportResult = XArchiveImportResult & {
+  windowsProcessed: number
 }
 
 /** Imports one bounded historical window; the saved cursor makes this safe to run every day. */
@@ -147,6 +154,25 @@ export async function importNextFirst1XArchiveWindow(): Promise<XArchiveImportRe
   })
   if (updateError) throw new Error(`تعذّر تحديث تقدم أرشيف X: ${updateError.message}`)
   return { imported: rows.length, windowStart, windowEnd, nextStartDate: completed ? null : nextStartDate, completed }
+}
+
+/**
+ * Catches up several monthly windows in one invocation. It stops as soon as historical
+ * content is found, leaving the next run to continue safely from the saved cursor.
+ */
+export async function importFirst1XArchiveBatch(): Promise<XArchiveBatchImportResult> {
+  let latest: XArchiveImportResult | null = null
+  let imported = 0
+  let windowsProcessed = 0
+  for (let index = 0; index < WINDOWS_PER_RUN; index++) {
+    const result = await importNextFirst1XArchiveWindow()
+    latest = result
+    windowsProcessed++
+    imported += result.imported
+    if (result.completed || result.imported > 0) break
+  }
+  if (!latest) throw new Error('تعذّر بدء استيراد أرشيف X')
+  return { ...latest, imported, windowsProcessed }
 }
 
 function safeSocialId(xPostId: string): number {
