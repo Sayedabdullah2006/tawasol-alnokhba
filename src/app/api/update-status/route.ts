@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     // ── جلب الحالة الحالية قبل التحديث ──────────────────────────────
     const { data: current } = await supabase
       .from('publish_requests')
-      .select('status')
+      .select('status, admin_notes')
       .eq('id', requestId)
       .single()
 
@@ -76,18 +76,24 @@ export async function POST(request: Request) {
 
     // ── تحديث قاعدة البيانات ──────────────────────────────────────────
     const now = new Date().toISOString()
+    // لا نمسح ملاحظة الإدارة المخزنة عند تحديث الحالة ما لم يرسل الإجراء
+    // قيمة ملاحظة صريحة. بهذا تبقى الملاحظة ظاهرة في بطاقة الطلب.
+    const resolvedAdminNotes = typeof adminNotes === 'string'
+      ? (adminNotes.trim() || null)
+      : current.admin_notes
+
     const { data: updated, error } = await supabase
       .from('publish_requests')
       .update({
         status:             newStatus,
-        admin_notes:        adminNotes,
+        admin_notes:        resolvedAdminNotes,
         last_status_change: now,
         updated_at:         now,
         // سجّل وقت تأكيد الدفع عند انتقال الطلب إلى "مدفوع" (تحويل بنكي)
         ...(newStatus === 'paid' ? { paid_at: now, payment_status: 'paid' } : {}),
       })
       .eq('id', requestId)
-      .select('request_number, client_name, client_email, final_total, admin_quoted_price, estimated_reach')
+      .select('request_number, client_name, client_email, final_total, admin_quoted_price, estimated_reach, admin_notes')
       .single()
 
     if (error) {
@@ -128,7 +134,7 @@ export async function POST(request: Request) {
             ...base,
             status:      newStatus,
             statusLabel: REQUEST_STATUSES[newStatus as keyof typeof REQUEST_STATUSES]?.label || newStatus,
-            adminNotes,
+            adminNotes: resolvedAdminNotes,
           })
           break
         // "quoted" مقصود عدم إرسال إيميل هنا — send-quote يتولاه
@@ -138,7 +144,7 @@ export async function POST(request: Request) {
               ...base,
               status:      newStatus,
               statusLabel: REQUEST_STATUSES[newStatus as keyof typeof REQUEST_STATUSES].label,
-              adminNotes,
+              adminNotes: resolvedAdminNotes,
             })
           }
           break

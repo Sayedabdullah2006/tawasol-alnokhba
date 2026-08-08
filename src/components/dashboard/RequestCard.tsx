@@ -58,10 +58,10 @@ export default function RequestCard({ request: r }: Props) {
           </div>
         )}
 
-        {r.admin_notes && (
+        {r.admin_notes?.trim() && (
           <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3">
             <p className="mb-1 text-xs font-bold text-red-700">ملاحظة من الإدارة</p>
-            <p className="text-sm leading-relaxed text-red-700 whitespace-pre-line line-clamp-3">{r.admin_notes}</p>
+            <p className="text-sm leading-relaxed text-red-700 whitespace-pre-line break-words">{r.admin_notes.trim()}</p>
           </div>
         )}
 

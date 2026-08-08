@@ -442,10 +442,10 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
         {/* مراجعة المحتوى لكل خبر على حدة (يبقى الطلب «قيد التنفيذ») */}
         <PostReviews request={request} />
 
-        {request.admin_notes && request.status !== 'quoted' && request.status !== 'rejected' && (
-          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-3">
-            <span className="text-sm font-bold text-blue-700 block mb-1">ملاحظات الإدارة</span>
-            <p className="text-sm text-blue-600">{request.admin_notes}</p>
+        {request.admin_notes?.trim() && request.status !== 'rejected' && (
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3">
+            <span className="mb-1 block text-sm font-bold text-red-700">ملاحظات الإدارة</span>
+            <p className="text-sm text-red-700 whitespace-pre-line break-words">{request.admin_notes.trim()}</p>
           </div>
         )}
 
