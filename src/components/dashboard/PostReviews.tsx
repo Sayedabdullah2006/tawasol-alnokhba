@@ -33,6 +33,8 @@ export default function PostReviews({ request }: Props) {
   if (!hasAny) return null
 
   const isCampaign = request?.request_type === 'campaign'
+  const sentItems = items.filter(item => !!reviews[item.index])
+  const approvedItems = sentItems.filter(item => reviews[item.index]?.status === 'approved').length
 
   const approve = async (index: number, images: string[]) => {
     const chosen = selected[index] ?? (images.length === 1 ? images[0] : undefined)
@@ -100,6 +102,12 @@ export default function PostReviews({ request }: Props) {
         <p className="text-sm text-purple-600 mt-1">
           راجع كل خبر، اختر التصميم الذي تريده ثم اعتمده، أو اطلب تعديلاً.
         </p>
+        {isCampaign && (
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-purple-200 bg-white px-3 py-1.5 text-xs font-bold text-purple-700">
+            <span>تم اعتماد {approvedItems} من {sentItems.length} أخبار</span>
+            {approvedItems < sentItems.length && <span className="text-purple-500">· المتبقي {sentItems.length - approvedItems}</span>}
+          </div>
+        )}
       </div>
 
       {items.map(item => {
@@ -136,13 +144,13 @@ export default function PostReviews({ request }: Props) {
             }`}
           >
             {/* ترويسة الخبر */}
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-start gap-2 mb-3">
               {isCampaign && (
                 <span className="w-6 h-6 rounded-full bg-purple-200 text-purple-700 text-xs font-bold flex items-center justify-center">
                   {item.index + 1}
                 </span>
               )}
-              <span className="font-bold text-dark text-sm flex-1">{item.title}</span>
+              <span className="font-bold text-dark text-sm flex-1 leading-relaxed">{isCampaign ? `الخبر ${item.index + 1}: ` : ''}{item.title}</span>
               {isApproved && <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">✅ معتمد</span>}
               {isChanges && <span className="text-xs font-bold text-yellow-700 bg-yellow-100 px-2 py-0.5 rounded-full">🔄 طلبت تعديلاً</span>}
               {isReview && <span className="text-xs font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">👁️ بانتظار مراجعتك</span>}
@@ -162,7 +170,7 @@ export default function PostReviews({ request }: Props) {
                 {isReview ? (
                   <input
                     type="datetime-local"
-                    value={proposedDates[item.index] ?? r.proposed_date ?? ''}
+                    value={(proposedDates[item.index] ?? r.proposed_date ?? '').replace(/^([0-9]{4}-[0-9]{2}-[0-9]{2})$/, '$1T18:00')}
                     onChange={event => setProposedDates(prev => ({ ...prev, [item.index]: event.target.value }))}
                     className="w-full max-w-xs px-3 py-2 rounded-lg border border-border bg-white text-sm"
                   />
@@ -179,6 +187,7 @@ export default function PostReviews({ request }: Props) {
                 <h4 className="font-bold text-dark text-xs mb-2">
                   {isApproved ? 'التصميم المعتمد:' : 'اختر تصميماً:'}
                 </h4>
+                {!isApproved && <p className="text-[11px] text-muted mb-2">هذه هي التصاميم التي اختارها فريقنا لهذا الخبر فقط. اضغط على أحدها للاختيار، أو على رمز التكبير للمعاينة.</p>}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {images.map((img, i) => {
                     const isSel = isApproved ? r.selected_image === img : chosen === img
@@ -226,7 +235,7 @@ export default function PostReviews({ request }: Props) {
             {/* الإجراءات — فقط أثناء المراجعة */}
             {isReview && (
               !feedbackOpen[item.index] ? (
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Button
                     onClick={() => approve(item.index, images)}
                     loading={busy === item.index}
@@ -259,7 +268,7 @@ export default function PostReviews({ request }: Props) {
                     className="w-full px-3 py-2 rounded-lg border border-border text-sm min-h-[90px] resize-y"
                     maxLength={500}
                   />
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Button
                       variant="ghost"
                       onClick={() => { setFeedbackOpen(prev => ({ ...prev, [item.index]: false })); setFeedback(prev => ({ ...prev, [item.index]: '' })) }}
