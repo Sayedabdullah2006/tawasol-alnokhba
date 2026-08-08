@@ -20,6 +20,8 @@ export interface PostReview {
   content_sent_at?: string
   content_approved_at?: string | null
   feedback_sent_at?: string | null
+  /** الموعد المقترح للنشر، ويستطيع العميل تعديله قبل الاعتماد. */
+  proposed_date?: string | null
   // سجل الجولات: كل إرسال يُضاف كجولة (تصاميم + نص + ملاحظة العميل)
   history?: Array<{
     images?: string[]

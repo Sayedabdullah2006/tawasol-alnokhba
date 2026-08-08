@@ -121,6 +121,12 @@ export default function PostReviewStatus({ request, onEdit }: Props) {
                 </div>
               )}
 
+              {isCampaign && (
+                <p className="text-[11px] text-muted">
+                  📅 الموعد المتوقع: <span className="font-bold text-dark">{r.proposed_date ? new Date(`${r.proposed_date}T12:00:00`).toLocaleDateString('ar-SA') : 'لم يُحدد'}</span>
+                </p>
+              )}
+
               {/* التصاميم المُرسلة (تظهر دائماً) — يُميَّز المعتمد عند الموافقة */}
               {images.length > 0 && (
                 <div>

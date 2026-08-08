@@ -13,6 +13,7 @@ import ClientName from '@/components/ui/ClientName'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import QuoteComposer from '@/components/admin/QuoteComposer'
 import ContentSender from '@/components/admin/ContentSender'
+import CampaignReviewSender from '@/components/admin/CampaignReviewSender'
 import AIStudioPanel from '@/components/admin/AIStudioPanel'
 import ImageEditSchedule from '@/components/admin/ImageEditSchedule'
 import PostReviewStatus from '@/components/admin/PostReviewStatus'
@@ -555,7 +556,9 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
 
                 const isCampaign = request.request_type === 'campaign' && Array.isArray(request.campaign_posts) && request.campaign_posts.length > 0
                 return (
-                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 space-y-3">
+                  <div className="space-y-4">
+                    {isCampaign && <CampaignReviewSender request={request} onSent={() => window.location.reload()} />}
+                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 space-y-3">
                     <h4 className="font-bold text-blue-700">📝 إرسال المحتوى للمراجعة</h4>
                     {isCampaign ? (
                       <p className="text-sm text-blue-600">لكل خبر في الحملة استوديو خاص به — استخدم الاستوديو أعلاه لتوليد وإرسال محتوى كل خبر على حدة. يمكنك بعد الإرسال تعديله من «حالة مراجعة العميل» أدناه.</p>
@@ -570,6 +573,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                         </Button>
                       </>
                     )}
+                    </div>
                   </div>
                 )
               })()}

@@ -22,6 +22,7 @@ export default function PostReviews({ request }: Props) {
   const reviews = getPostReviews(request)
 
   const [selected, setSelected] = useState<Record<number, string>>({})
+  const [proposedDates, setProposedDates] = useState<Record<number, string>>({})
   const [feedbackOpen, setFeedbackOpen] = useState<Record<number, boolean>>({})
   const [feedback, setFeedback] = useState<Record<number, string>>({})
   const [busy, setBusy] = useState<number | null>(null)
@@ -44,7 +45,12 @@ export default function PostReviews({ request }: Props) {
       const res = await fetch('/api/approve-post-content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId: request.id, postIndex: index, selectedImage: chosen ?? null }),
+        body: JSON.stringify({
+          requestId: request.id,
+          postIndex: index,
+          selectedImage: chosen ?? null,
+          proposedDate: proposedDates[index] ?? reviews[index]?.proposed_date ?? null,
+        }),
       })
       if (res.ok) {
         showToast('تم اعتماد المحتوى')
@@ -147,6 +153,23 @@ export default function PostReviews({ request }: Props) {
               <div className="bg-white rounded-xl p-3 mb-3">
                 <h4 className="font-bold text-dark text-xs mb-1">النص المقترح:</h4>
                 <p className="text-dark text-sm leading-relaxed whitespace-pre-line">{r.proposed_content}</p>
+              </div>
+            )}
+
+            {isCampaign && (
+              <div className="bg-white rounded-xl p-3 mb-3">
+                <label className="block font-bold text-dark text-xs mb-1">موعد النشر المتوقع</label>
+                {isReview ? (
+                  <input
+                    type="date"
+                    value={proposedDates[item.index] ?? r.proposed_date ?? ''}
+                    onChange={event => setProposedDates(prev => ({ ...prev, [item.index]: event.target.value }))}
+                    className="w-full max-w-xs px-3 py-2 rounded-lg border border-border bg-white text-sm"
+                  />
+                ) : (
+                  <p className="text-sm text-muted">{r.proposed_date ? new Date(`${r.proposed_date}T12:00:00`).toLocaleDateString('ar-SA') : 'لم يُحدد'}</p>
+                )}
+                {isReview && <p className="text-[11px] text-muted mt-1">يمكنك تغيير الموعد المقترح، ويصل التعديل للإدارة مع اعتماد المنشور.</p>}
               </div>
             )}
 

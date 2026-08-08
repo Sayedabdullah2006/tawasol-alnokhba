@@ -768,6 +768,42 @@ export function contentReadyForReview(d: {
   }
 }
 
+/** رسالة واحدة لمراجعة جميع منشورات الحملة من صفحة واحدة. */
+export function campaignReadyForReview(d: {
+  requestNumber: string
+  requestId: string
+  clientName: string
+  posts: Array<{ title: string; content: string; proposedDate?: string | null; images: string[] }>
+}) {
+  const postCards = d.posts.map((post, index) => `
+    <div style="background:#F8FAFC; border:1px solid #E5E7EB; border-radius:12px; padding:18px; margin:16px 0;">
+      <div style="font-size:15px; font-weight:900; color:${BRAND_NAVY}; margin:0 0 10px;">المنشور ${index + 1}: ${escapeHtml(post.title)}</div>
+      <div style="background:#FFFFFF; border-right:4px solid ${BRAND_GOLD}; border-radius:8px; padding:12px; color:${BRAND_NAVY}; font-size:13px; line-height:1.8; white-space:pre-line;">${escapeHtml(post.content)}</div>
+      <div style="margin:14px 0 8px; font-size:13px; font-weight:bold; color:${BRAND_NAVY};">التصاميم المقترحة للاعتماد (${post.images.length})</div>
+      <div style="text-align:center; line-height:0;">
+        ${post.images.map((image, imageIndex) => `<a href="${image}" target="_blank" style="display:inline-block; margin:4px; text-decoration:none;"><img src="${image}" alt="تصميم ${imageIndex + 1}" style="width:120px; max-width:30%; height:150px; object-fit:cover; border-radius:7px; border:1px solid #D1D5DB;" /></a>`).join('')}
+      </div>
+      <div style="margin-top:14px; background:#EAF4F1; border-radius:8px; padding:10px; font-size:13px; color:${BRAND_NAVY};"><strong>موعد النشر المتوقع:</strong> ${post.proposedDate ? formatDateAr(post.proposedDate) : 'يُحدّد لاحقاً'}</div>
+    </div>`).join('')
+
+  return {
+    subject: `محتوى حملتك جاهز للمراجعة · ${d.requestNumber} · تواصل النخبة`,
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <div style="text-align:center; margin:20px 0;">
+        <div style="font-size:44px; margin-bottom:12px;">📣</div>
+        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">حملتك جاهزة للمراجعة</h2>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${escapeHtml(d.requestNumber)}</p>
+      </div>
+      <p style="font-size:14px; color:#6B7C99; line-height:1.8; margin:16px 0;">
+        جهزنا النصوص وخيارات التصاميم لكل منشور. افتح صفحة المراجعة لاختيار التصميم المعتمد لكل منشور، وكتابة ملاحظاتك أو اقتراح موعد نشر مختلف.
+      </p>
+      ${postCards}
+      <p style="margin:26px 0 0; text-align:center;">${button('مراجعة الحملة واختيار التصاميم', `${SITE_URL}/dashboard/${d.requestId}`)}</p>
+    `),
+  }
+}
+
 export function contentApprovedToAdmin(d: {
   requestNumber: string; clientName: string
 }) {

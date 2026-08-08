@@ -161,6 +161,17 @@ export async function notifyContentReadyForReview(args: {
   return sendEmail(args.email, t.subject, t.html)
 }
 
+export async function notifyCampaignReadyForReview(args: {
+  requestNumber: string
+  requestId: string
+  clientName: string
+  email: string
+  posts: Array<{ title: string; content: string; proposedDate?: string | null; images: string[] }>
+}) {
+  const t = templates.campaignReadyForReview(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
 export async function notifyContentApprovedToAdmin(args: {
   requestNumber: string; clientName: string
 }) {

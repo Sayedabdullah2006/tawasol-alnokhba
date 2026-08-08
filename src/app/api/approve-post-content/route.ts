@@ -17,6 +17,9 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { requestId, selectedImage } = body
     const postIndex = Number(body.postIndex)
+    const proposedDate = typeof body.proposedDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.proposedDate)
+      ? body.proposedDate
+      : null
 
     if (!requestId || !Number.isInteger(postIndex) || postIndex < 0) {
       return NextResponse.json({ error: 'بيانات غير كاملة' }, { status: 400 })
@@ -66,6 +69,7 @@ export async function POST(request: Request) {
       selected_image: chosen,
       user_feedback: null,
       content_approved_at: now,
+      proposed_date: proposedDate ?? entry.proposed_date ?? null,
       history,
     }
 
@@ -76,6 +80,11 @@ export async function POST(request: Request) {
     const allApproved = approvedCount >= totalPosts
 
     const upd: Record<string, unknown> = { post_reviews: reviews, updated_at: now }
+    if (isCampaign && proposedDate) {
+      const posts = [...existingRequest.campaign_posts]
+      if (posts[postIndex]) posts[postIndex] = { ...posts[postIndex], preferred_date: proposedDate }
+      upd.campaign_posts = posts
+    }
     if (allApproved) { upd.status = 'in_progress'; upd.content_approved_at = now } // خرج من مرحلة المراجعة
 
     const { error } = await supabase
