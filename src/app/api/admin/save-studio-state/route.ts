@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     if (profile?.role !== 'admin') return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
 
     const body = await request.json()
-    const { requestId, designs, uploadedImages } = body
+    const { requestId, designs, uploadedImages, selectedImages } = body
     const hasPostIndex = typeof body.postIndex === 'number' && Number.isInteger(body.postIndex) && body.postIndex >= 0
     const postIndex: number | null = hasPostIndex ? body.postIndex : null
 
@@ -35,6 +35,7 @@ export async function POST(request: Request) {
       const entry: Record<string, any> = { ...(aiPosts[postIndex] ?? {}) }
       if (Array.isArray(designs)) entry.designs = designs
       if (Array.isArray(uploadedImages)) entry.uploaded_images = uploadedImages
+      if (Array.isArray(selectedImages)) entry.selected_images = selectedImages
       aiPosts[postIndex] = entry
       const { error } = await service.from('publish_requests').update({ ai_posts: aiPosts }).eq('id', requestId)
       if (error) throw new Error(error.message)

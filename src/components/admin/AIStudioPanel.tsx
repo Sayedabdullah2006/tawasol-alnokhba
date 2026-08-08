@@ -50,6 +50,7 @@ export default function AIStudioPanel({
         chosenConcept: savedStudio?.chosen_concept ?? null,
         imagePrompt: savedStudio?.image_prompt ?? '',
         sourceImage: savedStudio?.source_image ?? null,
+        selectedImages: Array.isArray(savedStudio?.selected_images) ? savedStudio.selected_images : [],
         imageUrl: '', // المعاينة المفردة للجلسة فقط؛ الحفظ عبر designs
         designs: Array.isArray(savedStudio?.designs) ? savedStudio.designs : [],
         uploadedImages: Array.isArray(savedStudio?.uploaded_images) ? savedStudio.uploaded_images : [],
@@ -62,6 +63,7 @@ export default function AIStudioPanel({
         chosenConcept: request.ai_chosen_concept ?? null,
         imagePrompt: request.ai_image_prompt ?? '',
         sourceImage: request.ai_source_image ?? null,
+        selectedImages: [],
         imageUrl: '',
         designs: Array.isArray(request.ai_designs) ? request.ai_designs : [],
         uploadedImages: Array.isArray(request.ai_uploaded_images) ? request.ai_uploaded_images : [],
@@ -79,7 +81,7 @@ export default function AIStudioPanel({
   const contentImages: string[] = [...baseImages, ...uploadedImages.filter(u => !baseImages.includes(u))]
 
   // حفظ حالة الاستوديو (تصاميم/صور مرفوعة) في قاعدة البيانات لتبقى بعد إعادة التحميل
-  const persistStudioState = (patch: { designs?: any[]; uploadedImages?: string[] }) => {
+  const persistStudioState = (patch: { designs?: any[]; uploadedImages?: string[]; selectedImages?: string[] }) => {
     fetch('/api/admin/save-studio-state', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -117,7 +119,11 @@ export default function AIStudioPanel({
         persistStudioState({ uploadedImages: next }) // حفظ ليبقى بعد إعادة التحميل
         return next
       })
-      setSelectedImages(prev => (prev.includes(data.publicUrl) ? prev : [...prev, data.publicUrl]))
+      setSelectedImages(prev => {
+        const next = prev.includes(data.publicUrl) ? prev : [...prev, data.publicUrl]
+        persistStudioState({ selectedImages: next })
+        return next
+      })
       showToast('تم رفع الصورة', 'success')
     } catch {
       showToast('فشل رفع الصورة', 'error')
@@ -129,11 +135,15 @@ export default function AIStudioPanel({
   // ── State (prefilled from saved studio state when re-opened) ──
   // يمكن اختيار أكثر من صورة مصدر تُضمَّن جميعها ويُبنى عليها التحليل والاتجاهات والتصميم.
   const [selectedImages, setSelectedImages] = useState<string[]>(
-    saved.sourceImage ? [saved.sourceImage] : (contentImages.length === 1 ? [contentImages[0]] : [])
+    saved.selectedImages.length ? saved.selectedImages : (saved.sourceImage ? [saved.sourceImage] : (contentImages.length === 1 ? [contentImages[0]] : []))
   )
   const [extraInfo, setExtraInfo] = useState('')
   const toggleImage = (url: string) =>
-    setSelectedImages(prev => (prev.includes(url) ? prev.filter(u => u !== url) : [...prev, url]))
+    setSelectedImages(prev => {
+      const next = prev.includes(url) ? prev.filter(u => u !== url) : [...prev, url]
+      persistStudioState({ selectedImages: next })
+      return next
+    })
   const [analysis, setAnalysis] = useState<any>(saved.analysis)
   const [tweets, setTweets] = useState<string>(saved.tweets?.raw ?? '')
   const [selectedTweet, setSelectedTweet] = useState<string>(saved.tweets?.raw ?? '')

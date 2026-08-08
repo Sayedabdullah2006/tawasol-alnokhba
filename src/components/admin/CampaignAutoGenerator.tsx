@@ -26,8 +26,12 @@ export default function CampaignAutoGenerator({ request, onFinished }: { request
   }
 
   const generatePost = async (post: any, postIndex: number) => {
-    const sourceImages = Array.isArray(post?.images)
-      ? post.images.filter((url: unknown): url is string => typeof url === 'string' && url.length > 0).slice(0, 5)
+    const sourceResponse = await fetch('/api/admin/campaign-source-images', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requestId: request.id, postIndex }),
+    })
+    const sourceData = await sourceResponse.json().catch(() => ({}))
+    const sourceImages = Array.isArray(sourceData.sourceImages)
+      ? sourceData.sourceImages.filter((url: unknown): url is string => typeof url === 'string' && url.length > 0).slice(0, 5)
       : []
     if (!sourceImages.length) throw new Error('لا توجد صورة مصدر لهذا الخبر')
 

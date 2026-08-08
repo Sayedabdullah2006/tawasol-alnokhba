@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
     if (profile?.role !== 'admin') return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
 
-    const { requestId, proposedDates } = await request.json()
+    const { requestId, proposedDates, reviewItems } = await request.json()
     if (typeof requestId !== 'string' || !requestId) return NextResponse.json({ error: 'بيانات ناقصة' }, { status: 400 })
 
     const { data: row } = await supabase
@@ -40,10 +40,15 @@ export async function POST(request: Request) {
         ? proposedDates[index]
         : (typeof post.preferred_date === 'string' ? post.preferred_date : null)
       const studio = aiPosts[index] ?? {}
-      const content = String(studio?.tweets?.raw ?? post.content ?? '').trim()
-      const images = Array.isArray(studio?.designs)
+      const fallbackContent = String(studio?.tweets?.raw ?? post.content ?? '').trim()
+      const fallbackImages = Array.isArray(studio?.designs)
         ? studio.designs.map((design: any) => design?.imageUrl).filter((url: unknown): url is string => typeof url === 'string' && url.length > 0)
         : []
+      const requestedItem = reviewItems && typeof reviewItems === 'object' ? reviewItems[index] : null
+      const content = typeof requestedItem?.content === 'string' ? requestedItem.content.trim() : fallbackContent
+      const images = Array.isArray(requestedItem?.images)
+        ? requestedItem.images.filter((url: unknown): url is string => typeof url === 'string' && fallbackImages.includes(url))
+        : fallbackImages
       if (!content || images.length === 0) {
         return NextResponse.json({ error: `أكمل النص وتصميماً واحداً على الأقل للمنشور ${index + 1} قبل إرسال الحملة.` }, { status: 400 })
       }
