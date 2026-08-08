@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { CATEGORIES, REQUEST_STATUSES } from '@/lib/constants'
 import { formatNumber, formatDate, generateRequestNumber } from '@/lib/utils'
 import { fixTextDirection } from '@/lib/text-utils'
@@ -16,15 +16,16 @@ import NameDisplayTest from '@/components/debug/NameDisplayTest'
 
 export default function AdminRequestsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const { showToast } = useToast()
   const [loading, setLoading] = useState(true)
   const [requests, setRequests] = useState<any[]>([])
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [duplicatesOnly, setDuplicatesOnly] = useState(false)
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') ?? '')
+  const [duplicatesOnly, setDuplicatesOnly] = useState(() => searchParams.get('duplicates') === '1')
   // فلتر المستخدم: مفتاح المستخدم المختار + نص البحث في القائمة + إظهار القائمة
-  const [userFilter, setUserFilter] = useState('')
+  const [userFilter, setUserFilter] = useState(() => searchParams.get('user') ?? '')
   const [userQuery, setUserQuery] = useState('')
   const [showUserList, setShowUserList] = useState(false)
   const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null)
@@ -71,6 +72,22 @@ export default function AdminRequestsPage() {
   }, [supabase, router])
 
   useEffect(() => { loadData() }, [loadData])
+
+  // تبقى الفلاتر عند تحديث الصفحة، ويصبح الرابط نفسه قابلاً للمشاركة.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const setParam = (key: string, value: string) => {
+      if (value) params.set(key, value)
+      else params.delete(key)
+    }
+    setParam('q', search.trim())
+    setParam('status', statusFilter)
+    setParam('user', userFilter)
+    setParam('duplicates', duplicatesOnly ? '1' : '')
+    const query = params.toString()
+    const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}`
+    window.history.replaceState(window.history.state, '', nextUrl)
+  }, [search, statusFilter, userFilter, duplicatesOnly])
 
   // Removed drawer useEffect
 
