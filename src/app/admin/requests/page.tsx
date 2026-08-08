@@ -38,6 +38,9 @@ export default function AdminRequestsPage() {
   const [reminderTarget, setReminderTarget] = useState<any | null>(null)
   const [singleApplyDiscount, setSingleApplyDiscount] = useState(false)
   const [singleDiscountPct, setSingleDiscountPct] = useState<number>(10)
+  const [quickNoteTarget, setQuickNoteTarget] = useState<any | null>(null)
+  const [quickNote, setQuickNote] = useState('')
+  const [savingQuickNote, setSavingQuickNote] = useState(false)
   const [showDebug, setShowDebug] = useState(false)
   // نموذج إضافة طلب خارجي (نُشر ودُفع خارج المنصة)
   const [showExternalForm, setShowExternalForm] = useState(false)
@@ -209,6 +212,39 @@ export default function AdminRequestsPage() {
   const handleDeleteCancel = () => {
     setShowDeleteDialog(false)
     setRequestToDelete(null)
+  }
+
+  const openQuickNote = (request: any, event: React.MouseEvent) => {
+    event.stopPropagation()
+    setQuickNoteTarget(request)
+    setQuickNote(request.admin_notes ?? '')
+  }
+
+  const handleSaveQuickNote = async () => {
+    if (!quickNoteTarget) return
+    setSavingQuickNote(true)
+    try {
+      const response = await fetch('/api/admin/request-note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: quickNoteTarget.id, adminNotes: quickNote }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.success) {
+        showToast(data.error ?? 'تعذّر حفظ ملاحظة الإدارة', 'error')
+        return
+      }
+      setRequests(current => current.map(request => request.id === quickNoteTarget.id
+        ? { ...request, admin_notes: data.adminNotes }
+        : request))
+      showToast(quickNote.trim() ? 'تم حفظ الملاحظة وتظهر الآن في بطاقة الطلب' : 'تم حذف ملاحظة الإدارة')
+      setQuickNoteTarget(null)
+      setQuickNote('')
+    } catch {
+      showToast('خطأ في الاتصال بالخادم', 'error')
+    } finally {
+      setSavingQuickNote(false)
+    }
   }
 
   const quotedCount = requests.filter(r => r.status === 'quoted').length
@@ -661,8 +697,21 @@ export default function AdminRequestsPage() {
                     <td className="px-3 py-3 text-muted text-xs">{formatDate(r.created_at)}</td>
 
                     {/* إجراءات */}
-                    <td className="px-3 py-3 text-center min-w-[120px]">
+                    <td className="px-3 py-3 text-center min-w-[180px]">
                       <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={(e) => openQuickNote(r, e)}
+                          className={`inline-flex h-8 items-center justify-center gap-1 rounded-lg px-2 text-xs font-bold transition-colors shrink-0 ${
+                            r.admin_notes?.trim()
+                              ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                          title={r.admin_notes?.trim() ? 'تعديل ملاحظة الإدارة' : 'إضافة ملاحظة للإدارة'}
+                        >
+                          <span aria-hidden="true">📝</span>
+                          <span>ملاحظة</span>
+                        </button>
+
                         {/* زر التذكير */}
                         <button
                           onClick={(e) => handleSendReminder(r, e)}
@@ -734,6 +783,46 @@ export default function AdminRequestsPage() {
           </div>
         )}
       </div>
+
+      {/* Quick Admin Note Dialog */}
+      {quickNoteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !savingQuickNote && setQuickNoteTarget(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={event => event.stopPropagation()}>
+            <div className="mb-4">
+              <h3 className="text-lg font-black text-red-700">ملاحظة الإدارة</h3>
+              <p className="mt-1 text-sm text-muted">
+                {generateRequestNumber(quickNoteTarget.request_number)} · تظهر للعميل باللون الأحمر في بطاقة الطلب.
+              </p>
+            </div>
+            <textarea
+              value={quickNote}
+              onChange={event => setQuickNote(event.target.value)}
+              className="min-h-[130px] w-full resize-y rounded-xl border border-red-200 bg-red-50/40 px-3 py-2 text-sm text-dark outline-none focus:border-red-400"
+              placeholder="اكتب الملاحظة التي تريد أن يراها العميل..."
+              maxLength={1000}
+              autoFocus
+            />
+            <div className="mt-1 text-left text-xs text-muted">{quickNote.length}/1000</div>
+            <div className="mt-4 flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => { setQuickNoteTarget(null); setQuickNote('') }}
+                className="flex-1"
+                disabled={savingQuickNote}
+              >
+                إلغاء
+              </Button>
+              <Button
+                onClick={handleSaveQuickNote}
+                loading={savingQuickNote}
+                className="flex-1 bg-red-600 hover:bg-red-700"
+              >
+                حفظ الملاحظة
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Single Reminder Dialog */}
       {reminderTarget && (
