@@ -51,6 +51,10 @@ function formatArabicDate(dateStr: string): string {
   })
 }
 
+function riyadhDateKey(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Riyadh' }).format(new Date())
+}
+
 function getScheduleStatusBadge(status: string): { label: string; className: string } {
   switch (status) {
     case 'scheduled':
@@ -132,6 +136,7 @@ export default function AdminSocialPage() {
   const [occasionGenerationProgress, setOccasionGenerationProgress] = useState({ completed: 0, total: 0 })
   const [occasionText, setOccasionText] = useState<Record<string, string>>({})
   const [occasionDates, setOccasionDates] = useState<Record<string, string>>({})
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(() => new Set([riyadhDateKey()]))
 
   const loadOccasions = async (): Promise<OccasionMeta[]> => {
     const res = await fetch('/api/admin/social/occasions', { cache: 'no-store' })
@@ -555,22 +560,36 @@ export default function AdminSocialPage() {
 
       {dates.map(date => {
         const dayItems = byDate.get(date)!
+        const isExpanded = expandedDates.has(date)
         return (
           <div key={date} className="space-y-3">
-            <div className="flex items-center gap-3 sticky top-0 bg-cream/95 backdrop-blur-sm py-2 z-10">
-              <h2 className="font-black text-dark">{formatArabicDate(date)}</h2>
-              <span className="text-xs bg-green/10 text-green font-bold rounded-full px-2.5 py-0.5">
-                {dayItems.length} منشورات
-              </span>
+            <div className="sticky top-0 z-10 bg-cream/95 py-2 backdrop-blur-sm">
+              <button
+                type="button"
+                onClick={() => setExpandedDates(current => {
+                  const next = new Set(current)
+                  if (next.has(date)) next.delete(date)
+                  else next.add(date)
+                  return next
+                })}
+                aria-expanded={isExpanded}
+                className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2 text-right transition hover:bg-white"
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="font-black text-dark">{formatArabicDate(date)}</span>
+                  <span className="shrink-0 rounded-full bg-green/10 px-2.5 py-0.5 text-xs font-bold text-green">{dayItems.length} منشورات</span>
+                </span>
+                <span className="shrink-0 text-lg font-bold text-green" aria-hidden="true">{isExpanded ? '⌃' : '⌄'}</span>
+              </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {isExpanded && <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {dayItems.map(item => (
                 <div key={item.id} className="bg-card rounded-2xl border border-border overflow-hidden flex flex-col">
                   {item.design_image_url ? (
                     <a href={item.design_image_url} target="_blank" rel="noreferrer">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={item.design_image_url} alt={item.post_title} className="w-full aspect-[4/5] object-cover bg-cream" />
+                      <img src={item.design_image_url} alt={item.post_title} loading="lazy" decoding="async" className="w-full aspect-[4/5] object-cover bg-cream" />
                     </a>
                   ) : (
                     <div className="w-full aspect-[4/5] bg-cream flex items-center justify-center text-muted text-sm">لا يوجد تصميم</div>
@@ -719,7 +738,7 @@ export default function AdminSocialPage() {
                   </div>
                 </div>
               ))}
-            </div>
+            </div>}
           </div>
         )
       })}
