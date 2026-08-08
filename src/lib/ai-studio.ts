@@ -9,7 +9,7 @@
  */
 import OpenAI from 'openai'
 import sharp from 'sharp'
-import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives, buildTweetDirectives } from './openai'
+import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, buildConceptDirectives, buildTweetDirectives } from './openai'
 import { generateImageWithOpenAI, generateImageFromPartsWithOpenAI } from './image-generation'
 import { compositeLogoBottomRight, resizeToPoster } from './logo-overlay'
 import { createServiceRoleClient } from './supabase-server'
@@ -116,44 +116,19 @@ export async function prepareConceptImagePrompts(
   openai: OpenAI,
   args: { analysis: unknown; concepts: Concept[]; sourceImageCount: number; hasVideo?: boolean; videoOrientation?: VideoOrientation },
 ): Promise<Concept[]> {
-  if (!args.concepts.length) return args.concepts
-
-  try {
-    const completion = await chatComplete(openai, {
-      model: OPENAI_MODEL,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content: `${SYS_IMAGE}\n\nBATCH OVERRIDE: Produce a JSON object only: {"prompts":["...","...","..."]}. Create one complete, production-ready English image-editing prompt for each supplied direction, in the same order. Each prompt must preserve the supplied real reference people, use the exact verified Arabic facts only, make its direction visibly distinct, retain the First1Saudi identity and social footer requirements, and be ready for the image model without any further prompt-writing call.`,
-        },
-        {
-          role: 'user',
-          content: JSON.stringify({
-            analysis: args.analysis,
-            reference_image_count: args.sourceImageCount,
-            has_video: Boolean(args.hasVideo),
-            video_orientation: args.hasVideo ? (args.videoOrientation ?? 'landscape') : null,
-            directions: args.concepts.map((concept, index) => ({
-              index,
-              title: concept.title,
-              mood: concept.mood,
-              brief: concept.brief,
-            })),
-          }),
-        },
-      ],
-    })
-    const raw = completion.choices[0]?.message?.content ?? '{}'
-    const parsed = JSON.parse(raw) as { prompts?: unknown }
-    const prompts = Array.isArray(parsed.prompts)
-      ? parsed.prompts.map(prompt => typeof prompt === 'string' ? prompt.trim() : '')
-      : []
-    return args.concepts.map((concept, index) => ({ ...concept, imagePrompt: prompts[index] || undefined }))
-  } catch {
-    // Directions remain usable through the on-demand prompt path if preparation fails.
-    return args.concepts
-  }
+  // لا نخزن برومبتات تحرير الصور الطويلة مع الاتجاهات. كانت البرومبتات القديمة
+  // تطلب تغييرات حساسة على الأشخاص، فتُرفض فوراً من نموذج الصور عند إعادة الاستخدام.
+  // يُبنى برومبت قصير وآمن وقت التوليد من الحقائق والاتجاه المختار.
+  void openai
+  void args.analysis
+  void args.sourceImageCount
+  void args.hasVideo
+  void args.videoOrientation
+  return args.concepts.map(concept => ({
+    title: concept.title,
+    mood: concept.mood,
+    brief: concept.brief,
+  }))
 }
 
 /**
@@ -267,18 +242,58 @@ export function conceptToString(c: Concept | undefined): string {
 
 /** Keeps a moderation retry faithful to the selected studio direction instead of using a generic poster. */
 export function buildStudioSafetyFallbackPrompt(args: { analysis: unknown; chosenConcept: string; hasVideo?: boolean; videoOrientation?: VideoOrientation }): string {
-  const facts = JSON.stringify(args.analysis).slice(0, 5000)
+  return buildCompactImagePrompt(args)
+}
+
+function textValue(value: unknown, maxLength: number): string {
+  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, maxLength) : ''
+}
+
+function textList(value: unknown, limit: number, maxLength: number): string[] {
+  return Array.isArray(value)
+    ? value.map(item => textValue(item, maxLength)).filter(Boolean).slice(0, limit)
+    : []
+}
+
+/**
+ * موجّه صورة قصير يُنشأ لحظة التوليد؛ لا يعيد إدخال برومبتات تاريخية مطوّلة
+ * قد تطلب تعديل وجه أو هوية الشخص فتتوقف عند فحص أمان الصور.
+ */
+export function buildCompactImagePrompt(args: {
+  analysis: unknown
+  chosenConcept: string
+  note?: string
+  extra?: string
+  hasVideo?: boolean
+  videoOrientation?: VideoOrientation
+  templateDirective?: string
+}): string {
+  const record = args.analysis && typeof args.analysis === 'object'
+    ? args.analysis as Record<string, unknown>
+    : {}
+  const name = textValue(record.name, 160)
+  const achievement = textValue(record.achievement_core, 360)
+  const label = textValue(record.context_label, 120)
+  const facts = [...textList(record.key_facts, 3, 220), ...textList(record.awards, 1, 220)]
+  const direction = textValue(args.chosenConcept, 1100)
+  const note = textValue(args.note, 500)
+  const extra = textValue(args.extra, 500)
+  const content = [name, achievement, ...facts].filter(Boolean).map(item => `"${item}"`).join(' | ')
+
   return [
     'Create a premium 4:5 Arabic editorial social-media poster for First1Saudi.',
-    `Use only these verified news facts: ${facts}`,
-    `The selected creative direction is mandatory: ${args.chosenConcept.slice(0, 2600)}`,
-    'Make that direction clearly visible through the composition, visual metaphor, palette, and hierarchy. Do not reduce the result to a portrait with a logo.',
-    'If reference photos are supplied, keep them as intact documentary photographs and build the layout around them. Do not redraw people or turn them into illustrations.',
-    'Turn the facts into a clear Arabic infographic: one concise Arabic headline and up to three short factual callouts. Do not copy the caption or use paragraphs.',
-    'Use a strict right-to-left Arabic hierarchy with accurate connected Arabic. Add a compact social footer with the recognizable icons for X, Instagram, LinkedIn, Facebook, and TikTok, followed by @First1Saudi.',
-    'Do not draw a First1Saudi logo; it is overlaid after generation. Keep the artwork full-bleed with no white panel, frame, or empty logo box.',
+    'Use each supplied reference image as an intact documentary photograph. Do not redraw, replace, alter, or synthesize people, clothing, faces, or poses. Build the composition around the real photographs.',
+    `Creative direction: ${direction || 'A distinctive, modern Arabic editorial infographic with a strong visual hierarchy.'}`,
+    label ? `Small context label: "${label}".` : '',
+    `Use only these verified Arabic content elements: ${content || 'A concise Arabic headline and up to three verified factual callouts.'}`,
+    'Use strict right-to-left Arabic hierarchy, one concise headline, and no more than three short callouts. Do not copy a long caption, invent facts, or add photo descriptions.',
+    'Use deep teal, Saudi green, turquoise, restrained gold, and white. Keep the artwork full-bleed, with no white logo panel or empty logo frame.',
+    'Add a compact footer with equal, recognizable icons for X, Instagram, LinkedIn, Facebook, and TikTok followed by @First1Saudi. Do not draw a brand logo; it is overlaid after generation.',
+    args.templateDirective ?? '',
     args.hasVideo ? videoLayoutFor(args.videoOrientation) : '',
-    'Avoid flags, politics, weapons, danger symbols, violence, unsafe material details, and invented factual claims.',
+    note ? `Apply this additional visual direction: ${note}` : '',
+    extra ? `Additional verified context: ${extra}` : '',
+    'Avoid flags, politics, weapons, military content, danger symbols, and violence.',
   ].filter(Boolean).join('\n\n')
 }
 
@@ -288,45 +303,20 @@ export async function generateDesign(
   args: { analysis: unknown; chosenConcept: string; sourceImages: string[]; note?: string; extra?: string; hasVideo?: boolean; videoOrientation?: VideoOrientation; preparedPrompt?: string },
 ): Promise<{ imageUrl: string; prompt: string }> {
   const { analysis, chosenConcept, sourceImages, note, extra, hasVideo, videoOrientation, preparedPrompt } = args
-  const primarySource = sourceImages[0] ?? null
 
   const service = await createServiceRoleClient()
   const { data: brand } = await service.from('brand_settings').select('first1saudi_logo_url').eq('id', 1).single()
   const logoUrl: string | null = brand?.first1saudi_logo_url ?? null
 
-  const promptCompletion = preparedPrompt?.trim()
-    ? null
-    : await chatComplete(openai, {
-      model: OPENAI_MODEL,
-      messages: [
-        { role: 'system', content: SYS_IMAGE },
-        {
-          role: 'user',
-          content:
-          `بيانات الخبر (JSON):\n${JSON.stringify(analysis)}\n\n` +
-          `الاتجاه المعتمد:\n${chosenConcept}\n\n` +
-          (sourceImages.length > 1
-            ? `الصور الحقيقية المرفقة (${sourceImages.length}) على الروابط التالية — ادمجها جميعاً بتكوين متناسق داخل التصميم الواحد مع الحفاظ على واقعيتها:\n${sourceImages.map((u, i) => `${i + 1}. ${u}`).join('\n')}\n`
-            : `الصورة الحقيقية المرفقة هي على الرابط: ${primarySource}\n`) +
-          `سيُضاف الشعار لاحقاً برمجياً مباشرة فوق التصميم في أسفل اليمين. لا ترسم أي شعار هناك، وأبقِ الخلفية ممتدة وطبيعية بلا إطار أو مربع أو مساحة فارغة؛ فقط لا تضع نصاً أو أرقاماً أو أيقونات في تلك الزاوية الصغيرة.\n` +
-          (hasVideo ? `\n${videoLayoutFor(videoOrientation)}\n` : '') +
-          (note && note.trim()
-            ? `\n‼️ ملاحظات الأدمن على التصميم (طبّقها بدقّة مع الحفاظ على ثوابت الهوية والصورة الحقيقية): ${note.trim()}\n`
-            : '') +
-          (extra && extra.trim() ? `\n${extra.trim()}\n` : ''),
-        },
-      ],
-    })
   const templateDirective = await selectEditorialTemplate({
     sourceImageUrls: sourceImages,
     variantKey: `${chosenConcept}:${note ?? ''}`,
   })
-  const designPrompt = [
-    preparedPrompt?.trim() || promptCompletion?.choices[0]?.message?.content || '',
-    preparedPrompt?.trim() && note?.trim() ? `ADMIN DESIGN NOTE — apply this exactly while preserving every established design requirement: ${note.trim()}` : '',
-    preparedPrompt?.trim() ? extra?.trim() || '' : '',
-    templateDirective,
-  ].filter(Boolean).join('\n\n')
+  // لا نعيد استخدام برومبتات قديمة محفوظة مع المفهوم، لأنها قد تحتوي أوامر
+  // تحرير حساسة على الصورة المرجعية. نستخلص فقط الحقائق والاتجاه الآمن الحالي.
+  void openai
+  void preparedPrompt
+  const designPrompt = buildCompactImagePrompt({ analysis, chosenConcept, note, extra, hasVideo, videoOrientation, templateDirective })
 
   // قفل الصورة: يُحاط به موجّه الصورة من الطرفين حتى يبني النموذج القالب حول اللقطة الحقيقية.
   // عند وجود فيديو: نُلحق توجيه تخطيط الفيديو في النهاية (أولوية قصوى).

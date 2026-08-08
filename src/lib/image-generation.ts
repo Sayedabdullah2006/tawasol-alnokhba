@@ -261,7 +261,12 @@ async function createImageViaImageApi(
   // A safety rejection can be triggered by a complex prompt or a reference image.
   // Retry once with a benign, text-free editorial composition instead of leaving the user with a raw provider error.
   if (isModerationBlocked(lastErr) && opts.allowSafetyFallback !== false) {
-    console.warn('[OpenAI Images] moderation blocked the requested output; using a safe editorial fallback.')
+    console.warn('[OpenAI Images] moderation blocked the requested output; using a safe editorial fallback.', {
+      model: OPENAI_IMAGE_MODEL,
+      referenceImageCount: refs.length,
+      promptLength: promptText.length,
+      providerMessage: lastErr instanceof Error ? lastErr.message.slice(0, 500) : String(lastErr).slice(0, 500),
+    })
     try {
       return await createImageViaImageApi(
         opts.safetyFallbackPrompt?.trim() || (refs.length ? SAFE_EDITORIAL_REFERENCE_FALLBACK_PROMPT : SAFE_EDITORIAL_FALLBACK_PROMPT),

@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
-import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMAGE, buildConceptDirectives, buildTweetDirectives } from '@/lib/openai'
+import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, buildConceptDirectives, buildTweetDirectives } from '@/lib/openai'
 import { logGeneratedDesign } from '@/lib/newsletter'
 import { generateImageWithOpenAI, imageGenerationErrorMessage } from '@/lib/image-generation'
-import { buildStudioSafetyFallbackPrompt, prepareConceptImagePrompts } from '@/lib/ai-studio'
+import { buildCompactImagePrompt, buildStudioSafetyFallbackPrompt, prepareConceptImagePrompts } from '@/lib/ai-studio'
 import { compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
 import { completeGenerationJob, failGenerationJob, startGenerationJob, throwIfGenerationCancelled } from '@/lib/generation-jobs'
 import { selectEditorialTemplate } from '@/lib/editorial-template-selector'
@@ -331,44 +331,19 @@ export async function POST(req: Request) {
       // Persist the chosen concept immediately.
       await saveStep({ chosenConcept: { text: chosenConcept } })
 
-      // Use a prompt prepared alongside the three concepts when it is available.
-      // Manual or historical concepts keep the existing on-demand prompt path.
-      const promptCompletion = typeof preparedPrompt === 'string' && preparedPrompt.trim()
-        ? null
-        : await chatComplete(openai, {
-        model: OPENAI_MODEL,
-        messages: [
-          { role: 'system', content: SYS_IMAGE },
-          {
-            role: 'user',
-            content:
-              `بيانات الخبر (JSON):\n${JSON.stringify(priorAnalysis)}\n\n` +
-              `الاتجاه المعتمد:\n${chosenConcept}\n\n` +
-              (sourceImages.length > 1
-                ? `الصور الحقيقية المرفقة (${sourceImages.length}) على الروابط التالية — ادمجها جميعاً بتكوين متناسق داخل التصميم الواحد مع الحفاظ على واقعيتها:\n${sourceImages.map((u, i) => `${i + 1}. ${u}`).join('\n')}\n`
-                : `الصورة الحقيقية المرفقة هي على الرابط: ${primarySource}\n`) +
-              // اللوقو يُركَّب برمجياً بعد التوليد — اطلب ترك مكانه فارغاً فقط.
-              `اترك مساحة فارغة أسفل يمين الفوتر للوقو (سيُضاف لاحقاً برمجياً) ولا ترسم أي شعار هناك.\n` +
-              // ملاحظات الأدمن لإعادة التوليد — تُطبَّق بدقّة مع الحفاظ على القواعد والهوية والصورة الحقيقية.
-              (note && note.trim()
-                ? `\n‼️ ملاحظات الأدمن على التصميم (طبّقها بدقّة مع الحفاظ على ثوابت الهوية والصورة الحقيقية): ${note.trim()}\n`
-                : ''),
-          },
-        ],
-        })
-
       const templateDirective = await selectEditorialTemplate({
         sourceImageUrls: sourceImages,
         variantKey: `${chosenConcept}:${note ?? ''}`,
       })
-      const designPrompt = [
-        typeof preparedPrompt === 'string' ? preparedPrompt.trim() : '',
-        promptCompletion?.choices[0]?.message?.content ?? '',
-        typeof preparedPrompt === 'string' && preparedPrompt.trim() && note?.trim()
-          ? `ADMIN DESIGN NOTE — apply this exactly while preserving every established design requirement: ${note.trim()}`
-          : '',
+      // البرومبتات المحفوظة مع المفاهيم القديمة قد تحتوي أوامر تعديل حساسة على
+      // الأشخاص. نستخدم الحقائق والاتجاه الحاليين فقط لبناء موجّه قصير وآمن.
+      void preparedPrompt
+      const designPrompt = buildCompactImagePrompt({
+        analysis: priorAnalysis,
+        chosenConcept: String(chosenConcept ?? ''),
+        note,
         templateDirective,
-      ].filter(Boolean).join('\n\n')
+      })
 
       await saveStep({ imagePrompt: designPrompt })
 
