@@ -138,6 +138,7 @@ export default function AdminRequestsPage() {
           r.client_email?.toLowerCase().includes(q) ||
           r.title?.toLowerCase().includes(q) ||
           r.content?.toLowerCase().includes(q) ||
+          r.admin_notes?.toLowerCase().includes(q) ||
           generateRequestNumber(r.request_number).toLowerCase().includes(q)
         )
       }
@@ -611,6 +612,11 @@ export default function AdminRequestsPage() {
                         {r.content && (
                           <div className="text-muted text-xs leading-relaxed">
                             {truncateContent(r.content)}
+                          </div>
+                        )}
+                        {r.admin_notes?.trim() && (
+                          <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-xs leading-5 text-red-700 whitespace-pre-wrap break-words">
+                            <span className="font-black">ملاحظة الإدارة: </span>{r.admin_notes.trim()}
                           </div>
                         )}
                         {!r.title && !r.content && (
