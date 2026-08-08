@@ -99,21 +99,19 @@ export async function POST(req: Request) {
   // دمج المعلومات الإضافية (إن وُجدت) مع نص الخبر قبل أي خطوة.
   newsText += extraInfoText
 
-  // ── سياق الحملة: لأي خبر بعد الأول، نمرّر الخبر الأول كمرجع ──────
-  // (الحملات مترابطة: الخبر الأول غالباً يحوي التعريف بالشخصية/الموضوع،
-  //  فتستفيد منه بقية الأخبار لتكون متناسقة دون تكراره حرفياً.)
+  // ── سياق الحملة: نمرّر بقية المنشورات لمنع تكرار المعلومة أو الزاوية ──
   let campaignContext = ''
-  if (isCampaignPost && (postIndex as number) > 0) {
+  if (isCampaignPost) {
     const posts = Array.isArray(reqRow.campaign_posts) ? reqRow.campaign_posts : []
-    const first = posts[0]
-    if (first) {
+    const otherPosts: Array<{ post: any; index: number }> = posts
+      .map((post: any, index: number) => ({ post, index }))
+      .filter((entry: { post: any; index: number }) => entry.index !== postIndex)
+      .slice(0, 8)
+    if (otherPosts.length) {
       campaignContext =
-        `سياق الحملة — الخبر الأول (مرجع للتعريف بالشخصية/الموضوع؛ استفد منه للتناسق ولا تكرّره حرفياً، وركّز على الخبر الحالي):\n` +
-        `العنوان: ${first.title ?? ''}\nالمحتوى: ${first.content ?? ''}`
-      const firstAnalysis = reqRow.ai_posts?.[0]?.analysis
-      if (firstAnalysis) {
-        campaignContext += `\n\nتحليل الخبر الأول (JSON للاسترشاد): ${JSON.stringify(firstAnalysis)}`
-      }
+        'سياق الحملة — منشورات أخرى في نفس الحملة (للتنسيق فقط):\n' +
+        otherPosts.map(({ post, index }) => `منشور ${index + 1}: العنوان: ${post.title ?? ''}\nالمحتوى: ${post.content ?? ''}`).join('\n\n') +
+        '\n\nقاعدة إلزامية: ركّز على معلومة أو زاوية مختلفة تخص الخبر الحالي. لا تكرر العنوان أو الإنجاز أو الأرقام أو الافتتاحية المستخدمة في أي منشور آخر، إلا إذا كانت حقيقة تعريفية لا يمكن تجنبها.'
     }
   }
 

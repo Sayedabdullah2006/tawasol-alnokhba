@@ -14,6 +14,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import QuoteComposer from '@/components/admin/QuoteComposer'
 import ContentSender from '@/components/admin/ContentSender'
 import CampaignReviewSender from '@/components/admin/CampaignReviewSender'
+import CampaignAutoGenerator from '@/components/admin/CampaignAutoGenerator'
 import AIStudioPanel from '@/components/admin/AIStudioPanel'
 import ImageEditSchedule from '@/components/admin/ImageEditSchedule'
 import PostReviewStatus from '@/components/admin/PostReviewStatus'
@@ -463,8 +464,15 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                           <p className="text-xs text-muted bg-cream rounded-lg p-2">
                             🚀 هذه حملة من {campaignPosts.length} منشورات — لكل خبر استوديو مستقل خاص به.
                           </p>
+                          <CampaignAutoGenerator request={request} onFinished={() => window.location.reload()} />
                           {campaignPosts.map((post: Record<string, unknown>, idx: number) => (
-                            <div key={idx} className="rounded-2xl border border-border/70 p-3 bg-cream/30">
+                            <details key={idx} className="group rounded-2xl border border-border/70 bg-cream/30">
+                              <summary className="cursor-pointer list-none p-3 flex items-center gap-2 text-sm font-bold text-dark">
+                                <span className="w-6 h-6 rounded-full bg-green/10 text-green flex items-center justify-center text-xs">{idx + 1}</span>
+                                <span className="min-w-0 flex-1 truncate">{(post.title as string) || `منشور ${idx + 1}`}</span>
+                                <span className="text-muted transition-transform group-open:rotate-180">⌄</span>
+                              </summary>
+                              <div className="border-t border-border/70 p-3">
                               <AIStudioPanel
                                 request={request}
                                 postIndex={idx}
@@ -473,7 +481,8 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                                 savedStudio={request.ai_posts?.[idx]}
                                 onUsedContent={studioOnUsed}
                               />
-                            </div>
+                              </div>
+                            </details>
                           ))}
                         </div>
                       )
