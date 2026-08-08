@@ -1,4 +1,5 @@
 import https from 'https'
+import sharp from 'sharp'
 
 export interface RefImage {
   mimeType: string
@@ -52,9 +53,23 @@ function isTransient(err: unknown): boolean {
 async function fetchImageAsBase64(url: string): Promise<RefImage> {
   const resp = await fetch(url)
   if (!resp.ok) throw new Error(`تعذّر تحميل الصورة المرجعية: ${url}`)
-  const mimeType = resp.headers.get('content-type') || 'image/png'
   const buf = Buffer.from(await resp.arrayBuffer())
-  return { mimeType, data: buf.toString('base64') }
+  try {
+    // بعض هواتف iPhone تحفظ امتداد JPEG لكن محتوى MPO متعدد الصور. نموذج OpenAI
+    // يرفض MPO مباشرة، لذلك نعيد ترميز كل مرجع إلى صيغة PNG/JPEG قياسية بلا تغيير بصري.
+    const source = sharp(buf, { failOn: 'none' }).rotate()
+    const metadata = await source.metadata()
+    const normalized = metadata.hasAlpha
+      ? await source.png({ compressionLevel: 9 }).toBuffer()
+      : await source.jpeg({ quality: 92, mozjpeg: true }).toBuffer()
+    return {
+      mimeType: metadata.hasAlpha ? 'image/png' : 'image/jpeg',
+      data: normalized.toString('base64'),
+    }
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'صيغة غير مقروءة'
+    throw new Error(`تعذّر تجهيز الصورة المرجعية بصيغة مدعومة: ${reason}`)
+  }
 }
 
 function postJsonOnce(
@@ -116,7 +131,7 @@ function postJsonOnce(
 
 function isModerationBlocked(err: unknown): boolean {
   const message = err instanceof Error ? err.message : String(err)
-  return /moderation_blocked|rejected by the safety system|image_generation_user_error/i.test(message)
+  return /moderation_blocked|rejected by the safety system/i.test(message)
 }
 
 const SAFE_EDITORIAL_FALLBACK_PROMPT = [
