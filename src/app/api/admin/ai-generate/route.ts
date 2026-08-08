@@ -7,6 +7,7 @@ import { generateImageWithOpenAI, imageGenerationErrorMessage } from '@/lib/imag
 import { buildStudioSafetyFallbackPrompt, prepareConceptImagePrompts } from '@/lib/ai-studio'
 import { compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
 import { completeGenerationJob, failGenerationJob, startGenerationJob, throwIfGenerationCancelled } from '@/lib/generation-jobs'
+import { selectEditorialTemplate } from '@/lib/editorial-template-selector'
 
 export const dynamic = 'force-dynamic'
 // Image generation can be slow — give it room.
@@ -356,12 +357,17 @@ export async function POST(req: Request) {
         ],
         })
 
+      const templateDirective = await selectEditorialTemplate({
+        sourceImageUrls: sourceImages,
+        variantKey: `${chosenConcept}:${note ?? ''}`,
+      })
       const designPrompt = [
         typeof preparedPrompt === 'string' ? preparedPrompt.trim() : '',
         promptCompletion?.choices[0]?.message?.content ?? '',
         typeof preparedPrompt === 'string' && preparedPrompt.trim() && note?.trim()
           ? `ADMIN DESIGN NOTE — apply this exactly while preserving every established design requirement: ${note.trim()}`
           : '',
+        templateDirective,
       ].filter(Boolean).join('\n\n')
 
       await saveStep({ imagePrompt: designPrompt })
@@ -373,6 +379,7 @@ export async function POST(req: Request) {
       // لا نفرض نسبة 4:5 على النموذج — فرضها يجعله يُعيد تكوين المشهد ويتجاهل الصورة الحقيقية.
       // المقاس النهائي يُضبط بـ sharp إلى 1080×1350 لاحقاً.
       const { b64 } = await generateImageWithOpenAI(designPrompt, referenceImages, {
+        quality: 'high',
         safetyFallbackPrompt: buildStudioSafetyFallbackPrompt({ analysis: priorAnalysis, chosenConcept: String(chosenConcept ?? '') }),
       })
 

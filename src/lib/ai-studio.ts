@@ -13,6 +13,7 @@ import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, SYS_IMA
 import { generateImageWithOpenAI, generateImageFromPartsWithOpenAI } from './image-generation'
 import { compositeLogoBottomRight, resizeToPoster } from './logo-overlay'
 import { createServiceRoleClient } from './supabase-server'
+import { selectEditorialTemplate } from './editorial-template-selector'
 
 export const OPENAI_MODEL = 'gpt-5.5'
 
@@ -317,10 +318,15 @@ export async function generateDesign(
         },
       ],
     })
+  const templateDirective = await selectEditorialTemplate({
+    sourceImageUrls: sourceImages,
+    variantKey: `${chosenConcept}:${note ?? ''}`,
+  })
   const designPrompt = [
     preparedPrompt?.trim() || promptCompletion?.choices[0]?.message?.content || '',
     preparedPrompt?.trim() && note?.trim() ? `ADMIN DESIGN NOTE — apply this exactly while preserving every established design requirement: ${note.trim()}` : '',
     preparedPrompt?.trim() ? extra?.trim() || '' : '',
+    templateDirective,
   ].filter(Boolean).join('\n\n')
 
   // قفل الوجه: يُحاط به موجّه الصورة من الطرفين (بداية ونهاية) لتقليل إعادة رسم الوجه.
@@ -329,6 +335,7 @@ export async function generateDesign(
     ? `${FACE_LOCK}\n\n${designPrompt}\n\n${videoLayoutFor(videoOrientation)}\n\n${FACE_LOCK}`
     : `${FACE_LOCK}\n\n${designPrompt}\n\n${FACE_LOCK}`
   const { b64 } = await generateImageWithOpenAI(imagePrompt, sourceImages, {
+    quality: 'high',
     safetyFallbackPrompt: buildStudioSafetyFallbackPrompt({ analysis, chosenConcept, hasVideo, videoOrientation }),
   })
   const rawImage = Buffer.from(b64, 'base64')

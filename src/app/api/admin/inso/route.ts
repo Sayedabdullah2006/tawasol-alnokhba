@@ -9,6 +9,7 @@ import { compositeCampaignLogos, resizeToPoster } from '@/lib/logo-overlay'
 import { completeGenerationJob, failGenerationJob, startGenerationJob, throwIfGenerationCancelled } from '@/lib/generation-jobs'
 import { editDesign } from '@/lib/ai-studio'
 import { cancelScheduledPost } from '@/lib/postpulse'
+import { selectEditorialTemplate } from '@/lib/editorial-template-selector'
 import {
   enforceInsoFooter,
   INSO_CAMPAIGN_KEY,
@@ -68,6 +69,10 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
   if (!brand?.first1saudi_logo_url) {
     throw new Error('اضبط شعار أول سعودي من إعدادات الهوية قبل توليد تصميم حملة INSO')
   }
+  const templateDirective = await selectEditorialTemplate({
+    sourceImageUrls: args.sourceImages ?? [],
+    variantKey: `${item.coverage_date}:${item.slot}:${args.direction}:${args.note ?? ''}`,
+  })
   const prompt = [
     'Create an editorial 4:5 social media poster for the International Nuclear Science Olympiad 2026 in Jeddah.',
     STUDIO_EDITORIAL_DESIGN_RULES,
@@ -76,6 +81,7 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
     `Event moment: ${item.title}. ${item.brief}`,
     `Source post facts to interpret visually: ${postText}. Do not copy or paste this caption into the design.`,
     `Creative direction: ${args.direction}.`,
+    templateDirective,
     args.sourceImages?.length
       ? `Use all ${args.sourceImages.length} supplied reference images as editorial visual sources and integrate them into one creative composition. Treat every depicted person as identity-critical: preserve their exact facial identity and features, skin tone, apparent age, body proportions, hairstyle, clothing, uniforms, accessories, and overall appearance. Do not beautify, restyle, swap, invent, alter, or regenerate their face, body, clothes, or identity. Do not turn the people into illustrations, avatars, or lookalikes. Keep them recognizably faithful while designing the surrounding composition creatively.`
       : 'No reference image was supplied. Make Jeddah unmistakable and authentic through the Red Sea waterfront, people, event details, science, or a real verified landmark only. Never use a generic foreign city, invented tower, fictional venue, or imaginary cityscape.',
@@ -105,7 +111,7 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
     args.note?.trim() ? `Additional creative direction: ${args.note.trim()}` : '',
     'Avoid flags, weapons, radiation-danger symbols, danger imagery, explosions, political messaging, military content, invented buildings, and invented claims.',
   ].filter(Boolean).join('\n\n')
-  const { b64 } = await generateImageWithOpenAI(prompt, args.sourceImages ?? [], { safetyFallbackPrompt })
+  const { b64 } = await generateImageWithOpenAI(prompt, args.sourceImages ?? [], { quality: 'high', safetyFallbackPrompt })
   const poster = await resizeToPoster(Buffer.from(b64, 'base64'))
   const response = await fetch(brand.first1saudi_logo_url)
   if (!response.ok) throw new Error('تعذّر تحميل شعار أول سعودي من إعدادات الهوية')
