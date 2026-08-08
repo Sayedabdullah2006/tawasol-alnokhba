@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
     for (let index = 0; index < row.campaign_posts.length; index += 1) {
       const post = row.campaign_posts[index] as Record<string, any>
-      const requestedDate = proposedDates && typeof proposedDates === 'object' && typeof proposedDates[index] === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(proposedDates[index])
+      const requestedDate = proposedDates && typeof proposedDates === 'object' && typeof proposedDates[index] === 'string' && /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2})?$/.test(proposedDates[index])
         ? proposedDates[index]
         : (typeof post.preferred_date === 'string' ? post.preferred_date : null)
       const studio = aiPosts[index] ?? {}

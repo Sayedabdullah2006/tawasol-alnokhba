@@ -123,7 +123,7 @@ export default function PostReviewStatus({ request, onEdit }: Props) {
 
               {isCampaign && (
                 <p className="text-[11px] text-muted">
-                  📅 الموعد المتوقع: <span className="font-bold text-dark">{r.proposed_date ? new Date(`${r.proposed_date}T12:00:00`).toLocaleDateString('ar-SA') : 'لم يُحدد'}</span>
+                  📅 الموعد المتوقع: <span className="font-bold text-dark">{r.proposed_date ? new Date(`${r.proposed_date.includes('T') ? r.proposed_date : `${r.proposed_date}T12:00`}:00+03:00`).toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: r.proposed_date.includes('T') ? 'short' : undefined }) : 'لم يُحدد'}</span>
                 </p>
               )}
 

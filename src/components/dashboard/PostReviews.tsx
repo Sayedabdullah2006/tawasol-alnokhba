@@ -161,13 +161,13 @@ export default function PostReviews({ request }: Props) {
                 <label className="block font-bold text-dark text-xs mb-1">موعد النشر المتوقع</label>
                 {isReview ? (
                   <input
-                    type="date"
+                    type="datetime-local"
                     value={proposedDates[item.index] ?? r.proposed_date ?? ''}
                     onChange={event => setProposedDates(prev => ({ ...prev, [item.index]: event.target.value }))}
                     className="w-full max-w-xs px-3 py-2 rounded-lg border border-border bg-white text-sm"
                   />
                 ) : (
-                  <p className="text-sm text-muted">{r.proposed_date ? new Date(`${r.proposed_date}T12:00:00`).toLocaleDateString('ar-SA') : 'لم يُحدد'}</p>
+                  <p className="text-sm text-muted">{r.proposed_date ? new Date(`${r.proposed_date.includes('T') ? r.proposed_date : `${r.proposed_date}T12:00`}:00+03:00`).toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: r.proposed_date.includes('T') ? 'short' : undefined }) : 'لم يُحدد'}</p>
                 )}
                 {isReview && <p className="text-[11px] text-muted mt-1">يمكنك تغيير الموعد المقترح، ويصل التعديل للإدارة مع اعتماد المنشور.</p>}
               </div>
