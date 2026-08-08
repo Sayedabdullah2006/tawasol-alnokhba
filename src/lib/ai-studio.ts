@@ -255,6 +255,17 @@ function textList(value: unknown, limit: number, maxLength: number): string[] {
     : []
 }
 
+/** يستبعد لغة التحليل الداخلية كي لا تُطبع على التصميم كأنها جزء من الخبر. */
+function finalPrintCopy(value: unknown, maxLength: number): string {
+  const source = textValue(value, maxLength)
+  if (!source) return ''
+  return source
+    .replace(/^(?:الخبر\s*(?:الحالي|المذكور)?\s*)?(?:يذكر|يتحدث\s*عن|يتناول|يركز\s*على|يستعرض|يشير\s*إلى|يوضح|يسلط\s*الضوء\s*على)\s*[:،-]?\s*/i, '')
+    .replace(/^(?:هذا\s*(?:الخبر|المحتوى)|المحتوى)\s*(?:يتحدث\s*عن|يتناول|يستعرض|يركز\s*على)\s*[:،-]?\s*/i, '')
+    .replace(/^(?:في\s*الخبر\s*(?:الحالي|المذكور))\s*[:،-]?\s*/i, '')
+    .trim()
+}
+
 /**
  * موجّه صورة قصير يُنشأ لحظة التوليد؛ لا يعيد إدخال برومبتات تاريخية مطوّلة
  * قد تطلب تعديل وجه أو هوية الشخص فتتوقف عند فحص أمان الصور.
@@ -271,21 +282,28 @@ export function buildCompactImagePrompt(args: {
   const record = args.analysis && typeof args.analysis === 'object'
     ? args.analysis as Record<string, unknown>
     : {}
-  const name = textValue(record.name, 160)
-  const achievement = textValue(record.achievement_core, 360)
-  const label = textValue(record.context_label, 120)
+  const name = finalPrintCopy(record.name, 160)
+  const achievement = finalPrintCopy(record.achievement_core, 360)
+  const label = finalPrintCopy(record.context_label, 120)
   const facts = [...textList(record.key_facts, 3, 220), ...textList(record.awards, 1, 220)]
+    .map(fact => finalPrintCopy(fact, 220))
+    .filter(Boolean)
   const direction = textValue(args.chosenConcept, 1100)
   const note = textValue(args.note, 500)
   const extra = textValue(args.extra, 500)
-  const content = [name, achievement, ...facts].filter(Boolean).map(item => `"${item}"`).join(' | ')
+  const displayContent = [
+    name ? `NAME: "${name}"` : '',
+    achievement ? `HEADLINE: "${achievement}"` : '',
+    ...facts.map(fact => `FACT: "${fact}"`),
+  ].filter(Boolean).join(' | ')
 
   return [
     'Create a premium 4:5 Arabic editorial social-media poster for First1Saudi.',
     'Use each supplied reference image as an intact documentary photograph. Do not redraw, replace, alter, or synthesize people, clothing, faces, or poses. Build the composition around the real photographs.',
     `Creative direction: ${direction || 'A distinctive, modern Arabic editorial infographic with a strong visual hierarchy.'}`,
     label ? `Small context label: "${label}".` : '',
-    `Use only these verified Arabic content elements: ${content || 'A concise Arabic headline and up to three verified factual callouts.'}`,
+    `FINAL PRINT-READY ARABIC COPY ONLY: ${displayContent || 'A concise Arabic headline and up to three verified factual callouts.'}`,
+    'Render the quoted Arabic as finished news copy: direct, human, clear, and declarative. Never print internal narration or meta-language such as "الخبر الحالي", "يذكر الخبر", "يتحدث عن", "هذا المحتوى", "يوضح الخبر", "الصورة المرفقة", or any equivalent description of the source.',
     'Use strict right-to-left Arabic hierarchy, one concise headline, and no more than three short callouts. Do not copy a long caption, invent facts, or add photo descriptions.',
     'Use deep teal, Saudi green, turquoise, restrained gold, and white. Keep the artwork full-bleed, with no white logo panel or empty logo frame.',
     'Add a compact footer with equal, recognizable icons for X, Instagram, LinkedIn, Facebook, and TikTok followed by @First1Saudi. Do not draw a brand logo; it is overlaid after generation.',
