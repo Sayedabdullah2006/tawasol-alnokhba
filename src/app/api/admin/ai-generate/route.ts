@@ -91,6 +91,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'منشور الحملة غير موجود' }, { status: 404 })
     }
     newsText = `العنوان: ${post.title ?? ''}\nالمحتوى: ${post.content ?? ''}`
+    if (typeof reqRow.client_name === 'string' && reqRow.client_name.trim()) {
+      newsText += `\n\nاسم صاحب الإنجاز (معلومة موثقة من الطلب، استخدمه حرفياً في حقل name ولا تُسقطه): ${reqRow.client_name.trim()}`
+    }
     priorAnalysis = reqRow.ai_posts?.[postIndex as number]?.analysis ?? null
   } else {
     newsText = `العنوان: ${reqRow.title ?? ''}\nالمحتوى: ${reqRow.content ?? ''}`

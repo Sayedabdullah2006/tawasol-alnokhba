@@ -628,9 +628,14 @@ export default function AIStudioPanel({
         )}
       </div>
 
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
       {/* ── الخطوة 1 — تحليل الخبر ── */}
-      <div className={cardCls}>
-        <StepHead n={1} title="تحليل الخبر" subtitle="استخراج عناصر الخبر لبناء المحتوى" done={!!analysis} />
+      <details className="group bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+        <summary className="list-none cursor-pointer p-4 flex items-center gap-2 hover:bg-cream/40">
+          <div className="flex-1"><StepHead n={1} title="تحليل الخبر" subtitle="استخراج عناصر الخبر لبناء المحتوى" done={!!analysis} /></div>
+          <span className="w-7 h-7 rounded-full border border-green/30 text-green flex items-center justify-center font-bold group-open:rotate-45 transition-transform">+</span>
+        </summary>
+        <div className="border-t border-border p-4 space-y-3">
         <Button
           onClick={() => callStep('analyze')}
           loading={loadingStep === 'analyze'}
@@ -647,11 +652,16 @@ export default function AIStudioPanel({
             {JSON.stringify(analysis, null, 2)}
           </pre>
         )}
-      </div>
+        </div>
+      </details>
 
       {/* ── الخطوة 2 — التغريدات ── */}
-      <div className={cardCls}>
-        <StepHead n={2} title="التغريدات" subtitle="٣ تغريدات بزوايا ومطالع متنوّعة" done={!!tweets} />
+      <details className="group bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+        <summary className="list-none cursor-pointer p-4 flex items-center gap-2 hover:bg-cream/40">
+          <div className="flex-1"><StepHead n={2} title="التغريدات" subtitle="٣ تغريدات بزوايا ومطالع متنوّعة" done={!!tweets} /></div>
+          <span className="w-7 h-7 rounded-full border border-green/30 text-green flex items-center justify-center font-bold group-open:rotate-45 transition-transform">+</span>
+        </summary>
+        <div className="border-t border-border p-4 space-y-3">
         <Button
           onClick={() => callStep('tweets')}
           loading={loadingStep === 'tweets'}
@@ -678,11 +688,16 @@ export default function AIStudioPanel({
             />
           </div>
         )}
-      </div>
+        </div>
+      </details>
 
       {/* ── الخطوة 3 — اتجاهات التصميم ── */}
-      <div className={cardCls}>
-        <StepHead n={3} title="اتجاهات التصميم" subtitle="٣ اتجاهات مختلفة بناءً على الخبر والصورة" done={conceptItems.length > 0} />
+      <details className="group bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+        <summary className="list-none cursor-pointer p-4 flex items-center gap-2 hover:bg-cream/40">
+          <div className="flex-1"><StepHead n={3} title="اتجاهات التصميم" subtitle="٣ اتجاهات مختلفة بناءً على الخبر والصورة" done={conceptItems.length > 0} /></div>
+          <span className="w-7 h-7 rounded-full border border-green/30 text-green flex items-center justify-center font-bold group-open:rotate-45 transition-transform">+</span>
+        </summary>
+        <div className="border-t border-border p-4 space-y-3">
         <Button
           onClick={() => callStep('concepts')}
           loading={loadingStep === 'concepts'}
@@ -731,6 +746,8 @@ export default function AIStudioPanel({
           placeholder="اضغط «اعتمد للمفرد» على أحد الاتجاهات أعلاه، أو اكتب اتجاهاً يدوياً."
           className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[80px] resize-y"
         />
+        </div>
+      </details>
       </div>
 
       {/* ── الخطوة 4 — توليد التصميم ── */}
