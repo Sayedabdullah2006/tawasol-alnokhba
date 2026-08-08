@@ -30,11 +30,10 @@ export default function CampaignReviewSender({ request, onSent }: { request: any
       .then(data => {
         if (!alive || !Array.isArray(data.slots)) return
         setSuggestions(data.slots)
-        setDates(previous => {
-          const next = { ...previous }
-          data.slots.forEach((slot: { value: string }, index: number) => { if (!next[index]) next[index] = slot.value })
-          return next
-        })
+        // نبدأ دائماً من اقتراحات التقويم الحية، لا من تواريخ الطلب القديمة
+        // (التي قد تكون متطابقة أو أصبحت في الماضي). بعد ظهورها يظل للأدمن
+        // كامل الحرية في تعديل أي موعد قبل فتح مراجعة الإرسال.
+        setDates(Object.fromEntries(data.slots.map((slot: { value: string }, index: number) => [index, slot.value])))
       })
       .finally(() => { if (alive) setLoadingSuggestions(false) })
     return () => { alive = false }
