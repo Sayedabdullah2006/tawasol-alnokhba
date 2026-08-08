@@ -63,6 +63,6 @@ export async function selectEditorialTemplate(args: { sourceImageUrls: string[];
   return [
     `EDITORIAL TEMPLATE PREFLIGHT — selected template: ${template.label} (${template.id}).`,
     template.direction,
-    'REFERENCE PHOTO LOCK — the supplied image is an authentic source photograph, not inspiration for a new generated portrait. Keep every depicted person recognizably identical: exact face, expression, apparent age, body proportions, pose, hands, hair or veil, clothing, accessories, and camera viewpoint. Do not beautify, stylize, redraw, replace, merge, invent, or alter any person or the real setting. Integrate the original photo organically into the selected template; let the design adapt to the photo, never force the photo to change for the design.',
+    'REFERENCE PHOTO LOCK — treat the supplied image as an authentic editorial photograph, not inspiration for a new portrait. Preserve the real people, clothing, pose, and setting faithfully. Integrate it naturally into the selected template; let the layout adapt to the photograph, never force the photograph to change for the layout.',
   ].join('\n')
 }
