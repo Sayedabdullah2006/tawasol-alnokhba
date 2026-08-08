@@ -83,7 +83,7 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
     `Creative direction: ${args.direction}.`,
     templateDirective,
     args.sourceImages?.length
-      ? `Use all ${args.sourceImages.length} supplied reference images as editorial visual sources and integrate them into one creative composition. Treat every depicted person as identity-critical: preserve their exact facial identity and features, skin tone, apparent age, body proportions, hairstyle, clothing, uniforms, accessories, and overall appearance. Do not beautify, restyle, swap, invent, alter, or regenerate their face, body, clothes, or identity. Do not turn the people into illustrations, avatars, or lookalikes. Keep them recognizably faithful while designing the surrounding composition creatively.`
+      ? `Use all ${args.sourceImages.length} supplied reference images as intact documentary photographs in one creative composition. Do not redraw, restyle, replace, or synthesize people; retain each photo's real pose, clothing, and scene while designing the surrounding layout creatively.`
       : 'No reference image was supplied. Make Jeddah unmistakable and authentic through the Red Sea waterfront, people, event details, science, or a real verified landmark only. Never use a generic foreign city, invented tower, fictional venue, or imaginary cityscape.',
     args.hasVideo
       ? args.videoOrientation === 'portrait'
@@ -103,7 +103,7 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
     `Interpret these source-post facts visually: ${postText.slice(0, 3500)}.`,
     `Mandatory creative direction: ${args.direction}.`,
     args.sourceImages?.length
-      ? 'Use every supplied reference image and preserve all people exactly in face, identity, body, clothing, apparent age, and accessories. Integrate them creatively; do not make a plain portrait.'
+      ? 'Use every supplied reference image as an intact documentary photograph. Integrate the photos creatively without redrawing, replacing, or restyling people.'
       : 'Use only authentic Jeddah context or abstract scientific elements. Omit any architecture whose authenticity is uncertain.',
     'Use one concise Arabic headline and 2 to 4 short factual callouts in strict right-to-left hierarchy. Do not copy the whole caption.',
     'Add a compact First1Saudi social footer with X, Instagram, LinkedIn, Facebook, and TikTok icons and the exact handle @First1Saudi. Do not draw logos or hashtags; they are overlaid after generation. Full-bleed artwork only, with no white panel or logo frame.',

@@ -18,15 +18,14 @@ import { selectEditorialTemplate } from './editorial-template-selector'
 export const OPENAI_MODEL = 'gpt-5.5'
 
 /**
- * قفل الوجه — تعليمة قصوى تُحاط بموجّه صورة OpenAI لتقليل إعادة رسمه للوجه.
- * مكتوبة بالعربية والإنجليزية لأقصى التزام من النموذج.
+ * قفل الصورة المرجعية — تعليمة تحفظ اللقطة الأصلية داخل التكوين التحريري.
+ * مكتوبة بالعربية والإنجليزية كي يتكيّف القالب مع الصورة بدلاً من إعادة رسمها.
  */
 export const FACE_LOCK =
-  'IDENTITY PRESERVATION RULE: use the attached photo as the real identity reference. ' +
-  'Preserve the subject/person recognizably: same identity, age, face structure, skin tone, expression, hair/veil, and key clothing cues. ' +
-  'Do not invent, swap, beautify into, age, slim, or replace the person with a different-looking person. ' +
-  'Creative poster composition is allowed: crop, reframe, extend the background, add depth, editorial lighting, graphic layers, and bold typography while keeping the face/identity faithful. ' +
-  'بالعربية: حافظ على هوية الشخص وملامحه بوضوح من الصورة المرجعية، لكن اسمح بتكوين بوستر إبداعي حوله دون استبداله أو تغيير هويته.'
+  'REFERENCE PHOTO RULE: treat each attached photo as an intact documentary photograph. ' +
+  'Keep any person, clothing, pose, and scene from the supplied photograph unchanged; do not redraw, restyle, replace, or synthesize a person. ' +
+  'Build the editorial layout around the photo using its natural crop and negative space. ' +
+  'بالعربية: استخدم الصورة المرجعية كما هي كلقطة وثائقية حقيقية، ولا تعِد رسم الشخص أو تغيّر ملامحه أو ملابسه أو وضعيته؛ ابنِ التصميم حولها.'
 
 /**
  * توجيه تخطيط الفيديو — يُلحق فقط عند تفعيل "الخبر يتضمّن فيديو" في الاستوديو.
@@ -274,7 +273,7 @@ export function buildStudioSafetyFallbackPrompt(args: { analysis: unknown; chose
     `Use only these verified news facts: ${facts}`,
     `The selected creative direction is mandatory: ${args.chosenConcept.slice(0, 2600)}`,
     'Make that direction clearly visible through the composition, visual metaphor, palette, and hierarchy. Do not reduce the result to a portrait with a logo.',
-    'If reference photos are supplied, integrate them naturally and preserve every depicted person exactly: face, identity, apparent age, body, clothing, hairstyle, and accessories. Do not turn people into illustrations or lookalikes.',
+    'If reference photos are supplied, keep them as intact documentary photographs and build the layout around them. Do not redraw people or turn them into illustrations.',
     'Turn the facts into a clear Arabic infographic: one concise Arabic headline and up to three short factual callouts. Do not copy the caption or use paragraphs.',
     'Use a strict right-to-left Arabic hierarchy with accurate connected Arabic. Add a compact social footer with the recognizable icons for X, Instagram, LinkedIn, Facebook, and TikTok, followed by @First1Saudi.',
     'Do not draw a First1Saudi logo; it is overlaid after generation. Keep the artwork full-bleed with no white panel, frame, or empty logo box.',
@@ -329,7 +328,7 @@ export async function generateDesign(
     templateDirective,
   ].filter(Boolean).join('\n\n')
 
-  // قفل الوجه: يُحاط به موجّه الصورة من الطرفين (بداية ونهاية) لتقليل إعادة رسم الوجه.
+  // قفل الصورة: يُحاط به موجّه الصورة من الطرفين حتى يبني النموذج القالب حول اللقطة الحقيقية.
   // عند وجود فيديو: نُلحق توجيه تخطيط الفيديو في النهاية (أولوية قصوى).
   const imagePrompt = hasVideo
     ? `${FACE_LOCK}\n\n${designPrompt}\n\n${videoLayoutFor(videoOrientation)}\n\n${FACE_LOCK}`

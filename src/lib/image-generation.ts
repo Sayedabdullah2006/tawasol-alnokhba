@@ -127,10 +127,10 @@ const SAFE_EDITORIAL_FALLBACK_PROMPT = [
 ].join(' ')
 
 const SAFE_EDITORIAL_REFERENCE_FALLBACK_PROMPT = [
-  'Create a polished vertical 4:5 editorial social-media graphic about learning, scientific curiosity, global collaboration, and achievement.',
-  'Use the supplied reference image as an authentic editorial photo integrated naturally into the composition. Preserve every depicted person faithfully: do not alter their face, identity, body, clothing, or apparent age.',
-  'Use an abstract deep teal and turquoise scientific setting with restrained gold accents, a concise Arabic headline, and no more than two short factual callouts. Add a compact footer with the recognizable icons for X, Instagram, LinkedIn, Facebook, and TikTok, followed by the exact handle @First1Saudi.',
-  'Do not add logos, brand names, flags, weapons, dangerous materials, medical imagery, politics, military content, or violence.',
+  'Create a polished vertical 4:5 editorial social-media graphic about learning, innovation, and achievement.',
+  'Keep the supplied image as one intact documentary photograph. Do not redraw or transform people; place the editorial typography and graphics only around the photo.',
+  'Use a refined deep teal, turquoise, and restrained gold editorial treatment. Use very little Arabic text and a compact social footer with X, Instagram, LinkedIn, Facebook, and TikTok plus @First1Saudi.',
+  'Keep the artwork full-bleed and neutral, with no logos, flags, weapons, danger symbols, politics, military content, or violence.',
 ].join(' ')
 
 export function imageGenerationErrorMessage(error: unknown): string {
