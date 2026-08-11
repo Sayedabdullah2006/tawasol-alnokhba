@@ -12,6 +12,9 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     const { requestId, feedback } = body
+    const referenceImages = Array.isArray(body.referenceImages)
+      ? body.referenceImages.filter((url: unknown): url is string => typeof url === 'string' && /^https:\/\//.test(url)).slice(0, 5)
+      : []
 
     // Validate input data
     try {
@@ -62,7 +65,7 @@ export async function POST(request: Request) {
 
     // ⚡ إعادة توليد التصاميم تلقائياً بملاحظة العميل في الخلفية (تُبقي القديمة + تضيف المعدّلة)
     void import('@/lib/auto-revise')
-      .then(m => m.autoReviseFromFeedback({ requestId, postIndex: null, feedback: feedback.trim() }))
+      .then(m => m.autoReviseFromFeedback({ requestId, postIndex: null, feedback: feedback.trim(), referenceImages }))
       .catch(e => console.error('[CONTENT_CHANGES] auto-revise trigger failed:', e))
 
     // Send notification email to admin

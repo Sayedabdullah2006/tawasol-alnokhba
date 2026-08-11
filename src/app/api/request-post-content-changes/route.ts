@@ -17,6 +17,9 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     const { requestId, feedback } = body
+    const referenceImages = Array.isArray(body.referenceImages)
+      ? body.referenceImages.filter((url: unknown): url is string => typeof url === 'string' && /^https:\/\//.test(url)).slice(0, 5)
+      : []
     const postIndex = Number(body.postIndex)
 
     try {
@@ -58,13 +61,14 @@ export async function POST(request: Request) {
 
     // أرفق ملاحظة العميل بآخر جولة في السجل (هيستوري التصاميم + الملاحظات)
     const history: any[] = Array.isArray(entry.history) ? [...entry.history] : []
-    if (history.length) history[history.length - 1] = { ...history[history.length - 1], feedback: feedback.trim(), feedback_at: new Date().toISOString() }
+    if (history.length) history[history.length - 1] = { ...history[history.length - 1], feedback: feedback.trim(), feedback_at: new Date().toISOString(), reference_images: referenceImages }
 
     reviews[postIndex] = {
       ...entry,
       status: 'changes_requested',
       user_feedback: feedback.trim(),
       feedback_sent_at: new Date().toISOString(),
+      reference_images: referenceImages,
       history,
     }
 
@@ -84,7 +88,7 @@ export async function POST(request: Request) {
 
     // ⚡ إعادة توليد التصاميم تلقائياً بملاحظة العميل في الخلفية (تُبقي القديمة + تضيف المعدّلة)
     void import('@/lib/auto-revise')
-      .then(m => m.autoReviseFromFeedback({ requestId, postIndex, feedback: feedback.trim() }))
+      .then(m => m.autoReviseFromFeedback({ requestId, postIndex, feedback: feedback.trim(), referenceImages }))
       .catch(e => console.error('[POST_CHANGES] auto-revise trigger failed:', e))
 
     const requestNumber = `ATH-${String(existingRequest.request_number).padStart(4, '0')}`

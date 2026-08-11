@@ -14,6 +14,7 @@ import PostReviews from '@/components/dashboard/PostReviews'
 import RequestInfoEditor from '@/components/dashboard/RequestInfoEditor'
 import RequestManageActions from '@/components/dashboard/RequestManageActions'
 import CampaignPostStatusList from '@/components/dashboard/CampaignPostStatusList'
+import ContentImagesUploader from '@/components/request/ContentImagesUploader'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useToast } from '@/components/ui/Toast'
@@ -27,6 +28,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
   const [influencer, setInfluencer] = useState<any>(null)
   const [providingFeedback, setProvidingFeedback] = useState(false)
   const [feedback, setFeedback] = useState('')
+  const [feedbackReferenceImages, setFeedbackReferenceImages] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -89,7 +91,8 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requestId: request.id,
-          feedback: feedback.trim()
+          feedback: feedback.trim(),
+          referenceImages: feedbackReferenceImages,
         }),
       })
 
@@ -97,6 +100,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
         showToast('تم إرسال ملاحظاتك للإدارة')
         setProvidingFeedback(false)
         setFeedback('')
+        setFeedbackReferenceImages([])
         // Reload to get updated status
         window.location.reload()
       } else {
@@ -407,12 +411,22 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
                     <span className="text-xs text-muted">الحد الأقصى 500 حرف</span>
                     <span className="text-xs text-muted">{feedback.length}/500</span>
                   </div>
+                  <div className="mb-4 rounded-lg border border-teal-100 bg-teal-50/70 p-3">
+                    <p className="mb-1 text-sm font-bold text-dark">صور مرجعية للتعديل (اختياري)</p>
+                    <p className="mb-3 text-xs leading-5 text-muted">إذا رغبت في تضمين أو استبدال صورة، ارفعها بدقة عالية قدر الإمكان. ستُؤخذ الصور وملاحظتك معاً في الاعتبار قبل إعادة توليد التصميم.</p>
+                    <ContentImagesUploader
+                      images={feedbackReferenceImages}
+                      onChange={setFeedbackReferenceImages}
+                      maxImages={5}
+                    />
+                  </div>
                   <div className="flex gap-2">
                     <Button
                       variant="ghost"
                       onClick={() => {
                         setProvidingFeedback(false)
                         setFeedback('')
+                        setFeedbackReferenceImages([])
                       }}
                       className="flex-1"
                     >

@@ -165,6 +165,14 @@ export default function PostReviewStatus({ request, onEdit }: Props) {
                   <p className="text-[11px] font-bold text-yellow-700 mb-0.5">ملاحظات العميل:</p>
                   <p className="text-xs text-yellow-700 whitespace-pre-line">{r.user_feedback}</p>
                   <p className="text-[11px] text-muted mt-1">عدّل المحتوى/الصور وأعد الإرسال، أو أعد التوليد من الاستوديو.</p>
+                  {Array.isArray(r.reference_images) && r.reference_images.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-[11px] font-bold text-yellow-700 mb-1">صور العميل المرجعية ({r.reference_images.length}):</p>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {r.reference_images.map((image: string, imageIndex: number) => <button key={imageIndex} type="button" onClick={() => setLightbox(image)} className="aspect-square overflow-hidden rounded border border-yellow-200"><img src={image} alt={`مرجع العميل ${imageIndex + 1}`} className="w-full h-full object-cover" /></button>)}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

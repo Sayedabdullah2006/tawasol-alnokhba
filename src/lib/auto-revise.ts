@@ -23,9 +23,10 @@ function normalizeDesigns(v: unknown): DesignEntry[] {
 }
 
 /** ينفّذ التعديل الدقيق بالملاحظة على كل تصميم مُرسل. آمن للاستدعاء fire-and-forget. */
-export async function autoReviseFromFeedback(args: { requestId: string; postIndex?: number | null; feedback: string }): Promise<void> {
+export async function autoReviseFromFeedback(args: { requestId: string; postIndex?: number | null; feedback: string; referenceImages?: string[] }): Promise<void> {
   const { requestId } = args
   const feedback = (args.feedback || '').trim()
+  const referenceImages = Array.isArray(args.referenceImages) ? args.referenceImages.filter(Boolean).slice(0, 5) : []
   if (!feedback) return
   const isPost = typeof args.postIndex === 'number' && args.postIndex >= 0
   const postIndex = args.postIndex as number
@@ -58,13 +59,13 @@ export async function autoReviseFromFeedback(args: { requestId: string; postInde
     const revised: DesignEntry[] = []
     for (const d of baseDesigns) {
       try {
-        const { imageUrl } = await editDesign({ designImageUrl: d.imageUrl as string, note: feedback })
+        const { imageUrl } = await editDesign({ designImageUrl: d.imageUrl as string, note: feedback, referenceImageUrls: referenceImages })
         revised.push({ title: `🔁 معدّل: ${d.title ?? 'تصميم'}`, imageUrl })
       } catch { /* تجاهل فشل تصميم واحد */ }
     }
     if (!revised.length) return
 
-    const payload = { feedback, at: new Date().toISOString(), designs: revised }
+    const payload = { feedback, reference_images: referenceImages, at: new Date().toISOString(), designs: revised }
     if (isPost) {
       const aiPosts: Record<string, any> = req.ai_posts && typeof req.ai_posts === 'object' ? { ...(req.ai_posts as any) } : {}
       aiPosts[postIndex] = { ...(aiPosts[postIndex] ?? {}), revised: payload }

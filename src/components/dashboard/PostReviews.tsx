@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
 import ImageLightbox from '@/components/ui/ImageLightbox'
+import ContentImagesUploader from '@/components/request/ContentImagesUploader'
 import { getReviewItems, getPostReviews } from '@/lib/review-items'
 
 interface Props {
@@ -25,6 +26,7 @@ export default function PostReviews({ request }: Props) {
   const [proposedDates, setProposedDates] = useState<Record<number, string>>({})
   const [feedbackOpen, setFeedbackOpen] = useState<Record<number, boolean>>({})
   const [feedback, setFeedback] = useState<Record<number, string>>({})
+  const [referenceImages, setReferenceImages] = useState<Record<number, string[]>>({})
   const [busy, setBusy] = useState<number | null>(null)
   const [lightbox, setLightbox] = useState<string | null>(null)
 
@@ -76,7 +78,7 @@ export default function PostReviews({ request }: Props) {
       const res = await fetch('/api/request-post-content-changes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId: request.id, postIndex: index, feedback: fb }),
+        body: JSON.stringify({ requestId: request.id, postIndex: index, feedback: fb, referenceImages: referenceImages[index] ?? [] }),
       })
       if (res.ok) {
         showToast('تم إرسال ملاحظاتك للإدارة')
@@ -229,6 +231,11 @@ export default function PostReviews({ request }: Props) {
                 <h4 className="font-bold text-yellow-700 text-xs mb-1">ملاحظاتك المُرسلة:</h4>
                 <p className="text-sm text-yellow-700 whitespace-pre-line">{r.user_feedback}</p>
                 <p className="text-xs text-muted mt-1">بانتظار تعديل الإدارة وإعادة الإرسال.</p>
+                {Array.isArray(r.reference_images) && r.reference_images.length > 0 && (
+                  <div className="mt-2 grid grid-cols-4 gap-1.5">
+                    {r.reference_images.map((image, imageIndex) => <button key={imageIndex} type="button" onClick={() => setLightbox(image)} className="aspect-square overflow-hidden rounded-lg border border-border"><img src={image} alt={`صورة مرجعية ${imageIndex + 1}`} className="w-full h-full object-cover" /></button>)}
+                  </div>
+                )}
               </div>
             )}
 
@@ -268,10 +275,15 @@ export default function PostReviews({ request }: Props) {
                     className="w-full px-3 py-2 rounded-lg border border-border text-sm min-h-[90px] resize-y"
                     maxLength={500}
                   />
+                  <div className="rounded-lg border border-purple-200 bg-purple-50/50 p-2.5">
+                    <p className="text-[11px] font-bold text-purple-800">صور مرجعية للتعديل (اختياري)</p>
+                    <p className="text-[11px] text-purple-700 mt-0.5">إذا رغبت في تضمين أو استبدال صورة، ارفعها هنا بدقة عالية قدر الإمكان. ستُؤخذ الصور والملاحظة معاً في الاعتبار قبل إعادة التوليد.</p>
+                    <div className="mt-2"><ContentImagesUploader images={referenceImages[item.index] ?? []} onChange={images => setReferenceImages(prev => ({ ...prev, [item.index]: images }))} maxImages={5} /></div>
+                  </div>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <Button
                       variant="ghost"
-                      onClick={() => { setFeedbackOpen(prev => ({ ...prev, [item.index]: false })); setFeedback(prev => ({ ...prev, [item.index]: '' })) }}
+                      onClick={() => { setFeedbackOpen(prev => ({ ...prev, [item.index]: false })); setFeedback(prev => ({ ...prev, [item.index]: '' })); setReferenceImages(prev => ({ ...prev, [item.index]: [] })) }}
                       className="flex-1"
                       size="sm"
                     >
