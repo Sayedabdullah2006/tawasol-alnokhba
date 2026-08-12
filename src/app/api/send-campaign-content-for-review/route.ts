@@ -46,9 +46,10 @@ export async function POST(request: Request) {
         : []
       const requestedItem = reviewItems && typeof reviewItems === 'object' ? reviewItems[index] : null
       const content = typeof requestedItem?.content === 'string' ? requestedItem.content.trim() : fallbackContent
+      // لا نستخدم fallback للتصاميم: الإرسال يتطلب قائمة اختيار صريحة من نافذة المراجعة.
       const images = Array.isArray(requestedItem?.images)
         ? requestedItem.images.filter((url: unknown): url is string => typeof url === 'string' && fallbackImages.includes(url))
-        : fallbackImages
+        : []
       if (!content || images.length === 0) {
         return NextResponse.json({ error: `أكمل النص وتصميماً واحداً على الأقل للمنشور ${index + 1} قبل إرسال الحملة.` }, { status: 400 })
       }

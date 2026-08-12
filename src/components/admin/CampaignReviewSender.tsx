@@ -16,8 +16,8 @@ export default function CampaignReviewSender({ request, onSent }: { request: any
   ))
   const [items, setItems] = useState<Record<number, ReviewItem>>(() => Object.fromEntries(posts.map((post: any, index: number) => {
     const studio = request?.ai_posts?.[index] ?? {}
-    const images = Array.isArray(studio?.designs) ? studio.designs.map((design: any) => design?.imageUrl).filter(Boolean) : []
-    return [index, { content: String(studio?.tweets?.raw ?? post?.content ?? ''), images }]
+    // لا نختار أي تصميم تلقائياً: ما يصل للعميل هو ما يحدده الأدمن صراحةً في نافذة المراجعة.
+    return [index, { content: String(studio?.tweets?.raw ?? post?.content ?? ''), images: [] }]
   })))
   const [suggestions, setSuggestions] = useState<Array<{ value: string }>>([])
   const [loadingSuggestions, setLoadingSuggestions] = useState(true)

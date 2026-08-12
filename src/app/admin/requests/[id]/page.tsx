@@ -96,6 +96,7 @@ function renderSubOptionLabel(category: string, raw: string | null | undefined):
 }
 
 type TabKey = 'details' | 'content' | 'actions' | 'log'
+type ContentView = 'studio' | 'review' | 'history'
 
 // ─── الصفحة الرئيسية ──────────────────────────────────────────────
 
@@ -127,6 +128,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   const [deleting, setDeleting] = useState(false)
   const [sendingReminder, setSendingReminder] = useState(false)
   const [activeTab, setActiveTab] = useState<TabKey>('details')
+  const [contentView, setContentView] = useState<ContentView>('studio')
   const [infoMessage, setInfoMessage] = useState('')
   const [requestingInfo, setRequestingInfo] = useState(false)
   // يُبدّل قيمته لإعادة تهيئة محرّر الإرسال بالمحتوى الجديد عند «استخدم هذا التصميم»
@@ -450,7 +452,22 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
         <div className={activeTab === 'content' ? 'space-y-5' : 'hidden'}>
           {request.status === 'in_progress' || request.status === 'completed' || request.status === 'changes_requested' ||
            (request.status === 'content_review' && request.request_type === 'campaign') ? (
-            <>
+           <>
+              <div className="sticky top-0 z-10 -mx-1 border-b border-border bg-cream/95 px-1 pb-3 pt-1 backdrop-blur">
+                <div className="flex gap-2 overflow-x-auto" role="tablist" aria-label="مساحة عمل المحتوى">
+                  {([
+                    ['studio', '✦ الاستديو الداخلي'],
+                    ['review', '👁 مراجعة العميل'],
+                    ['history', '◷ سجل الجولات'],
+                  ] as Array<[ContentView, string]>).map(([key, label]) => (
+                    <button key={key} type="button" onClick={() => setContentView(key)}
+                      className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-bold transition ${contentView === key ? 'border-green bg-green text-white' : 'border-border bg-white text-muted hover:text-dark'}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className={contentView === 'studio' ? 'space-y-5' : 'hidden'}>
               {/* استوديو الذكاء الاصطناعي — متاح في التنفيذ وبعد الاكتمال (لاختيار تصميم المجلة) */}
               <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
                   <Button variant="outline" onClick={() => setShowAIStudio(v => !v)} className="w-full">
@@ -524,6 +541,9 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                 </div>
               )}
 
+              </div>
+
+              <div className={contentView === 'review' ? 'space-y-5' : 'hidden'}>
               {/* إرسال المحتوى — مطالبات الحالة (المسار العام/القديم) */}
               {!sendingContent && (() => {
                 const hasClientFeedback = !!request.user_feedback
@@ -607,6 +627,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                   />
                 </div>
               )}
+              </div>
             </>
           ) : request.status === 'info_requested' ? (
             <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 space-y-2">
@@ -626,19 +647,22 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
           )}
 
           {/* حالة مراجعة العميل لكل خبر + تعديل المحتوى المُرسل قبل الموافقة */}
-          <PostReviewStatus
+          {contentView === 'review' && <PostReviewStatus
             request={request}
+            view="current"
             onEdit={(idx, content, images) => {
               setAiContent(content ?? '')
               setAiImages(Array.isArray(images) ? images : [])
               setAiPostIndex(idx)
-              setShowAIStudio(true) // إظهار الاستوديو لإعادة التوليد مع الحفاظ على الخطوات السابقة
+              setContentView('studio')
+              setShowAIStudio(true)
               setSendingContent(true)
               setSenderNonce(n => n + 1)
               setActiveTab('content')
               focusSender()
             }}
-          />
+          />}
+          {contentView === 'history' && <PostReviewStatus request={request} view="history" />}
         </div>
 
         {/* ════════ تبويب: الإجراءات ════════ */}

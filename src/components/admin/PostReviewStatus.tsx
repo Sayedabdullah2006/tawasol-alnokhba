@@ -7,6 +7,7 @@ import { getReviewItems, getPostReviews } from '@/lib/review-items'
 
 interface Props {
   request: any
+  view?: 'current' | 'history'
   // تعديل المحتوى/الصور المُرسلة لخبر قبل موافقة العميل (يفتح محرّر الإرسال مملوءاً)
   onEdit?: (index: number, content: string, images: string[]) => void
 }
@@ -22,7 +23,7 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
  * (حتى قبل موافقة العميل)، مع ليبل الحالة: مراجعة / معتمد / ملاحظات.
  * عند الاعتماد يُميَّز التصميم المختار؛ وعند الملاحظات تظهر ملاحظات العميل.
  */
-export default function PostReviewStatus({ request, onEdit }: Props) {
+export default function PostReviewStatus({ request, onEdit, view = 'current' }: Props) {
   const items = getReviewItems(request)
   const reviews = getPostReviews(request)
   const [lightbox, setLightbox] = useState<string | null>(null)
@@ -78,6 +79,51 @@ export default function PostReviewStatus({ request, onEdit }: Props) {
   const isCampaign = request?.request_type === 'campaign'
   const approvedCount = items.filter(it => reviews[it.index]?.status === 'approved').length
   const sentCount = items.filter(it => reviews[it.index]).length
+
+  if (view === 'history') {
+    return (
+      <div className="space-y-4" dir="rtl">
+        <div className="flex items-end justify-between gap-3">
+          <div><h3 className="font-bold text-dark">سجل جولات المحتوى والتصاميم</h3><p className="mt-1 text-xs text-muted">كل جولة تمثل لقطة ثابتة لما أُرسل للعميل، مع اختياره وملاحظاته.</p></div>
+          <span className="rounded-full bg-cream px-2.5 py-1 text-xs font-bold text-muted">{sentCount} منشورات</span>
+        </div>
+        {items.map(item => {
+          const review = reviews[item.index]
+          if (!review) return null
+          const rounds: any[] = Array.isArray(review.history) && review.history.length
+            ? review.history
+            : [{ content: review.proposed_content, images: review.proposed_images, feedback: review.user_feedback, approved: review.status === 'approved', selected_image: review.selected_image }]
+          return (
+            <section key={item.index} className="rounded-xl border border-border bg-card p-4">
+              <div className="mb-3 flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-green/10 text-xs font-bold text-green">{item.index + 1}</span><h4 className="min-w-0 flex-1 truncate text-sm font-bold text-dark">{item.title}</h4></div>
+              <div className="space-y-2 border-r-2 border-border pr-3">
+                {[...rounds].reverse().map((round, reverseIndex) => {
+                  const roundNumber = rounds.length - reverseIndex
+                  const roundImages: string[] = Array.isArray(round.images) ? round.images : []
+                  const isLatest = reverseIndex === 0
+                  return (
+                    <details key={roundNumber} open={isLatest} className="rounded-lg border border-border bg-cream/30">
+                      <summary className="flex cursor-pointer list-none items-center gap-2 p-3 text-xs">
+                        <span className="font-bold text-dark">الجولة {roundNumber}</span>
+                        {round.approved ? <span className="rounded-full bg-green/10 px-2 py-0.5 font-bold text-green">معتمدة</span> : round.feedback ? <span className="rounded-full bg-yellow-100 px-2 py-0.5 font-bold text-yellow-700">طلب تعديل</span> : <span className="rounded-full bg-purple-100 px-2 py-0.5 font-bold text-purple-700">أُرسلت للمراجعة</span>}
+                        <span className="mr-auto text-muted">{round.sent_at ? new Date(round.sent_at).toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }) : ''}</span>
+                      </summary>
+                      <div className="space-y-3 border-t border-border p-3">
+                        {round.content && <p className="whitespace-pre-line rounded-lg border border-border bg-white p-3 text-xs leading-6 text-dark">{round.content}</p>}
+                        {roundImages.length > 0 && <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">{roundImages.map((image, index) => <button key={index} type="button" onClick={() => setLightbox(image)} className={`relative aspect-[4/5] overflow-hidden rounded-lg border-2 ${round.selected_image === image ? 'border-green ring-2 ring-green/30' : 'border-border'}`}><img src={image} alt={`تصميم الجولة ${roundNumber}`} className="h-full w-full object-cover" />{round.selected_image === image && <span className="absolute left-1 top-1 rounded-full bg-green px-1.5 py-0.5 text-[10px] font-bold text-white">اختيار العميل</span>}</button>)}</div>}
+                        {(round.text_feedback || round.design_feedback || round.feedback) && <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-2 text-xs text-yellow-800"><p className="font-bold">ملاحظات العميل</p>{round.text_feedback && <p className="mt-1">النص: {round.text_feedback}</p>}{round.design_feedback && <p className="mt-1">التصميم: {round.design_feedback}</p>}{!round.text_feedback && !round.design_feedback && <p className="mt-1 whitespace-pre-line">{round.feedback}</p>}</div>}
+                      </div>
+                    </details>
+                  )
+                })}
+              </div>
+            </section>
+          )
+        })}
+        <ImageLightbox src={lightbox} onClose={() => setLightbox(null)} />
+      </div>
+    )
+  }
 
   return (
     <div className="bg-card rounded-2xl border border-border p-5 space-y-3" dir="rtl">
@@ -177,7 +223,7 @@ export default function PostReviewStatus({ request, onEdit }: Props) {
               )}
 
               {/* 📜 سجل التصاميم المُرسلة عبر الجولات + ملاحظات العميل لكل جولة */}
-              {(() => {
+              {['history'].includes(view) && (() => {
                 const rounds: any[] = Array.isArray(r.history) && r.history.length
                   ? r.history
                   : (images.length ? [{ images, content: r.proposed_content, feedback: r.user_feedback, approved: status === 'approved', selected_image: r.selected_image }] : [])
