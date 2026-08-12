@@ -454,6 +454,13 @@ export default function AdminRequestsPage() {
 
   const quotedCount = requestSummaries.filter(r => r.status === 'quoted').length
   const autoClosedCount = requestSummaries.filter(r => r.status === 'auto_closed').length
+  const quickStatusFilters = [
+    { status: 'in_progress', label: 'قيد التنفيذ', className: 'border-orange-200 bg-orange-50 text-orange-700' },
+    { status: 'pending', label: 'تحت المراجعة', className: 'border-yellow-200 bg-yellow-50 text-yellow-700' },
+    { status: 'payment_review', label: 'بانتظار تحقق الدفع', className: 'border-amber-200 bg-amber-50 text-amber-800' },
+    { status: 'changes_requested', label: 'العميل طلب تعديلات', className: 'border-purple-200 bg-purple-50 text-purple-700' },
+    { status: 'scheduled', label: 'مجدول للنشر', className: 'border-cyan-200 bg-cyan-50 text-cyan-800' },
+  ].map(filter => ({ ...filter, count: requestSummaries.filter(request => request.status === filter.status).length }))
 
   const handleBulkReminder = async () => {
     if (bulkApplyDiscount && (bulkDiscountPct <= 0 || bulkDiscountPct >= 100)) {
@@ -706,6 +713,23 @@ export default function AdminRequestsPage() {
             ⚙️ فلاتر إضافية
             {(userFilter || duplicatesOnly) && <span className="mr-2 rounded-full bg-green px-1.5 py-0.5 text-[10px] text-white">مفعلة</span>}
           </button>
+        </div>
+
+        <div className="mt-3 flex gap-2 overflow-x-auto border-t border-border pt-3" aria-label="فلاتر الإجراءات السريعة">
+          {quickStatusFilters.map(filter => {
+            const active = statusFilter === filter.status
+            return (
+              <button
+                key={filter.status}
+                type="button"
+                onClick={() => { setStatusFilter(active ? '' : filter.status); setCurrentPage(1) }}
+                className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-bold transition-colors ${active ? 'border-dark bg-dark text-white shadow-sm' : `${filter.className} hover:brightness-95`}`}
+                aria-pressed={active}
+              >
+                {filter.label} <span className={`mr-1 rounded-full px-1.5 py-0.5 text-[10px] ${active ? 'bg-white/20 text-white' : 'bg-white/70'}`}>{filter.count}</span>
+              </button>
+            )
+          })}
         </div>
 
         {showAdvancedFilters && (
