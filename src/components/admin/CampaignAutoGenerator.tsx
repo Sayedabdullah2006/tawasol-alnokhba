@@ -26,6 +26,10 @@ export default function CampaignAutoGenerator({ request, onFinished }: { request
   }
 
   const generatePost = async (post: any, postIndex: number) => {
+    const existingDesigns = Array.isArray(request?.ai_posts?.[postIndex]?.designs)
+      ? request.ai_posts[postIndex].designs
+      : []
+    const generationRound = `round-${Date.now()}`
     const sourceResponse = await fetch('/api/admin/campaign-source-images', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requestId: request.id, postIndex }),
     })
@@ -45,17 +49,17 @@ export default function CampaignAutoGenerator({ request, onFinished }: { request
     const concepts = Array.isArray(conceptsResult.concepts) ? conceptsResult.concepts : []
     if (!concepts.length) throw new Error('لم تُقترح اتجاهات تصميم لهذا الخبر')
 
-    const designs: Array<{ title: string; imageUrl: string; brief: string }> = []
+    const designs: Array<{ title: string; imageUrl: string; brief: string; generationRound: string }> = []
     for (let index = 0; index < concepts.length; index += 1) {
       const concept = concepts[index] ?? {}
       setPostState(postIndex, 'running', `توليد التصميم ${index + 1}/${concepts.length}…`)
       const brief = String(concept.brief ?? concept.title ?? '')
       const imageResult = await call({ ...base, step: 'image', chosenConcept: brief })
       if (typeof imageResult.imageUrl === 'string') {
-        designs.push({ title: String(concept.title ?? `اتجاه ${index + 1}`), imageUrl: imageResult.imageUrl, brief })
+        designs.push({ title: String(concept.title ?? `اتجاه ${index + 1}`), imageUrl: imageResult.imageUrl, brief, generationRound })
         await fetch('/api/admin/save-studio-state', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ requestId: request.id, postIndex, designs }),
+          body: JSON.stringify({ requestId: request.id, postIndex, designs: [...existingDesigns, ...designs] }),
         })
       }
     }

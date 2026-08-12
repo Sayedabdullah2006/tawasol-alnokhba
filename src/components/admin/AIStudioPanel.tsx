@@ -14,7 +14,7 @@ interface ConceptItem {
   brief?: string
   imagePrompt?: string
 }
-interface DesignResult { title: string; imageUrl: string; brief: string; preparedPrompt?: string }
+interface DesignResult { title: string; imageUrl: string; brief: string; preparedPrompt?: string; generationRound?: string }
 
 interface Props {
   request: any
@@ -232,9 +232,11 @@ export default function AIStudioPanel({
   // توليد الاتجاهات الثلاثة دفعة واحدة + الاختيار منها للإرسال
   // تُعاد تهيئتها من الحالة المحفوظة (saved.designs) فتبقى بعد إعادة التحميل
   const initialDesigns: DesignResult[] = (saved.designs as any[]).map(
-    (d, i) => ({ title: d.title ?? `تصميم ${i + 1}`, imageUrl: d.imageUrl ?? d.url ?? '', brief: d.brief ?? '', preparedPrompt: d.preparedPrompt })
+    (d, i) => ({ title: d.title ?? `تصميم ${i + 1}`, imageUrl: d.imageUrl ?? d.url ?? '', brief: d.brief ?? '', preparedPrompt: d.preparedPrompt, generationRound: d.generationRound ?? 'legacy' })
   ).filter(d => d.imageUrl)
   const [batchResults, setBatchResults] = useState<DesignResult[]>(initialDesigns)
+  const roundIds = Array.from(new Set(initialDesigns.map(design => design.generationRound ?? 'legacy')))
+  const [activeRound, setActiveRound] = useState<string>(roundIds.at(-1) ?? 'legacy')
   const [batchLoading, setBatchLoading] = useState(false)
   const [batchProgress, setBatchProgress] = useState('')
   const designResultsRef = useRef<HTMLDivElement | null>(null)
@@ -250,6 +252,15 @@ export default function AIStudioPanel({
   const [bulkNote, setBulkNote] = useState('')
   const [bulkBusy, setBulkBusy] = useState(false)
   const [bulkProgress, setBulkProgress] = useState('')
+  const activeRoundResults = batchResults
+    .map((design, index) => ({ design, index }))
+    .filter(({ design }) => (design.generationRound ?? 'legacy') === activeRound)
+  const designRounds = Array.from(new Set(batchResults.map(design => design.generationRound ?? 'legacy')))
+  const beginDesignRound = () => {
+    const roundId = `round-${Date.now()}`
+    setActiveRound(roundId)
+    return roundId
+  }
 
   useEffect(() => {
     if ((autoRunning || batchLoading) && batchResults.length > 0) {
@@ -294,7 +305,7 @@ export default function AIStudioPanel({
         setImagePrompt(data.prompt)
         // أضِف التصميم المفرد إلى القائمة المحفوظة ليبقى بعد إعادة التحميل
         setBatchResults(prev => {
-          const next = [...prev, { title: 'تصميم مفرد', imageUrl: data.imageUrl, brief: chosenConcept, preparedPrompt: chosenPreparedPrompt }]
+          const next = [...prev, { title: 'تصميم مفرد', imageUrl: data.imageUrl, brief: chosenConcept, preparedPrompt: chosenPreparedPrompt, generationRound: activeRound }]
           persistStudioState({ designs: next })
           return next
         })
@@ -362,22 +373,21 @@ export default function AIStudioPanel({
         return
       }
       // 4) توليد تصميم لكل اتجاه
-      setBatchResults([])
-      setSelectedBatch(new Set())
+      const roundId = beginDesignRound()
       const results: DesignResult[] = []
       for (let i = 0; i < concepts.length; i++) {
         setAutoStage(`٤/٤ — توليد التصميم ${i + 1}/${concepts.length}…`)
         const brief = concepts[i].brief ?? concepts[i].title ?? ''
         const url = await generateOneDesign(brief, undefined, concepts[i].imagePrompt)
         if (url) {
-          const result = { title: concepts[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief, preparedPrompt: concepts[i].imagePrompt }
+          const result = { title: concepts[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief, preparedPrompt: concepts[i].imagePrompt, generationRound: roundId }
           results.push(result)
           setBatchResults(prev => {
             const next = [...prev, result]
             persistStudioState({ designs: next })
+            setSelectedBatch(selected => new Set(selected).add(next.length - 1))
             return next
           })
-          setSelectedBatch(prev => new Set(prev).add(results.length - 1))
         }
       }
       if (results.length) showToast(`اكتمل التوليد التلقائي — ${results.length} تصاميم جاهزة`, 'success')
@@ -397,8 +407,7 @@ export default function AIStudioPanel({
       return
     }
     setBatchLoading(true)
-    setBatchResults([])
-    setSelectedBatch(new Set())
+      const roundId = beginDesignRound()
     try {
       const results: DesignResult[] = []
       for (let i = 0; i < conceptItems.length; i++) {
@@ -406,14 +415,14 @@ export default function AIStudioPanel({
         const brief = conceptItems[i].brief ?? conceptItems[i].title ?? ''
         const url = await generateOneDesign(brief, undefined, conceptItems[i].imagePrompt)
         if (url) {
-          const result = { title: conceptItems[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief, preparedPrompt: conceptItems[i].imagePrompt }
+          const result = { title: conceptItems[i].title ?? `اتجاه ${i + 1}`, imageUrl: url, brief, preparedPrompt: conceptItems[i].imagePrompt, generationRound: roundId }
           results.push(result)
           setBatchResults(prev => {
             const next = [...prev, result]
             persistStudioState({ designs: next })
+            setSelectedBatch(selected => new Set(selected).add(next.length - 1))
             return next
           })
-          setSelectedBatch(prev => new Set(prev).add(results.length - 1))
         }
       }
       setNoteByIndex({})
@@ -776,9 +785,18 @@ export default function AIStudioPanel({
               <span>{autoStage}</span>
             </div>
           )}
-          {batchResults.length > 0 && (
+          {activeRoundResults.length > 0 && (
             <div ref={designResultsRef} className="space-y-3">
               <p className="text-xs text-muted">اختر التصاميم لإرسالها للعميل، أو اكتب ملاحظة وأعد توليد أي تصميم:</p>
+              {designRounds.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto border-b border-border pb-2" aria-label="جولات توليد التصاميم">
+                  {designRounds.map((roundId, roundIndex) => {
+                    const count = batchResults.filter(design => (design.generationRound ?? 'legacy') === roundId).length
+                    const generatedRoundNumber = designRounds.filter(id => id !== 'legacy').indexOf(roundId) + 1
+                    return <button key={roundId} type="button" onClick={() => setActiveRound(roundId)} className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-bold transition ${activeRound === roundId ? 'border-green bg-green text-white' : 'border-border bg-white text-dark'}`}>{roundId === 'legacy' ? 'التصاميم السابقة' : `جولة توليد ${generatedRoundNumber}`} <span className="opacity-80">({count})</span></button>
+                  })}
+                </div>
+              )}
               {/* إعادة توليد كل التصاميم بملاحظة واحدة (حذف نص/إضافة نص/تعديل عام) */}
               <div className="rounded-xl border border-green/40 bg-green/5 p-3 space-y-2">
                 <p className="text-[11px] text-muted">✍️ ملاحظة تُطبَّق على كل التصاميم معاً — مثل: احذف نص «كذا»، أضِف «كذا»، أو تعديل عام على التصميم.</p>
@@ -792,7 +810,7 @@ export default function AIStudioPanel({
                 </div>
               </div>
               <div className="space-y-3">
-                {batchResults.map((r, i) => {
+                {activeRoundResults.map(({ design: r, index: i }) => {
                   const on = selectedBatch.has(i)
                   const regenerating = regenIndex === i
                   return (
@@ -869,14 +887,14 @@ export default function AIStudioPanel({
               </div>
               <Button
                 onClick={() => {
-                  const urls = batchResults.filter((_, i) => selectedBatch.has(i)).map(r => r.imageUrl)
+                  const urls = activeRoundResults.filter(({ index }) => selectedBatch.has(index)).map(({ design }) => design.imageUrl)
                   if (!urls.length) { showToast('اختر تصميماً واحداً على الأقل', 'error'); return }
                   onUsedContent(selectedTweet, urls, isPost ? (postIndex as number) : 0)
                 }}
                 variant="secondary"
                 size="sm"
               >
-                إرسال التصاميم المختارة ({selectedBatch.size}) والتغريدة للعميل
+                إرسال التصاميم المختارة ({activeRoundResults.filter(({ index }) => selectedBatch.has(index)).length}) والتغريدة للعميل
               </Button>
             </div>
           )}

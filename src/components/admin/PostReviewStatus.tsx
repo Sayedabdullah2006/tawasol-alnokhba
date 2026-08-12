@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import ImageLightbox from '@/components/ui/ImageLightbox'
 import ScheduleSuggestions from '@/components/admin/ScheduleSuggestions'
+import ContentImagesUploader from '@/components/request/ContentImagesUploader'
 import { getReviewItems, getPostReviews } from '@/lib/review-items'
 
 interface Props {
@@ -36,6 +37,8 @@ export default function PostReviewStatus({ request, onEdit, view = 'current' }: 
   const [historyOpen, setHistoryOpen] = useState<Record<number, boolean>>({})
   const [editTarget, setEditTarget] = useState<string | null>(null)
   const [editNote, setEditNote] = useState('')
+  const [editReferenceImages, setEditReferenceImages] = useState<string[]>([])
+  const [internalDrafts, setInternalDrafts] = useState<Record<string, string>>({})
   const [editBusy, setEditBusy] = useState(false)
   const [regenerating, setRegenerating] = useState<number | null>(null)
 
@@ -46,12 +49,13 @@ export default function PostReviewStatus({ request, onEdit, view = 'current' }: 
     try {
       const res = await fetch('/api/admin/ai-studio/edit-design', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: editTarget, note: editNote }),
+        body: JSON.stringify({ imageUrl: editTarget, note: editNote, referenceImageUrls: editReferenceImages }),
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) { alert(d.error ?? 'فشل التعديل'); return }
       setEditTarget(null); setEditNote('')
-      onEdit?.(index, content, [d.imageUrl]) // يفتح محرّر الإرسال بالتصميم المعدّل للمراجعة والإرسال
+      setInternalDrafts(current => ({ ...current, [editTarget]: d.imageUrl }))
+      setEditReferenceImages([])
     } catch { alert('حدث خطأ أثناء التعديل') } finally { setEditBusy(false) }
   }
 
@@ -257,13 +261,18 @@ export default function PostReviewStatus({ request, onEdit, view = 'current' }: 
                       {revision.designs.map((design: { title?: string; imageUrl?: string }, designIndex: number) => design.imageUrl && (
                         <div key={designIndex} className="flex gap-2 rounded-lg border border-amber-200 bg-white p-2">
                           <button type="button" onClick={() => setLightbox(design.imageUrl!)} className="h-20 w-16 shrink-0 overflow-hidden rounded border border-border"><img src={design.imageUrl} alt={`نتيجة تعديل ${designIndex + 1}`} className="h-full w-full object-cover" /></button>
-                          <div className="min-w-0 flex-1 space-y-1.5"><p className="truncate text-[11px] font-bold text-dark">{design.title ?? `نتيجة التعديل ${designIndex + 1}`}</p><div className="flex flex-wrap gap-1"><button type="button" onClick={() => onEdit?.(item.index, revision.revised_text || r.proposed_content || '', [design.imageUrl!])} className="rounded border border-green bg-green/5 px-2 py-1 text-[10px] font-bold text-green">إرسال للمراجعة</button><button type="button" onClick={() => { setEditTarget(design.imageUrl!); setEditNote('') }} className="rounded border border-border px-2 py-1 text-[10px] font-bold text-dark">تعديل التصميم</button></div></div>
+                          <div className="min-w-0 flex-1 space-y-1.5"><p className="truncate text-[11px] font-bold text-dark">{design.title ?? `نتيجة التعديل ${designIndex + 1}`}</p><div className="flex flex-wrap gap-1"><button type="button" onClick={() => onEdit?.(item.index, revision.revised_text || r.proposed_content || '', [design.imageUrl!])} className="rounded border border-green bg-green/5 px-2 py-1 text-[10px] font-bold text-green">مراجعة قبل الإرسال</button><button type="button" onClick={() => { setEditTarget(design.imageUrl!); setEditNote(''); setEditReferenceImages([]) }} className="rounded border border-border px-2 py-1 text-[10px] font-bold text-dark">تعديل التصميم</button></div></div>
                         </div>
                       ))}
                     </div>
                   ) : <p className="rounded-lg border border-dashed border-amber-300 bg-white p-2 text-[11px] text-amber-900">لا توجد صورة في هذه النتيجة بعد. استخدم «إعادة التوليد» لتطبيق ملاحظة التصميم مرة أخرى.</p>}
-                  {editTarget && revision.designs?.some((design: { imageUrl?: string }) => design.imageUrl === editTarget) && (
-                    <div className="rounded-lg border border-border bg-white p-2 space-y-2"><textarea value={editNote} onChange={e => setEditNote(e.target.value)} placeholder="اكتب تعديلك الإضافي على هذا التصميم" className="min-h-[72px] w-full rounded border border-border p-2 text-xs" /><div className="flex gap-2"><button type="button" onClick={() => applyEdit(item.index, revision.revised_text || r.proposed_content || '')} disabled={editBusy || !editNote.trim()} className="rounded bg-green px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50">{editBusy ? 'جارٍ التعديل...' : 'تطبيق وإرسال للمراجعة'}</button><button type="button" onClick={() => { setEditTarget(null); setEditNote('') }} className="text-[11px] text-muted">إلغاء</button></div></div>
+                  {revision.designs?.map((design: { imageUrl?: string }, designIndex: number) => {
+                    const draft = design.imageUrl ? internalDrafts[design.imageUrl] : undefined
+                    if (!draft) return null
+                    return <div key={`draft-${designIndex}`} className="rounded-lg border border-green/40 bg-green/5 p-2"><p className="mb-2 text-[11px] font-bold text-green">مسودة داخلية معدّلة - لم تُرسل للعميل</p><div className="flex gap-2"><button type="button" onClick={() => setLightbox(draft)} className="h-20 w-16 shrink-0 overflow-hidden rounded border border-green"><img src={draft} alt="مسودة التصميم المعدلة" className="h-full w-full object-cover" /></button><div className="flex min-w-0 flex-1 flex-wrap content-center gap-1"><button type="button" onClick={() => onEdit?.(item.index, revision.revised_text || r.proposed_content || '', [draft])} className="rounded border border-green bg-white px-2 py-1 text-[10px] font-bold text-green">فتح مراجعة الإرسال</button><button type="button" onClick={() => { setEditTarget(draft); setEditNote(''); setEditReferenceImages([]) }} className="rounded border border-border bg-white px-2 py-1 text-[10px] font-bold text-dark">تعديل إضافي</button></div></div></div>
+                  })}
+                  {editTarget && (revision.designs?.some((design: { imageUrl?: string }) => design.imageUrl === editTarget) || Object.values(internalDrafts).includes(editTarget)) && (
+                    <div className="rounded-lg border border-border bg-white p-2 space-y-2"><textarea value={editNote} onChange={e => setEditNote(e.target.value)} placeholder="اكتب تعديلك الإضافي على هذا التصميم" className="min-h-[72px] w-full rounded border border-border p-2 text-xs" /><div className="rounded border border-sky-100 bg-sky-50 p-2"><p className="mb-2 text-[11px] font-bold text-dark">صور لاستبدال أو تضمين جزء من هذا التصميم</p><ContentImagesUploader images={editReferenceImages} onChange={setEditReferenceImages} maxImages={5} /><p className="mt-2 text-[10px] leading-5 text-muted">ارفع صوراً عالية الدقة فقط. ستُستخدم مع التصميم المحدد، مع الحفاظ على الوجه والملامح والهيئة والملابس كما هي.</p></div><div className="flex gap-2"><button type="button" onClick={() => applyEdit(item.index, revision.revised_text || r.proposed_content || '')} disabled={editBusy || !editNote.trim()} className="rounded bg-green px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50">{editBusy ? 'جارٍ التعديل...' : 'تطبيق كمسودة داخلية'}</button><button type="button" onClick={() => { setEditTarget(null); setEditNote(''); setEditReferenceImages([]) }} className="text-[11px] text-muted">إلغاء</button></div></div>
                   )}
                 </div>
               )}
@@ -339,7 +348,7 @@ export default function PostReviewStatus({ request, onEdit, view = 'current' }: 
                   onClick={() => onEdit(item.index, r.proposed_content ?? '', images)}
                   className="w-full rounded-lg py-1.5 text-[11px] font-bold bg-white border border-green text-green hover:bg-green/5 transition-colors"
                 >
-                  ✏️ تعديل المحتوى المُرسل
+                  ✏️ فتح محرّر المحتوى والتصاميم
                 </button>
               )}
 
