@@ -915,13 +915,13 @@ export default function AdminRequestsPage() {
                         href={thumbnailUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="mb-3 block overflow-hidden rounded-lg border border-border bg-white/70"
+                        className="mb-3 flex h-28 items-center justify-center overflow-hidden rounded-lg border border-border bg-cream/50 p-2"
                         title="عرض الصورة المرفقة"
                       >
                         <img
                           src={thumbnailUrl}
                           alt={`صورة مرفقة للطلب ${generateRequestNumber(r.request_number)}`}
-                          className="h-24 w-full object-cover object-top"
+                          className="h-full w-full object-contain"
                         />
                       </a>
                     )}
