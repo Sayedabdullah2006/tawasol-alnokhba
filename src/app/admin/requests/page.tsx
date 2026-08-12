@@ -646,7 +646,9 @@ export default function AdminRequestsPage() {
             <tbody>
               {filteredRequests.map(r => {
                 const cat = CATEGORIES.find(c => c.id === r.category)
-                const selectedPackage = PACKAGES.find(pkg => pkg.id === r.selected_package)
+                // الباقة المثبتة في سجل الطلب تُحفظ مع التسعير التلقائي في auto_quote_tier.
+                // نُبقي selected_package كاحتياط للطلبات التي استُوردت بصيغة أقدم.
+                const selectedPackage = PACKAGES.find(pkg => pkg.id === (r.auto_quote_tier ?? r.selected_package))
                 return (
                   <tr
                     key={r.id}
