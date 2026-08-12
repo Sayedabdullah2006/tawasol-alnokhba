@@ -5,12 +5,14 @@ interface StatusBadgeProps {
   status: string
   userRole?: 'client' | 'admin' | 'public'
   showDescription?: boolean
+  emphasizeCompleted?: boolean
 }
 
 export default function StatusBadge({
   status,
   userRole = 'public',
-  showDescription = false
+  showDescription = false,
+  emphasizeCompleted = false,
 }: StatusBadgeProps) {
   const config = getStatusLabel(status as RequestStatus, userRole)
 
@@ -26,7 +28,7 @@ export default function StatusBadge({
 
   return (
     <div className="flex flex-col gap-1">
-      <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium border ${colors[config.color]}`}>
+      <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium border ${emphasizeCompleted && status === 'completed' ? 'border-green bg-green text-white' : colors[config.color]}`}>
         {config.label}
       </span>
       {showDescription && config.description && (

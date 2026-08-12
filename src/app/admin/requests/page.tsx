@@ -168,7 +168,16 @@ export default function AdminRequestsPage() {
       return true
     })
     // عند تفعيل فلتر المكرر: تجميع طلبات كل مستخدم معاً (مع الحفاظ على ترتيب التاريخ داخل كل مجموعة)
-    .sort((a, b) => (duplicatesOnly ? ownerKey(a).localeCompare(ownerKey(b)) : 0))
+    .sort((a, b) => {
+      const priority: Record<string, number> = { in_progress: 0, changes_requested: 1, scheduled: 2, completed: 3 }
+      const priorityDiff = (priority[a.status] ?? 4) - (priority[b.status] ?? 4)
+      if (priorityDiff) return priorityDiff
+      if (duplicatesOnly) {
+        const ownerDiff = ownerKey(a).localeCompare(ownerKey(b))
+        if (ownerDiff) return ownerDiff
+      }
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    })
 
   // عدد المستخدمين الذين لديهم أكثر من طلب (لعرضه على زر الفلتر)
   const duplicateOwnersCount = Object.values(requestCountByOwner).filter(c => c > 1).length
@@ -664,7 +673,7 @@ export default function AdminRequestsPage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs font-bold text-muted">{generateRequestNumber(r.request_number)}</span>
-                      <StatusBadge status={r.status} userRole="admin" />
+                      <StatusBadge status={r.status} userRole="admin" emphasizeCompleted />
                       {r.is_external && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">خارجي</span>}
                     </div>
                     <button type="button" onClick={() => openRequest(r)} className="mt-2 block text-right text-sm font-black leading-6 text-dark hover:text-green sm:text-base">{r.title || 'طلب بدون عنوان'}</button>
