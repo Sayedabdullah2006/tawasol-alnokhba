@@ -7,6 +7,33 @@ import { createServiceRoleClient } from '@/lib/supabase-server';
 import { buildAuthHeader, MOYASAR_API_URL, toSAR } from '@/lib/moyasar';
 import { notifyPaymentConfirmedToClient } from '@/lib/email';
 
+export async function refundMoyasarPayment(paymentId: string, amountHalalas?: number): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const detailsResponse = await fetch(`${MOYASAR_API_URL}/payments/${paymentId}`, {
+      headers: { Authorization: buildAuthHeader(), 'Content-Type': 'application/json' },
+    })
+    const payment = await detailsResponse.json().catch(() => ({}))
+    if (!detailsResponse.ok || !['paid', 'captured'].includes(payment.status)) {
+      return { success: false, error: 'عملية ميسر غير قابلة للاسترجاع في حالتها الحالية' }
+    }
+    const available = Number(payment.amount ?? 0) - Number(payment.refunded ?? 0)
+    if (amountHalalas && amountHalalas > available) {
+      return { success: false, error: 'المبلغ يتجاوز الرصيد القابل للاسترجاع لدى ميسر' }
+    }
+
+    const response = await fetch(`${MOYASAR_API_URL}/payments/${paymentId}/refund`, {
+      method: 'POST',
+      headers: { Authorization: buildAuthHeader(), 'Content-Type': 'application/json' },
+      body: amountHalalas ? JSON.stringify({ amount: amountHalalas }) : undefined,
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) return { success: false, error: data.message ?? `Moyasar refund failed (${response.status})` }
+    return { success: true, data }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Moyasar refund failed' }
+  }
+}
+
 /**
  * Shared Payment Verification and Status Update Function
  * This is the single source of truth for payment verification

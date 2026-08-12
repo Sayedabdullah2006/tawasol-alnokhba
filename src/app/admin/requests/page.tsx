@@ -75,6 +75,12 @@ export default function AdminRequestsPage() {
   const [sendingReviewInvitationId, setSendingReviewInvitationId] = useState<string | null>(null)
   const [showBulkReviewConfirm, setShowBulkReviewConfirm] = useState(false)
   const [sendingBulkReviewInvitations, setSendingBulkReviewInvitations] = useState(false)
+  const [refundTarget, setRefundTarget] = useState<any | null>(null)
+  const [refundAmount, setRefundAmount] = useState('')
+  const [refundReason, setRefundReason] = useState('')
+  const [processingRefund, setProcessingRefund] = useState(false)
+  const [confirmingRefundId, setConfirmingRefundId] = useState<string | null>(null)
+  const [refundsByRequest, setRefundsByRequest] = useState<Record<string, any[]>>({})
   const [revivalTarget, setRevivalTarget] = useState<any | null>(null)
   const [revivalDiscountPct, setRevivalDiscountPct] = useState(15)
   const [revivalValidDays, setRevivalValidDays] = useState(3)
@@ -118,6 +124,16 @@ export default function AdminRequestsPage() {
         return acc
       }, {})
       setReviewsByRequest(mapped)
+    }
+
+    const refundsResponse = await fetch('/api/admin/refund')
+    if (refundsResponse.ok) {
+      const refundsData = await refundsResponse.json().catch(() => ({ refunds: [] }))
+      const mapped = (refundsData.refunds ?? []).reduce((acc: Record<string, any[]>, refund: any) => {
+        acc[refund.request_id] = [...(acc[refund.request_id] ?? []), refund]
+        return acc
+      }, {})
+      setRefundsByRequest(mapped)
     }
     setLoading(false)
   }, [supabase, router])
@@ -325,6 +341,68 @@ export default function AdminRequestsPage() {
       showToast('خطأ في الاتصال بالخادم', 'error')
     } finally {
       setSendingReviewInvitationId(null)
+    }
+  }
+
+  const openRefund = (request: any) => {
+    const completedRefunds = (refundsByRequest[request.id] ?? []).filter(refund => refund.status === 'completed')
+    const paidAmount = Number(request.final_total ?? request.admin_quoted_price ?? 0)
+    const refundedAmount = completedRefunds.reduce((total, refund) => total + Number(refund.amount), 0)
+    const remaining = Math.max(0, Math.round((paidAmount - refundedAmount) * 100) / 100)
+    setRefundTarget({ ...request, remainingRefundAmount: remaining })
+    setRefundAmount(String(remaining))
+    setRefundReason('')
+  }
+
+  const submitRefund = async () => {
+    if (!refundTarget) return
+    const amount = Number(refundAmount)
+    if (!Number.isFinite(amount) || amount <= 0 || amount > refundTarget.remainingRefundAmount + 0.001) {
+      showToast('أدخل مبلغاً ضمن الرصيد القابل للاسترجاع', 'error')
+      return
+    }
+    if (refundReason.trim().length < 3) {
+      showToast('اكتب سبب الاسترجاع', 'error')
+      return
+    }
+    const provider = refundTarget.moyasar_payment_id ? 'moyasar' : refundTarget.tamara_order_id ? 'tamara' : 'manual'
+    setProcessingRefund(true)
+    try {
+      const response = await fetch('/api/admin/refund', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: refundTarget.id, provider, amount, reason: refundReason.trim() }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.success) {
+        showToast(data.error ?? 'تعذّر تنفيذ الاسترجاع', 'error')
+        return
+      }
+      showToast(data.status === 'pending' ? 'تم تسجيل طلب الاسترجاع اليدوي وإشعار العميل' : 'تم تنفيذ الاسترجاع وإشعار العميل')
+      setRefundTarget(null)
+      await loadData()
+    } catch {
+      showToast('خطأ في الاتصال بالخادم', 'error')
+    } finally {
+      setProcessingRefund(false)
+    }
+  }
+
+  const confirmManualRefund = async (refund: any) => {
+    if (!window.confirm('هل تؤكد تنفيذ التحويل البنكي للاسترجاع؟ سيُشعر العميل بإتمام الاسترجاع.')) return
+    setConfirmingRefundId(refund.id)
+    try {
+      const response = await fetch(`/api/admin/refund/${refund.id}/complete`, { method: 'POST' })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.success) {
+        showToast(data.error ?? 'تعذّر تأكيد التحويل', 'error')
+        return
+      }
+      showToast('تم تأكيد تحويل مبلغ الاسترجاع وإشعار العميل')
+      await loadData()
+    } catch {
+      showToast('خطأ في الاتصال بالخادم', 'error')
+    } finally {
+      setConfirmingRefundId(null)
     }
   }
 
@@ -980,6 +1058,12 @@ export default function AdminRequestsPage() {
             const expanded = !!expandedRequests[r.id]
             const thumbnailUrl = getRequestThumbnail(r)
             const review = reviewsByRequest[r.id]
+            const refunds = refundsByRequest[r.id] ?? []
+            const completedRefundAmount = refunds.filter(refund => refund.status === 'completed').reduce((total, refund) => total + Number(refund.amount), 0)
+            const hasRefund = refunds.length > 0
+            const pendingRefund = refunds.find(refund => refund.status === 'pending')
+            const pendingManualRefund = pendingRefund?.provider === 'manual' ? pendingRefund : null
+            const canRefund = !pendingRefund && Boolean(r.payment_status === 'paid' || r.paid_at || r.moyasar_payment_id || r.tamara_order_id) && r.status !== 'refunded' && completedRefundAmount < Number(r.final_total ?? r.admin_quoted_price ?? 0)
             return (
               <article key={r.id} className="rounded-lg border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
@@ -998,6 +1082,8 @@ export default function AdminRequestsPage() {
                       {r.status === 'completed' && review?.rating && <span className="rounded-full border border-gold/30 bg-gold/10 px-2.5 py-1 text-gold">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)} تقييم العميل</span>}
                       {r.status === 'completed' && !review?.rating && review?.invitation_sent_at && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">بانتظار تقييم العميل</span>}
                       {r.status === 'completed' && !review?.rating && !review?.invitation_sent_at && <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-slate-500">التقييم: لم يُرسل</span>}
+                      {hasRefund && <span className={`rounded-full px-2.5 py-1 ${pendingRefund ? 'bg-orange-50 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>{pendingRefund ? 'استرجاع قيد المعالجة' : `مسترجع ${formatNumber(completedRefundAmount)} ر.س`}</span>}
+                      {r.refund_timing && <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">مدة الاسترجاع: {r.refund_timing}</span>}
                     </div>
                     {r.status === 'completed' && review?.comment && <div className="mt-3 rounded-lg border border-gold/20 bg-gold/5 px-3 py-2 text-xs leading-5 text-dark"><span className="font-black text-gold">رأي العميل: </span>{review.comment}</div>}
                     {r.admin_notes?.trim() && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700"><span className="font-black">ملاحظة الإدارة: </span>{r.admin_notes.trim()}</div>}
@@ -1071,6 +1157,8 @@ export default function AdminRequestsPage() {
                       {sendingReviewInvitationId === r.id ? 'جارٍ الإرسال...' : review?.invitation_sent_at ? 'إعادة إرسال التقييم' : 'طلب تقييم'}
                     </button>
                   )}
+                  {canRefund && <button onClick={() => openRefund(r)} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100" title="استرجاع مبلغ للعميل">استرجاع مبلغ</button>}
+                  {pendingManualRefund && <button onClick={() => confirmManualRefund(pendingManualRefund)} disabled={confirmingRefundId === pendingManualRefund.id} className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-800 hover:bg-orange-100 disabled:opacity-50">{confirmingRefundId === pendingManualRefund.id ? 'جارٍ التأكيد...' : 'تأكيد تحويل الاسترجاع'}</button>}
                   {r.status === 'client_rejected' && <button onClick={(e) => { e.stopPropagation(); openRequest(r) }} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100">إرسال عرض جديد</button>}
                   {r.status === 'auto_closed' && <button onClick={(e) => openRevival(r, e)} disabled={!r.client_email} className="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">↻ إحياء الطلب</button>}
                   <button onClick={(e) => handleDeleteClick(r, e)} disabled={deletingRequestId === r.id} className="mr-auto inline-flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50" title="حذف الطلب نهائياً">{deletingRequestId === r.id ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-red-600 border-t-transparent" /> : '🗑'}</button>
@@ -1324,6 +1412,45 @@ export default function AdminRequestsPage() {
 
               <div className="mt-5 flex justify-end">
                 <button type="button" onClick={() => setThumbnailTarget(null)} disabled={savingThumbnail} className="rounded-lg border border-border bg-white px-4 py-2 text-sm font-bold text-dark hover:bg-cream disabled:opacity-50">إلغاء</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {refundTarget && (() => {
+        const provider = refundTarget.moyasar_payment_id ? 'ميسر' : refundTarget.tamara_order_id ? 'تمارا' : 'تحويل بنكي يدوي'
+        const timing = refundTarget.moyasar_payment_id ? '3 إلى 10 أيام عمل' : refundTarget.tamara_order_id ? 'ساعات إلى عدة أيام عمل' : 'يومين إلى 5 أيام عمل'
+        const isManual = !refundTarget.moyasar_payment_id && !refundTarget.tamara_order_id
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !processingRefund && setRefundTarget(null)}>
+            <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-white/70 bg-white p-5 shadow-xl sm:p-6" onClick={event => event.stopPropagation()} dir="rtl">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold text-red-600">استرجاع مبلغ للعميل</p>
+                  <h3 className="mt-1 text-lg font-black text-dark">{generateRequestNumber(refundTarget.request_number)}</h3>
+                  <p className="mt-1 text-sm text-muted">وسيلة الدفع: {provider}</p>
+                </div>
+                <button type="button" onClick={() => setRefundTarget(null)} disabled={processingRefund} className="grid h-8 w-8 place-items-center rounded-lg text-lg text-muted hover:bg-slate-100" aria-label="إغلاق">×</button>
+              </div>
+
+              <div className="mt-4 rounded-lg border border-border bg-cream/40 px-4 py-3 text-sm">
+                <div className="flex justify-between gap-3"><span className="text-muted">المتاح للاسترجاع</span><strong className="text-dark">{formatNumber(refundTarget.remainingRefundAmount)} ر.س</strong></div>
+                <div className="mt-2 border-t border-border pt-2 text-xs leading-5 text-muted">سيظهر للعميل أن انعكاس المبلغ متوقع خلال <strong className="text-dark">{timing}</strong>.</div>
+              </div>
+
+              {isManual && <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs leading-5 text-orange-800">لا يمكن تنفيذ التحويل البنكي آلياً. سيُسجّل الطلب كاسترجاع قيد المعالجة حتى تنفّذ التحويل خارج المنصة.</div>}
+              {!isManual && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-800">سيتم تنفيذ الاسترجاع فور تأكيدك عبر {provider}. لا يمكن التراجع عن العملية من المنصة.</div>}
+
+              <label className="mt-4 block text-sm font-bold text-dark">مبلغ الاسترجاع
+                <div className="relative mt-2"><input type="number" min="0.01" max={refundTarget.remainingRefundAmount} step="0.01" value={refundAmount} onChange={event => setRefundAmount(event.target.value)} className="min-h-[46px] w-full rounded-lg border border-border bg-white px-3 pl-12 text-sm outline-none focus:border-red-400" /><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">ر.س</span></div>
+              </label>
+              <label className="mt-4 block text-sm font-bold text-dark">سبب الاسترجاع
+                <textarea value={refundReason} onChange={event => setRefundReason(event.target.value)} maxLength={1000} rows={4} className="mt-2 w-full resize-y rounded-lg border border-border bg-white px-3 py-2 text-sm font-normal text-dark outline-none focus:border-red-400" placeholder="يُحفظ في سجل الإدارة ولا يظهر للعميل." />
+              </label>
+              <div className="mt-5 flex gap-3">
+                <Button variant="outline" onClick={() => setRefundTarget(null)} disabled={processingRefund} className="flex-1">إلغاء</Button>
+                <Button onClick={submitRefund} loading={processingRefund} className="flex-1 bg-red-600 hover:bg-red-700">{isManual ? 'تسجيل طلب الاسترجاع' : 'تأكيد الاسترجاع'}</Button>
               </div>
             </div>
           </div>

@@ -63,6 +63,16 @@ export const CLIENT_STATUS_LABELS: Record<RequestStatus, { label: string; color:
     color: 'cyan',
     description: 'تم اعتماد المحتوى وتحديد موعد نشره على قنواتنا'
   },
+  refund_pending: {
+    label: 'استرجاع قيد المعالجة',
+    color: 'orange',
+    description: 'يجري استرجاع المبلغ إلى وسيلة الدفع'
+  },
+  refunded: {
+    label: 'تم الاسترجاع',
+    color: 'gray',
+    description: 'تم استرجاع مبلغ الطلب إلى وسيلة الدفع'
+  },
   suspended: {
     label: 'قيد المراجعة',
     color: 'gray',
@@ -152,6 +162,16 @@ export const ADMIN_STATUS_LABELS: Record<RequestStatus, { label: string; color: 
     color: 'cyan',
     description: 'تم اعتماد المحتوى وجدولته للنشر على القنوات'
   },
+  refund_pending: {
+    label: 'استرجاع قيد المعالجة',
+    color: 'orange',
+    description: 'طلب استرجاع بانتظار إتمام التحويل أو معالجة مزود الدفع'
+  },
+  refunded: {
+    label: 'مسترجع',
+    color: 'gray',
+    description: 'تم تسجيل استرجاع كامل مبلغ الطلب'
+  },
   suspended: {
     label: 'معلق داخلياً',
     color: 'gray',
@@ -210,7 +230,7 @@ export function isWaitingStatus(status: RequestStatus): boolean {
 }
 
 export function isFinalStatus(status: RequestStatus): boolean {
-  return ['completed', 'rejected', 'client_rejected', 'auto_closed', 'cancelled'].includes(status)
+  return ['completed', 'rejected', 'client_rejected', 'auto_closed', 'cancelled', 'refunded'].includes(status)
 }
 
 // أولويات المهام للإدارة

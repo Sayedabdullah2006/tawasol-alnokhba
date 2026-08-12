@@ -795,6 +795,29 @@ export function requestReviewToClient(d: {
   }
 }
 
+export function refundUpdateToClient(d: {
+  requestNumber: string
+  clientName: string
+  amount: number
+  timing: string
+  isPending: boolean
+}) {
+  const amount = new Intl.NumberFormat('ar-SA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(d.amount)
+  return {
+    subject: `${d.isPending ? '⏳' : '↩'} تحديث استرجاع مبلغ طلبك · ${d.requestNumber}`,
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <div style="text-align:center; margin-bottom:18px;">
+        <div style="font-size:42px;">${d.isPending ? '⏳' : '↩'}</div>
+        <p style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${BRAND_NAVY};">${d.isPending ? 'طلب الاسترجاع قيد المعالجة' : 'تم تنفيذ الاسترجاع'}</p>
+      </div>
+      <p style="margin:0 0 14px 0; font-size:14px; line-height:1.8;">تم ${d.isPending ? 'تسجيل طلب' : 'تنفيذ'} استرجاع مبلغ <strong>${amount} ر.س</strong> لطلبك <strong>${escapeHtml(d.requestNumber)}</strong>.</p>
+      <div style="background:#F7F4ED; border-right:3px solid ${BRAND_GOLD}; padding:12px 14px; border-radius:8px; margin:14px 0; font-size:13px; line-height:1.8;">من المتوقع أن ينعكس المبلغ في وسيلة الدفع خلال <strong>${escapeHtml(d.timing)}</strong>، بحسب البنك أو مزود الدفع.</div>
+      <p style="margin:18px 0 0 0; font-size:13px; line-height:1.8; color:#6B7C99;">لأي استفسار، يسعد فريقنا بخدمتك.</p>
+    `),
+  }
+}
+
 /** رسالة واحدة لمراجعة جميع منشورات الحملة من صفحة واحدة. */
 export function campaignReadyForReview(d: {
   requestNumber: string

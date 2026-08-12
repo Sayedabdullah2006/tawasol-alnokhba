@@ -34,6 +34,34 @@ function authHeader(): string {
   return `Bearer ${getApiToken()}`
 }
 
+export async function refundTamaraOrder(orderId: string, amount: number, comment: string, merchantRefundId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const orderResponse = await fetch(`${TAMARA_API_URL}/merchants/orders/${orderId}`, {
+      headers: { Authorization: authHeader() },
+    })
+    const order = await orderResponse.json().catch(() => ({}))
+    const orderStatus = String(order.status ?? order.order_status ?? '').toLowerCase()
+    if (!orderResponse.ok || !['fully_captured', 'partially_captured'].includes(orderStatus)) {
+      return { success: false, error: 'لا يمكن استرجاع طلب تمارا قبل أن يصبح ملتقطاً بالكامل أو جزئياً' }
+    }
+
+    const response = await fetch(`${TAMARA_API_URL}/payments/simplified-refund/${orderId}`, {
+      method: 'POST',
+      headers: { Authorization: authHeader(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        total_amount: { amount, currency: 'SAR' },
+        comment,
+        merchant_refund_id: merchantRefundId,
+      }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) return { success: false, error: data.message ?? `Tamara refund failed (${response.status})` }
+    return { success: true, data }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Tamara refund failed' }
+  }
+}
+
 // ─── JWT verification ─────────────────────────────────────────────────────────
 
 /**

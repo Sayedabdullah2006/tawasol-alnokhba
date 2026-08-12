@@ -463,6 +463,16 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
           </div>
         )}
 
+        {(request.refund_amount != null || ['refund_pending', 'refunded', 'partially_refunded'].includes(request.payment_status)) && (
+          <div className={`mt-4 rounded-2xl border p-4 ${request.status === 'refund_pending' || request.payment_status === 'refund_pending' ? 'border-orange-200 bg-orange-50' : 'border-green/20 bg-green/5'}`}>
+            <p className={`font-bold text-sm ${request.status === 'refund_pending' || request.payment_status === 'refund_pending' ? 'text-orange-800' : 'text-green'}`}>
+              {request.status === 'refund_pending' || request.payment_status === 'refund_pending' ? 'طلب الاسترجاع قيد المعالجة' : 'تم تنفيذ استرجاع المبلغ'}
+            </p>
+            {request.refund_amount != null && <p className="mt-1 text-sm text-dark">مبلغ الاسترجاع: <strong>{formatNumber(request.refund_amount)} ر.س</strong></p>}
+            <p className="mt-1 text-xs leading-5 text-muted">من المتوقع أن ينعكس المبلغ خلال {request.refund_timing ?? 'عدة أيام عمل'}، بحسب وسيلة الدفع والبنك.</p>
+          </div>
+        )}
+
         {/* تعديل/إلغاء الطلب — للطلبات غير المدفوعة فقط (يمنع النهاية المسدودة) */}
         <RequestManageActions request={request} className="mt-4" />
 

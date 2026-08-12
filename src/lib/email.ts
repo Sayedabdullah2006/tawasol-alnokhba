@@ -168,6 +168,13 @@ export async function sendRequestReviewEmail(args: {
   return sendEmail(args.email, t.subject, t.html)
 }
 
+export async function notifyRefundUpdateToClient(args: {
+  email: string; requestNumber: string; clientName: string; amount: number; timing: string; isPending: boolean
+}) {
+  const t = templates.refundUpdateToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
 export async function notifyCampaignReadyForReview(args: {
   requestNumber: string
   requestId: string

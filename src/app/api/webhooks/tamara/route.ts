@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyTamaraWebhookToken, handleTamaraOrderApproved } from '@/lib/tamara-server'
+import { completeProviderRefund } from '@/lib/refund-webhooks'
 
 export async function POST(request: NextRequest) {
   const ok = () => NextResponse.json({ received: true }, { status: 200 })
@@ -33,7 +34,16 @@ export async function POST(request: NextRequest) {
     const payload = await request.json()
     console.log('[TAMARA_WEBHOOK] Received event:', payload.event_type, 'order:', payload.order_id)
 
-    // Only handle the approved event
+    if (payload.event_type === 'order_refunded' && payload.order_id) {
+      const result = await completeProviderRefund({
+        provider: 'tamara', providerPaymentId: payload.order_id,
+        providerRefundId: payload.data?.refund_id ?? null, payload,
+      })
+      console.log('[TAMARA_WEBHOOK] Refund result:', result)
+      return ok()
+    }
+
+    // Only handle the approved payment event beyond refunds.
     if (payload.event_type !== 'order_approved') {
       console.log('[TAMARA_WEBHOOK] Skipping event:', payload.event_type)
       return ok()

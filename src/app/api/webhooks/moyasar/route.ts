@@ -49,8 +49,8 @@ export async function POST(request: NextRequest) {
       console.error('[WEBHOOK] ⚠️ Failed to log webhook:', logError);
     }
 
-    // Step 4: Handle payment.paid
-    if (payload.type === 'payment.paid' && payload.data) {
+    // يدعم الصيغة القديمة والجديدة لأسماء أحداث ميسر.
+    if ((payload.type === 'payment.paid' || payload.type === 'payment_paid') && payload.data) {
       const { id: paymentId, metadata } = payload.data;
       const requestId = metadata?.request_id;
 
@@ -74,6 +74,17 @@ export async function POST(request: NextRequest) {
 
       } catch (processError) {
         console.error('[WEBHOOK] ❌ Error processing payment:', processError);
+      }
+    } else if ((payload.type === 'payment.refunded' || payload.type === 'payment_refunded') && payload.data?.id) {
+      try {
+        const { completeProviderRefund } = await import('@/lib/refund-webhooks')
+        const result = await completeProviderRefund({
+          provider: 'moyasar', providerPaymentId: payload.data.id,
+          providerRefundId: payload.data.refund_id ?? null, payload,
+        })
+        console.log('[WEBHOOK] Refund result:', result.reason)
+      } catch (processError) {
+        console.error('[WEBHOOK] Error processing refund:', processError)
       }
     } else {
       console.log('[WEBHOOK] ⚠️ Skipping non-payment event:', payload.type);
