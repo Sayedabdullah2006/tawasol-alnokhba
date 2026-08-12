@@ -29,6 +29,31 @@ function isConfirmedPaid(r: any): boolean {
   return (r.paid_at != null || PAID_STATUSES.includes(r.status)) && (r.final_total ?? 0) > 0
 }
 
+type TrendPoint = { day: number; value: number }
+
+function MonthlyBarChart({ data, color, valueLabel }: { data: TrendPoint[]; color: string; valueLabel: (value: number) => string }) {
+  const max = Math.max(...data.map(point => point.value), 1)
+  const labelDays = new Set([1, 5, 10, 15, 20, 25, data.length])
+
+  return (
+    <div className="relative h-44 pt-3">
+      <div aria-hidden className="absolute inset-x-0 top-3 h-32 border-y border-border/70">
+        <div className="absolute inset-x-0 top-1/2 border-t border-border/60" />
+      </div>
+      <div className="relative grid h-32 items-end gap-1" style={{ gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))` }}>
+        {data.map(point => (
+          <div key={point.day} className="group relative flex h-full min-w-0 items-end justify-center" title={`اليوم ${point.day}: ${valueLabel(point.value)}`}>
+            <div className="w-full min-h-[3px] rounded-t-sm transition-[height] duration-300 group-hover:opacity-75" style={{ height: `${Math.max((point.value / max) * 100, point.value > 0 ? 4 : 1)}%`, backgroundColor: color }} />
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-1 pt-2" style={{ gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))` }}>
+        {data.map(point => <span key={point.day} className="min-w-0 text-center text-[9px] text-muted">{labelDays.has(point.day) ? point.day : ''}</span>)}
+      </div>
+    </div>
+  )
+}
+
 export default function AdminStatsPage() {
   const supabase = createClient()
   const router = useRouter()
@@ -217,6 +242,29 @@ export default function AdminStatsPage() {
     return { count, revenue, byMethod }
   }, [allRequests, selectedMonthKey])
 
+  const monthlyTrend = useMemo(() => {
+    const [year, month] = selectedMonthKey.split('-').map(Number)
+    const dayCount = new Date(year, month, 0).getDate()
+    const orders = Array.from({ length: dayCount }, (_, index) => ({ day: index + 1, value: 0 }))
+    const revenue = Array.from({ length: dayCount }, (_, index) => ({ day: index + 1, value: 0 }))
+
+    for (const request of allRequests) {
+      const createdAt = request.created_at ? new Date(request.created_at) : null
+      if (createdAt && createdAt.getFullYear() === year && createdAt.getMonth() + 1 === month) {
+        orders[createdAt.getDate() - 1].value += 1
+      }
+
+      if (isConfirmedPaid(request)) {
+        const paidAt = new Date(request.paid_at ?? request.created_at)
+        if (!Number.isNaN(paidAt.getTime()) && paidAt.getFullYear() === year && paidAt.getMonth() + 1 === month) {
+          revenue[paidAt.getDate() - 1].value += Number(request.final_total ?? request.admin_quoted_price ?? 0)
+        }
+      }
+    }
+
+    return { orders, revenue }
+  }, [allRequests, selectedMonthKey])
+
   if (loading) return <LoadingSpinner size="lg" />
 
   // قاعدة الهدف الشهري: 15,000 ر.س في مايو 2026 ويزيد 5% كل شهر
@@ -284,7 +332,7 @@ export default function AdminStatsPage() {
       </div>
 
       {/* ── بطاقة إجمالي الطلبات مع التقسيم ── */}
-      <div className="bg-card rounded-2xl border border-border p-5">
+      <div className="hidden">
         <div className="flex items-start justify-between mb-5">
           <div>
             <p className="text-sm text-muted">إجمالي الطلبات</p>
@@ -326,6 +374,47 @@ export default function AdminStatsPage() {
       </div>
 
       {/* ── الطلبات المدفوعة شهريًا + المقارنة ── */}
+      <section className="glass-panel rounded-lg p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border/70 pb-4">
+          <div>
+            <p className="text-xs font-bold text-gold">تحليل شهري</p>
+            <h2 className="mt-1 text-lg font-black text-dark">حركة الطلبات والإيرادات</h2>
+            <p className="mt-1 text-xs text-muted">توزيع يومي للطلبات المستلمة والإيرادات المؤكدة.</p>
+          </div>
+          <label className="min-w-[190px] text-xs font-bold text-dark">الشهر
+            <select
+              value={selectedMonthKey}
+              onChange={event => setSelectedMonthKey(event.target.value)}
+              className="mt-1.5 min-h-[42px] w-full rounded-lg border border-border bg-white/60 px-3 text-sm font-medium text-dark outline-none transition focus:border-green"
+            >
+              {availableMonths.map(key => {
+                const [year, month] = key.split('-').map(Number)
+                const label = new Date(year, month - 1, 1).toLocaleString('ar', { month: 'long', year: 'numeric', calendar: 'gregory' })
+                return <option key={key} value={key}>{label}</option>
+              })}
+            </select>
+          </label>
+        </div>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <article className="rounded-lg border border-border/80 bg-white/40 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div><p className="text-sm font-black text-dark">الطلبات</p><p className="mt-1 text-xs text-muted">إجمالي الشهر: {monthlyTrend.orders.reduce((total, point) => total + point.value, 0)} طلب</p></div>
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-green/10 text-lg text-green">▥</span>
+            </div>
+            <MonthlyBarChart data={monthlyTrend.orders} color="var(--color-green)" valueLabel={value => `${value} طلب`} />
+          </article>
+
+          <article className="rounded-lg border border-border/80 bg-white/40 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div><p className="text-sm font-black text-dark">الإيرادات المؤكدة</p><p className="mt-1 text-xs text-muted">إجمالي الشهر: {formatNumber(monthlyTrend.revenue.reduce((total, point) => total + point.value, 0))} ر.س</p></div>
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-gold/15 text-lg text-gold">⌁</span>
+            </div>
+            <MonthlyBarChart data={monthlyTrend.revenue} color="var(--color-gold)" valueLabel={value => `${formatNumber(value)} ر.س`} />
+          </article>
+        </div>
+      </section>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
         {/* معدل الطلبات المدفوعة هذا الشهر */}
@@ -407,7 +496,7 @@ export default function AdminStatsPage() {
           <select
             value={selectedMonthKey}
             onChange={e => setSelectedMonthKey(e.target.value)}
-            className="w-full mb-3 bg-cream border border-border rounded-lg px-3 py-2 text-sm font-medium text-dark"
+            className="hidden"
           >
             {availableMonths.map(key => {
               const [y, m] = key.split('-').map(Number)
