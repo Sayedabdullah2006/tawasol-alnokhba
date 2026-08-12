@@ -37,6 +37,9 @@ export async function POST(request: Request) {
     if (existingRequest.user_id !== user.id) {
       return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
     }
+    if (existingRequest.status !== 'content_review') {
+      return NextResponse.json({ error: 'انتهت مرحلة مراجعة المحتوى لهذا الطلب' }, { status: 409 })
+    }
 
     const reviews: Record<string, any> =
       existingRequest.post_reviews && typeof existingRequest.post_reviews === 'object'
@@ -87,15 +90,18 @@ export async function POST(request: Request) {
     }
     if (allApproved) { upd.status = 'in_progress'; upd.content_approved_at = now } // خرج من مرحلة المراجعة
 
-    const { error } = await supabase
+    const { data: updatedRows, error } = await supabase
       .from('publish_requests')
       .update(upd)
       .eq('id', requestId)
+      .eq('status', 'content_review')
+      .select('id')
 
     if (error) {
       console.error('Database error:', error)
       return NextResponse.json({ error: 'فشل تحديث الطلب' }, { status: 500 })
     }
+    if (!updatedRows?.length) return NextResponse.json({ error: 'تغيّرت حالة الطلب، حدّث الصفحة قبل المتابعة' }, { status: 409 })
 
     const requestNumber = `ATH-${String(existingRequest.request_number).padStart(4, '0')}`
     notifyContentApprovedToAdmin({

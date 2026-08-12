@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     if (row.request_type !== 'campaign' || !Array.isArray(row.campaign_posts) || row.campaign_posts.length === 0) {
       return NextResponse.json({ error: 'هذه العملية متاحة للحملات فقط' }, { status: 400 })
     }
-    if (!['in_progress', 'content_review', 'changes_requested', 'completed'].includes(row.status)) {
+    if (!['in_progress', 'content_review', 'changes_requested'].includes(row.status)) {
       return NextResponse.json({ error: 'الطلب ليس في مرحلة تجهيز المحتوى' }, { status: 400 })
     }
 

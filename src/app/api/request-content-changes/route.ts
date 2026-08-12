@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     }
 
     // Update request with feedback and change status back to in_progress for admin action
-    const { error } = await supabase
+    const { data: updatedRows, error } = await supabase
       .from('publish_requests')
       .update({
         status: 'changes_requested',
@@ -57,11 +57,15 @@ export async function POST(request: Request) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', requestId)
+      .eq('status', 'content_review')
+      .select('id')
 
     if (error) {
       console.error('Database error:', error)
       return NextResponse.json({ error: 'فشل تحديث الطلب' }, { status: 500 })
     }
+
+    if (!updatedRows?.length) return NextResponse.json({ error: 'تغيّرت حالة الطلب، حدّث الصفحة قبل المتابعة' }, { status: 409 })
 
     // ⚡ إعادة توليد التصاميم تلقائياً بملاحظة العميل في الخلفية (تُبقي القديمة + تضيف المعدّلة)
     void import('@/lib/auto-revise')
