@@ -202,6 +202,18 @@ export default function AdminRequestsPage() {
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
   }
 
+  // The request may have several reference images; cards intentionally preview only the first one.
+  const getRequestThumbnail = (request: any): string | null => {
+    const images = request.content_images
+    if (!Array.isArray(images)) return null
+
+    const imageUrl = images.find((image: unknown): image is string =>
+      typeof image === 'string' && image.trim().length > 0
+    )
+
+    return imageUrl?.trim() ?? null
+  }
+
   const openRequest = (req: any) => {
     // Navigate to full-page request view
     router.push(`/admin/requests/${req.id}`)
@@ -756,6 +768,7 @@ export default function AdminRequestsPage() {
             const selectedPackage = PACKAGES.find(pkg => pkg.id === (r.auto_quote_tier ?? r.selected_package))
             const total = r.final_total ?? r.admin_quoted_price
             const expanded = !!expandedRequests[r.id]
+            const thumbnailUrl = getRequestThumbnail(r)
             return (
               <article key={r.id} className="rounded-lg border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
@@ -776,6 +789,21 @@ export default function AdminRequestsPage() {
                   </div>
 
                   <div className="border-t border-border pt-3 lg:border-r lg:border-t-0 lg:pr-4 lg:pt-0">
+                    {thumbnailUrl && (
+                      <a
+                        href={thumbnailUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mb-3 block overflow-hidden rounded-lg border border-border bg-white/70"
+                        title="عرض الصورة المرفقة"
+                      >
+                        <img
+                          src={thumbnailUrl}
+                          alt={`صورة مرفقة للطلب ${generateRequestNumber(r.request_number)}`}
+                          className="h-24 w-full object-cover object-top"
+                        />
+                      </a>
+                    )}
                     <ClientNameFixed name={r.client_name || 'عميل بدون اسم'} maxLength={32} className="block text-sm font-bold text-dark" />
                     {r.client_email && <p className="mt-1 truncate text-xs text-muted" dir="ltr">{r.client_email}</p>}
                     <div className="mt-3 flex items-end justify-between gap-3">
