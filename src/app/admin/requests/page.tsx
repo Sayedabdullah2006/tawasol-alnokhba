@@ -65,6 +65,8 @@ export default function AdminRequestsPage() {
     const { data: reqs } = await supabase
       .from('publish_requests')
       .select('*')
+      // الطلب الذي ألغاه العميل لا يحتاج متابعة في لوحة الإدارة.
+      .neq('status', 'cancelled')
       .order('created_at', { ascending: false })
 
     setRequests(reqs ?? [])
