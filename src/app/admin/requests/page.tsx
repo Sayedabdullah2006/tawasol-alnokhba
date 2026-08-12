@@ -16,6 +16,22 @@ import NameDisplayTest from '@/components/debug/NameDisplayTest'
 
 const REQUESTS_PER_PAGE = 10
 
+const QUICK_STATUS_TRANSITIONS: Record<string, string[]> = {
+  pending: ['rejected'],
+  negotiation: ['pending', 'rejected'],
+  client_rejected: ['pending', 'rejected'],
+  approved: ['paid'],
+  payment_review: ['in_progress', 'approved', 'rejected'],
+  paid: ['in_progress'],
+  in_progress: ['content_review', 'scheduled', 'completed', 'info_requested'],
+  info_requested: ['in_progress', 'content_review'],
+  content_review: ['in_progress', 'scheduled', 'completed', 'changes_requested'],
+  changes_requested: ['in_progress', 'content_review', 'completed'],
+  scheduled: ['completed', 'in_progress'],
+  rejected: ['pending'],
+  auto_closed: ['pending'],
+}
+
 export default function AdminRequestsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -48,6 +64,10 @@ export default function AdminRequestsPage() {
   const [quickNoteTarget, setQuickNoteTarget] = useState<any | null>(null)
   const [quickNote, setQuickNote] = useState('')
   const [savingQuickNote, setSavingQuickNote] = useState(false)
+  const [quickActionTarget, setQuickActionTarget] = useState<any | null>(null)
+  const [quickActionStatus, setQuickActionStatus] = useState('')
+  const [quickActionNotes, setQuickActionNotes] = useState('')
+  const [savingQuickAction, setSavingQuickAction] = useState(false)
   const [revivalTarget, setRevivalTarget] = useState<any | null>(null)
   const [revivalDiscountPct, setRevivalDiscountPct] = useState(15)
   const [revivalValidDays, setRevivalValidDays] = useState(3)
@@ -316,6 +336,52 @@ export default function AdminRequestsPage() {
     event.stopPropagation()
     setQuickNoteTarget(request)
     setQuickNote(request.admin_notes ?? '')
+  }
+
+  const quickActionLabel = (currentStatus: string, nextStatus: string) => {
+    if (currentStatus === 'approved' && nextStatus === 'paid') return 'تأكيد الدفع'
+    if (currentStatus === 'payment_review' && nextStatus === 'in_progress') return 'تأكيد الدفع وبدء التنفيذ'
+    if (currentStatus === 'paid' && nextStatus === 'in_progress') return 'بدء التنفيذ'
+    return REQUEST_STATUSES[nextStatus as keyof typeof REQUEST_STATUSES]?.label ?? nextStatus
+  }
+
+  const openQuickAction = (request: any, event: React.MouseEvent) => {
+    event.stopPropagation()
+    const options = QUICK_STATUS_TRANSITIONS[request.status] ?? []
+    setQuickActionTarget(request)
+    setQuickActionStatus(options[0] ?? '')
+    setQuickActionNotes(request.admin_notes ?? '')
+  }
+
+  const handleQuickAction = async () => {
+    if (!quickActionTarget || !quickActionStatus) return
+    setSavingQuickAction(true)
+    try {
+      const response = await fetch('/api/update-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: quickActionTarget.id,
+          status: quickActionStatus,
+          adminNotes: quickActionNotes.trim() || null,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.success) {
+        showToast(data.error ?? 'تعذّر تنفيذ الإجراء', 'error')
+        return
+      }
+
+      showToast(`تم ${quickActionLabel(quickActionTarget.status, quickActionStatus)} بنجاح`)
+      setQuickActionTarget(null)
+      setQuickActionStatus('')
+      setQuickActionNotes('')
+      await loadData()
+    } catch {
+      showToast('خطأ في الاتصال بالخادم', 'error')
+    } finally {
+      setSavingQuickAction(false)
+    }
   }
 
   const handleSaveQuickNote = async () => {
@@ -874,6 +940,14 @@ export default function AdminRequestsPage() {
 
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3" onClick={e => e.stopPropagation()}>
                   <button onClick={() => setExpandedRequests(current => ({ ...current, [r.id]: !expanded }))} className="rounded-lg border border-border bg-white px-3 py-1.5 text-xs font-bold text-dark hover:bg-cream">{expanded ? 'إخفاء التفاصيل ▲' : 'مزيد من التفاصيل ▼'}</button>
+                  <button
+                    onClick={(e) => openQuickAction(r, e)}
+                    disabled={(QUICK_STATUS_TRANSITIONS[r.status] ?? []).length === 0}
+                    className="rounded-lg bg-green px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-green/90 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+                    title={(QUICK_STATUS_TRANSITIONS[r.status] ?? []).length ? 'تنفيذ إجراء سريع' : 'لا يوجد إجراء سريع متاح لهذه الحالة'}
+                  >
+                    إجراءات
+                  </button>
                   <button onClick={(e) => openQuickNote(r, e)} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${r.admin_notes?.trim() ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>📝 {r.admin_notes?.trim() ? 'تعديل الملاحظة' : 'إضافة ملاحظة'}</button>
                   <button onClick={(e) => handleSendReminder(r, e)} disabled={sendingReminderId === r.id || !r.client_email} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50" title="إرسال تذكير بالبريد">{sendingReminderId === r.id ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" /> : '✉'}</button>
                   <button onClick={(e) => handleWhatsApp(r, e)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green hover:bg-green/15" title="مراسلة العميل عبر واتساب">◉</button>
@@ -1091,6 +1165,45 @@ export default function AdminRequestsPage() {
           </div>
         )}
       </div>
+
+      {quickActionTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !savingQuickAction && setQuickActionTarget(null)}>
+          <div className="w-full max-w-md rounded-lg border border-white/70 bg-white p-5 shadow-xl sm:p-6" onClick={event => event.stopPropagation()} dir="rtl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold text-gold">إجراء سريع للطلب {generateRequestNumber(quickActionTarget.request_number)}</p>
+                <h3 className="mt-1 text-lg font-black text-dark">تحديث حالة الطلب</h3>
+                <p className="mt-1 text-sm text-muted">{quickActionTarget.client_name || 'العميل'} · {quickActionTarget.title || 'طلب بدون عنوان'}</p>
+              </div>
+              <button type="button" onClick={() => setQuickActionTarget(null)} disabled={savingQuickAction} className="grid h-8 w-8 place-items-center rounded-lg text-lg text-muted hover:bg-slate-100" aria-label="إغلاق">×</button>
+            </div>
+
+            {(QUICK_STATUS_TRANSITIONS[quickActionTarget.status] ?? []).length > 0 ? (
+              <>
+                <label className="mt-5 block text-sm font-bold text-dark">
+                  الإجراء
+                  <select value={quickActionStatus} onChange={event => setQuickActionStatus(event.target.value)} className="mt-2 min-h-[46px] w-full rounded-lg border border-border bg-white px-3 text-sm text-dark outline-none focus:border-green">
+                    {(QUICK_STATUS_TRANSITIONS[quickActionTarget.status] ?? []).map(status => (
+                      <option key={status} value={status}>{quickActionLabel(quickActionTarget.status, status)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="mt-4 block text-sm font-bold text-dark">
+                  ملاحظة للإدارة (اختيارية)
+                  <textarea value={quickActionNotes} onChange={event => setQuickActionNotes(event.target.value)} rows={3} className="mt-2 w-full resize-y rounded-lg border border-border bg-white px-3 py-2 text-sm font-normal text-dark outline-none focus:border-green" placeholder="تظهر في بطاقة الطلب ويمكن تضمينها في إشعار الحالة." />
+                </label>
+                <p className="mt-3 text-xs leading-5 text-muted">سيُطبّق الإجراء وفق مسار الحالة المعتمد، ويصل إشعار للعميل عند الحاجة.</p>
+                <div className="mt-5 flex gap-3">
+                  <button type="button" onClick={() => setQuickActionTarget(null)} disabled={savingQuickAction} className="flex-1 rounded-lg border border-border bg-white px-4 py-2.5 text-sm font-bold text-dark hover:bg-cream disabled:opacity-50">إلغاء</button>
+                  <button type="button" onClick={handleQuickAction} disabled={!quickActionStatus || savingQuickAction} className="flex-1 rounded-lg bg-green px-4 py-2.5 text-sm font-black text-white hover:bg-green/90 disabled:opacity-50">{savingQuickAction ? 'جارٍ التنفيذ...' : 'تأكيد الإجراء'}</button>
+                </div>
+              </>
+            ) : (
+              <div className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-muted">لا يوجد إجراء سريع متاح لهذه الحالة. يمكنك فتح الطلب لمتابعة خطواته التفصيلية.</div>
+            )}
+          </div>
+        </div>
+      )}
 
       {revivalTarget && (() => {
         const originalPrice = Number(revivalTarget.final_total ?? revivalTarget.admin_quoted_price ?? 0)
