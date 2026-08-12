@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { CATEGORIES, REQUEST_STATUSES } from '@/lib/constants'
+import { CATEGORIES, PACKAGES, REQUEST_STATUSES } from '@/lib/constants'
 import { formatNumber, formatDate, generateRequestNumber } from '@/lib/utils'
 import { fixTextDirection } from '@/lib/text-utils'
 import StatusBadge from '@/components/dashboard/StatusBadge'
@@ -646,6 +646,7 @@ export default function AdminRequestsPage() {
             <tbody>
               {filteredRequests.map(r => {
                 const cat = CATEGORIES.find(c => c.id === r.category)
+                const selectedPackage = PACKAGES.find(pkg => pkg.id === r.selected_package)
                 return (
                   <tr
                     key={r.id}
@@ -698,7 +699,14 @@ export default function AdminRequestsPage() {
                     </td>
 
                     {/* الفئة */}
-                    <td className="px-3 py-3 text-sm">{cat?.icon} {cat?.nameAr}</td>
+                    <td className="px-3 py-3 text-sm">
+                      <div>{cat?.icon} {cat?.nameAr}</div>
+                      {selectedPackage && (
+                        <span className="mt-1 inline-flex rounded-full border border-green/20 bg-green/10 px-2 py-0.5 text-[10px] font-bold text-green">
+                          {selectedPackage.name}
+                        </span>
+                      )}
+                    </td>
 
                     {/* المبلغ */}
                     <td className="px-3 py-3 text-sm">
