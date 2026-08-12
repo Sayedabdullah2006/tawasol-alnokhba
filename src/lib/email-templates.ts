@@ -812,7 +812,7 @@ export function refundUpdateToClient(d: {
         <p style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${BRAND_NAVY};">${d.isPending ? 'طلب الاسترجاع قيد المعالجة' : 'تم تنفيذ الاسترجاع'}</p>
       </div>
       <p style="margin:0 0 14px 0; font-size:14px; line-height:1.8;">تم ${d.isPending ? 'تسجيل طلب' : 'تنفيذ'} استرجاع مبلغ <strong>${amount} ر.س</strong> لطلبك <strong>${escapeHtml(d.requestNumber)}</strong>.</p>
-      <div style="background:#F7F4ED; border-right:3px solid ${BRAND_GOLD}; padding:12px 14px; border-radius:8px; margin:14px 0; font-size:13px; line-height:1.8;">من المتوقع أن ينعكس المبلغ في وسيلة الدفع خلال <strong>${escapeHtml(d.timing)}</strong>، بحسب البنك أو مزود الدفع.</div>
+      <div style="background:#F7F4ED; border-right:3px solid ${BRAND_GOLD}; padding:12px 14px; border-radius:8px; margin:14px 0; font-size:13px; line-height:1.8;">من المتوقع أن ينعكس المبلغ في وسيلة الدفع خلال <strong>${escapeHtml(d.timing)}</strong>، بحسب البنك أو مزود الدفع.${d.isPending ? '<br /><br />تخضع عملية الاسترداد، بعد رفع الطلب، لإجراءات ومدد المعالجة الخاصة بمزود خدمة الدفع والبنوك أو الجهات المالية ذات العلاقة. ولا تتحمل الإدارة مسؤولية أي تأخير ناتج عن تلك الجهات أو عن أسباب خارجة عن نطاق سيطرتها، وذلك في حدود ما تجيزه الأنظمة واللوائح المعمول بها.' : ''}</div>
       <p style="margin:18px 0 0 0; font-size:13px; line-height:1.8; color:#6B7C99;">لأي استفسار، يسعد فريقنا بخدمتك.</p>
     `),
   }
