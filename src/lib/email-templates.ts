@@ -768,6 +768,30 @@ export function contentReadyForReview(d: {
   }
 }
 
+export function requestReviewToClient(d: {
+  requestNumber: string
+  clientName: string
+  reviewUrl: string
+}) {
+  return {
+    subject: `⭐ قيّم تجربتك مع تواصل النخبة · ${d.requestNumber}`,
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <div style="text-align:center; margin-bottom:18px;">
+        <div style="font-size:40px; letter-spacing:3px; color:${BRAND_GOLD};">★★★★★</div>
+        <p style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${BRAND_NAVY};">كيف كانت تجربتك؟</p>
+      </div>
+      <p style="margin:0 0 16px 0; font-size:14px; line-height:1.8;">
+        اكتمل طلبك <strong>${escapeHtml(d.requestNumber)}</strong>، ويسعدنا أن تمنحنا دقيقة من وقتك لتقييم الخدمة.
+      </p>
+      <p style="margin:0 0 20px 0; font-size:13px; line-height:1.8; color:#6B7C99;">
+        تقييمك يساعدنا على تحسين التجربة والاهتمام بالتفاصيل التي تهمك.
+      </p>
+      <p style="margin:0; text-align:center;">${button('تقييم التجربة', d.reviewUrl)}</p>
+    `),
+  }
+}
+
 /** رسالة واحدة لمراجعة جميع منشورات الحملة من صفحة واحدة. */
 export function campaignReadyForReview(d: {
   requestNumber: string

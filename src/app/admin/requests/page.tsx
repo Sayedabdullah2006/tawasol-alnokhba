@@ -71,6 +71,10 @@ export default function AdminRequestsPage() {
   const [savingQuickAction, setSavingQuickAction] = useState(false)
   const [thumbnailTarget, setThumbnailTarget] = useState<any | null>(null)
   const [savingThumbnail, setSavingThumbnail] = useState(false)
+  const [reviewsByRequest, setReviewsByRequest] = useState<Record<string, any>>({})
+  const [sendingReviewInvitationId, setSendingReviewInvitationId] = useState<string | null>(null)
+  const [showBulkReviewConfirm, setShowBulkReviewConfirm] = useState(false)
+  const [sendingBulkReviewInvitations, setSendingBulkReviewInvitations] = useState(false)
   const [revivalTarget, setRevivalTarget] = useState<any | null>(null)
   const [revivalDiscountPct, setRevivalDiscountPct] = useState(15)
   const [revivalValidDays, setRevivalValidDays] = useState(3)
@@ -105,6 +109,16 @@ export default function AdminRequestsPage() {
       .order('created_at', { ascending: false })
 
     setRequestSummaries(summaries ?? [])
+
+    const reviewResponse = await fetch('/api/admin/request-reviews')
+    if (reviewResponse.ok) {
+      const reviewData = await reviewResponse.json().catch(() => ({ reviews: [] }))
+      const mapped = (reviewData.reviews ?? []).reduce((acc: Record<string, any>, review: any) => {
+        acc[review.request_id] = review
+        return acc
+      }, {})
+      setReviewsByRequest(mapped)
+    }
     setLoading(false)
   }, [supabase, router])
 
@@ -286,6 +300,31 @@ export default function AdminRequestsPage() {
       showToast('خطأ في الاتصال بالخادم', 'error')
     } finally {
       setSavingThumbnail(false)
+    }
+  }
+
+  const sendReviewInvitation = async (request: any) => {
+    setSendingReviewInvitationId(request.id)
+    try {
+      const response = await fetch('/api/admin/request-review-invitation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: request.id }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.success) {
+        showToast(data.error ?? 'تعذّر إرسال دعوة التقييم', 'error')
+        return
+      }
+      setReviewsByRequest(current => ({
+        ...current,
+        [request.id]: { ...(current[request.id] ?? {}), invitation_sent_at: new Date().toISOString() },
+      }))
+      showToast('تم إرسال رابط التقييم للعميل')
+    } catch {
+      showToast('خطأ في الاتصال بالخادم', 'error')
+    } finally {
+      setSendingReviewInvitationId(null)
     }
   }
 
@@ -533,6 +572,28 @@ export default function AdminRequestsPage() {
     }
   }
 
+  const handleBulkReviewInvitations = async () => {
+    setSendingBulkReviewInvitations(true)
+    try {
+      const response = await fetch('/api/admin/bulk-request-review-invitations', { method: 'POST' })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.success) {
+        showToast(data.error ?? 'تعذّر إرسال دعوات التقييم', 'error')
+        return
+      }
+      const parts = [`تم إرسال ${data.sent} دعوة تقييم`]
+      if (data.skipped) parts.push(`تخطي ${data.skipped} تقييم مكتمل`)
+      if (data.failed) parts.push(`فشل ${data.failed}`)
+      showToast(parts.join(' • '), data.failed ? 'info' : 'success')
+      await loadData()
+      setShowBulkReviewConfirm(false)
+    } catch {
+      showToast('خطأ في الاتصال بالخادم', 'error')
+    } finally {
+      setSendingBulkReviewInvitations(false)
+    }
+  }
+
   const handleSendReminder = (request: any, event: React.MouseEvent) => {
     event.stopPropagation() // منع فتح صفحة الطلب
     setSingleApplyDiscount(false)
@@ -775,6 +836,15 @@ export default function AdminRequestsPage() {
           >
             🔔 تذكير ({quotedCount})
           </Button>
+          <button
+            type="button"
+            onClick={() => setShowBulkReviewConfirm(true)}
+            title="إرسال طلب تقييم للطلبات المكتملة"
+            aria-label="إرسال طلب تقييم للطلبات المكتملة"
+            className="inline-flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center rounded-lg border border-gold/50 bg-gold/10 px-2 text-base text-gold transition hover:bg-gold/20"
+          >
+            ★
+          </button>
         </div>
 
         <div className="mt-3 flex gap-2 overflow-x-auto border-t border-border pt-3" aria-label="فلاتر الإجراءات السريعة">
@@ -909,6 +979,7 @@ export default function AdminRequestsPage() {
             const total = r.final_total ?? r.admin_quoted_price
             const expanded = !!expandedRequests[r.id]
             const thumbnailUrl = getRequestThumbnail(r)
+            const review = reviewsByRequest[r.id]
             return (
               <article key={r.id} className="rounded-lg border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
@@ -924,34 +995,44 @@ export default function AdminRequestsPage() {
                       {cat && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{cat.icon} {cat.nameAr}</span>}
                       {selectedPackage && <span className="rounded-full border border-green/20 bg-green/10 px-2.5 py-1 text-green">{selectedPackage.name}</span>}
                       {isDuplicate(r) && <span className="rounded-full bg-purple-50 px-2.5 py-1 text-purple-700">{requestCountByOwner[ownerKey(r)]} طلبات لنفس العميل</span>}
+                      {r.status === 'completed' && review?.rating && <span className="rounded-full border border-gold/30 bg-gold/10 px-2.5 py-1 text-gold">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)} تقييم العميل</span>}
+                      {r.status === 'completed' && !review?.rating && review?.invitation_sent_at && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">بانتظار تقييم العميل</span>}
                     </div>
+                    {r.status === 'completed' && review?.comment && <div className="mt-3 rounded-lg border border-gold/20 bg-gold/5 px-3 py-2 text-xs leading-5 text-dark"><span className="font-black text-gold">رأي العميل: </span>{review.comment}</div>}
                     {r.admin_notes?.trim() && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700"><span className="font-black">ملاحظة الإدارة: </span>{r.admin_notes.trim()}</div>}
                   </div>
 
                   <div className="border-t border-border pt-3 lg:border-r lg:border-t-0 lg:pr-4 lg:pt-0">
                     {thumbnailUrl && (
-                      <a
-                        href={thumbnailUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mb-3 flex h-28 items-center justify-center overflow-hidden rounded-lg border border-border bg-cream/50 p-2"
-                        title="عرض الصورة المرفقة"
-                      >
-                        <img
-                          src={thumbnailUrl}
-                          alt={`صورة مرفقة للطلب ${generateRequestNumber(r.request_number)}`}
-                          className="h-full w-full object-contain"
-                        />
-                      </a>
+                      <div className="relative mb-3 h-28 overflow-hidden rounded-lg border border-border bg-cream/50 p-2">
+                        <a
+                          href={thumbnailUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex h-full w-full items-center justify-center"
+                          title="عرض الصورة المرفقة"
+                        >
+                          <img
+                            src={thumbnailUrl}
+                            alt={`صورة مرفقة للطلب ${generateRequestNumber(r.request_number)}`}
+                            className="h-full w-full object-contain"
+                          />
+                        </a>
+                        {Array.isArray(r.content_images) && r.content_images.filter((image: unknown) => typeof image === 'string' && !!image.trim()).length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setThumbnailTarget(r)}
+                            className="absolute left-2 top-2 grid h-8 w-8 place-items-center rounded-full border border-white/80 bg-white/95 text-sm text-dark shadow-sm transition hover:bg-green hover:text-white"
+                            title="اختيار صورة مصغرة أخرى"
+                            aria-label="اختيار صورة مصغرة أخرى"
+                          >
+                            ✎
+                          </button>
+                        )}
+                      </div>
                     )}
                     {Array.isArray(r.content_images) && r.content_images.filter((image: unknown) => typeof image === 'string' && !!image.trim()).length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => setThumbnailTarget(r)}
-                        className="mb-3 w-full rounded-lg border border-border bg-white px-3 py-2 text-xs font-bold text-dark transition-colors hover:border-green hover:bg-green/5"
-                      >
-                        اختيار صورة أخرى
-                      </button>
+                      !thumbnailUrl && <button type="button" onClick={() => setThumbnailTarget(r)} className="mb-3 w-full rounded-lg border border-border bg-white px-3 py-2 text-xs font-bold text-dark transition-colors hover:border-green hover:bg-green/5">اختيار صورة</button>
                     )}
                     <ClientNameFixed name={r.client_name || 'عميل بدون اسم'} maxLength={32} className="block text-sm font-bold text-dark" />
                     {r.client_email && <p className="mt-1 truncate text-xs text-muted" dir="ltr">{r.client_email}</p>}
@@ -984,6 +1065,11 @@ export default function AdminRequestsPage() {
                   <button onClick={(e) => openQuickNote(r, e)} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${r.admin_notes?.trim() ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>📝 {r.admin_notes?.trim() ? 'تعديل الملاحظة' : 'إضافة ملاحظة'}</button>
                   <button onClick={(e) => handleSendReminder(r, e)} disabled={sendingReminderId === r.id || !r.client_email} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50" title="إرسال تذكير بالبريد">{sendingReminderId === r.id ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" /> : '✉'}</button>
                   <button onClick={(e) => handleWhatsApp(r, e)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green hover:bg-green/15" title="مراسلة العميل عبر واتساب">◉</button>
+                  {r.status === 'completed' && r.client_email && !review?.rating && (
+                    <button onClick={() => sendReviewInvitation(r)} disabled={sendingReviewInvitationId === r.id} className="rounded-lg border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-bold text-dark hover:bg-gold/20 disabled:opacity-50">
+                      {sendingReviewInvitationId === r.id ? 'جارٍ الإرسال...' : review?.invitation_sent_at ? 'إعادة إرسال التقييم' : 'طلب تقييم'}
+                    </button>
+                  )}
                   {r.status === 'client_rejected' && <button onClick={(e) => { e.stopPropagation(); openRequest(r) }} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100">إرسال عرض جديد</button>}
                   {r.status === 'auto_closed' && <button onClick={(e) => openRevival(r, e)} disabled={!r.client_email} className="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">↻ إحياء الطلب</button>}
                   <button onClick={(e) => handleDeleteClick(r, e)} disabled={deletingRequestId === r.id} className="mr-auto inline-flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50" title="حذف الطلب نهائياً">{deletingRequestId === r.id ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-red-600 border-t-transparent" /> : '🗑'}</button>
@@ -1537,6 +1623,23 @@ export default function AdminRequestsPage() {
               >
                 {bulkApplyDiscount ? `إرسال + خصم ${bulkDiscountPct}%` : 'إرسال الآن'}
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBulkReviewConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !sendingBulkReviewInvitations && setShowBulkReviewConfirm(false)}>
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" onClick={event => event.stopPropagation()} dir="rtl">
+            <div className="text-center">
+              <div className="text-5xl text-gold">★★★★★</div>
+              <h3 className="mt-3 text-xl font-black text-dark">إرسال طلبات التقييم</h3>
+              <p className="mt-2 text-sm leading-6 text-muted">سيُرسل رابط تقييم إلى <strong className="text-dark">{requestSummaries.filter(request => request.status === 'completed' && request.client_email && !reviewsByRequest[request.id]?.rating).length}</strong> عميل من الطلبات المكتملة.</p>
+            </div>
+            <div className="mt-4 rounded-lg border border-gold/20 bg-gold/5 px-3 py-2 text-xs leading-5 text-dark">لن تُرسل الدعوة للعملاء الذين قيّموا طلباتهم مسبقاً. والرابط صالح لمدة 30 يوماً ولا يتطلب تسجيل دخول.</div>
+            <div className="mt-5 flex gap-3">
+              <Button variant="outline" onClick={() => setShowBulkReviewConfirm(false)} disabled={sendingBulkReviewInvitations} className="flex-1">إلغاء</Button>
+              <Button onClick={handleBulkReviewInvitations} loading={sendingBulkReviewInvitations} className="flex-1 bg-gold text-dark hover:bg-gold/90">إرسال التقييمات</Button>
             </div>
           </div>
         </div>

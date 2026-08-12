@@ -8,6 +8,8 @@ import {
   notifyStatusUpdateToClient,
 } from '@/lib/email'
 import { REQUEST_STATUSES } from '@/lib/constants'
+import { sendRequestReviewInvitation } from '@/lib/request-reviews'
+import { generateRequestNumber } from '@/lib/utils'
 
 // ── حماية انتقالات الحالة ──────────────────────────────────────────
 // يمنع الانتقال العشوائي بين الحالات ويحمي الحالات المالية النهائية
@@ -99,7 +101,7 @@ export async function POST(request: Request) {
           : {}),
       })
       .eq('id', requestId)
-      .select('request_number, client_name, client_email, final_total, admin_quoted_price, estimated_reach, admin_notes')
+      .select('id, request_number, client_name, client_email, final_total, admin_quoted_price, estimated_reach, admin_notes')
       .single()
 
     if (error) {
@@ -156,6 +158,15 @@ export async function POST(request: Request) {
           break
       }
       if (p) p.catch(e => console.error('Status email failed:', e))
+
+      if (targetStatus === 'completed') {
+        sendRequestReviewInvitation({
+          requestId: updated.id,
+          requestNumber: generateRequestNumber(updated.request_number),
+          clientName: updated.client_name ?? 'عميلنا العزيز',
+          clientEmail: updated.client_email,
+        }).catch(error => console.error('Request review invitation failed:', error))
+      }
     }
 
     return NextResponse.json({ success: true })

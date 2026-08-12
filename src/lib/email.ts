@@ -161,6 +161,13 @@ export async function notifyContentReadyForReview(args: {
   return sendEmail(args.email, t.subject, t.html)
 }
 
+export async function sendRequestReviewEmail(args: {
+  email: string; requestNumber: string; clientName: string; reviewUrl: string
+}) {
+  const t = templates.requestReviewToClient(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
 export async function notifyCampaignReadyForReview(args: {
   requestNumber: string
   requestId: string
