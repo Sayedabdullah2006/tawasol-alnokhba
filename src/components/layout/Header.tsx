@@ -83,7 +83,7 @@ export default function Header() {
 
   return (
     <>
-    <header className="glass-panel sticky top-3 z-40 mx-auto w-[calc(100%-1.5rem)] max-w-6xl rounded-lg">
+    <header className="glass-panel fixed inset-x-3 top-3 z-50 w-auto rounded-lg">
       <div className="mx-auto flex h-[68px] items-center justify-between px-4 sm:px-5">
         <Link href="/" className="flex items-center" aria-label="تواصل النخبة">
           {/* eslint-disable-next-line @next/next/no-img-element */}

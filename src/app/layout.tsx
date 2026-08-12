@@ -32,7 +32,7 @@ export default function RootLayout({
       <body className="site-page min-h-full flex flex-col antialiased overflow-x-hidden">
         <ToastProvider>
           <Header />
-          <main className="flex-1 flex flex-col min-w-0">{children}</main>
+          <main className="min-w-0 flex-1 flex flex-col pt-[84px]">{children}</main>
           <Footer />
           <DiscountPopup />
         </ToastProvider>
