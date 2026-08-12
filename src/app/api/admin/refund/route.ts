@@ -58,7 +58,9 @@ export async function POST(request: Request) {
 
   const reference = randomUUID()
   const now = new Date().toISOString()
-  let status: 'pending' | 'completed' | 'failed' = provider === 'manual' ? 'pending' : 'failed'
+  // قبول مزود الدفع لطلب الاسترجاع ليس تأكيداً لوصول المبلغ إلى العميل.
+  // يبقى السجل قيد المعالجة حتى يصل إشعار المزود النهائي عبر الـWebhook.
+  let status: 'pending' | 'failed' = provider === 'manual' ? 'pending' : 'failed'
   let providerResponse: any = null
   let providerRefundId: string | null = null
 
@@ -66,7 +68,7 @@ export async function POST(request: Request) {
     const result = await refundMoyasarPayment(publishRequest.moyasar_payment_id!, Math.round(amount * 100))
     providerResponse = result.data ?? { error: result.error }
     if (result.success) {
-      status = result.data?.status === 'refunded' ? 'completed' : 'pending'
+      status = 'pending'
       providerRefundId = result.data?.id ?? reference
     }
   } else if (provider === 'tamara') {
@@ -82,7 +84,7 @@ export async function POST(request: Request) {
   const { data: refund, error: insertError } = await service.from('payment_refunds').insert({
     request_id: requestId, provider, provider_payment_id: provider === 'moyasar' ? publishRequest.moyasar_payment_id : publishRequest.tamara_order_id,
     provider_refund_id: providerRefundId, amount, reason, status, requested_by: user.id, requested_at: now,
-    processed_at: status === 'completed' ? now : null, provider_response: providerResponse,
+    processed_at: null, provider_response: providerResponse,
   }).select().single()
   if (insertError) return NextResponse.json({ error: 'تعذّر تسجيل عملية الاسترجاع' }, { status: 500 })
 
@@ -90,10 +92,10 @@ export async function POST(request: Request) {
 
   const totalAfterRefund = Math.round((refundedAmount + amount) * 100) / 100
   const isFullRefund = totalAfterRefund >= paidAmount - 0.001
-  const isPending = status === 'pending'
+  const isPending = true
   // لا نغيّر مسار تنفيذ الطلب في الاسترجاع الجزئي، بينما الاسترجاع الكامل ينتظر تأكيد المزود أو الإدارة.
-  const nextStatus = isPending && isFullRefund ? 'refund_pending' : isFullRefund ? 'refunded' : undefined
-  const nextPaymentStatus = isPending ? 'refund_pending' : isFullRefund ? 'refunded' : 'partially_refunded'
+  const nextStatus = isFullRefund ? 'refund_pending' : undefined
+  const nextPaymentStatus = 'refund_pending'
   await service.from('publish_requests').update({
     ...(nextStatus ? { status: nextStatus } : {}),
     payment_status: nextPaymentStatus,

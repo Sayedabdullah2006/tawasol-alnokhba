@@ -41,7 +41,7 @@ img { border:0; height:auto; line-height:100%; outline:none; text-decoration:non
 a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !important; }
 </style>
 </head>
-<body style="margin:0 !important; padding:0 !important; width:100% !important; min-width:100% !important; background-color:#F7F4ED; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:${BRAND_NAVY}; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
+<body dir="rtl" style="direction:rtl; text-align:right; margin:0 !important; padding:0 !important; width:100% !important; min-width:100% !important; background-color:#F7F4ED; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:${BRAND_NAVY}; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
   <!-- Preheader text for better inbox preview -->
   <div style="display:none; font-size:1px; color:#F7F4ED; line-height:1px; max-height:0px; max-width:0px; opacity:0; overflow:hidden; mso-hide:all;">
     تحديث من منصة تواصل النخبة للتسويق والإعلان
@@ -50,7 +50,7 @@ a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !impo
   <!-- 100% background wrapper -->
   <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="background-color:#F7F4ED; min-width:100%;">
     <tr>
-      <td align="center" valign="top" style="padding:24px 12px;">
+      <td align="center" valign="top" dir="rtl" style="direction:rtl; text-align:right; padding:24px 12px;">
         <!-- Main container -->
         <table width="560" cellpadding="0" cellspacing="0" border="0" role="presentation" style="max-width:560px; width:100%; background-color:#FFFFFF; border-radius:16px; overflow:hidden; box-shadow:0 2px 8px rgba(14,40,85,0.08);">
 
@@ -64,7 +64,7 @@ a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !impo
 
           <!-- Main content body -->
           <tr>
-            <td style="padding:32px 28px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height:1.6;">
+            <td dir="rtl" style="direction:rtl; text-align:right; padding:32px 28px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height:1.6;">
               ${innerHtml}
             </td>
           </tr>
@@ -811,8 +811,8 @@ export function refundUpdateToClient(d: {
         <div style="font-size:42px;">${d.isPending ? '⏳' : '↩'}</div>
         <p style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${BRAND_NAVY};">${d.isPending ? 'طلب الاسترجاع قيد المعالجة' : 'تم تنفيذ الاسترجاع'}</p>
       </div>
-      <p style="margin:0 0 14px 0; font-size:14px; line-height:1.8;">تم ${d.isPending ? 'تسجيل طلب' : 'تنفيذ'} استرجاع مبلغ <strong>${amount} ر.س</strong> لطلبك <strong>${escapeHtml(d.requestNumber)}</strong>.</p>
-      <div style="background:#F7F4ED; border-right:3px solid ${BRAND_GOLD}; padding:12px 14px; border-radius:8px; margin:14px 0; font-size:13px; line-height:1.8;">من المتوقع أن ينعكس المبلغ في وسيلة الدفع خلال <strong>${escapeHtml(d.timing)}</strong>، بحسب البنك أو مزود الدفع.${d.isPending ? '<br /><br />تخضع عملية الاسترداد، بعد رفع الطلب، لإجراءات ومدد المعالجة الخاصة بمزود خدمة الدفع والبنوك أو الجهات المالية ذات العلاقة. ولا تتحمل الإدارة مسؤولية أي تأخير ناتج عن تلك الجهات أو عن أسباب خارجة عن نطاق سيطرتها، وذلك في حدود ما تجيزه الأنظمة واللوائح المعمول بها.' : ''}</div>
+      <p style="margin:0 0 14px 0; font-size:14px; line-height:1.8;">${d.isPending ? 'تم رفع طلب استرداد مبلغ' : 'تم تنفيذ استرداد مبلغ'} <strong>${amount} ر.س</strong> لطلبك <strong dir="ltr">${escapeHtml(d.requestNumber)}</strong>.</p>
+      <div style="background:#F7F4ED; border-right:3px solid ${BRAND_GOLD}; padding:12px 14px; border-radius:8px; margin:14px 0; font-size:13px; line-height:1.8;">${d.isPending ? 'أحالت إدارة تواصل النخبة طلب الاسترداد إلى مزود خدمة الدفع، وهو الآن قيد المعالجة.' : 'أكّد مزود خدمة الدفع إتمام عملية الاسترداد.'}<br /><br />من المتوقع أن ينعكس المبلغ في وسيلة الدفع خلال <strong>${escapeHtml(d.timing)}</strong>، بحسب البنك أو مزود الدفع.${d.isPending ? '<br /><br />تخضع عملية الاسترداد، بعد رفع الطلب، لإجراءات ومدد المعالجة الخاصة بمزود خدمة الدفع والبنوك أو الجهات المالية ذات العلاقة. ولا تتحمل الإدارة مسؤولية أي تأخير ناتج عن تلك الجهات أو عن أسباب خارجة عن نطاق سيطرتها، وذلك في حدود ما تجيزه الأنظمة واللوائح المعمول بها.' : ''}</div>
       <p style="margin:18px 0 0 0; font-size:13px; line-height:1.8; color:#6B7C99;">لأي استفسار، يسعد فريقنا بخدمتك.</p>
     `),
   }

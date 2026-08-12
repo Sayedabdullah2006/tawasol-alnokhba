@@ -80,6 +80,7 @@ export default function AdminRequestsPage() {
   const [refundReason, setRefundReason] = useState('')
   const [processingRefund, setProcessingRefund] = useState(false)
   const [confirmingRefundId, setConfirmingRefundId] = useState<string | null>(null)
+  const [resendingRefundId, setResendingRefundId] = useState<string | null>(null)
   const [refundsByRequest, setRefundsByRequest] = useState<Record<string, any[]>>({})
   const [revivalTarget, setRevivalTarget] = useState<any | null>(null)
   const [revivalDiscountPct, setRevivalDiscountPct] = useState(15)
@@ -377,7 +378,7 @@ export default function AdminRequestsPage() {
         showToast(data.error ?? 'تعذّر تنفيذ الاسترجاع', 'error')
         return
       }
-      showToast(data.status === 'pending' ? 'تم تسجيل طلب الاسترجاع اليدوي وإشعار العميل' : 'تم تنفيذ الاسترجاع وإشعار العميل')
+      showToast('تم رفع طلب الاسترجاع وإشعار العميل بأنه قيد المعالجة')
       setRefundTarget(null)
       await loadData()
     } catch {
@@ -403,6 +404,23 @@ export default function AdminRequestsPage() {
       showToast('خطأ في الاتصال بالخادم', 'error')
     } finally {
       setConfirmingRefundId(null)
+    }
+  }
+
+  const resendRefundRequestEmail = async (refund: any) => {
+    setResendingRefundId(refund.id)
+    try {
+      const response = await fetch(`/api/admin/refund/${refund.id}/resend-request`, { method: 'POST' })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.success) {
+        showToast(data.error ?? 'تعذّر إرسال إشعار الاسترجاع', 'error')
+        return
+      }
+      showToast('تم إرسال إشعار طلب الاسترجاع للعميل')
+    } catch {
+      showToast('خطأ في الاتصال بالخادم', 'error')
+    } finally {
+      setResendingRefundId(null)
     }
   }
 
@@ -1158,6 +1176,11 @@ export default function AdminRequestsPage() {
                     </button>
                   )}
                   {canRefund && <button onClick={() => openRefund(r)} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100" title="استرجاع مبلغ للعميل">استرجاع مبلغ</button>}
+                  {hasRefund && r.client_email && (
+                    <button onClick={() => resendRefundRequestEmail(refunds[0])} disabled={resendingRefundId === refunds[0]?.id} className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-800 hover:bg-orange-100 disabled:opacity-50" title="إرسال إشعار بأن طلب الاسترجاع قيد المعالجة">
+                      {resendingRefundId === refunds[0]?.id ? 'جارٍ الإرسال...' : 'إعادة إرسال إشعار الاسترجاع'}
+                    </button>
+                  )}
                   {pendingManualRefund && <button onClick={() => confirmManualRefund(pendingManualRefund)} disabled={confirmingRefundId === pendingManualRefund.id} className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-800 hover:bg-orange-100 disabled:opacity-50">{confirmingRefundId === pendingManualRefund.id ? 'جارٍ التأكيد...' : 'تأكيد تحويل الاسترجاع'}</button>}
                   {r.status === 'client_rejected' && <button onClick={(e) => { e.stopPropagation(); openRequest(r) }} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100">إرسال عرض جديد</button>}
                   {r.status === 'auto_closed' && <button onClick={(e) => openRevival(r, e)} disabled={!r.client_email} className="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">↻ إحياء الطلب</button>}
