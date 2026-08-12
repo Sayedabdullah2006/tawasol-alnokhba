@@ -487,15 +487,19 @@ export default function AdminRequestsPage() {
   if (loading) return <LoadingSpinner size="lg" />
 
   return (
-    <div className="p-4 md:p-6">
-      <h1 className="text-2xl font-black text-dark mb-6">إدارة الطلبات</h1>
+    <div className="mx-auto max-w-7xl p-4 md:p-6">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div><h1 className="text-2xl font-black text-dark">إدارة الطلبات</h1><p className="mt-1 text-sm text-muted">تابع الطلبات، تواصل مع العملاء، وراجع تفاصيل التنفيذ.</p></div>
+        <span className="rounded-full bg-cream px-3 py-1.5 text-xs font-bold text-muted">{requests.length} طلب نشط</span>
+      </div>
 
-      <div className="flex flex-wrap gap-3 mb-4">
+      <div className="mb-4 rounded-lg border border-border bg-card p-3">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_224px]">
         <Input
           placeholder="بحث بالاسم أو رقم الطلب..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="max-w-xs"
+          className="w-full"
         />
         <select
           value={statusFilter}
@@ -548,6 +552,9 @@ export default function AdminRequestsPage() {
           )}
         </div>
 
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+
         <Button variant="outline" onClick={handleExport}>تصدير CSV</Button>
 
         <Button
@@ -596,6 +603,7 @@ export default function AdminRequestsPage() {
         <div className="ml-auto text-xs text-muted">
           عدد الطلبات: {requests.length} | المفلترة: {filteredRequests.length}
         </div>
+        </div>
       </div>
 
       {/* Debug Panel */}
@@ -630,7 +638,66 @@ export default function AdminRequestsPage() {
         </>
       )}
 
-      <div className="bg-card rounded-2xl border border-border overflow-hidden">
+      <div className="overflow-hidden rounded-lg border border-border bg-card" dir="rtl">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-cream/60 px-4 py-3">
+          <div>
+            <h2 className="text-sm font-black text-dark">قائمة الطلبات</h2>
+            <p className="mt-0.5 text-xs text-muted">{filteredRequests.length} طلب ظاهر</p>
+          </div>
+          {(search || statusFilter || duplicatesOnly || userFilter) && (
+            <button onClick={() => { setSearch(''); setStatusFilter(''); setDuplicatesOnly(false); setUserFilter(''); setUserQuery('') }} className="text-xs font-bold text-green hover:underline">مسح الفلاتر</button>
+          )}
+        </div>
+
+        <div className="divide-y divide-border">
+          {filteredRequests.map(r => {
+            const cat = CATEGORIES.find(c => c.id === r.category)
+            const selectedPackage = PACKAGES.find(pkg => pkg.id === (r.auto_quote_tier ?? r.selected_package))
+            const total = r.final_total ?? r.admin_quoted_price
+            return (
+              <article key={r.id} onClick={() => openRequest(r)} className="cursor-pointer p-4 transition-colors hover:bg-cream/35 sm:p-5">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-muted">{generateRequestNumber(r.request_number)}</span>
+                      <StatusBadge status={r.status} userRole="admin" />
+                      {r.is_external && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">خارجي</span>}
+                    </div>
+                    <h3 className="mt-2 text-sm font-black leading-6 text-dark sm:text-base">{r.title || 'طلب بدون عنوان'}</h3>
+                    {r.content && <p className="mt-1 max-w-3xl text-xs leading-5 text-muted">{truncateContent(r.content, 150)}</p>}
+                    <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-bold">
+                      {cat && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{cat.icon} {cat.nameAr}</span>}
+                      {selectedPackage && <span className="rounded-full border border-green/20 bg-green/10 px-2.5 py-1 text-green">{selectedPackage.name}</span>}
+                      {isDuplicate(r) && <span className="rounded-full bg-purple-50 px-2.5 py-1 text-purple-700">{requestCountByOwner[ownerKey(r)]} طلبات لنفس العميل</span>}
+                    </div>
+                    {r.admin_notes?.trim() && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700"><span className="font-black">ملاحظة الإدارة: </span>{r.admin_notes.trim()}</div>}
+                  </div>
+
+                  <div className="border-t border-border pt-3 lg:border-r lg:border-t-0 lg:pr-4 lg:pt-0">
+                    <ClientNameFixed name={r.client_name || 'عميل بدون اسم'} maxLength={32} className="block text-sm font-bold text-dark" />
+                    {r.client_email && <p className="mt-1 truncate text-xs text-muted" dir="ltr">{r.client_email}</p>}
+                    <div className="mt-3 flex items-end justify-between gap-3">
+                      <div><p className="text-[10px] font-bold text-muted">إجمالي الطلب</p><p className="mt-0.5 text-base font-black text-dark">{total != null ? `${formatNumber(total)} ر.س` : '—'}</p></div>
+                      <p className="text-left text-[11px] leading-5 text-muted">{formatDate(r.created_at)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3" onClick={e => e.stopPropagation()}>
+                  <button onClick={(e) => openQuickNote(r, e)} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${r.admin_notes?.trim() ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>📝 {r.admin_notes?.trim() ? 'تعديل الملاحظة' : 'إضافة ملاحظة'}</button>
+                  <button onClick={(e) => handleSendReminder(r, e)} disabled={sendingReminderId === r.id || !r.client_email} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50" title="إرسال تذكير بالبريد">{sendingReminderId === r.id ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" /> : '✉'}</button>
+                  <button onClick={(e) => handleWhatsApp(r, e)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green hover:bg-green/15" title="مراسلة العميل عبر واتساب">◉</button>
+                  {r.status === 'client_rejected' && <button onClick={(e) => { e.stopPropagation(); openRequest(r) }} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100">إرسال عرض جديد</button>}
+                  <button onClick={(e) => handleDeleteClick(r, e)} disabled={deletingRequestId === r.id} className="mr-auto inline-flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50" title="حذف الطلب نهائياً">{deletingRequestId === r.id ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-red-600 border-t-transparent" /> : '🗑'}</button>
+                </div>
+              </article>
+            )
+          })}
+          {filteredRequests.length === 0 && <div className="p-10 text-center text-sm text-muted">لا توجد طلبات تطابق الفلاتر الحالية.</div>}
+        </div>
+      </div>
+
+      <div className="hidden bg-card rounded-2xl border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[800px]">
             <thead className="bg-cream">
