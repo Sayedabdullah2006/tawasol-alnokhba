@@ -972,66 +972,6 @@ export default function AIStudioPanel({
         </div>
       </div>
 
-      {/* ── التصاميم المعدّلة تلقائياً حسب ملاحظات العميل (مع الإبقاء على القديمة أعلاه) ── */}
-      {((Array.isArray(saved.revised?.designs) && saved.revised.designs.length > 0) || saved.revised?.revised_text) && (
-        <div className={`${cardCls} border-amber-300`}>
-          <StepHead n="🔁" title="مسودة التعديل الداخلية" subtitle="لم تُرسل للعميل بعد. راجع النتيجة، ثم أرسل فقط ما تريد اعتماده للمراجعة التالية." tone="gold" />
-          {saved.revised.revision_base_image && (
-            <div className="flex items-center gap-3 rounded-xl border border-green/30 bg-green/5 p-3 text-xs text-dark">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={saved.revised.revision_base_image} alt="التصميم الذي اختاره العميل" className="h-16 w-12 rounded-lg border border-green object-cover" />
-              <div><p className="font-bold text-green">التصميم الذي اختاره العميل كأساس</p><p className="mt-1 text-muted">جميع نتائج هذه المسودة مبنية عليه.</p></div>
-            </div>
-          )}
-          {(saved.revised.text_feedback || saved.revised.design_feedback || saved.revised.feedback) && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
-              <p className="font-bold">✍️ ملاحظات العميل التي عولجت</p>
-              {saved.revised.text_feedback && <p className="mt-1"><span className="font-bold">تعديل النص:</span> {saved.revised.text_feedback}</p>}
-              {saved.revised.design_feedback && <p className="mt-1"><span className="font-bold">تعديل التصميم:</span> {saved.revised.design_feedback}</p>}
-              {!saved.revised.text_feedback && !saved.revised.design_feedback && <p className="mt-1 whitespace-pre-line">{saved.revised.feedback}</p>}
-            </div>
-          )}
-          {saved.revised.analysis && (
-            <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-xs text-sky-800">
-              <span className="font-bold">🔎 تحليل التعديل:</span> {saved.revised.analysis}
-            </div>
-          )}
-          {saved.revised.revised_text && (
-            <div className="bg-white border border-sky-200 rounded-xl p-3 text-xs text-dark whitespace-pre-line">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <span className="font-bold text-sky-800">النص المقترح بعد التعديل</span>
-                <Button onClick={() => { setTweets(saved.revised.revised_text); setSelectedTweet(saved.revised.revised_text) }} variant="outline" size="sm">استخدم النص</Button>
-              </div>
-              {saved.revised.revised_text}
-            </div>
-          )}
-          <div className="space-y-3">
-            {saved.revised.designs.map((d: { title?: string; imageUrl?: string }, i: number) => {
-              const url = d.imageUrl as string
-              return (
-                <div key={i} className="rounded-xl border-2 border-amber-200 p-2 flex gap-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt={d.title} onClick={() => setLightbox(url)} className="w-24 flex-shrink-0 aspect-[4/5] object-cover rounded-lg border border-border cursor-zoom-in" />
-                  <div className="flex-1 min-w-0 space-y-1.5">
-                    <div className="font-bold text-dark text-xs">{d.title ?? `معدّل ${i + 1}`}</div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button onClick={() => onUsedContent(saved.revised.revised_text || selectedTweet, [url], isPost ? (postIndex as number) : 0)} variant="secondary" size="sm">📤 أرسل هذا للعميل</Button>
-                      <Button onClick={() => openPublish(url)} loading={publishingCover === url} disabled={publishingCover !== null} variant={publishedCover === url ? 'secondary' : 'outline'} size="sm">
-                        {publishedCover === url ? '✅ نُشر' : '📣 انشر'}
-                      </Button>
-                      <Button onClick={() => featureInMagazine(url)} loading={featuringCover === url} disabled={featuringCover !== null} variant={featuredCover === url ? 'secondary' : 'outline'} size="sm">
-                        {featuredCover === url ? '⭐ مميّز' : '⭐ ضمّن'}
-                      </Button>
-                      <a href={url} target="_blank" rel="noopener noreferrer" download className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold bg-green/10 text-green hover:bg-green/20">⬇️ تنزيل</a>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
       <ImageLightbox src={lightbox} onClose={() => setLightbox(null)} />
 
       {/* نافذة معاينة/تعديل قبل النشر عبر القنوات */}

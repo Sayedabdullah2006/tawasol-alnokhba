@@ -37,6 +37,7 @@ export default function PostReviewStatus({ request, onEdit, view = 'current' }: 
   const [editTarget, setEditTarget] = useState<string | null>(null)
   const [editNote, setEditNote] = useState('')
   const [editBusy, setEditBusy] = useState(false)
+  const [regenerating, setRegenerating] = useState<number | null>(null)
 
   const resend = (index: number, content: string, img: string) => onEdit?.(index, content, [img])
   const applyEdit = async (index: number, content: string) => {
@@ -93,8 +94,6 @@ export default function PostReviewStatus({ request, onEdit, view = 'current' }: 
           const rounds: any[] = Array.isArray(review.history) && review.history.length
             ? review.history
             : [{ content: review.proposed_content, images: review.proposed_images, feedback: review.user_feedback, approved: review.status === 'approved', selected_image: review.selected_image }]
-          const revision = request?.ai_posts?.[item.index]?.revised
-            ?? (item.index === 0 ? request?.ai_revised_designs : null)
           return (
             <section key={item.index} className="rounded-xl border border-border bg-card p-4">
               <div className="mb-3 flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-green/10 text-xs font-bold text-green">{item.index + 1}</span><h4 className="min-w-0 flex-1 truncate text-sm font-bold text-dark">{item.title}</h4></div>
@@ -119,51 +118,25 @@ export default function PostReviewStatus({ request, onEdit, view = 'current' }: 
                   )
                 })}
               </div>
-              {revision && (
-                <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50/60 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <h5 className="text-xs font-bold text-dark">مسودة التعديل الداخلية</h5>
-                      <p className="mt-0.5 text-[11px] text-muted">ناتجة عن ملاحظات العميل ولم تُرسل له بعد.</p>
-                    </div>
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">بانتظار مراجعة الأدمن</span>
-                  </div>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-[120px_1fr]">
-                    {revision.revision_base_image && (
-                      <button type="button" onClick={() => setLightbox(revision.revision_base_image)} className="relative aspect-[4/5] w-24 overflow-hidden rounded-lg border-2 border-green bg-white sm:w-full">
-                        <img src={revision.revision_base_image} alt="التصميم المختار كأساس" className="h-full w-full object-cover" />
-                        <span className="absolute inset-x-0 bottom-0 bg-green/90 px-1 py-1 text-[10px] font-bold text-white">اختيار العميل</span>
-                      </button>
-                    )}
-                    <div className="space-y-2">
-                      {(revision.text_feedback || revision.design_feedback || revision.feedback) && (
-                        <div className="rounded-lg border border-amber-200 bg-white p-2 text-[11px] leading-5 text-amber-900">
-                          <p className="font-bold">ملاحظات العميل التي عولجت</p>
-                          {revision.text_feedback && <p className="mt-1"><span className="font-bold">النص:</span> {revision.text_feedback}</p>}
-                          {revision.design_feedback && <p className="mt-1"><span className="font-bold">التصميم:</span> {revision.design_feedback}</p>}
-                          {!revision.text_feedback && !revision.design_feedback && <p className="mt-1 whitespace-pre-line">{revision.feedback}</p>}
-                        </div>
-                      )}
-                      {revision.analysis && <p className="rounded-lg border border-sky-200 bg-sky-50 p-2 text-[11px] leading-5 text-sky-900"><span className="font-bold">تحليل التعديل:</span> {revision.analysis}</p>}
-                      {revision.revised_text && <p className="whitespace-pre-line rounded-lg border border-sky-200 bg-white p-2 text-[11px] leading-5 text-dark"><span className="font-bold text-sky-800">النص المقترح:</span><br />{revision.revised_text}</p>}
-                    </div>
-                  </div>
-                  {Array.isArray(revision.designs) && revision.designs.length > 0 && (
-                    <div className="mt-3">
-                      <p className="mb-1 text-[11px] font-bold text-amber-900">التصاميم الناتجة من التعديل ({revision.designs.length})</p>
-                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-                        {revision.designs.map((design: { imageUrl?: string }, index: number) => design.imageUrl && <button key={index} type="button" onClick={() => setLightbox(design.imageUrl!)} className="aspect-[4/5] overflow-hidden rounded-lg border-2 border-amber-300 bg-white"><img src={design.imageUrl} alt={`نتيجة التعديل ${index + 1}`} className="h-full w-full object-cover" /></button>)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
             </section>
           )
         })}
         <ImageLightbox src={lightbox} onClose={() => setLightbox(null)} />
       </div>
     )
+  }
+
+  const regenerateRevision = async (index: number) => {
+    setRegenerating(index)
+    try {
+      const res = await fetch('/api/admin/regenerate-client-revision', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: request.id, postIndex: index }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { alert(data.error ?? 'فشلت إعادة التوليد'); return }
+      window.location.reload()
+    } catch { alert('تعذر الاتصال بالخادم لإعادة التوليد') } finally { setRegenerating(null) }
   }
 
   return (
@@ -181,9 +154,15 @@ export default function PostReviewStatus({ request, onEdit, view = 'current' }: 
         {items.map(item => {
           const r = reviews[item.index]
           if (!r) return null
-          const status = r.status ?? 'content_review'
+          const isLegacySingleRevision = !isCampaign && request?.status === 'changes_requested'
+          const status = isLegacySingleRevision ? 'changes_requested' : (r.status ?? 'content_review')
           const meta = STATUS_META[status] ?? STATUS_META.content_review
           const images: string[] = Array.isArray(r.proposed_images) ? r.proposed_images : []
+          const revision = request?.ai_posts?.[item.index]?.revised
+            ?? (item.index === 0 ? request?.ai_revised_designs : null)
+          const feedback = r.user_feedback ?? (!isCampaign ? request?.user_feedback : null)
+          const textFeedback = r.text_feedback
+          const designFeedback = r.design_feedback
 
           return (
             <div key={item.index} className="rounded-xl border border-border bg-cream/40 p-3 space-y-2">
@@ -247,13 +226,13 @@ export default function PostReviewStatus({ request, onEdit, view = 'current' }: 
               )}
 
               {/* ملاحظات العميل عند طلب التعديل */}
-              {status === 'changes_requested' && (r.text_feedback || r.design_feedback || r.user_feedback) && (
+              {status === 'changes_requested' && (textFeedback || designFeedback || feedback) && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2">
                   <p className="text-[11px] font-bold text-yellow-700 mb-0.5">ملاحظات العميل المعتمدة للتعديل:</p>
                   {r.revision_base_image && <button type="button" onClick={() => setLightbox(r.revision_base_image!)} className="mb-2 flex items-center gap-2 text-[11px] font-bold text-green"><img src={r.revision_base_image} alt="التصميم المختار كأساس" className="h-12 w-10 rounded border border-green object-cover" />التصميم الذي اختاره العميل كأساس</button>}
-                  {r.text_feedback && <p className="text-xs text-yellow-700 whitespace-pre-line"><span className="font-bold">تعديل النص:</span> {r.text_feedback}</p>}
-                  {r.design_feedback && <p className="mt-1 text-xs text-yellow-700 whitespace-pre-line"><span className="font-bold">تعديل التصميم:</span> {r.design_feedback}</p>}
-                  {!r.text_feedback && !r.design_feedback && <p className="text-xs text-yellow-700 whitespace-pre-line">{r.user_feedback}</p>}
+                  {textFeedback && <p className="text-xs text-yellow-700 whitespace-pre-line"><span className="font-bold">تعديل النص:</span> {textFeedback}</p>}
+                  {designFeedback && <p className="mt-1 text-xs text-yellow-700 whitespace-pre-line"><span className="font-bold">تعديل التصميم:</span> {designFeedback}</p>}
+                  {!textFeedback && !designFeedback && <p className="text-xs text-yellow-700 whitespace-pre-line">{feedback}</p>}
                   <p className="text-[11px] text-muted mt-1">تُجهّز نتيجة التعديل داخل الاستديو أولاً، ثم يقرر الأدمن ما يعيد إرساله للعميل.</p>
                   {Array.isArray(r.reference_images) && r.reference_images.length > 0 && (
                     <div className="mt-2">
@@ -262,6 +241,29 @@ export default function PostReviewStatus({ request, onEdit, view = 'current' }: 
                         {r.reference_images.map((image: string, imageIndex: number) => <button key={imageIndex} type="button" onClick={() => setLightbox(image)} className="aspect-square overflow-hidden rounded border border-yellow-200"><img src={image} alt={`مرجع العميل ${imageIndex + 1}`} className="w-full h-full object-cover" /></button>)}
                       </div>
                     </div>
+                  )}
+                </div>
+              )}
+
+              {status === 'changes_requested' && revision && (
+                <div className="rounded-xl border border-amber-300 bg-amber-50/60 p-3 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div><h4 className="text-xs font-bold text-dark">نتائج التعديل بعد ملاحظات العميل</h4><p className="mt-0.5 text-[11px] text-muted">مسودة داخلية؛ اختر نتيجة أو عدّلها ثم أرسلها للمراجعة التالية.</p></div>
+                    <button type="button" onClick={() => regenerateRevision(item.index)} disabled={regenerating !== null} className="shrink-0 rounded-lg border border-amber-400 bg-white px-2 py-1 text-[11px] font-bold text-amber-800 disabled:opacity-50">{regenerating === item.index ? 'جارٍ إعادة التوليد...' : '↻ إعادة التوليد'}</button>
+                  </div>
+                  {revision.revised_text && <div className="rounded-lg border border-sky-200 bg-white p-2 text-xs leading-6 text-dark"><span className="font-bold text-sky-800">النص المعدّل:</span><p className="mt-1 whitespace-pre-line">{revision.revised_text}</p></div>}
+                  {Array.isArray(revision.designs) && revision.designs.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {revision.designs.map((design: { title?: string; imageUrl?: string }, designIndex: number) => design.imageUrl && (
+                        <div key={designIndex} className="flex gap-2 rounded-lg border border-amber-200 bg-white p-2">
+                          <button type="button" onClick={() => setLightbox(design.imageUrl!)} className="h-20 w-16 shrink-0 overflow-hidden rounded border border-border"><img src={design.imageUrl} alt={`نتيجة تعديل ${designIndex + 1}`} className="h-full w-full object-cover" /></button>
+                          <div className="min-w-0 flex-1 space-y-1.5"><p className="truncate text-[11px] font-bold text-dark">{design.title ?? `نتيجة التعديل ${designIndex + 1}`}</p><div className="flex flex-wrap gap-1"><button type="button" onClick={() => onEdit?.(item.index, revision.revised_text || r.proposed_content || '', [design.imageUrl!])} className="rounded border border-green bg-green/5 px-2 py-1 text-[10px] font-bold text-green">إرسال للمراجعة</button><button type="button" onClick={() => { setEditTarget(design.imageUrl!); setEditNote('') }} className="rounded border border-border px-2 py-1 text-[10px] font-bold text-dark">تعديل التصميم</button></div></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="rounded-lg border border-dashed border-amber-300 bg-white p-2 text-[11px] text-amber-900">لا توجد صورة في هذه النتيجة بعد. استخدم «إعادة التوليد» لتطبيق ملاحظة التصميم مرة أخرى.</p>}
+                  {editTarget && revision.designs?.some((design: { imageUrl?: string }) => design.imageUrl === editTarget) && (
+                    <div className="rounded-lg border border-border bg-white p-2 space-y-2"><textarea value={editNote} onChange={e => setEditNote(e.target.value)} placeholder="اكتب تعديلك الإضافي على هذا التصميم" className="min-h-[72px] w-full rounded border border-border p-2 text-xs" /><div className="flex gap-2"><button type="button" onClick={() => applyEdit(item.index, revision.revised_text || r.proposed_content || '')} disabled={editBusy || !editNote.trim()} className="rounded bg-green px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50">{editBusy ? 'جارٍ التعديل...' : 'تطبيق وإرسال للمراجعة'}</button><button type="button" onClick={() => { setEditTarget(null); setEditNote('') }} className="text-[11px] text-muted">إلغاء</button></div></div>
                   )}
                 </div>
               )}
@@ -337,7 +339,7 @@ export default function PostReviewStatus({ request, onEdit, view = 'current' }: 
                   onClick={() => onEdit(item.index, r.proposed_content ?? '', images)}
                   className="w-full rounded-lg py-1.5 text-[11px] font-bold bg-white border border-green text-green hover:bg-green/5 transition-colors"
                 >
-                  ✏️ تعديل المحتوى والصور المُرسلة
+                  ✏️ تعديل المحتوى المُرسل
                 </button>
               )}
 

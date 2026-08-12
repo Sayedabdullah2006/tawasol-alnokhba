@@ -401,7 +401,8 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
     setAiContent(text)
     setAiImages(Array.isArray(images) ? images : [])
     setAiPostIndex(reviewIndex)
-    // نُبقي الاستوديو مفتوحاً ليبقى زر «الملاحظة وإعادة التوليد» متاحاً فوق شاشة الإرسال
+    // الانتقال لمراجعة العميل لأن محرّر الإرسال يعيش هناك، ولا يتم الإرسال تلقائياً.
+    setContentView('review')
     setSendingContent(true)
     setSenderNonce(n => n + 1)
     focusSender()
@@ -584,6 +585,8 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                 }
 
                 const isCampaign = request.request_type === 'campaign' && Array.isArray(request.campaign_posts) && request.campaign_posts.length > 0
+                const hasSentPostReview = !!request.post_reviews && typeof request.post_reviews === 'object' && Object.keys(request.post_reviews).length > 0
+                if (hasSentPostReview) return null
                 return (
                   <div className="space-y-4">
                     {isCampaign && <CampaignReviewSender request={request} onSent={() => window.location.reload()} />}
@@ -654,8 +657,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
               setAiContent(content ?? '')
               setAiImages(Array.isArray(images) ? images : [])
               setAiPostIndex(idx)
-              setContentView('studio')
-              setShowAIStudio(true)
+              setContentView('review')
               setSendingContent(true)
               setSenderNonce(n => n + 1)
               setActiveTab('content')
