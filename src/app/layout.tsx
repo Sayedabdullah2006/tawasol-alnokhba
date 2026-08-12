@@ -29,7 +29,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ar" dir="rtl" className={`${cairo.className} h-full`}>
-      <body className="min-h-full flex flex-col antialiased bg-cream overflow-x-hidden">
+      <body className="site-page min-h-full flex flex-col antialiased overflow-x-hidden">
         <ToastProvider>
           <Header />
           <main className="flex-1 flex flex-col min-w-0">{children}</main>

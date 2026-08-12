@@ -2,16 +2,18 @@
 
 :root {
   /* Brand palette — Tawasol Al-Nokhba (navy + gold) */
-  --cream: #F7F4ED;          /* warm off-white background */
+  --cream: #f3f6fb;          /* warm off-white background */
   --dark: #0E2855;           /* deep navy — primary text + headings */
   --green: #14366E;          /* navy primary action (kept name to minimize churn) */
   --light: #2C5099;          /* lighter navy accent */
-  --card: #FFFFFF;
-  --border: #E3DCC9;
+  --card: rgba(255, 255, 255, 0.72);
+  --border: rgba(22, 63, 120, 0.16);
   --gold: #C9A961;           /* refined gold matching logo */
-  --muted: #6B7C99;
-  --background: #F7F4ED;
-  --foreground: #0E2855;
+  --muted: #64738e;
+  --background: #eef3fa;
+  --foreground: #102b5c;
+  --glass-blur: blur(18px) saturate(125%);
+  --glass-shadow: 0 14px 38px rgba(16, 43, 92, 0.10);
 }
 
 html {
@@ -35,10 +37,57 @@ html {
 body {
   width: 100%;
   max-width: 100%;
-  background: var(--background);
+  min-height: 100vh;
+  background-color: var(--background);
+  background-image:
+    radial-gradient(circle at 8% 0%, rgba(200, 161, 84, 0.16), transparent 28rem),
+    radial-gradient(circle at 92% 6%, rgba(41, 93, 164, 0.17), transparent 32rem),
+    linear-gradient(135deg, #f9fbff 0%, #eef3fa 45%, #f7f4ec 100%);
+  background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-cairo), Arial, sans-serif;
 }
+
+/* Shared liquid-glass language, restricted to functional surfaces for performance. */
+.bg-card {
+  background-color: var(--card) !important;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.glass-panel-dark {
+  background: rgba(16, 43, 92, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 18px 46px rgba(9, 26, 58, 0.24);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.site-page { position: relative; isolation: isolate; }
+
+main > .bg-cream { background-color: transparent !important; }
+
+.site-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: linear-gradient(rgba(23, 72, 129, 0.026) 1px, transparent 1px), linear-gradient(90deg, rgba(23, 72, 129, 0.026) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: linear-gradient(to bottom, black, transparent 72%);
+}
+
+.app-heading { letter-spacing: 0; color: var(--dark); }
+::selection { background: rgba(200, 161, 84, 0.35); color: var(--dark); }
 
 /* إصلاح عرض النصوص العربية */
 [dir="rtl"] {

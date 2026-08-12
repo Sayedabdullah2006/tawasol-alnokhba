@@ -547,7 +547,7 @@ export default function RequestWizard() {
   if (pendingQuote) {
     const statusInfo = getStatusLabel(pendingQuote.status, 'client')
     return (
-      <div className="bg-cream min-h-screen flex items-center justify-center px-4 py-12">
+      <div className="min-h-screen px-4 py-12 flex items-center justify-center">
         <div className="max-w-md w-full space-y-4">
           <div className="bg-card rounded-2xl border-2 border-amber-200 p-7 text-center shadow-sm">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-50 flex items-center justify-center text-3xl">
@@ -589,7 +589,7 @@ export default function RequestWizard() {
     const canSelectExtras = requestType === 'single' && selectedPackage === 'basic' && estimatedTotal != null
 
     return (
-      <div className="bg-cream min-h-screen pb-8">
+      <div className="min-h-screen pb-8">
         <div className="max-w-2xl mx-auto w-full px-4 py-6">
           <button
             type="button"
@@ -732,7 +732,7 @@ export default function RequestWizard() {
 
   // ── العرض ───────────────────────────────────────────────────────
   return (
-    <div className="bg-cream min-h-screen pb-36 lg:pb-10">
+    <div className="min-h-screen pb-36 lg:pb-10">
       <div className="max-w-6xl mx-auto w-full px-4 pt-6">
         <div className="max-w-3xl mx-auto text-center mb-5">
           <h1 className="text-2xl md:text-3xl font-black text-dark mb-1">طلب نشر جديد</h1>

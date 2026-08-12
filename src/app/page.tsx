@@ -2,145 +2,119 @@ import Link from 'next/link'
 
 const stats = [
   { value: '+500K', label: 'وصول شهري' },
-  { value: '4', label: 'منصات' },
+  { value: '4', label: 'منصات نشر' },
   { value: '24 ساعة', label: 'متوسط التنفيذ' },
-  { value: '%98', label: 'رضا العملاء' },
+  { value: '98%', label: 'رضا العملاء' },
 ]
 
 const values = [
-  { icon: '🌐', title: 'وصول واسع', desc: 'حضور قوي عبر X و LinkedIn و Instagram و TikTok يوصل خبرك للجمهور المناسب.' },
-  { icon: '🎨', title: 'تصميم وصياغة راقية', desc: 'محتوى يليق بإنجازك بأيدي محترفين — لا قالب جاهز.' },
-  { icon: '✅', title: 'أنت تعتمد قبل النشر', desc: 'لا يُنشر شيء إلا بعد موافقتك الكاملة. صفر مخاطرة على صورتك.' },
-  { icon: '⚡', title: 'تنفيذ سريع', desc: 'خبرك جاهز للنشر خلال 24–48 ساعة من تأكيد الدفع.' },
-  { icon: '💳', title: 'سعر فوري + تقسيط', desc: 'تسعير شفّاف يظهر فوراً، ودفع مريح عبر تمارا على 3 دفعات.' },
-  { icon: '🔒', title: 'تعامل موثوق', desc: 'رُقيّ واحترافية من أول رسالة حتى نشر إنجازك بأبهى صورة.' },
+  { icon: '◎', title: 'وصول واسع', desc: 'حضور قوي عبر X وLinkedIn وInstagram وTikTok يصل بخبرك للجمهور المناسب.' },
+  { icon: '✦', title: 'صياغة وتصميم راقيان', desc: 'محتوى مصمم بعناية يليق بالإنجاز، لا قالب جاهز يتكرر على الجميع.' },
+  { icon: '✓', title: 'اعتمادك قبل النشر', desc: 'لا يُنشر شيء إلا بعد مراجعتك واعتمادك الكامل للمحتوى والتصميم.' },
+  { icon: '↗', title: 'تنفيذ واضح وسريع', desc: 'يتحول خبرك إلى خطة نشر جاهزة خلال 24 إلى 48 ساعة من تأكيد الدفع.' },
 ]
 
 const testimonials = [
-  { name: 'أحمد', role: 'رائد أعمال', quote: 'وصل خبري لآلاف خلال يوم واحد — احترافية من أول رسالة.', img: 'https://api.dicebear.com/9.x/micah/svg?seed=Ahmed&backgroundColor=1b3d85' },
-  { name: 'نورة', role: 'أكاديمية', quote: 'التصميم فاق توقعاتي والتفاعل كان لافتاً جداً.', img: 'https://api.dicebear.com/9.x/micah/svg?seed=Noura&backgroundColor=b6804a' },
-  { name: 'خالد', role: 'مهندس', quote: 'راقني أنني أعتمد المحتوى قبل النشر — ثقة كاملة.', img: 'https://api.dicebear.com/9.x/micah/svg?seed=Khalid&backgroundColor=2f5e3f' },
-  { name: 'ريم', role: 'صاحبة مشروع', quote: 'أبرزوا إنجازي بأسلوب يليق به فعلاً.', img: 'https://api.dicebear.com/9.x/micah/svg?seed=Reem&backgroundColor=8a5a83' },
-  { name: 'فهد', role: 'مستثمر', quote: 'أسرع وأرقى خدمة جرّبتها لإيصال خبري.', img: 'https://api.dicebear.com/9.x/micah/svg?seed=Fahad&backgroundColor=1b3d85' },
-  { name: 'سارة', role: 'مختصة تسويق', quote: 'خدمة منظّمة وسريعة، والنتيجة تستحق كل ريال.', img: 'https://api.dicebear.com/9.x/micah/svg?seed=Sara&backgroundColor=b6804a' },
+  { name: 'أحمد', role: 'رائد أعمال', quote: 'وصل خبري لآلاف خلال يوم واحد، وكنت متابعاً لكل تفصيلة حتى لحظة النشر.' },
+  { name: 'نورة', role: 'أكاديمية', quote: 'التصميم فاق توقعاتي والتعامل كان منظماً وواضحاً من البداية.' },
+  { name: 'خالد', role: 'مهندس', quote: 'فكرة أن أعتمد المحتوى قبل النشر أعطتني ثقة كاملة في التجربة.' },
 ]
 
 const faqs = [
-  { q: 'كم يستغرق تنفيذ الطلب؟', a: 'عادةً خلال 24–48 ساعة من تأكيد الدفع، حسب نوع المحتوى.' },
-  { q: 'هل أراجع المحتوى قبل النشر؟', a: 'نعم — لا يُنشر أي محتوى إلا بعد اعتمادك له بالكامل.' },
-  { q: 'كيف يمكنني الدفع؟', a: 'دفع إلكتروني بالبطاقة، أو تقسيط عبر تمارا على 3 دفعات، أو تحويل بنكي.' },
-  { q: 'هل الخدمة للأفراد أم الجهات؟', a: 'للجميع — الأفراد يحصلون على سعر فوري، والجهات على عرض مخصّص بعد المراجعة.' },
+  { q: 'كم يستغرق تنفيذ الطلب؟', a: 'عادة خلال 24 إلى 48 ساعة من تأكيد الدفع، بحسب نوع المحتوى وحجم الحملة.' },
+  { q: 'هل أراجع المحتوى قبل النشر؟', a: 'نعم، لا يُنشر أي محتوى قبل اعتمادك النهائي.' },
+  { q: 'كيف يمكنني الدفع؟', a: 'يمكنك الدفع بالبطاقة أو عبر تمارا أو بالتحويل البنكي.' },
 ]
 
 export default function HomePage() {
   return (
-    <div className="relative bg-dark overflow-hidden">
-      {/* لوحة غامرة متصلة — توهّجات محيطة تمنح إحساساً واحداً متواصلاً */}
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-48 left-1/2 -translate-x-1/2 w-[760px] h-[760px] bg-gold/10 rounded-full blur-3xl" />
-        <div className="absolute top-[820px] -right-48 w-[560px] h-[560px] bg-[#1B3D85]/50 rounded-full blur-3xl" />
-        <div className="absolute top-[1700px] -left-48 w-[560px] h-[560px] bg-green/10 rounded-full blur-3xl" />
-        <div className="absolute top-[2600px] -right-40 w-[520px] h-[520px] bg-gold/[0.08] rounded-full blur-3xl" />
-        <div className="absolute bottom-[-120px] left-1/2 -translate-x-1/2 w-[900px] h-[560px] bg-gold/10 rounded-full blur-3xl" />
-      </div>
-
-      <div className="relative">
-        {/* البطل */}
-        <section className="max-w-5xl mx-auto px-4 pt-20 md:pt-28 pb-8 text-center">
-          <h1 className="text-4xl md:text-7xl font-black text-cream leading-[1.18] mb-6">
+    <div className="relative overflow-hidden pb-12">
+      <section className="mx-auto grid max-w-6xl gap-6 px-4 pb-8 pt-12 md:grid-cols-[1.1fr_0.9fr] md:items-center md:pb-14 md:pt-20">
+        <div className="glass-panel order-2 rounded-lg p-6 sm:p-9 md:order-1">
+          <span className="inline-flex rounded-full border border-gold/35 bg-gold/10 px-3 py-1 text-xs font-black text-dark">إعلان وتسويق يليق بالإنجاز</span>
+          <h1 className="mt-5 text-4xl font-black leading-tight text-dark sm:text-5xl md:text-6xl">
             إنجازك يستحق أن <span className="text-gold">يراه الجميع</span>
           </h1>
-          <p className="text-cream/70 text-base md:text-xl leading-relaxed max-w-2xl mx-auto mb-9">
-            نوصِل خبرك إلى أوسع جمهور سعودي، بتصميمٍ يليق بك وصياغةٍ تُلهم — وأنت تعتمد كل شيء قبل النشر.
+          <p className="mt-5 max-w-xl text-base leading-8 text-muted sm:text-lg">
+            نحول خبرك إلى محتوى وتصميم وخطة نشر متكاملة، وتبقى أنت صاحب القرار قبل وصوله إلى الجمهور.
           </p>
-          <Link href="/request"
-            className="inline-block px-12 py-4 bg-gold text-dark rounded-2xl text-lg font-black hover:bg-gold/90 transition-all active:scale-[0.98] shadow-2xl shadow-gold/20">
-            ابدأ طلبك الآن
-          </Link>
-        </section>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link href="/request" className="rounded-lg bg-green px-6 py-3 text-sm font-black text-white shadow-lg shadow-green/20 transition hover:bg-green/90 sm:text-base">ابدأ طلبك الآن</Link>
+            <Link href="/services" className="rounded-lg border border-green/35 bg-white/50 px-6 py-3 text-sm font-bold text-green backdrop-blur-sm transition hover:bg-white/80 sm:text-base">استكشف الخدمات</Link>
+          </div>
+        </div>
 
-        {/* شريط أرقام رفيع منساب */}
-        <section className="max-w-4xl mx-auto px-4 py-10">
-          <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-7 text-center">
-            {stats.map(s => (
-              <div key={s.label} className="min-w-[80px]">
-                <div className="text-3xl md:text-5xl font-black text-gold leading-none mb-2">{s.value}</div>
-                <div className="text-xs md:text-sm text-cream/60">{s.label}</div>
-              </div>
+        <div className="glass-panel relative order-1 flex min-h-[300px] items-center justify-center overflow-hidden rounded-lg p-8 md:order-2 md:min-h-[430px]">
+          <div aria-hidden className="absolute inset-x-8 top-8 h-px bg-gradient-to-l from-transparent via-gold/60 to-transparent" />
+          <div aria-hidden className="absolute bottom-8 left-8 right-8 h-px bg-gradient-to-l from-transparent via-green/35 to-transparent" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="تواصل النخبة" className="relative h-auto w-[78%] max-w-[330px] object-contain drop-shadow-[0_16px_24px_rgba(16,43,92,0.18)]" />
+          <span className="absolute bottom-8 text-center text-[10px] font-bold tracking-[0.18em] text-muted sm:text-xs">ADVERTISING &amp; MARKETING</span>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-4">
+        <div className="glass-panel grid rounded-lg p-4 sm:grid-cols-2 md:grid-cols-4 md:p-5">
+          {stats.map((stat, index) => (
+            <div key={stat.label} className={`px-4 py-4 text-center ${index > 0 ? 'border-t border-border/70 sm:border-r sm:border-t-0' : ''}`}>
+              <p className="text-2xl font-black text-green sm:text-3xl">{stat.value}</p>
+              <p className="mt-1 text-xs font-medium text-muted">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-4 py-16 md:py-20">
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
+          <div><p className="text-xs font-bold text-gold">تجربة واضحة من أول خطوة</p><h2 className="mt-2 text-2xl font-black text-dark md:text-3xl">لماذا تواصل النخبة؟</h2></div>
+          <p className="max-w-md text-sm leading-6 text-muted">كل ما تحتاجه لإظهار إنجازك بوضوح، دون تعقيد في الطلب أو الاعتماد أو النشر.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {values.map(value => (
+            <article key={value.title} className="glass-panel rounded-lg p-5 transition-transform duration-200 hover:-translate-y-1">
+              <span className="grid h-10 w-10 place-items-center rounded-lg bg-green/10 text-xl font-black text-green">{value.icon}</span>
+              <h3 className="mt-5 text-base font-black text-dark">{value.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-muted">{value.desc}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="mx-auto grid max-w-6xl gap-4 px-4 pb-16 md:grid-cols-[0.9fr_1.1fr]">
+        <div className="glass-panel rounded-lg p-6 md:p-8">
+          <p className="text-xs font-bold text-gold">من تجربة عملائنا</p>
+          <h2 className="mt-2 text-2xl font-black text-dark">نتائج يلمسها أصحاب الإنجازات</h2>
+          <div className="mt-6 space-y-4">
+            {testimonials.map(testimonial => (
+              <blockquote key={testimonial.name} className="border-r-2 border-gold/60 pr-4">
+                <p className="text-sm leading-7 text-dark/80">{testimonial.quote}</p>
+                <footer className="mt-2 text-xs font-bold text-muted">{testimonial.name} <span className="font-normal">· {testimonial.role}</span></footer>
+              </blockquote>
             ))}
           </div>
-        </section>
+        </div>
 
-        {/* سردية القيمة — منسابة بلا بطاقات مربّعة */}
-        <section className="max-w-5xl mx-auto px-4 pt-14 pb-10">
-          <h2 className="text-center text-2xl md:text-4xl font-black text-cream mb-12">
-            لماذا <span className="text-gold">تواصل النخبة</span>؟
-          </h2>
-          <div className="grid sm:grid-cols-2 gap-x-14 gap-y-10">
-            {values.map(v => (
-              <div key={v.title} className="flex items-start gap-4">
-                <div className="text-3xl leading-none shrink-0">{v.icon}</div>
-                <div>
-                  <h3 className="text-cream font-black text-lg mb-1.5">{v.title}</h3>
-                  <p className="text-cream/60 text-sm leading-relaxed">{v.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* آراء — اقتباسات منسابة بلا بطاقات ثقيلة */}
-        <section className="max-w-5xl mx-auto px-4 py-14">
-          <h2 className="text-center text-2xl md:text-4xl font-black text-cream mb-12">ماذا قالوا عنا؟</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-10">
-            {testimonials.map(t => (
-              <div key={t.name + t.quote} className="border-t border-cream/15 pt-5">
-                <div className="text-gold text-4xl leading-none mb-2">“</div>
-                <p className="text-cream/85 text-sm leading-relaxed mb-4">{t.quote}</p>
-                <div className="flex items-center gap-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={t.img} alt={t.name} loading="lazy"
-                    className="w-11 h-11 rounded-full object-cover ring-2 ring-gold/30 bg-cream/10 shrink-0" />
-                  <div className="text-sm leading-tight">
-                    <div className="text-gold font-black">{t.name}</div>
-                    <div className="text-cream/50">{t.role}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* أسئلة شائعة — منسابة على نفس اللوحة */}
-        <section className="max-w-2xl mx-auto px-4 py-14">
-          <h2 className="text-center text-2xl md:text-4xl font-black text-cream mb-10">قبل أن تبدأ</h2>
-          <div className="divide-y divide-cream/10 border-y border-cream/10">
-            {faqs.map(f => (
-              <details key={f.q} className="group py-4">
-                <summary className="flex items-center justify-between cursor-pointer list-none text-cream font-bold text-sm md:text-base">
-                  {f.q}
-                  <span className="text-gold text-xl group-open:rotate-45 transition-transform">+</span>
-                </summary>
-                <p className="text-cream/60 text-sm leading-relaxed mt-3">{f.a}</p>
+        <div className="glass-panel rounded-lg p-6 md:p-8">
+          <p className="text-xs font-bold text-gold">إجابات سريعة</p>
+          <h2 className="mt-2 text-2xl font-black text-dark">قبل أن تبدأ</h2>
+          <div className="mt-4 divide-y divide-border/70">
+            {faqs.map(faq => (
+              <details key={faq.q} className="group py-4">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-bold text-dark"><span>{faq.q}</span><span className="text-lg text-gold transition-transform group-open:rotate-45">+</span></summary>
+                <p className="mt-3 text-sm leading-7 text-muted">{faq.a}</p>
               </details>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* الدعوة الختامية */}
-        <section className="max-w-3xl mx-auto px-4 pt-10 pb-28 text-center">
-          <h2 className="text-3xl md:text-5xl font-black text-cream mb-5 leading-tight">
-            جاهز تترك أثراً <span className="text-gold">دائماً</span>؟
-          </h2>
-          <p className="text-cream/65 text-base md:text-lg mb-9">
-            قدّم طلبك الآن — سعرك يظهر فوراً، وأنت تعتمد كل شيء قبل النشر.
-          </p>
-          <Link href="/request"
-            className="inline-block px-14 py-4 bg-gold text-dark rounded-2xl text-lg font-black hover:bg-gold/90 transition-all active:scale-[0.98] shadow-2xl shadow-gold/20">
-            ابدأ طلبك الآن
-          </Link>
-        </section>
-      </div>
+      <section className="mx-auto max-w-5xl px-4 pb-8">
+        <div className="glass-panel-dark rounded-lg px-6 py-10 text-center sm:px-12">
+          <h2 className="text-3xl font-black text-white sm:text-4xl">جاهز تترك أثراً دائماً؟</h2>
+          <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-white/70">قدّم طلبك الآن، وتابع كل مرحلة من الصياغة إلى الاعتماد ثم النشر.</p>
+          <Link href="/request" className="mt-7 inline-flex rounded-lg bg-gold px-7 py-3 text-sm font-black text-dark shadow-lg shadow-black/20 transition hover:bg-gold/90">ابدأ طلبك الآن</Link>
+        </div>
+      </section>
     </div>
   )
 }

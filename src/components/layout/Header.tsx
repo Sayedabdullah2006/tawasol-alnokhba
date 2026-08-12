@@ -83,12 +83,12 @@ export default function Header() {
 
   return (
     <>
-    <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border shadow-sm">
-      <div className="max-w-6xl mx-auto px-4 h-20 flex items-center justify-between">
+    <header className="glass-panel sticky top-3 z-40 mx-auto w-[calc(100%-1.5rem)] max-w-6xl rounded-lg">
+      <div className="mx-auto flex h-[68px] items-center justify-between px-4 sm:px-5">
         <Link href="/" className="flex items-center" aria-label="تواصل النخبة">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="تواصل النخبة"
-            className="h-16 w-auto object-contain"
+            className="h-12 w-auto object-contain sm:h-14"
             onError={(e) => {
               const el = e.currentTarget as HTMLImageElement
               el.style.display = 'none'
@@ -98,21 +98,20 @@ export default function Header() {
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-6">
+        <nav className="hidden items-center gap-2 md:flex">
           {navLinks.map(l => (
-            <Link key={l.href} href={l.href} className="text-sm font-medium text-dark/80 hover:text-green transition-colors">
+            <Link key={l.href} href={l.href} className="rounded-lg px-3 py-2 text-sm font-medium text-dark/80 transition-colors hover:bg-white/60 hover:text-green">
               {l.label}
             </Link>
           ))}
 
           {loading ? (
-            <div className="w-20 h-9 bg-border/30 rounded-xl animate-pulse" />
+            <div className="h-9 w-20 animate-pulse rounded-lg bg-border/30" />
           ) : user ? (
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="flex items-center gap-2 px-4 py-2 bg-green/10 text-green rounded-xl text-sm font-medium
-                           hover:bg-green/20 transition-all cursor-pointer"
+                className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/60 bg-white/50 px-3 py-1.5 text-sm font-medium text-green transition-all hover:bg-white/80"
               >
                 <div className="w-7 h-7 bg-green text-white rounded-full flex items-center justify-center text-xs font-black">
                   {user.fullName.charAt(0)}
@@ -124,7 +123,7 @@ export default function Header() {
               </button>
 
               {dropdownOpen && (
-                <div className="absolute left-0 mt-2 w-56 bg-card rounded-xl border border-border shadow-xl overflow-hidden z-50">
+                <div className="glass-panel absolute left-0 z-50 mt-2 w-56 overflow-hidden rounded-lg">
                   <div className="px-4 py-3 border-b border-border">
                     <ClientNameFixed name={user.fullName} className="font-bold text-dark text-sm" />
                     <p className="text-xs text-muted">
@@ -171,7 +170,7 @@ export default function Header() {
           ) : (
             <Link
               href="/auth/login"
-              className="px-5 py-2 bg-green text-white rounded-xl text-sm font-medium hover:bg-green/90 transition-all"
+              className="rounded-lg bg-green px-5 py-2 text-sm font-medium text-white shadow-md shadow-green/20 transition-all hover:bg-green/90"
             >
               تسجيل الدخول
             </Link>
@@ -181,7 +180,7 @@ export default function Header() {
         {/* Mobile menu button */}
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          className="md:hidden p-2 text-dark cursor-pointer"
+          className="cursor-pointer rounded-lg p-2 text-dark transition-colors hover:bg-white/60 md:hidden"
           aria-label="القائمة"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -197,7 +196,7 @@ export default function Header() {
 
       {/* Mobile menu — outside <header> so backdrop-blur doesn't trap fixed positioning */}
       {menuOpen && (
-        <div className="md:hidden fixed inset-x-0 top-20 bottom-0 z-50 bg-cream flex flex-col"
+        <div className="md:hidden fixed inset-x-0 top-[5.5rem] bottom-0 z-50 mx-3 flex flex-col overflow-hidden rounded-lg border border-white/70 bg-card/95 shadow-2xl backdrop-blur-xl"
           onClick={() => setMenuOpen(false)}>
           <nav className="flex-1 overflow-y-auto px-4 pt-2 pb-6"
             onClick={e => e.stopPropagation()}>

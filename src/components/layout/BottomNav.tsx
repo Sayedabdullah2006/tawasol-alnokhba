@@ -18,7 +18,7 @@ export default function BottomNav({ items }: BottomNavProps) {
   const pathname = usePathname()
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40">
+    <nav className="glass-panel fixed bottom-3 left-3 right-3 z-40 rounded-lg md:hidden">
       <div className="overflow-x-auto overscroll-x-contain touch-pan-x" dir="rtl" aria-label="التنقل الإداري">
         <div className="flex w-max min-w-full gap-1 px-2 py-2 snap-x snap-proximity">
           {items.map(item => {
@@ -29,7 +29,7 @@ export default function BottomNav({ items }: BottomNavProps) {
                 href={item.href}
                 className={cn(
                   'flex w-[76px] shrink-0 snap-start flex-col items-center gap-1 rounded-lg px-2 py-1.5 text-center text-xs font-medium transition-all',
-                  isActive ? 'bg-green/10 text-green' : 'text-muted'
+                  isActive ? 'bg-white/80 text-green shadow-sm' : 'text-muted'
                 )}
               >
                 <span className="text-xl">{item.icon}</span>

@@ -273,10 +273,14 @@ export default function AdminStatsPage() {
   )
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
-      <div>
-        <h1 className="text-2xl font-black text-dark">الإحصائيات</h1>
-        <p className="text-sm text-muted mt-0.5">نظرة شاملة على أداء المنصة</p>
+    <div className="mx-auto max-w-7xl space-y-5 p-4 md:p-6">
+      <div className="glass-panel flex flex-wrap items-end justify-between gap-4 rounded-lg p-5 sm:p-6">
+        <div>
+          <p className="text-xs font-bold text-gold">لوحة الإدارة</p>
+          <h1 className="mt-1 text-2xl font-black text-dark sm:text-3xl">الإحصائيات</h1>
+          <p className="mt-1 text-sm text-muted">نظرة شاملة على أداء المنصة والطلبات.</p>
+        </div>
+        <span className="rounded-lg border border-green/15 bg-green/10 px-3 py-2 text-xs font-bold text-green">تحديث مباشر للبيانات</span>
       </div>
 
       {/* ── بطاقة إجمالي الطلبات مع التقسيم ── */}
