@@ -29,27 +29,30 @@ const faqs = [
 export default function HomePage() {
   return (
     <div className="relative overflow-hidden pb-12">
-      <section className="mx-auto grid max-w-6xl gap-6 px-4 pb-8 pt-12 md:grid-cols-[1.1fr_0.9fr] md:items-center md:pb-14 md:pt-20">
-        <div className="glass-panel order-2 rounded-lg p-6 sm:p-9 md:order-1">
-          <span className="inline-flex rounded-full border border-gold/35 bg-gold/10 px-3 py-1 text-xs font-black text-dark">إعلان وتسويق يليق بالإنجاز</span>
-          <h1 className="mt-5 text-4xl font-black leading-tight text-dark sm:text-5xl md:text-6xl">
-            إنجازك يستحق أن <span className="text-gold">يراه الجميع</span>
-          </h1>
-          <p className="mt-5 max-w-xl text-base leading-8 text-muted sm:text-lg">
-            نحول خبرك إلى محتوى وتصميم وخطة نشر متكاملة، وتبقى أنت صاحب القرار قبل وصوله إلى الجمهور.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/request" className="rounded-lg bg-green px-6 py-3 text-sm font-black text-white shadow-lg shadow-green/20 transition hover:bg-green/90 sm:text-base">ابدأ طلبك الآن</Link>
-            <Link href="/services" className="rounded-lg border border-green/35 bg-white/50 px-6 py-3 text-sm font-bold text-green backdrop-blur-sm transition hover:bg-white/80 sm:text-base">استكشف الخدمات</Link>
-          </div>
-        </div>
-
-        <div className="glass-panel relative order-1 min-h-[300px] overflow-hidden rounded-lg p-2 md:order-2 md:min-h-[430px]">
+      <section className="mx-auto max-w-6xl px-4 pb-8 pt-12 md:pb-14 md:pt-20">
+        <div className="glass-panel relative min-h-[590px] overflow-hidden rounded-xl md:min-h-[480px]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/landing-media-story.png" alt="صانعة محتوى سعودية تعمل على إعداد قصة إعلامية لإنجاز مهني" className="h-full min-h-[284px] w-full rounded-md object-cover object-center md:min-h-[414px]" />
-          <div className="absolute inset-x-5 bottom-5 rounded-lg border border-white/40 bg-dark/75 px-4 py-3 text-white backdrop-blur-md">
-            <p className="text-xs font-black text-gold">من الإنجاز إلى الحضور</p>
-            <p className="mt-1 text-xs leading-5 text-white/80">صياغة احترافية، تصميم متقن، ونشر يصل إلى جمهوره.</p>
+          <img
+            src="/landing-media-story.png"
+            alt="صانعة محتوى سعودية تعمل على إعداد قصة إعلامية لإنجاز مهني"
+            className="absolute inset-x-0 top-0 h-[270px] w-full object-cover object-[center_38%] md:inset-y-0 md:right-auto md:left-0 md:h-full md:w-[43%] md:object-center"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/15 via-[#f8fbff]/92 to-[#f8fbff] md:bg-gradient-to-r md:from-transparent md:via-[#f8fbff]/78 md:to-[#f8fbff]" />
+          <div className="relative z-10 flex min-h-[590px] items-end p-6 sm:p-9 md:min-h-[480px] md:items-center md:py-12">
+            <div className="w-full max-w-2xl text-right md:ml-auto md:w-[57%]">
+              <span className="inline-flex rounded-full border border-gold/35 bg-white/65 px-3 py-1 text-xs font-black text-dark backdrop-blur-sm">إعلان وتسويق يليق بالإنجاز</span>
+              <h1 className="mt-5 text-4xl font-black leading-tight text-dark sm:text-5xl md:text-6xl">
+                إنجازك يستحق أن <span className="text-gold">يراه الجميع</span>
+              </h1>
+              <p className="mt-5 max-w-xl text-base leading-8 text-muted sm:text-lg">
+                نحول خبرك إلى محتوى وتصميم وخطة نشر متكاملة، وتبقى أنت صاحب القرار قبل وصوله إلى الجمهور.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link href="/request" className="rounded-lg bg-green px-6 py-3 text-sm font-black text-white shadow-lg shadow-green/20 transition hover:bg-green/90 sm:text-base">ابدأ طلبك الآن</Link>
+                <Link href="/services" className="rounded-lg border border-green/35 bg-white/55 px-6 py-3 text-sm font-bold text-green backdrop-blur-sm transition hover:bg-white/85 sm:text-base">استكشف الخدمات</Link>
+              </div>
+              <p className="mt-7 text-xs font-bold text-dark/75">من الإنجاز إلى الحضور: صياغة احترافية، تصميم متقن، ونشر يصل إلى جمهوره.</p>
+            </div>
           </div>
         </div>
       </section>
