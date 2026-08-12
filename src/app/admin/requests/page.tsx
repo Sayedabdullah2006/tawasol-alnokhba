@@ -458,6 +458,7 @@ export default function AdminRequestsPage() {
     { status: 'in_progress', label: 'قيد التنفيذ', className: 'border-orange-200 bg-orange-50 text-orange-700' },
     { status: 'pending', label: 'تحت المراجعة', className: 'border-yellow-200 bg-yellow-50 text-yellow-700' },
     { status: 'payment_review', label: 'بانتظار تحقق الدفع', className: 'border-amber-200 bg-amber-50 text-amber-800' },
+    { status: 'content_review', label: 'مراجعة المحتوى', className: 'border-indigo-200 bg-indigo-50 text-indigo-700' },
     { status: 'changes_requested', label: 'العميل طلب تعديلات', className: 'border-purple-200 bg-purple-50 text-purple-700' },
     { status: 'scheduled', label: 'مجدول للنشر', className: 'border-cyan-200 bg-cyan-50 text-cyan-800' },
   ].map(filter => ({ ...filter, count: requestSummaries.filter(request => request.status === filter.status).length }))
@@ -688,12 +689,12 @@ export default function AdminRequestsPage() {
       </div>
 
       <div className="mb-4 rounded-lg border border-border bg-card p-3 sm:p-4">
-        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto]">
+        <div className="flex flex-wrap items-center gap-2">
           <Input
             placeholder="بحث بالاسم أو رقم الطلب..."
             value={search}
             onChange={e => { setSearch(e.target.value); setCurrentPage(1) }}
-            className="w-full"
+            className="w-full sm:w-72"
           />
           <select
             value={statusFilter}
@@ -713,6 +714,35 @@ export default function AdminRequestsPage() {
             ⚙️ فلاتر إضافية
             {(userFilter || duplicatesOnly) && <span className="mr-2 rounded-full bg-green px-1.5 py-0.5 text-[10px] text-white">مفعلة</span>}
           </button>
+          <Button onClick={() => setShowExternalForm(true)} className="bg-green-600 hover:bg-green-700">
+            ➕ تسجيل طلب خارجي
+          </Button>
+          <button
+            type="button"
+            onClick={handleExport}
+            title="تصدير CSV"
+            aria-label="تصدير CSV"
+            className="inline-flex min-h-[42px] min-w-[42px] items-center justify-center rounded-lg border border-border px-3 text-lg text-dark transition-colors hover:bg-cream"
+          >
+            ⇩
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/admin/studio')}
+            title="استوديو الذكاء الاصطناعي"
+            aria-label="استوديو الذكاء الاصطناعي"
+            className="inline-flex min-h-[42px] min-w-[42px] items-center justify-center rounded-lg border border-green px-3 text-lg text-green transition-colors hover:bg-green/5"
+          >
+            🤖
+          </button>
+          <Button
+            variant="outline"
+            onClick={() => setShowBulkConfirm(true)}
+            disabled={quotedCount === 0}
+            className="border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50"
+          >
+            🔔 تذكير العروض ({quotedCount})
+          </Button>
         </div>
 
         <div className="mt-3 flex gap-2 overflow-x-auto border-t border-border pt-3" aria-label="فلاتر الإجراءات السريعة">
@@ -802,42 +832,8 @@ export default function AdminRequestsPage() {
           </div>
         )}
 
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
-          <Button
-            onClick={() => setShowExternalForm(true)}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            ➕ تسجيل طلب خارجي
-          </Button>
-          <button
-            type="button"
-            onClick={handleExport}
-            title="تصدير CSV"
-            aria-label="تصدير CSV"
-            className="min-h-[42px] rounded-lg border border-border px-3 text-lg text-dark transition-colors hover:bg-cream"
-          >
-            ⇩
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push('/admin/studio')}
-            title="استوديو الذكاء الاصطناعي"
-            aria-label="استوديو الذكاء الاصطناعي"
-            className="min-h-[42px] rounded-lg border border-green px-3 text-lg text-green transition-colors hover:bg-green/5"
-          >
-            🤖
-          </button>
-          <Button
-            variant="outline"
-            onClick={() => setShowBulkConfirm(true)}
-            disabled={quotedCount === 0}
-            className="border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50"
-          >
-            🔔 تذكير العروض ({quotedCount})
-          </Button>
-          <div className="mr-auto text-xs text-muted">
-            إجمالي {requestSummaries.length} · ظاهر {filteredRequestSummaries.length}
-          </div>
+        <div className="mt-3 border-t border-border pt-3 text-xs text-muted">
+          إجمالي {requestSummaries.length} · ظاهر {filteredRequestSummaries.length}
         </div>
       </div>
 
