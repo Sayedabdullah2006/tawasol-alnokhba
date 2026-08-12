@@ -71,7 +71,10 @@ export async function POST(request: Request) {
     const isResume = newStatus === 'resume'
     const targetStatus = isResume ? (current.suspended_from_status ?? 'in_progress') : newStatus
     const allowed = ALLOWED_TRANSITIONS[current.status] ?? []
-    if ((isResume && current.status !== 'suspended') || (!isResume && !allowed.includes(targetStatus))) {
+    // The admin may schedule a request from any workflow state. This is useful when
+    // the publishing decision supersedes an outstanding review or revision state.
+    const isDirectSchedule = targetStatus === 'scheduled'
+    if ((isResume && current.status !== 'suspended') || (!isResume && !isDirectSchedule && !allowed.includes(targetStatus))) {
       return NextResponse.json({
         error: `لا يمكن الانتقال من "${current.status}" إلى "${targetStatus}"`,
         currentStatus: current.status,
@@ -92,7 +95,9 @@ export async function POST(request: Request) {
       .update({
         status:             targetStatus,
         admin_notes:        resolvedAdminNotes,
-        suspended_from_status: targetStatus === 'suspended' ? current.status : (isResume ? null : current.suspended_from_status),
+        suspended_from_status: targetStatus === 'suspended'
+          ? current.status
+          : (isResume || isDirectSchedule ? null : current.suspended_from_status),
         last_status_change: now,
         updated_at:         now,
         // سجّل وقت تأكيد الدفع عند انتقال الطلب إلى "مدفوع" (تحويل بنكي)

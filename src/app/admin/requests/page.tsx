@@ -33,6 +33,13 @@ const QUICK_STATUS_TRANSITIONS: Record<string, string[]> = {
   auto_closed: ['pending'],
 }
 
+const quickStatusTransitionsFor = (status: string): string[] => {
+  const transitions = QUICK_STATUS_TRANSITIONS[status] ?? []
+  return status === 'scheduled' || transitions.includes('scheduled')
+    ? transitions
+    : [...transitions, 'scheduled']
+}
+
 export default function AdminRequestsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -497,7 +504,7 @@ export default function AdminRequestsPage() {
 
   const openQuickAction = (request: any, event: React.MouseEvent) => {
     event.stopPropagation()
-    const options = QUICK_STATUS_TRANSITIONS[request.status] ?? []
+    const options = quickStatusTransitionsFor(request.status)
     setQuickActionTarget(request)
     setQuickActionStatus(options[0] ?? '')
     setQuickActionNotes(request.admin_notes ?? '')
@@ -622,6 +629,7 @@ export default function AdminRequestsPage() {
   const quickStatusFilters = [
     { status: 'in_progress', label: 'قيد التنفيذ', className: 'border-orange-200 bg-orange-50 text-orange-700' },
     { status: 'pending', label: 'تحت المراجعة', className: 'border-yellow-200 bg-yellow-50 text-yellow-700' },
+    { status: 'negotiation', label: 'تفاوض على السعر', className: 'border-rose-200 bg-rose-50 text-rose-700' },
     { status: 'payment_review', label: 'بانتظار تحقق الدفع', className: 'border-amber-200 bg-amber-50 text-amber-800' },
     { status: 'content_review', label: 'مراجعة المحتوى', className: 'border-indigo-200 bg-indigo-50 text-indigo-700' },
     { status: 'changes_requested', label: 'العميل طلب تعديلات', className: 'border-purple-200 bg-purple-50 text-purple-700' },
@@ -1161,9 +1169,9 @@ export default function AdminRequestsPage() {
                   <button onClick={() => setExpandedRequests(current => ({ ...current, [r.id]: !expanded }))} className="rounded-lg border border-border bg-white px-3 py-1.5 text-xs font-bold text-dark hover:bg-cream">{expanded ? 'إخفاء التفاصيل ▲' : 'مزيد من التفاصيل ▼'}</button>
                   <button
                     onClick={(e) => openQuickAction(r, e)}
-                    disabled={(QUICK_STATUS_TRANSITIONS[r.status] ?? []).length === 0}
+                    disabled={quickStatusTransitionsFor(r.status).length === 0}
                     className="rounded-lg bg-green px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-green/90 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-                    title={(QUICK_STATUS_TRANSITIONS[r.status] ?? []).length ? 'تنفيذ إجراء سريع' : 'لا يوجد إجراء سريع متاح لهذه الحالة'}
+                    title={quickStatusTransitionsFor(r.status).length ? 'تنفيذ إجراء سريع' : 'لا يوجد إجراء سريع متاح لهذه الحالة'}
                   >
                     إجراءات
                   </button>
@@ -1492,12 +1500,12 @@ export default function AdminRequestsPage() {
               <button type="button" onClick={() => setQuickActionTarget(null)} disabled={savingQuickAction} className="grid h-8 w-8 place-items-center rounded-lg text-lg text-muted hover:bg-slate-100" aria-label="إغلاق">×</button>
             </div>
 
-            {(QUICK_STATUS_TRANSITIONS[quickActionTarget.status] ?? []).length > 0 ? (
+            {quickStatusTransitionsFor(quickActionTarget.status).length > 0 ? (
               <>
                 <label className="mt-5 block text-sm font-bold text-dark">
                   الإجراء
                   <select value={quickActionStatus} onChange={event => setQuickActionStatus(event.target.value)} className="mt-2 min-h-[46px] w-full rounded-lg border border-border bg-white px-3 text-sm text-dark outline-none focus:border-green">
-                    {(QUICK_STATUS_TRANSITIONS[quickActionTarget.status] ?? []).map(status => (
+                    {quickStatusTransitionsFor(quickActionTarget.status).map(status => (
                       <option key={status} value={status}>{quickActionLabel(quickActionTarget.status, status)}</option>
                     ))}
                   </select>
