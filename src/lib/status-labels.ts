@@ -63,6 +63,11 @@ export const CLIENT_STATUS_LABELS: Record<RequestStatus, { label: string; color:
     color: 'cyan',
     description: 'تم اعتماد المحتوى وتحديد موعد نشره على قنواتنا'
   },
+  suspended: {
+    label: 'قيد المراجعة',
+    color: 'gray',
+    description: 'يجري فريق الإدارة متابعة طلبك'
+  },
   completed: {
     label: 'مكتمل',
     color: 'green',
@@ -146,6 +151,11 @@ export const ADMIN_STATUS_LABELS: Record<RequestStatus, { label: string; color: 
     label: 'مجدول للنشر',
     color: 'cyan',
     description: 'تم اعتماد المحتوى وجدولته للنشر على القنوات'
+  },
+  suspended: {
+    label: 'معلق داخلياً',
+    color: 'gray',
+    description: 'تم إيقاف الطلب مؤقتاً دون إشعار العميل، ويمكن استئنافه إلى مرحلته السابقة'
   },
   completed: {
     label: 'مكتمل',

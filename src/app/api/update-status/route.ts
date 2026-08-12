@@ -12,18 +12,19 @@ import { REQUEST_STATUSES } from '@/lib/constants'
 // ── حماية انتقالات الحالة ──────────────────────────────────────────
 // يمنع الانتقال العشوائي بين الحالات ويحمي الحالات المالية النهائية
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  pending:         ['quoted', 'rejected'],
-  quoted:          ['approved', 'rejected', 'pending'],
-  negotiation:     ['quoted', 'rejected', 'pending'],
-  client_rejected: ['quoted', 'rejected', 'pending'],
-  approved:        ['in_progress', 'paid', 'payment_review', 'rejected'],
-  payment_review:  ['approved', 'paid', 'in_progress', 'rejected'],
-  paid:            ['in_progress'],
-  in_progress:     ['content_review', 'completed', 'info_requested', 'scheduled'],
-  info_requested:  ['in_progress', 'content_review'],
-  content_review:  ['in_progress', 'completed', 'changes_requested', 'scheduled'],
-  changes_requested: ['in_progress', 'content_review', 'completed'],
-  scheduled:       ['completed', 'in_progress'],
+  pending:         ['quoted', 'rejected', 'suspended'],
+  quoted:          ['approved', 'rejected', 'pending', 'suspended'],
+  negotiation:     ['quoted', 'rejected', 'pending', 'suspended'],
+  client_rejected: ['quoted', 'rejected', 'pending', 'suspended'],
+  approved:        ['in_progress', 'paid', 'payment_review', 'rejected', 'suspended'],
+  payment_review:  ['approved', 'paid', 'in_progress', 'rejected', 'suspended'],
+  paid:            ['in_progress', 'suspended'],
+  in_progress:     ['content_review', 'completed', 'info_requested', 'scheduled', 'suspended'],
+  info_requested:  ['in_progress', 'content_review', 'suspended'],
+  content_review:  ['in_progress', 'completed', 'changes_requested', 'scheduled', 'suspended'],
+  changes_requested: ['in_progress', 'content_review', 'completed', 'suspended'],
+  scheduled:       ['completed', 'in_progress', 'suspended'],
+  suspended:       [],
   completed:       [],          // حالة نهائية — لا تراجع
   rejected:        ['pending'], // يمكن إعادة فتح الطلب المرفوض
   auto_closed:     ['pending'],
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
     // ── جلب الحالة الحالية قبل التحديث ──────────────────────────────
     const { data: current } = await supabase
       .from('publish_requests')
-      .select('status, admin_notes')
+      .select('status, admin_notes, suspended_from_status')
       .eq('id', requestId)
       .single()
 
@@ -65,10 +66,12 @@ export async function POST(request: Request) {
     }
 
     // ── التحقق من صحة الانتقال ────────────────────────────────────────
+    const isResume = newStatus === 'resume'
+    const targetStatus = isResume ? (current.suspended_from_status ?? 'in_progress') : newStatus
     const allowed = ALLOWED_TRANSITIONS[current.status] ?? []
-    if (!allowed.includes(newStatus)) {
+    if ((isResume && current.status !== 'suspended') || (!isResume && !allowed.includes(targetStatus))) {
       return NextResponse.json({
-        error: `لا يمكن الانتقال من "${current.status}" إلى "${newStatus}"`,
+        error: `لا يمكن الانتقال من "${current.status}" إلى "${targetStatus}"`,
         currentStatus: current.status,
         allowedTransitions: allowed,
       }, { status: 422 })
@@ -85,12 +88,13 @@ export async function POST(request: Request) {
     const { data: updated, error } = await supabase
       .from('publish_requests')
       .update({
-        status:             newStatus,
+        status:             targetStatus,
         admin_notes:        resolvedAdminNotes,
+        suspended_from_status: targetStatus === 'suspended' ? current.status : (isResume ? null : current.suspended_from_status),
         last_status_change: now,
         updated_at:         now,
         // سجّل وقت تأكيد الدفع عند انتقال الطلب إلى "مدفوع" (تحويل بنكي)
-        ...(newStatus === 'paid' || (current.status === 'payment_review' && newStatus === 'in_progress')
+        ...(targetStatus === 'paid' || (current.status === 'payment_review' && targetStatus === 'in_progress')
           ? { paid_at: now, payment_status: 'paid' }
           : {}),
       })
@@ -112,7 +116,7 @@ export async function POST(request: Request) {
         clientName: updated.client_name ?? 'عزيزنا',
       }
       let p: Promise<boolean> | null = null
-      switch (newStatus) {
+      if (!isResume && targetStatus !== 'suspended') switch (targetStatus) {
         case 'paid':
           p = notifyPaymentConfirmedToClient({
             ...base,
@@ -134,18 +138,18 @@ export async function POST(request: Request) {
         case 'pending':
           p = notifyStatusUpdateToClient({
             ...base,
-            status:      newStatus,
-            statusLabel: REQUEST_STATUSES[newStatus as keyof typeof REQUEST_STATUSES]?.label || newStatus,
+            status:      targetStatus,
+            statusLabel: REQUEST_STATUSES[targetStatus as keyof typeof REQUEST_STATUSES]?.label || targetStatus,
             adminNotes: resolvedAdminNotes,
           })
           break
         // "quoted" مقصود عدم إرسال إيميل هنا — send-quote يتولاه
         default:
-          if (REQUEST_STATUSES[newStatus as keyof typeof REQUEST_STATUSES]) {
+          if (REQUEST_STATUSES[targetStatus as keyof typeof REQUEST_STATUSES]) {
             p = notifyStatusUpdateToClient({
               ...base,
-              status:      newStatus,
-              statusLabel: REQUEST_STATUSES[newStatus as keyof typeof REQUEST_STATUSES].label,
+              status:      targetStatus,
+              statusLabel: REQUEST_STATUSES[targetStatus as keyof typeof REQUEST_STATUSES].label,
               adminNotes: resolvedAdminNotes,
             })
           }

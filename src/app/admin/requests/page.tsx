@@ -17,17 +17,18 @@ import NameDisplayTest from '@/components/debug/NameDisplayTest'
 const REQUESTS_PER_PAGE = 10
 
 const QUICK_STATUS_TRANSITIONS: Record<string, string[]> = {
-  pending: ['rejected'],
-  negotiation: ['pending', 'rejected'],
-  client_rejected: ['pending', 'rejected'],
-  approved: ['paid'],
-  payment_review: ['in_progress', 'approved', 'rejected'],
-  paid: ['in_progress'],
-  in_progress: ['content_review', 'scheduled', 'completed', 'info_requested'],
-  info_requested: ['in_progress', 'content_review'],
-  content_review: ['in_progress', 'scheduled', 'completed', 'changes_requested'],
-  changes_requested: ['in_progress', 'content_review', 'completed'],
-  scheduled: ['completed', 'in_progress'],
+  pending: ['rejected', 'suspended'],
+  negotiation: ['pending', 'rejected', 'suspended'],
+  client_rejected: ['pending', 'rejected', 'suspended'],
+  approved: ['paid', 'suspended'],
+  payment_review: ['in_progress', 'approved', 'rejected', 'suspended'],
+  paid: ['in_progress', 'suspended'],
+  in_progress: ['content_review', 'scheduled', 'completed', 'info_requested', 'suspended'],
+  info_requested: ['in_progress', 'content_review', 'suspended'],
+  content_review: ['in_progress', 'scheduled', 'completed', 'changes_requested', 'suspended'],
+  changes_requested: ['in_progress', 'content_review', 'completed', 'suspended'],
+  scheduled: ['completed', 'in_progress', 'suspended'],
+  suspended: ['resume'],
   rejected: ['pending'],
   auto_closed: ['pending'],
 }
@@ -199,25 +200,7 @@ export default function AdminRequestsPage() {
       }
       return true
     })
-    // عند تفعيل فلتر المكرر: تجميع طلبات كل مستخدم معاً (مع الحفاظ على ترتيب التاريخ داخل كل مجموعة)
-    .sort((a, b) => {
-      const priority: Record<string, number> = {
-        payment_review: 0,
-        pending: 1,
-        in_progress: 2,
-        changes_requested: 3,
-        content_review: 4,
-        scheduled: 5,
-        completed: 6,
-      }
-      const priorityDiff = (priority[a.status] ?? 4) - (priority[b.status] ?? 4)
-      if (priorityDiff) return priorityDiff
-      if (duplicatesOnly) {
-        const ownerDiff = ownerKey(a).localeCompare(ownerKey(b))
-        if (ownerDiff) return ownerDiff
-      }
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    })
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   const totalPages = Math.max(1, Math.ceil(filteredRequestSummaries.length / REQUESTS_PER_PAGE))
   const safeCurrentPage = Math.min(currentPage, totalPages)
@@ -339,6 +322,8 @@ export default function AdminRequestsPage() {
   }
 
   const quickActionLabel = (currentStatus: string, nextStatus: string) => {
+    if (nextStatus === 'suspended') return 'تعليق الطلب'
+    if (nextStatus === 'resume') return 'استئناف الطلب'
     if (currentStatus === 'approved' && nextStatus === 'paid') return 'تأكيد الدفع'
     if (currentStatus === 'payment_review' && nextStatus === 'in_progress') return 'تأكيد الدفع وبدء التنفيذ'
     if (currentStatus === 'paid' && nextStatus === 'in_progress') return 'بدء التنفيذ'
@@ -1192,7 +1177,7 @@ export default function AdminRequestsPage() {
                   ملاحظة للإدارة (اختيارية)
                   <textarea value={quickActionNotes} onChange={event => setQuickActionNotes(event.target.value)} rows={3} className="mt-2 w-full resize-y rounded-lg border border-border bg-white px-3 py-2 text-sm font-normal text-dark outline-none focus:border-green" placeholder="تظهر في بطاقة الطلب ويمكن تضمينها في إشعار الحالة." />
                 </label>
-                <p className="mt-3 text-xs leading-5 text-muted">سيُطبّق الإجراء وفق مسار الحالة المعتمد، ويصل إشعار للعميل عند الحاجة.</p>
+                <p className="mt-3 text-xs leading-5 text-muted">{quickActionStatus === 'suspended' || quickActionStatus === 'resume' ? 'إجراء داخلي فقط: لن يصل إلى العميل أي إشعار.' : 'سيُطبّق الإجراء وفق مسار الحالة المعتمد، ويصل إشعار للعميل عند الحاجة.'}</p>
                 <div className="mt-5 flex gap-3">
                   <button type="button" onClick={() => setQuickActionTarget(null)} disabled={savingQuickAction} className="flex-1 rounded-lg border border-border bg-white px-4 py-2.5 text-sm font-bold text-dark hover:bg-cream disabled:opacity-50">إلغاء</button>
                   <button type="button" onClick={handleQuickAction} disabled={!quickActionStatus || savingQuickAction} className="flex-1 rounded-lg bg-green px-4 py-2.5 text-sm font-black text-white hover:bg-green/90 disabled:opacity-50">{savingQuickAction ? 'جارٍ التنفيذ...' : 'تأكيد الإجراء'}</button>

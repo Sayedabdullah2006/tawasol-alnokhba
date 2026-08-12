@@ -145,6 +145,19 @@ export function getAdminActions(status: RequestStatus): AdminActionConfig {
         }
       }
 
+    case 'suspended':
+      return {
+        showStatusUpdate: false,
+        showAdminNotes: true,
+        showQuickActions: false,
+        allowedActions: ['resume'],
+        message: {
+          type: 'waiting',
+          text: 'الطلب معلّق داخلياً. لن يصل العميل أي إشعار، ويمكن استئنافه إلى مرحلته السابقة.',
+          icon: '⏸️'
+        }
+      }
+
     case 'rejected':
     case 'client_rejected':
       return {

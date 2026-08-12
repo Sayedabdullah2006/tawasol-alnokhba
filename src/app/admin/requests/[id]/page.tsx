@@ -873,7 +873,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                       onChange={e => setNewStatus(e.target.value)}
                       className="w-full px-4 py-3 rounded-xl border border-border bg-white text-sm mb-3"
                     >
-                      {Object.entries(REQUEST_STATUSES).map(([k, v]) => (
+                      {Object.entries(REQUEST_STATUSES).filter(([k]) => k !== 'suspended').map(([k, v]) => (
                         <option key={k} value={k}>{v.label}</option>
                       ))}
                     </select>
@@ -882,6 +882,22 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                 {adminActions.showStatusUpdate && (
                   <Button onClick={() => handleUpdateStatus()} loading={saving} className="w-full">
                     حفظ وإرسال إشعار للعميل
+                  </Button>
+                )}
+                {request.status === 'suspended' ? (
+                  <Button onClick={() => handleUpdateStatus('resume')} loading={saving} className="w-full bg-green hover:bg-green/90">
+                    ▶️ استئناف الطلب إلى مرحلته السابقة
+                  </Button>
+                ) : !isFinalStatus(request.status as any) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (confirm('هل تريد تعليق هذا الطلب مؤقتاً؟ لن يُرسل أي إشعار للعميل.')) handleUpdateStatus('suspended')
+                    }}
+                    loading={saving}
+                    className="w-full border-slate-300 text-slate-700 hover:bg-slate-50"
+                  >
+                    ⏸️ تعليق الطلب دون إشعار العميل
                   </Button>
                 )}
                 {waitingForClient(request.status as any) && !adminActions.showStatusUpdate && !canConfirmPayment && (
