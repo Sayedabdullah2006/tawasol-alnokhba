@@ -23,6 +23,7 @@ export default function Footer() {
               <Link href="/services" className="text-cream/70 hover:text-gold transition-colors">الخدمات</Link>
               <Link href="/pricing" className="text-cream/70 hover:text-gold transition-colors">الأسعار</Link>
               <Link href="/policies" className="text-cream/70 hover:text-gold transition-colors">السياسات</Link>
+              <Link href="/refund-policy" className="font-bold text-gold hover:text-cream transition-colors">سياسة الاسترجاع</Link>
               <Link href="/request" className="text-cream/70 hover:text-gold transition-colors">تقديم طلب</Link>
             </nav>
           </div>
