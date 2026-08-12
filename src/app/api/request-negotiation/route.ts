@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { notifyNegotiationRequestedByClient, notifyNegotiatedQuoteToClient } from '@/lib/email'
+import { notifyNegotiationRequestedByClient, notifyNegotiatedQuoteToClient, notifyNegotiationRequestToClient } from '@/lib/email'
 
 // ── سلّم الخصومات الآلي ──────────────────────────────────────────
 // الجولة 1: 5%  |  الجولة 2: 10%  |  الجولة 3: 15% (نهائي)
@@ -137,30 +137,33 @@ export async function POST(request: Request) {
     const now = new Date().toISOString()
     // مهلة الموافقة على العرض المعدّل — 24 ساعة من إصداره
     const quoteExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    const requiresAdminReview = String(req.category ?? '').trim().toLowerCase() === 'others'
 
     // ── تحديث قاعدة البيانات ───────────────────────────────────────
     const { error: updateError } = await supabase
       .from('publish_requests')
       .update({
-        status:                     'quoted',
-        admin_quoted_price:          counterPrice,
-        original_quoted_price:       originalPrice,
-        final_total:                 counterPrice,
+        status:                     requiresAdminReview ? 'negotiation' : 'quoted',
+        ...(requiresAdminReview ? {} : {
+          admin_quoted_price: counterPrice,
+          original_quoted_price: originalPrice,
+          final_total: counterPrice,
+          negotiated_at: now,
+          negotiated_discount_percentage: actualDiscountPct,
+          negotiation_price_source: clientPrice >= ourMinPrice && clientPrice > 0
+            ? 'client_accepted'
+            : 'admin_discount',
+          quote_expires_at: quoteExpiresAt,
+          user_selected_extras: [],
+          extras_selected_total: 0,
+        }),
         negotiation_round:           currentRound,
         negotiation_rejected:        isFinalRound,
         negotiation_reason:          negotiationReason?.trim() ?? null,
         client_proposed_price:       clientPrice || null,
         negotiation_requested_at:    now,
-        negotiated_at:               now,
-        negotiated_discount_percentage: actualDiscountPct,
-        negotiation_price_source:    clientPrice >= ourMinPrice && clientPrice > 0
-                                       ? 'client_accepted'
-                                       : 'admin_discount',
         last_status_change:          now,
-        quote_expires_at:            quoteExpiresAt,
         updated_at:                  now,
-        user_selected_extras:        [],
-        extras_selected_total:       0,
       })
       .eq('id', requestId)
 
@@ -169,7 +172,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'فشل معالجة طلب التفاوض' }, { status: 500 })
     }
 
-    if (req.client_email) {
+    if (req.client_email && requiresAdminReview) {
+      notifyNegotiationRequestToClient({
+        email: req.client_email,
+        requestNumber,
+        clientName: req.client_name ?? 'عزيزنا العميل',
+      }).catch(e => console.error('Negotiation receipt email failed:', e))
+    } else if (req.client_email) {
       notifyNegotiatedQuoteToClient({
         email:              req.client_email,
         requestNumber,
@@ -182,7 +191,7 @@ export async function POST(request: Request) {
       }).catch(e => console.error('Auto-negotiation client email failed:', e))
     }
 
-    notifyNegotiationRequestedByClient({
+    if (requiresAdminReview) notifyNegotiationRequestedByClient({
       requestNumber,
       clientName:        req.client_name ?? 'العميل',
       negotiationReason: negotiationReason?.trim() ?? '—',
@@ -195,8 +204,8 @@ export async function POST(request: Request) {
       round:            currentRound,
       maxRounds:        MAX_ROUNDS,
       isFinal:          isFinalRound,
-      counterPrice,
-      discountPct:      actualDiscountPct,
+      requiresAdminReview,
+      ...(requiresAdminReview ? {} : { counterPrice, discountPct: actualDiscountPct }),
       // ── الحصة الشهرية ──
       monthlyUsed:      monthlyUsed + 1,
       monthlyLimit:     MONTHLY_ROUNDS_LIMIT,

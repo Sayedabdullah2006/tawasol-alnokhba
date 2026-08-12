@@ -214,7 +214,7 @@ export default function QuoteApproval({
       if (data.monthlyRemaining !== undefined) {
         setMonthlyQuota({ used: data.monthlyUsed, limit: data.monthlyLimit, remaining: data.monthlyRemaining })
       }
-      showToast('✅ تم إرسال طلبك — تحقق من العرض الجديد')
+      showToast(data.requiresAdminReview ? '✅ تم إرسال طلب التفاوض، وسيرد الفريق عليك قريباً' : '✅ تم إرسال طلبك — تحقق من العرض الجديد')
       router.push(`/dashboard/${requestId}`)
     } else if (data.monthlyLimitReached) {
       showToast('غير متاح حالياً — حاول لاحقاً', 'error')
