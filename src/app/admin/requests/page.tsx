@@ -997,6 +997,7 @@ export default function AdminRequestsPage() {
                       {isDuplicate(r) && <span className="rounded-full bg-purple-50 px-2.5 py-1 text-purple-700">{requestCountByOwner[ownerKey(r)]} طلبات لنفس العميل</span>}
                       {r.status === 'completed' && review?.rating && <span className="rounded-full border border-gold/30 bg-gold/10 px-2.5 py-1 text-gold">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)} تقييم العميل</span>}
                       {r.status === 'completed' && !review?.rating && review?.invitation_sent_at && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">بانتظار تقييم العميل</span>}
+                      {r.status === 'completed' && !review?.rating && !review?.invitation_sent_at && <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-slate-500">التقييم: لم يُرسل</span>}
                     </div>
                     {r.status === 'completed' && review?.comment && <div className="mt-3 rounded-lg border border-gold/20 bg-gold/5 px-3 py-2 text-xs leading-5 text-dark"><span className="font-black text-gold">رأي العميل: </span>{review.comment}</div>}
                     {r.admin_notes?.trim() && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700"><span className="font-black">ملاحظة الإدارة: </span>{r.admin_notes.trim()}</div>}

@@ -787,6 +787,9 @@ export function requestReviewToClient(d: {
       <p style="margin:0 0 20px 0; font-size:13px; line-height:1.8; color:#6B7C99;">
         تقييمك يساعدنا على تحسين التجربة والاهتمام بالتفاصيل التي تهمك.
       </p>
+      <p style="margin:0 0 20px 0; font-size:14px; line-height:1.8; color:${BRAND_NAVY}; font-weight:700; text-align:center;">
+        ونتطلع لأن نكون جزءاً من إنجازك القادم.
+      </p>
       <p style="margin:0; text-align:center;">${button('تقييم التجربة', d.reviewUrl)}</p>
     `),
   }
