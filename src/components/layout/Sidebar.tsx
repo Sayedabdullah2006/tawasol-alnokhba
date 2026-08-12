@@ -38,8 +38,8 @@ export default function Sidebar({ items, title }: SidebarProps) {
 
   return (
     <aside className={cn(
-      'glass-panel hidden shrink-0 flex-col border-l-0 md:sticky md:top-[88px] md:mr-3 md:flex md:h-[calc(100vh-104px)] md:rounded-lg md:transition-[width] md:duration-200',
-      sidebarCollapsed ? 'w-14' : 'w-64'
+      'glass-panel hidden shrink-0 flex-col overflow-visible border-l-0 md:sticky md:top-[88px] md:mr-3 md:flex md:h-[calc(100vh-104px)] md:rounded-lg md:transition-[width] md:duration-200',
+      sidebarCollapsed ? 'w-[72px]' : 'w-64'
     )}>
       <div className={cn('flex items-center border-b border-white/60', sidebarCollapsed ? 'justify-center p-2' : 'justify-between p-4')}>
         {!sidebarCollapsed && <h2 className="font-black text-dark text-sm">{title}</h2>}
@@ -54,22 +54,29 @@ export default function Sidebar({ items, title }: SidebarProps) {
           {sidebarCollapsed ? '›' : '‹'}
         </button>
       </div>
-      {!sidebarCollapsed && <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {items.map(entry =>
-          isGroup(entry) ? (
-            <Group
-              key={entry.label}
-              group={entry}
-              pathname={pathname}
-              open={!collapsed[entry.label]}
-              onToggle={() => toggle(entry.label)}
-            />
-          ) : (
-            <LeafLink key={entry.href} item={entry} active={pathname === entry.href} />
-          )
-        )}
-      </nav>
-      }
+      {sidebarCollapsed ? (
+        <nav className="flex-1 space-y-2 overflow-y-auto px-2 py-3" aria-label={title}>
+          {items.flatMap(entry => isGroup(entry) ? entry.children : [entry]).map(item => (
+            <CollapsedLink key={item.href} item={item} active={pathname === item.href} />
+          ))}
+        </nav>
+      ) : (
+        <nav className="flex-1 space-y-1 overflow-y-auto p-3" aria-label={title}>
+          {items.map(entry =>
+            isGroup(entry) ? (
+              <Group
+                key={entry.label}
+                group={entry}
+                pathname={pathname}
+                open={!collapsed[entry.label]}
+                onToggle={() => toggle(entry.label)}
+              />
+            ) : (
+              <LeafLink key={entry.href} item={entry} active={pathname === entry.href} />
+            )
+          )}
+        </nav>
+      )}
     </aside>
   )
 }
@@ -127,6 +134,28 @@ function LeafLink({ item, active, sub }: { item: NavLeaf; active: boolean; sub?:
     >
       <span className={sub ? 'text-base' : 'text-lg'}>{item.icon}</span>
       {item.label}
+    </Link>
+  )
+}
+
+function CollapsedLink({ item, active }: { item: NavLeaf; active: boolean }) {
+  return (
+    <Link
+      href={item.href}
+      title={item.label}
+      aria-label={item.label}
+      aria-current={active ? 'page' : undefined}
+      className={cn(
+        'group relative flex h-11 w-full items-center justify-center rounded-lg text-xl transition-all',
+        active
+          ? 'border border-white/70 bg-white/75 text-green shadow-sm'
+          : 'text-dark/75 hover:bg-white/65 hover:text-dark'
+      )}
+    >
+      <span aria-hidden>{item.icon}</span>
+      <span className="pointer-events-none absolute left-[calc(100%+0.65rem)] top-1/2 z-50 w-max -translate-y-1/2 rounded-md border border-white/70 bg-dark px-3 py-1.5 text-xs font-bold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+        {item.label}
+      </span>
     </Link>
   )
 }
