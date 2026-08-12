@@ -699,7 +699,7 @@ export default function AdminRequestsPage() {
                 {expanded && (
                   <div className="mt-4 grid gap-3 border-t border-border pt-4 text-xs leading-5 text-muted sm:grid-cols-2 lg:grid-cols-4">
                     <div><p className="font-bold text-dark">بيانات التواصل</p><p className="mt-1" dir="ltr">{r.client_phone || 'لا يوجد جوال'}</p><p className="truncate" dir="ltr">{r.client_email || 'لا يوجد بريد'}</p></div>
-                    <div><p className="font-bold text-dark">مميزات الباقة</p>{selectedPackage ? <div className="mt-1 space-y-0.5">{selectedPackage.features.slice(0, 3).map(feature => <p key={feature}>• {feature}</p>)}</div> : <p className="mt-1">لا توجد باقة محددة لهذا الطلب</p>}</div>
+                    <div><p className="font-bold text-dark">مميزات الباقة</p>{selectedPackage ? <div className="mt-1 space-y-0.5">{selectedPackage.features.map(feature => <p key={feature}>• {feature}</p>)}</div> : <p className="mt-1">لا توجد باقة محددة لهذا الطلب</p>}</div>
                     <div><p className="font-bold text-dark">تفاصيل الطلب</p><p className="mt-1">النوع: {r.request_type === 'campaign' ? 'حملة' : 'منشور واحد'}</p><p>عدد المنشورات: {r.num_posts ?? r.campaign_post_count ?? 1}</p></div>
                     <div><p className="font-bold text-dark">معلومات إضافية</p><p className="mt-1">{r.link ? 'يوجد رابط مرجعي' : 'لا يوجد رابط مرجعي'}</p><p>{Array.isArray(r.content_images) && r.content_images.length ? `${r.content_images.length} صور مرفقة` : 'لا توجد صور مرفقة'}</p></div>
                   </div>
