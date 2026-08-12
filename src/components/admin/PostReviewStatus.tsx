@@ -93,6 +93,8 @@ export default function PostReviewStatus({ request, onEdit, view = 'current' }: 
           const rounds: any[] = Array.isArray(review.history) && review.history.length
             ? review.history
             : [{ content: review.proposed_content, images: review.proposed_images, feedback: review.user_feedback, approved: review.status === 'approved', selected_image: review.selected_image }]
+          const revision = request?.ai_posts?.[item.index]?.revised
+            ?? (item.index === 0 ? request?.ai_revised_designs : null)
           return (
             <section key={item.index} className="rounded-xl border border-border bg-card p-4">
               <div className="mb-3 flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-green/10 text-xs font-bold text-green">{item.index + 1}</span><h4 className="min-w-0 flex-1 truncate text-sm font-bold text-dark">{item.title}</h4></div>
@@ -117,6 +119,45 @@ export default function PostReviewStatus({ request, onEdit, view = 'current' }: 
                   )
                 })}
               </div>
+              {revision && (
+                <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50/60 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <h5 className="text-xs font-bold text-dark">مسودة التعديل الداخلية</h5>
+                      <p className="mt-0.5 text-[11px] text-muted">ناتجة عن ملاحظات العميل ولم تُرسل له بعد.</p>
+                    </div>
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">بانتظار مراجعة الأدمن</span>
+                  </div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-[120px_1fr]">
+                    {revision.revision_base_image && (
+                      <button type="button" onClick={() => setLightbox(revision.revision_base_image)} className="relative aspect-[4/5] w-24 overflow-hidden rounded-lg border-2 border-green bg-white sm:w-full">
+                        <img src={revision.revision_base_image} alt="التصميم المختار كأساس" className="h-full w-full object-cover" />
+                        <span className="absolute inset-x-0 bottom-0 bg-green/90 px-1 py-1 text-[10px] font-bold text-white">اختيار العميل</span>
+                      </button>
+                    )}
+                    <div className="space-y-2">
+                      {(revision.text_feedback || revision.design_feedback || revision.feedback) && (
+                        <div className="rounded-lg border border-amber-200 bg-white p-2 text-[11px] leading-5 text-amber-900">
+                          <p className="font-bold">ملاحظات العميل التي عولجت</p>
+                          {revision.text_feedback && <p className="mt-1"><span className="font-bold">النص:</span> {revision.text_feedback}</p>}
+                          {revision.design_feedback && <p className="mt-1"><span className="font-bold">التصميم:</span> {revision.design_feedback}</p>}
+                          {!revision.text_feedback && !revision.design_feedback && <p className="mt-1 whitespace-pre-line">{revision.feedback}</p>}
+                        </div>
+                      )}
+                      {revision.analysis && <p className="rounded-lg border border-sky-200 bg-sky-50 p-2 text-[11px] leading-5 text-sky-900"><span className="font-bold">تحليل التعديل:</span> {revision.analysis}</p>}
+                      {revision.revised_text && <p className="whitespace-pre-line rounded-lg border border-sky-200 bg-white p-2 text-[11px] leading-5 text-dark"><span className="font-bold text-sky-800">النص المقترح:</span><br />{revision.revised_text}</p>}
+                    </div>
+                  </div>
+                  {Array.isArray(revision.designs) && revision.designs.length > 0 && (
+                    <div className="mt-3">
+                      <p className="mb-1 text-[11px] font-bold text-amber-900">التصاميم الناتجة من التعديل ({revision.designs.length})</p>
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                        {revision.designs.map((design: { imageUrl?: string }, index: number) => design.imageUrl && <button key={index} type="button" onClick={() => setLightbox(design.imageUrl!)} className="aspect-[4/5] overflow-hidden rounded-lg border-2 border-amber-300 bg-white"><img src={design.imageUrl} alt={`نتيجة التعديل ${index + 1}`} className="h-full w-full object-cover" /></button>)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
           )
         })}
@@ -206,11 +247,14 @@ export default function PostReviewStatus({ request, onEdit, view = 'current' }: 
               )}
 
               {/* ملاحظات العميل عند طلب التعديل */}
-              {status === 'changes_requested' && r.user_feedback && (
+              {status === 'changes_requested' && (r.text_feedback || r.design_feedback || r.user_feedback) && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2">
-                  <p className="text-[11px] font-bold text-yellow-700 mb-0.5">ملاحظات العميل:</p>
-                  <p className="text-xs text-yellow-700 whitespace-pre-line">{r.user_feedback}</p>
-                  <p className="text-[11px] text-muted mt-1">عدّل المحتوى/الصور وأعد الإرسال، أو أعد التوليد من الاستوديو.</p>
+                  <p className="text-[11px] font-bold text-yellow-700 mb-0.5">ملاحظات العميل المعتمدة للتعديل:</p>
+                  {r.revision_base_image && <button type="button" onClick={() => setLightbox(r.revision_base_image!)} className="mb-2 flex items-center gap-2 text-[11px] font-bold text-green"><img src={r.revision_base_image} alt="التصميم المختار كأساس" className="h-12 w-10 rounded border border-green object-cover" />التصميم الذي اختاره العميل كأساس</button>}
+                  {r.text_feedback && <p className="text-xs text-yellow-700 whitespace-pre-line"><span className="font-bold">تعديل النص:</span> {r.text_feedback}</p>}
+                  {r.design_feedback && <p className="mt-1 text-xs text-yellow-700 whitespace-pre-line"><span className="font-bold">تعديل التصميم:</span> {r.design_feedback}</p>}
+                  {!r.text_feedback && !r.design_feedback && <p className="text-xs text-yellow-700 whitespace-pre-line">{r.user_feedback}</p>}
+                  <p className="text-[11px] text-muted mt-1">تُجهّز نتيجة التعديل داخل الاستديو أولاً، ثم يقرر الأدمن ما يعيد إرساله للعميل.</p>
                   {Array.isArray(r.reference_images) && r.reference_images.length > 0 && (
                     <div className="mt-2">
                       <p className="text-[11px] font-bold text-yellow-700 mb-1">صور العميل المرجعية ({r.reference_images.length}):</p>

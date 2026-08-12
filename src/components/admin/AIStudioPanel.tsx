@@ -975,10 +975,20 @@ export default function AIStudioPanel({
       {/* ── التصاميم المعدّلة تلقائياً حسب ملاحظات العميل (مع الإبقاء على القديمة أعلاه) ── */}
       {((Array.isArray(saved.revised?.designs) && saved.revised.designs.length > 0) || saved.revised?.revised_text) && (
         <div className={`${cardCls} border-amber-300`}>
-          <StepHead n="🔁" title="التصاميم المعدّلة (حسب ملاحظات العميل)" subtitle="أُعيد توليدها آلياً — راجعها وأرسل الأنسب؛ التصاميم القديمة محفوظة أعلاه" tone="gold" />
-          {saved.revised.feedback && (
+          <StepHead n="🔁" title="مسودة التعديل الداخلية" subtitle="لم تُرسل للعميل بعد. راجع النتيجة، ثم أرسل فقط ما تريد اعتماده للمراجعة التالية." tone="gold" />
+          {saved.revised.revision_base_image && (
+            <div className="flex items-center gap-3 rounded-xl border border-green/30 bg-green/5 p-3 text-xs text-dark">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={saved.revised.revision_base_image} alt="التصميم الذي اختاره العميل" className="h-16 w-12 rounded-lg border border-green object-cover" />
+              <div><p className="font-bold text-green">التصميم الذي اختاره العميل كأساس</p><p className="mt-1 text-muted">جميع نتائج هذه المسودة مبنية عليه.</p></div>
+            </div>
+          )}
+          {(saved.revised.text_feedback || saved.revised.design_feedback || saved.revised.feedback) && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
-              <span className="font-bold">✍️ ملاحظة العميل:</span> {saved.revised.feedback}
+              <p className="font-bold">✍️ ملاحظات العميل التي عولجت</p>
+              {saved.revised.text_feedback && <p className="mt-1"><span className="font-bold">تعديل النص:</span> {saved.revised.text_feedback}</p>}
+              {saved.revised.design_feedback && <p className="mt-1"><span className="font-bold">تعديل التصميم:</span> {saved.revised.design_feedback}</p>}
+              {!saved.revised.text_feedback && !saved.revised.design_feedback && <p className="mt-1 whitespace-pre-line">{saved.revised.feedback}</p>}
             </div>
           )}
           {saved.revised.analysis && (
@@ -1005,7 +1015,7 @@ export default function AIStudioPanel({
                   <div className="flex-1 min-w-0 space-y-1.5">
                     <div className="font-bold text-dark text-xs">{d.title ?? `معدّل ${i + 1}`}</div>
                     <div className="flex flex-wrap gap-2">
-                      <Button onClick={() => onUsedContent(selectedTweet, [url], isPost ? (postIndex as number) : 0)} variant="secondary" size="sm">📤 أرسل هذا للعميل</Button>
+                      <Button onClick={() => onUsedContent(saved.revised.revised_text || selectedTweet, [url], isPost ? (postIndex as number) : 0)} variant="secondary" size="sm">📤 أرسل هذا للعميل</Button>
                       <Button onClick={() => openPublish(url)} loading={publishingCover === url} disabled={publishingCover !== null} variant={publishedCover === url ? 'secondary' : 'outline'} size="sm">
                         {publishedCover === url ? '✅ نُشر' : '📣 انشر'}
                       </Button>
