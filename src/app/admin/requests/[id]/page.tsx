@@ -180,14 +180,14 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
     setSaving(false)
   }
 
-  const handleUpdateStatus = async (overrideStatus?: string) => {
+  const handleUpdateStatus = async (overrideStatus?: string, overrideAdminNotes?: string | null) => {
     if (!request) return
     setSaving(true)
     const statusToSend = overrideStatus ?? newStatus
     const res = await fetch('/api/update-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestId: request.id, status: statusToSend, adminNotes }),
+      body: JSON.stringify({ requestId: request.id, status: statusToSend, adminNotes: overrideAdminNotes ?? adminNotes }),
     })
     if (res.ok) {
       showToast('تم تحديث الحالة بنجاح')
@@ -210,6 +210,10 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
 
   const handleConfirmPayment = async () => {
     setShowPaymentConfirm(false)
+    if (request?.status === 'payment_review' && request.receipt_url) {
+      await handleUpdateStatus('in_progress', 'تم تأكيد التحويل البنكي وبدء تنفيذ الطلب')
+      return
+    }
     await handleUpdateStatus('paid')
   }
 

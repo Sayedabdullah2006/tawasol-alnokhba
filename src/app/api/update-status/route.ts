@@ -17,7 +17,7 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   negotiation:     ['quoted', 'rejected', 'pending'],
   client_rejected: ['quoted', 'rejected', 'pending'],
   approved:        ['in_progress', 'paid', 'payment_review', 'rejected'],
-  payment_review:  ['approved', 'paid', 'rejected'],
+  payment_review:  ['approved', 'paid', 'in_progress', 'rejected'],
   paid:            ['in_progress'],
   in_progress:     ['content_review', 'completed', 'info_requested', 'scheduled'],
   info_requested:  ['in_progress', 'content_review'],
@@ -90,7 +90,9 @@ export async function POST(request: Request) {
         last_status_change: now,
         updated_at:         now,
         // سجّل وقت تأكيد الدفع عند انتقال الطلب إلى "مدفوع" (تحويل بنكي)
-        ...(newStatus === 'paid' ? { paid_at: now, payment_status: 'paid' } : {}),
+        ...(newStatus === 'paid' || (current.status === 'payment_review' && newStatus === 'in_progress')
+          ? { paid_at: now, payment_status: 'paid' }
+          : {}),
       })
       .eq('id', requestId)
       .select('request_number, client_name, client_email, final_total, admin_quoted_price, estimated_reach, admin_notes')
