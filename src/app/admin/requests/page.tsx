@@ -69,6 +69,8 @@ export default function AdminRequestsPage() {
   const [quickActionStatus, setQuickActionStatus] = useState('')
   const [quickActionNotes, setQuickActionNotes] = useState('')
   const [savingQuickAction, setSavingQuickAction] = useState(false)
+  const [thumbnailTarget, setThumbnailTarget] = useState<any | null>(null)
+  const [savingThumbnail, setSavingThumbnail] = useState(false)
   const [revivalTarget, setRevivalTarget] = useState<any | null>(null)
   const [revivalDiscountPct, setRevivalDiscountPct] = useState(15)
   const [revivalValidDays, setRevivalValidDays] = useState(3)
@@ -247,16 +249,44 @@ export default function AdminRequestsPage() {
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
   }
 
-  // The request may have several reference images; cards intentionally preview only the first one.
+  // The admin can choose one existing request image for the card without changing source images.
   const getRequestThumbnail = (request: any): string | null => {
     const images = request.content_images
     if (!Array.isArray(images)) return null
+
+    if (typeof request.admin_thumbnail_url === 'string' && images.includes(request.admin_thumbnail_url)) {
+      return request.admin_thumbnail_url
+    }
 
     const imageUrl = images.find((image: unknown): image is string =>
       typeof image === 'string' && image.trim().length > 0
     )
 
     return imageUrl?.trim() ?? null
+  }
+
+  const selectThumbnail = async (imageUrl: string) => {
+    if (!thumbnailTarget) return
+    setSavingThumbnail(true)
+    try {
+      const response = await fetch('/api/admin/request-thumbnail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: thumbnailTarget.id, imageUrl }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.success) {
+        showToast(data.error ?? 'تعذّر حفظ الصورة المصغرة', 'error')
+        return
+      }
+      setRequests(current => current.map(request => request.id === thumbnailTarget.id ? { ...request, admin_thumbnail_url: data.imageUrl } : request))
+      setThumbnailTarget(null)
+      showToast('تم اختيار الصورة المصغرة للطلب')
+    } catch {
+      showToast('خطأ في الاتصال بالخادم', 'error')
+    } finally {
+      setSavingThumbnail(false)
+    }
   }
 
   const openRequest = (req: any) => {
@@ -737,11 +767,13 @@ export default function AdminRequestsPage() {
           </button>
           <Button
             variant="outline"
+            size="sm"
             onClick={() => setShowBulkConfirm(true)}
             disabled={quotedCount === 0}
-            className="border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50"
+            className="min-h-[34px] shrink-0 whitespace-nowrap border-orange-300 px-2 py-1 text-xs text-orange-700 hover:bg-orange-50 disabled:opacity-50"
+            title={`تذكير العروض (${quotedCount})`}
           >
-            🔔 تذكير العروض ({quotedCount})
+            🔔 تذكير ({quotedCount})
           </Button>
         </div>
 
@@ -869,19 +901,6 @@ export default function AdminRequestsPage() {
         </>
       )}
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card px-4 py-3" dir="rtl">
-        <div className="flex w-full flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-sm font-black text-dark">قائمة الطلبات</h2>
-            <p className="mt-0.5 text-xs text-muted">{filteredRequestSummaries.length} طلب ظاهر</p>
-          </div>
-          {(search || statusFilter || duplicatesOnly || userFilter) && (
-            <button onClick={() => { setSearch(''); setStatusFilter(''); setDuplicatesOnly(false); setUserFilter(''); setUserQuery(''); setCurrentPage(1) }} className="text-xs font-bold text-green hover:underline">مسح الفلاتر</button>
-          )}
-        </div>
-
-      </div>
-
       <div className="space-y-3" dir="rtl">
           {pageLoading && <div className="rounded-lg border border-border bg-card p-10 text-center text-sm text-muted">جارٍ تحميل الطلبات...</div>}
           {!pageLoading && filteredRequests.map(r => {
@@ -924,6 +943,15 @@ export default function AdminRequestsPage() {
                           className="h-full w-full object-contain"
                         />
                       </a>
+                    )}
+                    {Array.isArray(r.content_images) && r.content_images.filter((image: unknown) => typeof image === 'string' && !!image.trim()).length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setThumbnailTarget(r)}
+                        className="mb-3 w-full rounded-lg border border-border bg-white px-3 py-2 text-xs font-bold text-dark transition-colors hover:border-green hover:bg-green/5"
+                      >
+                        اختيار صورة أخرى
+                      </button>
                     )}
                     <ClientNameFixed name={r.client_name || 'عميل بدون اسم'} maxLength={32} className="block text-sm font-bold text-dark" />
                     {r.client_email && <p className="mt-1 truncate text-xs text-muted" dir="ltr">{r.client_email}</p>}
@@ -1170,6 +1198,52 @@ export default function AdminRequestsPage() {
           </div>
         )}
       </div>
+
+      {thumbnailTarget && (() => {
+        const images: string[] = Array.isArray(thumbnailTarget.content_images)
+          ? thumbnailTarget.content_images.filter((image: unknown): image is string => typeof image === 'string' && !!image.trim())
+          : []
+        const selectedImage = getRequestThumbnail(thumbnailTarget)
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !savingThumbnail && setThumbnailTarget(null)}>
+            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-white/70 bg-white p-5 shadow-xl sm:p-6" onClick={event => event.stopPropagation()} dir="rtl">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold text-gold">الصورة المصغرة لبطاقة الطلب</p>
+                  <h3 className="mt-1 text-lg font-black text-dark">اختر صورة من المرفقات</h3>
+                  <p className="mt-1 text-sm text-muted">يظهر الاختيار للإدارة فقط، ولا يغيّر صور الطلب أو ترتيبها.</p>
+                </div>
+                <button type="button" onClick={() => setThumbnailTarget(null)} disabled={savingThumbnail} className="grid h-8 w-8 place-items-center rounded-lg text-lg text-muted hover:bg-slate-100" aria-label="إغلاق">×</button>
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {images.map((imageUrl, index) => {
+                  const isSelected = imageUrl === selectedImage
+                  return (
+                    <button
+                      key={imageUrl}
+                      type="button"
+                      onClick={() => selectThumbnail(imageUrl)}
+                      disabled={savingThumbnail}
+                      className={`overflow-hidden rounded-xl border-2 p-2 text-right transition ${isSelected ? 'border-green bg-green/5' : 'border-border bg-white hover:border-green/60'} disabled:cursor-wait disabled:opacity-60`}
+                    >
+                      <span className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-lg bg-cream/50 p-1">
+                        <img src={imageUrl} alt={`صورة مرفقة ${index + 1}`} className="h-full w-full object-contain" />
+                      </span>
+                      <span className="mt-2 block text-xs font-bold text-dark">صورة {index + 1}</span>
+                      <span className={`mt-0.5 block text-[10px] font-bold ${isSelected ? 'text-green' : 'text-muted'}`}>{isSelected ? 'المحددة حالياً' : 'اختيار هذه الصورة'}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="mt-5 flex justify-end">
+                <button type="button" onClick={() => setThumbnailTarget(null)} disabled={savingThumbnail} className="rounded-lg border border-border bg-white px-4 py-2 text-sm font-bold text-dark hover:bg-cream disabled:opacity-50">إلغاء</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {quickActionTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !savingQuickAction && setQuickActionTarget(null)}>
