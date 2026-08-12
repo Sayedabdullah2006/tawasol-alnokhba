@@ -44,12 +44,13 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="glass-panel relative order-1 flex min-h-[300px] items-center justify-center overflow-hidden rounded-lg p-8 md:order-2 md:min-h-[430px]">
-          <div aria-hidden className="absolute inset-x-8 top-8 h-px bg-gradient-to-l from-transparent via-gold/60 to-transparent" />
-          <div aria-hidden className="absolute bottom-8 left-8 right-8 h-px bg-gradient-to-l from-transparent via-green/35 to-transparent" />
+        <div className="glass-panel relative order-1 min-h-[300px] overflow-hidden rounded-lg p-2 md:order-2 md:min-h-[430px]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="تواصل النخبة" className="relative h-auto w-[78%] max-w-[330px] object-contain drop-shadow-[0_16px_24px_rgba(16,43,92,0.18)]" />
-          <span className="absolute bottom-8 text-center text-[10px] font-bold tracking-[0.18em] text-muted sm:text-xs">ADVERTISING &amp; MARKETING</span>
+          <img src="/landing-media-story.png" alt="صانعة محتوى سعودية تعمل على إعداد قصة إعلامية لإنجاز مهني" className="h-full min-h-[284px] w-full rounded-md object-cover object-center md:min-h-[414px]" />
+          <div className="absolute inset-x-5 bottom-5 rounded-lg border border-white/40 bg-dark/75 px-4 py-3 text-white backdrop-blur-md">
+            <p className="text-xs font-black text-gold">من الإنجاز إلى الحضور</p>
+            <p className="mt-1 text-xs leading-5 text-white/80">صياغة احترافية، تصميم متقن، ونشر يصل إلى جمهوره.</p>
+          </div>
         </div>
       </section>
 
