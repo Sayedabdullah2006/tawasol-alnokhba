@@ -14,16 +14,21 @@ import { useToast } from '@/components/ui/Toast'
 import ClientNameFixed from '@/components/ui/ClientNameFixed'
 import NameDisplayTest from '@/components/debug/NameDisplayTest'
 
+const REQUESTS_PER_PAGE = 10
+
 export default function AdminRequestsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
   const { showToast } = useToast()
   const [loading, setLoading] = useState(true)
+  const [pageLoading, setPageLoading] = useState(false)
   const [requests, setRequests] = useState<any[]>([])
+  const [requestSummaries, setRequestSummaries] = useState<any[]>([])
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
   const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') ?? '')
   const [duplicatesOnly, setDuplicatesOnly] = useState(() => searchParams.get('duplicates') === '1')
+  const [currentPage, setCurrentPage] = useState(() => Math.max(1, Number(searchParams.get('page')) || 1))
   // فلتر المستخدم: مفتاح المستخدم المختار + نص البحث في القائمة + إظهار القائمة
   const [userFilter, setUserFilter] = useState(() => searchParams.get('user') ?? '')
   const [userQuery, setUserQuery] = useState('')
@@ -69,14 +74,14 @@ export default function AdminRequestsPage() {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
     if (profile?.role !== 'admin') { router.push('/dashboard'); return }
 
-    const { data: reqs } = await supabase
+    const { data: summaries } = await supabase
       .from('publish_requests')
-      .select('*')
+      .select('id,user_id,client_name,client_email,client_phone,title,content,admin_notes,status,created_at,request_number')
       // الطلب الذي ألغاه العميل لا يحتاج متابعة في لوحة الإدارة.
       .neq('status', 'cancelled')
       .order('created_at', { ascending: false })
 
-    setRequests(reqs ?? [])
+    setRequestSummaries(summaries ?? [])
     setLoading(false)
   }, [supabase, router])
 
@@ -93,10 +98,11 @@ export default function AdminRequestsPage() {
     setParam('status', statusFilter)
     setParam('user', userFilter)
     setParam('duplicates', duplicatesOnly ? '1' : '')
+    setParam('page', currentPage > 1 ? String(currentPage) : '')
     const query = params.toString()
     const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}`
     window.history.replaceState(window.history.state, '', nextUrl)
-  }, [search, statusFilter, userFilter, duplicatesOnly])
+  }, [search, statusFilter, userFilter, duplicatesOnly, currentPage])
 
   // Removed drawer useEffect
 
@@ -111,7 +117,7 @@ export default function AdminRequestsPage() {
     r.user_id || cleanId(r.client_email) || cleanId(r.client_phone) || `req:${r.id}`
 
   // عدد طلبات كل مستخدم (لتحديد المكررين وعرض الشارة)
-  const requestCountByOwner = requests.reduce((acc: Record<string, number>, r) => {
+  const requestCountByOwner = requestSummaries.reduce((acc: Record<string, number>, r) => {
     const key = ownerKey(r)
     if (key) acc[key] = (acc[key] ?? 0) + 1
     return acc
@@ -125,7 +131,7 @@ export default function AdminRequestsPage() {
   // قائمة المستخدمين الفريدة الذين لديهم طلبات (للفلتر بالاسم)
   const usersList = (() => {
     const map = new Map<string, { key: string; name: string; email: string; count: number }>()
-    for (const r of requests) {
+    for (const r of requestSummaries) {
       const key = ownerKey(r)
       if (!key) continue
       const existing = map.get(key)
@@ -155,7 +161,7 @@ export default function AdminRequestsPage() {
     ? (usersList.find(u => u.key === userFilter)?.name ?? '')
     : ''
 
-  const filteredRequests = requests
+  const filteredRequestSummaries = requestSummaries
     .filter(r => {
       if (userFilter && ownerKey(r) !== userFilter) return false
       if (duplicatesOnly && !isDuplicate(r)) return false
@@ -192,6 +198,42 @@ export default function AdminRequestsPage() {
       }
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     })
+
+  const totalPages = Math.max(1, Math.ceil(filteredRequestSummaries.length / REQUESTS_PER_PAGE))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const pageRequestIds = filteredRequestSummaries
+    .slice((safeCurrentPage - 1) * REQUESTS_PER_PAGE, safeCurrentPage * REQUESTS_PER_PAGE)
+    .map(request => request.id)
+
+  useEffect(() => {
+    if (currentPage !== safeCurrentPage) setCurrentPage(safeCurrentPage)
+  }, [currentPage, safeCurrentPage])
+
+  useEffect(() => {
+    const loadPage = async () => {
+      if (loading) return
+      if (pageRequestIds.length === 0) {
+        setRequests([])
+        return
+      }
+
+      setPageLoading(true)
+      const { data, error } = await supabase
+        .from('publish_requests')
+        .select('*')
+        .in('id', pageRequestIds)
+
+      if (!error) {
+        const requestsById = new Map((data ?? []).map(request => [request.id, request]))
+        setRequests(pageRequestIds.map(id => requestsById.get(id)).filter(Boolean))
+      }
+      setPageLoading(false)
+    }
+
+    loadPage()
+  }, [loading, supabase, safeCurrentPage, pageRequestIds.join('|')])
+
+  const filteredRequests = requests
 
   // عدد المستخدمين الذين لديهم أكثر من طلب (لعرضه على زر الفلتر)
   const duplicateOwnersCount = Object.values(requestCountByOwner).filter(c => c > 1).length
@@ -251,6 +293,7 @@ export default function AdminRequestsPage() {
         showToast(`تم حذف طلب ${generateRequestNumber(requestToDelete.request_number)} نهائياً`, 'success')
         // إزالة الطلب من القائمة
         setRequests(prev => prev.filter(r => r.id !== requestToDelete.id))
+        setRequestSummaries(prev => prev.filter(r => r.id !== requestToDelete.id))
       } else {
         showToast(data.error || 'فشل في حذف الطلب', 'error')
       }
@@ -290,6 +333,9 @@ export default function AdminRequestsPage() {
         return
       }
       setRequests(current => current.map(request => request.id === quickNoteTarget.id
+        ? { ...request, admin_notes: data.adminNotes }
+        : request))
+      setRequestSummaries(current => current.map(request => request.id === quickNoteTarget.id
         ? { ...request, admin_notes: data.adminNotes }
         : request))
       showToast(quickNote.trim() ? 'تم حفظ الملاحظة وتظهر الآن في بطاقة الطلب' : 'تم حذف ملاحظة الإدارة')
@@ -343,6 +389,9 @@ export default function AdminRequestsPage() {
       }
 
       setRequests(current => current.map(request => request.id === revivalTarget.id ? data.request : request))
+      setRequestSummaries(current => current.map(request => request.id === revivalTarget.id
+        ? { ...request, status: data.request.status }
+        : request))
       showToast(data.emailSent ? 'تم إحياء الطلب وإرسال عرض العودة للعميل' : 'تم إحياء الطلب، لكن تعذّر إرسال البريد', data.emailSent ? 'success' : 'error')
       setRevivalTarget(null)
     } catch {
@@ -352,8 +401,8 @@ export default function AdminRequestsPage() {
     }
   }
 
-  const quotedCount = requests.filter(r => r.status === 'quoted').length
-  const autoClosedCount = requests.filter(r => r.status === 'auto_closed').length
+  const quotedCount = requestSummaries.filter(r => r.status === 'quoted').length
+  const autoClosedCount = requestSummaries.filter(r => r.status === 'auto_closed').length
 
   const handleBulkReminder = async () => {
     if (bulkApplyDiscount && (bulkDiscountPct <= 0 || bulkDiscountPct >= 100)) {
@@ -577,7 +626,7 @@ export default function AdminRequestsPage() {
     <div className="mx-auto max-w-7xl p-4 md:p-6">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div><h1 className="text-2xl font-black text-dark">إدارة الطلبات</h1><p className="mt-1 text-sm text-muted">تابع الطلبات، تواصل مع العملاء، وراجع تفاصيل التنفيذ.</p></div>
-        <span className="rounded-full bg-cream px-3 py-1.5 text-xs font-bold text-muted">{requests.length} طلب نشط</span>
+        <span className="rounded-full bg-cream px-3 py-1.5 text-xs font-bold text-muted">{requestSummaries.length} طلب نشط</span>
       </div>
 
       <div className="mb-4 rounded-lg border border-border bg-card p-3 sm:p-4">
@@ -585,12 +634,12 @@ export default function AdminRequestsPage() {
           <Input
             placeholder="بحث بالاسم أو رقم الطلب..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); setCurrentPage(1) }}
             className="w-full"
           />
           <select
             value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
+            onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1) }}
             className="min-h-[48px] rounded-lg border border-border bg-card px-4 py-2 text-sm"
           >
             <option value="">جميع الحالات</option>
@@ -614,7 +663,7 @@ export default function AdminRequestsPage() {
               <input
                 type="text"
                 value={userFilter ? selectedUserName : userQuery}
-                onChange={e => { setUserFilter(''); setUserQuery(e.target.value); setShowUserList(true) }}
+                onChange={e => { setUserFilter(''); setUserQuery(e.target.value); setShowUserList(true); setCurrentPage(1) }}
                 onFocus={() => setShowUserList(true)}
                 onBlur={() => setTimeout(() => setShowUserList(false), 150)}
                 placeholder={`👤 فلترة بالمستخدم (${usersList.length})`}
@@ -622,7 +671,7 @@ export default function AdminRequestsPage() {
               />
               {userFilter && (
                 <button
-                  onClick={() => { setUserFilter(''); setUserQuery('') }}
+                  onClick={() => { setUserFilter(''); setUserQuery(''); setCurrentPage(1) }}
                   className="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted hover:text-red-600"
                   title="مسح فلتر المستخدم"
                   aria-label="مسح فلتر المستخدم"
@@ -638,7 +687,7 @@ export default function AdminRequestsPage() {
                     filteredUsersList.map(u => (
                       <button
                         key={u.key}
-                        onMouseDown={() => { setUserFilter(u.key); setUserQuery(''); setShowUserList(false) }}
+                        onMouseDown={() => { setUserFilter(u.key); setUserQuery(''); setShowUserList(false); setCurrentPage(1) }}
                         className="flex w-full items-center justify-between gap-2 border-b border-border/50 px-4 py-2.5 text-right transition-colors last:border-0 hover:bg-cream/60"
                       >
                         <span className="truncate text-sm font-medium text-dark">{u.name}</span>
@@ -651,7 +700,7 @@ export default function AdminRequestsPage() {
             </div>
             <Button
               variant="outline"
-              onClick={() => setDuplicatesOnly(value => !value)}
+              onClick={() => { setDuplicatesOnly(value => !value); setCurrentPage(1) }}
               disabled={!duplicatesOnly && duplicateOwnersCount === 0}
               className={duplicatesOnly
                 ? 'border-purple-400 bg-purple-50 text-purple-700'
@@ -661,7 +710,7 @@ export default function AdminRequestsPage() {
             </Button>
             <Button
               variant="outline"
-              onClick={() => setStatusFilter(statusFilter === 'auto_closed' ? '' : 'auto_closed')}
+              onClick={() => { setStatusFilter(statusFilter === 'auto_closed' ? '' : 'auto_closed'); setCurrentPage(1) }}
               disabled={!autoClosedCount && statusFilter !== 'auto_closed'}
               className={statusFilter === 'auto_closed'
                 ? 'border-slate-500 bg-slate-100 text-slate-700'
@@ -712,7 +761,7 @@ export default function AdminRequestsPage() {
             🔔 تذكير العروض ({quotedCount})
           </Button>
           <div className="mr-auto text-xs text-muted">
-            إجمالي {requests.length} · ظاهر {filteredRequests.length}
+            إجمالي {requestSummaries.length} · ظاهر {filteredRequestSummaries.length}
           </div>
         </div>
       </div>
@@ -723,24 +772,24 @@ export default function AdminRequestsPage() {
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4">
             <h3 className="font-bold text-yellow-700 mb-2">🔍 معلومات التشخيص</h3>
             <div className="text-xs text-yellow-600 space-y-1">
-              <div>إجمالي الطلبات: {requests.length}</div>
-              <div>الطلبات المفلترة: {filteredRequests.length}</div>
+              <div>إجمالي الطلبات: {requestSummaries.length}</div>
+              <div>الطلبات المفلترة: {filteredRequestSummaries.length}</div>
               <div>حالة البحث: "{search || 'فارغ'}"</div>
               <div>فلتر الحالة: "{statusFilter || 'جميع الحالات'}"</div>
-              {filteredRequests.length > 0 && (
+              {filteredRequestSummaries.length > 0 && (
                 <div>عينة من البيانات: {JSON.stringify({
-                  id: filteredRequests[0]?.id?.substring(0, 8),
-                  client_email: filteredRequests[0]?.client_email ? 'موجود' : 'مفقود',
-                  status: filteredRequests[0]?.status
+                  id: filteredRequestSummaries[0]?.id?.substring(0, 8),
+                  client_email: filteredRequestSummaries[0]?.client_email ? 'موجود' : 'مفقود',
+                  status: filteredRequestSummaries[0]?.status
                 })}</div>
               )}
             </div>
           </div>
 
           {/* Name Display Test */}
-          {filteredRequests.length > 0 && (
+          {filteredRequestSummaries.length > 0 && (
             <NameDisplayTest
-              names={filteredRequests
+              names={filteredRequestSummaries
                 .slice(0, 3)
                 .map(r => r.client_name)
                 .filter(Boolean)}
@@ -753,17 +802,18 @@ export default function AdminRequestsPage() {
         <div className="flex w-full flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-sm font-black text-dark">قائمة الطلبات</h2>
-            <p className="mt-0.5 text-xs text-muted">{filteredRequests.length} طلب ظاهر</p>
+            <p className="mt-0.5 text-xs text-muted">{filteredRequestSummaries.length} طلب ظاهر</p>
           </div>
           {(search || statusFilter || duplicatesOnly || userFilter) && (
-            <button onClick={() => { setSearch(''); setStatusFilter(''); setDuplicatesOnly(false); setUserFilter(''); setUserQuery('') }} className="text-xs font-bold text-green hover:underline">مسح الفلاتر</button>
+            <button onClick={() => { setSearch(''); setStatusFilter(''); setDuplicatesOnly(false); setUserFilter(''); setUserQuery(''); setCurrentPage(1) }} className="text-xs font-bold text-green hover:underline">مسح الفلاتر</button>
           )}
         </div>
 
       </div>
 
       <div className="space-y-3" dir="rtl">
-          {filteredRequests.map(r => {
+          {pageLoading && <div className="rounded-lg border border-border bg-card p-10 text-center text-sm text-muted">جارٍ تحميل الطلبات...</div>}
+          {!pageLoading && filteredRequests.map(r => {
             const cat = CATEGORIES.find(c => c.id === r.category)
             const selectedPackage = PACKAGES.find(pkg => pkg.id === (r.auto_quote_tier ?? r.selected_package))
             const total = r.final_total ?? r.admin_quoted_price
@@ -834,8 +884,30 @@ export default function AdminRequestsPage() {
               </article>
             )
           })}
-          {filteredRequests.length === 0 && <div className="p-10 text-center text-sm text-muted">لا توجد طلبات تطابق الفلاتر الحالية.</div>}
+          {!pageLoading && filteredRequestSummaries.length === 0 && <div className="p-10 text-center text-sm text-muted">لا توجد طلبات تطابق الفلاتر الحالية.</div>}
       </div>
+
+      {totalPages > 1 && (
+        <nav className="mt-5 flex flex-wrap items-center justify-center gap-3" aria-label="ترقيم صفحات الطلبات" dir="rtl">
+          <button
+            type="button"
+            onClick={() => { setCurrentPage(page => Math.max(1, page - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+            disabled={safeCurrentPage === 1 || pageLoading}
+            className="rounded-lg border border-border bg-white px-4 py-2 text-sm font-bold text-dark transition hover:bg-cream disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            السابق
+          </button>
+          <span className="rounded-lg bg-green/10 px-4 py-2 text-sm font-black text-green">الصفحة {safeCurrentPage} من {totalPages}</span>
+          <button
+            type="button"
+            onClick={() => { setCurrentPage(page => Math.min(totalPages, page + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+            disabled={safeCurrentPage === totalPages || pageLoading}
+            className="rounded-lg border border-border bg-white px-4 py-2 text-sm font-bold text-dark transition hover:bg-cream disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            التالي
+          </button>
+        </nav>
+      )}
 
       <div className="hidden bg-card rounded-2xl border border-border overflow-hidden">
         <div className="overflow-x-auto">
