@@ -29,6 +29,14 @@ function isConfirmedPaid(r: any): boolean {
   return (r.paid_at != null || PAID_STATUSES.includes(r.status)) && (r.final_total ?? 0) > 0
 }
 
+// صافي الإيراد يُخصم منه الاسترجاع المطلوب مباشرة، بما فيه الاسترجاع قيد المعالجة.
+// يعكس ذلك المبلغ المتاح فعلياً ولا ينتظر ظهور التحويل في حساب العميل.
+function getNetPaidAmount(r: any): number {
+  const paidAmount = Number(r.final_total ?? r.admin_quoted_price ?? 0)
+  const refundAmount = Number(r.refund_amount ?? 0)
+  return Math.max(0, paidAmount - refundAmount)
+}
+
 type TrendPoint = { day: number; value: number }
 
 function MonthlyBarChart({ data, color, valueLabel }: { data: TrendPoint[]; color: string; valueLabel: (value: number) => string }) {
@@ -129,16 +137,13 @@ export default function AdminStatsPage() {
       // الإيرادات: الطلبات التي تأكّد دفعها فعلاً
       // paid_at يُسجَّل عند تأكيد Moyasar/Tamara أو عند تأكيد الأدمن للتحويل البنكي
       // الفلتر الاحتياطي بالحالة يغطي السجلات القديمة قبل إضافة paid_at
-      const isConfirmedPaid = (r: any) =>
-        (r.paid_at != null || paidStatuses.includes(r.status)) && (r.final_total ?? 0) > 0
-
       const monthRevenue = requests
         .filter(r => isConfirmedPaid(r) && r.created_at >= monthStart)
-        .reduce((s, r) => s + (r.final_total ?? 0), 0)
+        .reduce((s, r) => s + getNetPaidAmount(r), 0)
 
       const totalPaidRevenue = requests
         .filter(isConfirmedPaid)
-        .reduce((s, r) => s + (r.final_total ?? 0), 0)
+        .reduce((s, r) => s + getNetPaidAmount(r), 0)
 
       // نحتفظ بكل الطلبات لحساب إحصاءات الشهر المختار ديناميكياً (يتبع فلتر الشهر)
       setAllRequests(requests)
@@ -152,7 +157,7 @@ export default function AdminStatsPage() {
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
         monthsWithData.add(key)
         if (isConfirmedPaid(r)) {
-          revenueByMonth[key] = (revenueByMonth[key] ?? 0) + (r.final_total ?? 0)
+          revenueByMonth[key] = (revenueByMonth[key] ?? 0) + getNetPaidAmount(r)
         }
       }
       const nowKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -167,7 +172,7 @@ export default function AdminStatsPage() {
         paidCount,
         monthPaidCount,
         monthRevenue,
-        revenue: requests.filter(isConfirmedPaid).reduce((s, r) => s + (r.final_total ?? 0), 0),
+        revenue: requests.filter(isConfirmedPaid).reduce((s, r) => s + getNetPaidAmount(r), 0),
         totalPaidRevenue,
         outstanding: requests
           .filter(r => r.status === 'quoted')
@@ -232,9 +237,10 @@ export default function AdminStatsPage() {
       if (!inMonth(r)) continue
       if (PAID_STATUSES.includes(r.status)) count++
       if (isConfirmedPaid(r)) {
-        revenue += (r.final_total ?? 0)
+        const netPaidAmount = getNetPaidAmount(r)
+        revenue += netPaidAmount
         const mm = classifyPayMethod(r)
-        agg[mm].amount += (r.final_total ?? 0)
+        agg[mm].amount += netPaidAmount
         agg[mm].count += 1
       }
     }
@@ -257,7 +263,7 @@ export default function AdminStatsPage() {
       if (isConfirmedPaid(request)) {
         const paidAt = new Date(request.paid_at ?? request.created_at)
         if (!Number.isNaN(paidAt.getTime()) && paidAt.getFullYear() === year && paidAt.getMonth() + 1 === month) {
-          revenue[paidAt.getDate() - 1].value += Number(request.final_total ?? request.admin_quoted_price ?? 0)
+          revenue[paidAt.getDate() - 1].value += getNetPaidAmount(request)
         }
       }
     }
