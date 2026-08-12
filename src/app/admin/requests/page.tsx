@@ -43,6 +43,11 @@ export default function AdminRequestsPage() {
   const [quickNoteTarget, setQuickNoteTarget] = useState<any | null>(null)
   const [quickNote, setQuickNote] = useState('')
   const [savingQuickNote, setSavingQuickNote] = useState(false)
+  const [revivalTarget, setRevivalTarget] = useState<any | null>(null)
+  const [revivalDiscountPct, setRevivalDiscountPct] = useState(15)
+  const [revivalValidDays, setRevivalValidDays] = useState(3)
+  const [revivalMessage, setRevivalMessage] = useState('')
+  const [sendingRevival, setSendingRevival] = useState(false)
   const [showDebug, setShowDebug] = useState(false)
   // نموذج إضافة طلب خارجي (نُشر ودُفع خارج المنصة)
   const [showExternalForm, setShowExternalForm] = useState(false)
@@ -285,7 +290,58 @@ export default function AdminRequestsPage() {
     }
   }
 
+  const openRevival = (request: any, event: React.MouseEvent) => {
+    event.stopPropagation()
+    const currentPrice = Number(request.final_total ?? request.admin_quoted_price ?? 0)
+    setRevivalTarget(request)
+    setRevivalDiscountPct(15)
+    setRevivalValidDays(3)
+    setRevivalMessage(currentPrice > 0
+      ? 'يسرّنا إعادة فتح طلبك السابق بعرض عودة خاص، ويمكنك استكماله مباشرة من الرابط.'
+      : 'يسرّنا إعادة فتح طلبك السابق، ويمكنك استكماله مباشرة من الرابط.')
+  }
+
+  const handleReviveRequest = async () => {
+    if (!revivalTarget) return
+    if (revivalDiscountPct < 0 || revivalDiscountPct >= 100) {
+      showToast('نسبة الخصم يجب أن تكون بين 0 و99', 'error')
+      return
+    }
+    if (!Number.isInteger(revivalValidDays) || revivalValidDays < 1 || revivalValidDays > 30) {
+      showToast('مدة العرض يجب أن تكون من يوم إلى 30 يوماً', 'error')
+      return
+    }
+
+    setSendingRevival(true)
+    try {
+      const response = await fetch('/api/admin/revive-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: revivalTarget.id,
+          discountPct: revivalDiscountPct,
+          validDays: revivalValidDays,
+          message: revivalMessage,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.success) {
+        showToast(data.error ?? 'تعذّر إرسال عرض الإحياء', 'error')
+        return
+      }
+
+      setRequests(current => current.map(request => request.id === revivalTarget.id ? data.request : request))
+      showToast(data.emailSent ? 'تم إحياء الطلب وإرسال عرض العودة للعميل' : 'تم إحياء الطلب، لكن تعذّر إرسال البريد', data.emailSent ? 'success' : 'error')
+      setRevivalTarget(null)
+    } catch {
+      showToast('خطأ في الاتصال بالخادم', 'error')
+    } finally {
+      setSendingRevival(false)
+    }
+  }
+
   const quotedCount = requests.filter(r => r.status === 'quoted').length
+  const autoClosedCount = requests.filter(r => r.status === 'auto_closed').length
 
   const handleBulkReminder = async () => {
     if (bulkApplyDiscount && (bulkDiscountPct <= 0 || bulkDiscountPct >= 100)) {
@@ -541,7 +597,7 @@ export default function AdminRequestsPage() {
         </div>
 
         {showAdvancedFilters && (
-          <div className="mt-3 grid gap-3 border-t border-border pt-3 md:grid-cols-[minmax(0,280px)_auto_auto] md:items-center">
+          <div className="mt-3 grid gap-3 border-t border-border pt-3 md:grid-cols-[minmax(0,280px)_auto_auto_auto] md:items-center">
             <div className="relative">
               <input
                 type="text"
@@ -590,6 +646,16 @@ export default function AdminRequestsPage() {
                 : 'border-purple-300 text-purple-700 hover:bg-purple-50 disabled:opacity-50'}
             >
               👥 {duplicatesOnly ? 'إلغاء فلتر المكرر' : `الطلبات المكررة (${duplicateOwnersCount})`}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setStatusFilter(statusFilter === 'auto_closed' ? '' : 'auto_closed')}
+              disabled={!autoClosedCount && statusFilter !== 'auto_closed'}
+              className={statusFilter === 'auto_closed'
+                ? 'border-slate-500 bg-slate-100 text-slate-700'
+                : 'border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50'}
+            >
+              ⏱️ أُغلقت تلقائياً ({autoClosedCount})
             </Button>
             <button
               onClick={() => setShowDebug(!showDebug)}
@@ -734,6 +800,7 @@ export default function AdminRequestsPage() {
                   <button onClick={(e) => handleSendReminder(r, e)} disabled={sendingReminderId === r.id || !r.client_email} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50" title="إرسال تذكير بالبريد">{sendingReminderId === r.id ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" /> : '✉'}</button>
                   <button onClick={(e) => handleWhatsApp(r, e)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green hover:bg-green/15" title="مراسلة العميل عبر واتساب">◉</button>
                   {r.status === 'client_rejected' && <button onClick={(e) => { e.stopPropagation(); openRequest(r) }} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100">إرسال عرض جديد</button>}
+                  {r.status === 'auto_closed' && <button onClick={(e) => openRevival(r, e)} disabled={!r.client_email} className="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">↻ إحياء الطلب</button>}
                   <button onClick={(e) => handleDeleteClick(r, e)} disabled={deletingRequestId === r.id} className="mr-auto inline-flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50" title="حذف الطلب نهائياً">{deletingRequestId === r.id ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-red-600 border-t-transparent" /> : '🗑'}</button>
                 </div>
               </article>
@@ -924,6 +991,46 @@ export default function AdminRequestsPage() {
           </div>
         )}
       </div>
+
+      {revivalTarget && (() => {
+        const originalPrice = Number(revivalTarget.final_total ?? revivalTarget.admin_quoted_price ?? 0)
+        const revivedPrice = Math.round(originalPrice * (1 - revivalDiscountPct / 100) * 100) / 100
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !sendingRevival && setRevivalTarget(null)}>
+            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl sm:p-6" onClick={event => event.stopPropagation()} dir="rtl">
+              <div className="mb-5">
+                <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700">طلب أُغلق تلقائياً</span>
+                <h3 className="mt-3 text-xl font-black text-dark">إحياء الطلب وإرسال عرض عودة</h3>
+                <p className="mt-1 text-sm text-muted">{generateRequestNumber(revivalTarget.request_number)} · {revivalTarget.client_name || 'العميل'}</p>
+              </div>
+
+              <div className="grid gap-3 rounded-xl border border-border bg-cream/35 p-4 sm:grid-cols-2">
+                <label className="block text-sm font-bold text-dark">نسبة الخصم
+                  <div className="relative mt-2"><input type="number" min="0" max="99" value={revivalDiscountPct} onChange={event => setRevivalDiscountPct(Number(event.target.value))} className="min-h-[44px] w-full rounded-lg border border-border bg-white px-3 pl-8 text-sm outline-none focus:border-green" /><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">%</span></div>
+                </label>
+                <label className="block text-sm font-bold text-dark">صلاحية العرض
+                  <div className="relative mt-2"><input type="number" min="1" max="30" value={revivalValidDays} onChange={event => setRevivalValidDays(Number(event.target.value))} className="min-h-[44px] w-full rounded-lg border border-border bg-white px-3 pl-12 text-sm outline-none focus:border-green" /><span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted">أيام</span></div>
+                </label>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between rounded-xl border border-green/20 bg-green/5 px-4 py-3 text-sm">
+                <span className="font-bold text-dark">السعر بعد العرض</span>
+                <span className="font-black text-green">{formatNumber(revivedPrice)} ر.س <span className="mr-1 text-xs font-normal text-muted line-through">{formatNumber(originalPrice)}</span></span>
+              </div>
+
+              <label className="mt-4 block text-sm font-bold text-dark">رسالة للعميل
+                <textarea value={revivalMessage} onChange={event => setRevivalMessage(event.target.value)} maxLength={600} className="mt-2 min-h-[120px] w-full resize-y rounded-xl border border-border px-3 py-2 text-sm font-normal leading-6 outline-none focus:border-green" placeholder="اكتب رسالة عرض العودة..." />
+              </label>
+              <p className="mt-2 text-xs leading-5 text-muted">سيصل العميل بريد يتضمن السعر الجديد ورابط استكمال الطلب. بعد الإرسال يصبح الطلب بانتظار موافقة العميل.</p>
+
+              <div className="mt-5 flex gap-3">
+                <Button variant="outline" onClick={() => setRevivalTarget(null)} disabled={sendingRevival} className="flex-1">إلغاء</Button>
+                <Button onClick={handleReviveRequest} loading={sendingRevival} className="flex-[1.5] bg-slate-700 hover:bg-slate-800">إرسال عرض العودة</Button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Quick Admin Note Dialog */}
       {quickNoteTarget && (
