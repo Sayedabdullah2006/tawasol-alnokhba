@@ -28,6 +28,7 @@ export default function AdminRequestsPage() {
   const [userFilter, setUserFilter] = useState(() => searchParams.get('user') ?? '')
   const [userQuery, setUserQuery] = useState('')
   const [showUserList, setShowUserList] = useState(false)
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(() => Boolean(searchParams.get('user')) || searchParams.get('duplicates') === '1')
   const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [requestToDelete, setRequestToDelete] = useState<any>(null)
@@ -511,116 +512,130 @@ export default function AdminRequestsPage() {
         <span className="rounded-full bg-cream px-3 py-1.5 text-xs font-bold text-muted">{requests.length} طلب نشط</span>
       </div>
 
-      <div className="mb-4 rounded-lg border border-border bg-card p-3">
-        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_224px]">
-        <Input
-          placeholder="بحث بالاسم أو رقم الطلب..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full"
-        />
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          className="px-4 py-2 rounded-xl border border-border bg-card text-sm min-h-[48px]"
-        >
-          <option value="">جميع الحالات</option>
-          {Object.entries(REQUEST_STATUSES).map(([k, v]) => (
-            <option key={k} value={k}>{v.label}</option>
-          ))}
-        </select>
-
-        {/* فلتر باسم المستخدم — قائمة قابلة للبحث بكل المستخدمين الذين لديهم طلبات */}
-        <div className="relative">
-          <input
-            type="text"
-            value={userFilter ? selectedUserName : userQuery}
-            onChange={e => { setUserFilter(''); setUserQuery(e.target.value); setShowUserList(true) }}
-            onFocus={() => setShowUserList(true)}
-            onBlur={() => setTimeout(() => setShowUserList(false), 150)}
-            placeholder={`👤 فلترة بالمستخدم (${usersList.length})`}
-            className="px-4 py-2 rounded-xl border border-border bg-card text-sm min-h-[48px] w-56"
+      <div className="mb-4 rounded-lg border border-border bg-card p-3 sm:p-4">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto]">
+          <Input
+            placeholder="بحث بالاسم أو رقم الطلب..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full"
           />
-          {userFilter && (
-            <button
-              onClick={() => { setUserFilter(''); setUserQuery('') }}
-              className="absolute left-2 top-1/2 -translate-y-1/2 text-muted hover:text-red-600 text-sm"
-              title="مسح الفلتر"
-            >
-              ✕
-            </button>
-          )}
-          {showUserList && (
-            <div className="absolute z-30 mt-1 w-72 max-h-72 overflow-y-auto bg-white border border-border rounded-xl shadow-lg right-0">
-              {filteredUsersList.length === 0 ? (
-                <div className="px-4 py-3 text-xs text-muted text-center">لا يوجد مستخدمون مطابقون</div>
-              ) : (
-                filteredUsersList.map(u => (
-                  <button
-                    key={u.key}
-                    onMouseDown={() => { setUserFilter(u.key); setUserQuery(''); setShowUserList(false) }}
-                    className="w-full text-right px-4 py-2.5 hover:bg-cream/60 transition-colors border-b border-border/50 last:border-0 flex items-center justify-between gap-2"
-                  >
-                    <span className="text-sm text-dark font-medium truncate">{u.name}</span>
-                    <span className="text-[10px] text-muted bg-cream px-1.5 py-0.5 rounded-md shrink-0">{u.count} طلب</span>
-                  </button>
-                ))
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="min-h-[48px] rounded-lg border border-border bg-card px-4 py-2 text-sm"
+          >
+            <option value="">جميع الحالات</option>
+            {Object.entries(REQUEST_STATUSES).map(([k, v]) => (
+              <option key={k} value={k}>{v.label}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => setShowAdvancedFilters(value => !value)}
+            className={`min-h-[48px] rounded-lg border px-4 text-sm font-bold transition-colors ${showAdvancedFilters || userFilter || duplicatesOnly ? 'border-green bg-green/5 text-green' : 'border-border bg-white text-dark hover:bg-cream'}`}
+          >
+            ⚙️ فلاتر إضافية
+            {(userFilter || duplicatesOnly) && <span className="mr-2 rounded-full bg-green px-1.5 py-0.5 text-[10px] text-white">مفعلة</span>}
+          </button>
+        </div>
+
+        {showAdvancedFilters && (
+          <div className="mt-3 grid gap-3 border-t border-border pt-3 md:grid-cols-[minmax(0,280px)_auto_auto] md:items-center">
+            <div className="relative">
+              <input
+                type="text"
+                value={userFilter ? selectedUserName : userQuery}
+                onChange={e => { setUserFilter(''); setUserQuery(e.target.value); setShowUserList(true) }}
+                onFocus={() => setShowUserList(true)}
+                onBlur={() => setTimeout(() => setShowUserList(false), 150)}
+                placeholder={`👤 فلترة بالمستخدم (${usersList.length})`}
+                className="min-h-[48px] w-full rounded-lg border border-border bg-card px-4 py-2 text-sm"
+              />
+              {userFilter && (
+                <button
+                  onClick={() => { setUserFilter(''); setUserQuery('') }}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted hover:text-red-600"
+                  title="مسح فلتر المستخدم"
+                  aria-label="مسح فلتر المستخدم"
+                >
+                  ✕
+                </button>
+              )}
+              {showUserList && (
+                <div className="absolute right-0 z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-border bg-white shadow-lg">
+                  {filteredUsersList.length === 0 ? (
+                    <div className="px-4 py-3 text-center text-xs text-muted">لا يوجد مستخدمون مطابقون</div>
+                  ) : (
+                    filteredUsersList.map(u => (
+                      <button
+                        key={u.key}
+                        onMouseDown={() => { setUserFilter(u.key); setUserQuery(''); setShowUserList(false) }}
+                        className="flex w-full items-center justify-between gap-2 border-b border-border/50 px-4 py-2.5 text-right transition-colors last:border-0 hover:bg-cream/60"
+                      >
+                        <span className="truncate text-sm font-medium text-dark">{u.name}</span>
+                        <span className="shrink-0 rounded-md bg-cream px-1.5 py-0.5 text-[10px] text-muted">{u.count} طلب</span>
+                      </button>
+                    ))
+                  )}
+                </div>
               )}
             </div>
-          )}
-        </div>
+            <Button
+              variant="outline"
+              onClick={() => setDuplicatesOnly(value => !value)}
+              disabled={!duplicatesOnly && duplicateOwnersCount === 0}
+              className={duplicatesOnly
+                ? 'border-purple-400 bg-purple-50 text-purple-700'
+                : 'border-purple-300 text-purple-700 hover:bg-purple-50 disabled:opacity-50'}
+            >
+              👥 {duplicatesOnly ? 'إلغاء فلتر المكرر' : `الطلبات المكررة (${duplicateOwnersCount})`}
+            </Button>
+            <button
+              onClick={() => setShowDebug(!showDebug)}
+              className="justify-self-start rounded-lg bg-yellow-100 px-3 py-2 text-xs font-bold text-yellow-700 hover:bg-yellow-200"
+            >
+              {showDebug ? 'إخفاء' : 'إظهار'} التشخيص
+            </button>
+          </div>
+        )}
 
-        </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
-
-        <Button variant="outline" onClick={handleExport}>تصدير CSV</Button>
-
-        <Button
-          variant="outline"
-          onClick={() => router.push('/admin/studio')}
-          className="border-green text-green hover:bg-green/5"
-        >
-          🤖 استوديو الذكاء الاصطناعي
-        </Button>
-
-        <Button
-          onClick={() => setShowExternalForm(true)}
-          className="bg-green-600 hover:bg-green-700"
-        >
-          ➕ تسجيل طلب خارجي
-        </Button>
-
-        <Button
-          variant="outline"
-          onClick={() => setShowBulkConfirm(true)}
-          disabled={quotedCount === 0}
-          className="border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50"
-        >
-          🔔 تذكير جماعي للعروض ({quotedCount})
-        </Button>
-
-        <Button
-          variant="outline"
-          onClick={() => setDuplicatesOnly(v => !v)}
-          disabled={!duplicatesOnly && duplicateOwnersCount === 0}
-          className={duplicatesOnly
-            ? 'border-purple-400 bg-purple-50 text-purple-700'
-            : 'border-purple-300 text-purple-700 hover:bg-purple-50 disabled:opacity-50'}
-        >
-          👥 {duplicatesOnly ? 'إلغاء فلتر المكرر' : `الطلبات المكررة (${duplicateOwnersCount})`}
-        </Button>
-
-        <button
-          onClick={() => setShowDebug(!showDebug)}
-          className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
-        >
-          {showDebug ? 'إخفاء' : 'إظهار'} التشخيص
-        </button>
-
-        {/* Debug Info */}
-        <div className="ml-auto text-xs text-muted">
-          عدد الطلبات: {requests.length} | المفلترة: {filteredRequests.length}
-        </div>
+          <Button
+            onClick={() => setShowExternalForm(true)}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            ➕ تسجيل طلب خارجي
+          </Button>
+          <button
+            type="button"
+            onClick={handleExport}
+            title="تصدير CSV"
+            aria-label="تصدير CSV"
+            className="min-h-[42px] rounded-lg border border-border px-3 text-lg text-dark transition-colors hover:bg-cream"
+          >
+            ⇩
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/admin/studio')}
+            title="استوديو الذكاء الاصطناعي"
+            aria-label="استوديو الذكاء الاصطناعي"
+            className="min-h-[42px] rounded-lg border border-green px-3 text-lg text-green transition-colors hover:bg-green/5"
+          >
+            🤖
+          </button>
+          <Button
+            variant="outline"
+            onClick={() => setShowBulkConfirm(true)}
+            disabled={quotedCount === 0}
+            className="border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50"
+          >
+            🔔 تذكير العروض ({quotedCount})
+          </Button>
+          <div className="mr-auto text-xs text-muted">
+            إجمالي {requests.length} · ظاهر {filteredRequests.length}
+          </div>
         </div>
       </div>
 
