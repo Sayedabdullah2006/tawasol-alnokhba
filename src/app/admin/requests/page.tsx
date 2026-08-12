@@ -53,6 +53,7 @@ export default function AdminRequestsPage() {
   const [extDate, setExtDate] = useState('')
   const [extMode, setExtMode] = useState<'completed' | 'in_progress'>('completed')
   const [extContent, setExtContent] = useState('')
+  const [expandedRequests, setExpandedRequests] = useState<Record<string, boolean>>({})
   // Removed drawer-related state since we now use full-page view
 
   const loadData = useCallback(async () => {
@@ -638,8 +639,8 @@ export default function AdminRequestsPage() {
         </>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-border bg-card" dir="rtl">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-cream/60 px-4 py-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card px-4 py-3" dir="rtl">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-sm font-black text-dark">قائمة الطلبات</h2>
             <p className="mt-0.5 text-xs text-muted">{filteredRequests.length} طلب ظاهر</p>
@@ -649,13 +650,16 @@ export default function AdminRequestsPage() {
           )}
         </div>
 
-        <div className="divide-y divide-border">
+      </div>
+
+      <div className="space-y-3" dir="rtl">
           {filteredRequests.map(r => {
             const cat = CATEGORIES.find(c => c.id === r.category)
             const selectedPackage = PACKAGES.find(pkg => pkg.id === (r.auto_quote_tier ?? r.selected_package))
             const total = r.final_total ?? r.admin_quoted_price
+            const expanded = !!expandedRequests[r.id]
             return (
-              <article key={r.id} onClick={() => openRequest(r)} className="cursor-pointer p-4 transition-colors hover:bg-cream/35 sm:p-5">
+              <article key={r.id} className="rounded-lg border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -663,7 +667,7 @@ export default function AdminRequestsPage() {
                       <StatusBadge status={r.status} userRole="admin" />
                       {r.is_external && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">خارجي</span>}
                     </div>
-                    <h3 className="mt-2 text-sm font-black leading-6 text-dark sm:text-base">{r.title || 'طلب بدون عنوان'}</h3>
+                    <button type="button" onClick={() => openRequest(r)} className="mt-2 block text-right text-sm font-black leading-6 text-dark hover:text-green sm:text-base">{r.title || 'طلب بدون عنوان'}</button>
                     {r.content && <p className="mt-1 max-w-3xl text-xs leading-5 text-muted">{truncateContent(r.content, 150)}</p>}
                     <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-bold">
                       {cat && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{cat.icon} {cat.nameAr}</span>}
@@ -683,7 +687,17 @@ export default function AdminRequestsPage() {
                   </div>
                 </div>
 
+                {expanded && (
+                  <div className="mt-4 grid gap-3 border-t border-border pt-4 text-xs leading-5 text-muted sm:grid-cols-2 lg:grid-cols-4">
+                    <div><p className="font-bold text-dark">بيانات التواصل</p><p className="mt-1" dir="ltr">{r.client_phone || 'لا يوجد جوال'}</p><p className="truncate" dir="ltr">{r.client_email || 'لا يوجد بريد'}</p></div>
+                    <div><p className="font-bold text-dark">النشر</p><p className="mt-1">{Array.isArray(r.channels) && r.channels.length ? r.channels.join(' · ') : 'لم تُحدد قنوات'}</p><p>{r.preferred_date ? `الموعد المفضل: ${r.preferred_date}` : 'لا يوجد موعد مفضل'}</p></div>
+                    <div><p className="font-bold text-dark">تفاصيل الطلب</p><p className="mt-1">النوع: {r.request_type === 'campaign' ? 'حملة' : 'منشور واحد'}</p><p>عدد المنشورات: {r.num_posts ?? r.campaign_post_count ?? 1}</p></div>
+                    <div><p className="font-bold text-dark">معلومات إضافية</p><p className="mt-1">{r.link ? 'يوجد رابط مرجعي' : 'لا يوجد رابط مرجعي'}</p><p>{Array.isArray(r.content_images) && r.content_images.length ? `${r.content_images.length} صور مرفقة` : 'لا توجد صور مرفقة'}</p></div>
+                  </div>
+                )}
+
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => setExpandedRequests(current => ({ ...current, [r.id]: !expanded }))} className="rounded-lg border border-border bg-white px-3 py-1.5 text-xs font-bold text-dark hover:bg-cream">{expanded ? 'إخفاء التفاصيل ▲' : 'مزيد من التفاصيل ▼'}</button>
                   <button onClick={(e) => openQuickNote(r, e)} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${r.admin_notes?.trim() ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>📝 {r.admin_notes?.trim() ? 'تعديل الملاحظة' : 'إضافة ملاحظة'}</button>
                   <button onClick={(e) => handleSendReminder(r, e)} disabled={sendingReminderId === r.id || !r.client_email} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50" title="إرسال تذكير بالبريد">{sendingReminderId === r.id ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" /> : '✉'}</button>
                   <button onClick={(e) => handleWhatsApp(r, e)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green hover:bg-green/15" title="مراسلة العميل عبر واتساب">◉</button>
@@ -694,7 +708,6 @@ export default function AdminRequestsPage() {
             )
           })}
           {filteredRequests.length === 0 && <div className="p-10 text-center text-sm text-muted">لا توجد طلبات تطابق الفلاتر الحالية.</div>}
-        </div>
       </div>
 
       <div className="hidden bg-card rounded-2xl border border-border overflow-hidden">
