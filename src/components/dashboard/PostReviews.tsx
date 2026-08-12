@@ -25,7 +25,8 @@ export default function PostReviews({ request }: Props) {
   const [selected, setSelected] = useState<Record<number, string>>({})
   const [proposedDates, setProposedDates] = useState<Record<number, string>>({})
   const [feedbackOpen, setFeedbackOpen] = useState<Record<number, boolean>>({})
-  const [feedback, setFeedback] = useState<Record<number, string>>({})
+  const [textFeedback, setTextFeedback] = useState<Record<number, string>>({})
+  const [designFeedback, setDesignFeedback] = useState<Record<number, string>>({})
   const [referenceImages, setReferenceImages] = useState<Record<number, string[]>>({})
   const [busy, setBusy] = useState<number | null>(null)
   const [lightbox, setLightbox] = useState<string | null>(null)
@@ -71,14 +72,17 @@ export default function PostReviews({ request }: Props) {
   }
 
   const requestChanges = async (index: number) => {
-    const fb = (feedback[index] ?? '').trim()
-    if (!fb) { showToast('اكتب ملاحظاتك', 'error'); return }
+    const textNote = (textFeedback[index] ?? '').trim()
+    const designNote = (designFeedback[index] ?? '').trim()
+    const chosen = selected[index]
+    if (!textNote && !designNote) { showToast('اكتب تعديل النص أو التصميم', 'error'); return }
+    if (!chosen) { showToast('اختر التصميم الأقرب لما تريده أولاً', 'error'); return }
     setBusy(index)
     try {
       const res = await fetch('/api/request-post-content-changes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId: request.id, postIndex: index, feedback: fb, referenceImages: referenceImages[index] ?? [] }),
+        body: JSON.stringify({ requestId: request.id, postIndex: index, selectedImage: chosen, textFeedback: textNote, designFeedback: designNote, referenceImages: referenceImages[index] ?? [] }),
       })
       if (res.ok) {
         showToast('تم إرسال ملاحظاتك للإدارة')
@@ -187,9 +191,9 @@ export default function PostReviews({ request }: Props) {
             {images.length > 0 && (
               <div className="bg-white rounded-xl p-3 mb-3">
                 <h4 className="font-bold text-dark text-xs mb-2">
-                  {isApproved ? 'التصميم المعتمد:' : 'اختر تصميماً:'}
+                  {isApproved ? 'التصميم المعتمد:' : 'اختر التصميم الأقرب لما تريده:'}
                 </h4>
-                {!isApproved && <p className="text-[11px] text-muted mb-2">هذه هي التصاميم التي اختارها فريقنا لهذا الخبر فقط. اضغط على أحدها للاختيار، أو على رمز التكبير للمعاينة.</p>}
+                {!isApproved && <p className="text-[11px] text-muted mb-2">حدّد تصميمًا واحدًا كأساس لاعتماده أو لتعديل تصميمه فقط. لا تُعدَّل بقية الخيارات.</p>}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {images.map((img, i) => {
                     const isSel = isApproved ? r.selected_image === img : chosen === img
@@ -268,13 +272,26 @@ export default function PostReviews({ request }: Props) {
                     ✍️ لتُنفَّذ ملاحظاتك بدقّة، اكتبها محدّدة وواضحة. مثال:
                     <span className="block mt-1 text-purple-600">«احذف عبارة (كذا) · أضِف (كذا) أسفل الاسم · كبّر اسم الشخص · اجعل الخلفية أغمق · غيّر لون العنوان».</span>
                   </div>
-                  <textarea
-                    value={feedback[item.index] ?? ''}
-                    onChange={e => setFeedback(prev => ({ ...prev, [item.index]: e.target.value }))}
-                    placeholder="مثال: احذف جملة «...»، أضِف «...» أسفل الاسم، كبّر اسم الشخص، اجعل الخلفية أغمق..."
-                    className="w-full px-3 py-2 rounded-lg border border-border text-sm min-h-[90px] resize-y"
-                    maxLength={500}
-                  />
+                  <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-2.5">
+                    <label className="block text-[11px] font-bold text-sky-900 mb-1">تعديلات نص التغريدة</label>
+                    <textarea
+                      value={textFeedback[item.index] ?? ''}
+                      onChange={e => setTextFeedback(prev => ({ ...prev, [item.index]: e.target.value }))}
+                      placeholder="مثال: اختصر البداية أو عدّل صياغة محددة أو أضف وسمًا مناسبًا..."
+                      className="w-full px-3 py-2 rounded-lg border border-sky-200 bg-white text-sm min-h-[76px] resize-y"
+                      maxLength={500}
+                    />
+                  </div>
+                  <div className="rounded-lg border border-purple-200 bg-purple-50/50 p-2.5">
+                    <label className="block text-[11px] font-bold text-purple-900 mb-1">تعديلات التصميم المختار</label>
+                    <textarea
+                      value={designFeedback[item.index] ?? ''}
+                      onChange={e => setDesignFeedback(prev => ({ ...prev, [item.index]: e.target.value }))}
+                      placeholder="مثال: كبّر اسم الشخصية، استبدل الصورة، أو عدّل ترتيب العناصر..."
+                      className="w-full px-3 py-2 rounded-lg border border-purple-200 bg-white text-sm min-h-[76px] resize-y"
+                      maxLength={500}
+                    />
+                  </div>
                   <div className="rounded-lg border border-purple-200 bg-purple-50/50 p-2.5">
                     <p className="text-[11px] font-bold text-purple-800">صور مرجعية للتعديل (اختياري)</p>
                     <p className="text-[11px] text-purple-700 mt-0.5">إذا رغبت في تضمين أو استبدال صورة، ارفعها هنا بدقة عالية قدر الإمكان. ستُؤخذ الصور والملاحظة معاً في الاعتبار قبل إعادة التوليد.</p>
@@ -283,7 +300,7 @@ export default function PostReviews({ request }: Props) {
                   <div className="flex flex-col sm:flex-row gap-2">
                     <Button
                       variant="ghost"
-                      onClick={() => { setFeedbackOpen(prev => ({ ...prev, [item.index]: false })); setFeedback(prev => ({ ...prev, [item.index]: '' })); setReferenceImages(prev => ({ ...prev, [item.index]: [] })) }}
+                      onClick={() => { setFeedbackOpen(prev => ({ ...prev, [item.index]: false })); setTextFeedback(prev => ({ ...prev, [item.index]: '' })); setDesignFeedback(prev => ({ ...prev, [item.index]: '' })); setReferenceImages(prev => ({ ...prev, [item.index]: [] })) }}
                       className="flex-1"
                       size="sm"
                     >
@@ -292,7 +309,7 @@ export default function PostReviews({ request }: Props) {
                     <Button
                       onClick={() => requestChanges(item.index)}
                       loading={busy === item.index}
-                      disabled={busy !== null || !(feedback[item.index] ?? '').trim()}
+                      disabled={busy !== null || (!textFeedback[item.index]?.trim() && !designFeedback[item.index]?.trim())}
                       className="flex-1"
                       size="sm"
                     >

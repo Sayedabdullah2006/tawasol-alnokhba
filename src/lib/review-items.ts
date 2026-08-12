@@ -17,6 +17,10 @@ export interface PostReview {
   selected_image?: string | null
   status?: 'content_review' | 'approved' | 'changes_requested'
   user_feedback?: string | null
+  text_feedback?: string | null
+  design_feedback?: string | null
+  revision_base_image?: string | null
+  revision_analysis?: string | null
   content_sent_at?: string
   content_approved_at?: string | null
   feedback_sent_at?: string | null
@@ -30,6 +34,10 @@ export interface PostReview {
     content?: string
     sent_at?: string
     feedback?: string | null
+    text_feedback?: string | null
+    design_feedback?: string | null
+    revision_base_image?: string | null
+    revision_analysis?: string | null
     feedback_at?: string
     reference_images?: string[]
     approved?: boolean

@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     // Get request details for email
     const { data: existingRequest } = await supabase
       .from('publish_requests')
-      .select('request_number, client_name, client_email, status')
+      .select('request_number, client_name, client_email, status, post_reviews')
       .eq('id', requestId)
       .single()
 
@@ -49,6 +49,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'الطلب ليس في مرحلة التنفيذ' }, { status: 400 })
     }
 
+    const now = new Date().toISOString()
+    const images = Array.isArray(proposedImages) ? proposedImages : []
+    const reviews: Record<string, any> = existingRequest.post_reviews && typeof existingRequest.post_reviews === 'object'
+      ? { ...existingRequest.post_reviews }
+      : {}
+    const previous = reviews[0]
+    const history: any[] = Array.isArray(previous?.history) ? [...previous.history] : []
+    history.push({ content: proposedContent.trim(), images, sent_at: now })
+    // الطلب المنفرد يستخدم الآن نفس مراجعة المنشور الدقيقة المستخدمة في الحملات.
+    reviews[0] = {
+      proposed_content: proposedContent.trim(), proposed_images: images, selected_image: null,
+      status: 'content_review', user_feedback: null, text_feedback: null, design_feedback: null,
+      revision_base_image: null, reference_images: [], content_sent_at: now, content_approved_at: null,
+      feedback_sent_at: null, history,
+    }
+
     // Update request with proposed content — clear previous feedback on re-send
     const { error } = await supabase
       .from('publish_requests')
@@ -56,6 +72,7 @@ export async function POST(request: Request) {
         status: 'content_review',
         proposed_content: proposedContent.trim(),
         proposed_images: proposedImages || [],
+        post_reviews: reviews,
         content_sent_at: new Date().toISOString(),
         user_feedback: null,
         feedback_sent_at: null,

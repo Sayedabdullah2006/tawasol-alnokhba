@@ -10,11 +10,53 @@
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { editDesign } from '@/lib/ai-studio'
 import { sendEmail } from '@/lib/email'
+import { chatComplete, getOpenAI } from '@/lib/openai'
+import { OPENAI_MODEL } from '@/lib/ai-studio'
 
 const ADMIN_EMAIL = 'first1saudi@gmail.com'
 const SITE_URL = process.env.APP_BASE_URL || 'https://nukhba.media'
 
 interface DesignEntry { title?: string; imageUrl?: string; url?: string; brief?: string }
+
+interface RevisionPlan { summary: string; textInstruction: string; designInstruction: string }
+
+async function analyzeRevision(args: { textFeedback: string; designFeedback: string; originalContent: string }): Promise<RevisionPlan> {
+  const fallback: RevisionPlan = {
+    summary: [args.textFeedback && 'تعديل النص', args.designFeedback && 'تعديل التصميم المختار'].filter(Boolean).join('، ') || 'مراجعة العميل',
+    textInstruction: args.textFeedback,
+    designInstruction: args.designFeedback,
+  }
+  try {
+    const completion = await chatComplete(getOpenAI(), {
+      model: OPENAI_MODEL,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: 'أنت محلل ملاحظات مراجعة محتوى. افصل بدقة بين تعديل نص المنشور وتعديل التصميم. لا تخترع طلبات جديدة. أعد JSON فقط بالمفاتيح summary وtextInstruction وdesignInstruction.' },
+        { role: 'user', content: JSON.stringify(args) },
+      ],
+    })
+    const parsed = JSON.parse(completion.choices[0]?.message?.content ?? '{}') as Partial<RevisionPlan>
+    return {
+      summary: typeof parsed.summary === 'string' && parsed.summary.trim() ? parsed.summary.trim() : fallback.summary,
+      textInstruction: typeof parsed.textInstruction === 'string' ? parsed.textInstruction.trim() : fallback.textInstruction,
+      designInstruction: typeof parsed.designInstruction === 'string' ? parsed.designInstruction.trim() : fallback.designInstruction,
+    }
+  } catch { return fallback }
+}
+
+async function rewritePostCopy(originalContent: string, instruction: string): Promise<string> {
+  if (!originalContent || !instruction) return originalContent
+  try {
+    const completion = await chatComplete(getOpenAI(), {
+      model: OPENAI_MODEL,
+      messages: [
+        { role: 'system', content: 'أنت محرر محتوى عربي محترف. طبّق فقط تعديل العميل على النص. حافظ على الحقائق والأسماء والوسوم الصحيحة، وأعد النص النهائي فقط بلا شرح أو عناوين.' },
+        { role: 'user', content: `النص الحالي:\n${originalContent}\n\nملاحظة العميل الخاصة بالنص:\n${instruction}` },
+      ],
+    })
+    return completion.choices[0]?.message?.content?.trim() || originalContent
+  } catch { return originalContent }
+}
 
 function normalizeDesigns(v: unknown): DesignEntry[] {
   return (Array.isArray(v) ? v : [])
@@ -23,7 +65,7 @@ function normalizeDesigns(v: unknown): DesignEntry[] {
 }
 
 /** ينفّذ التعديل الدقيق بالملاحظة على كل تصميم مُرسل. آمن للاستدعاء fire-and-forget. */
-export async function autoReviseFromFeedback(args: { requestId: string; postIndex?: number | null; feedback: string; referenceImages?: string[] }): Promise<void> {
+export async function autoReviseFromFeedback(args: { requestId: string; postIndex?: number | null; feedback: string; textFeedback?: string; designFeedback?: string; selectedImage?: string | null; referenceImages?: string[] }): Promise<void> {
   const { requestId } = args
   const feedback = (args.feedback || '').trim()
   const referenceImages = Array.isArray(args.referenceImages) ? args.referenceImages.filter(Boolean).slice(0, 5) : []
@@ -53,19 +95,32 @@ export async function autoReviseFromFeedback(args: { requestId: string; postInde
     ? sentImages.map((url, i) => ({ title: studioDesigns[i]?.title ?? `تصميم ${i + 1}`, imageUrl: url }))
     : studioDesigns
 
-  if (!baseDesigns.length) return
+  const selectedDesigns = args.selectedImage && baseDesigns.some(design => design.imageUrl === args.selectedImage)
+    ? baseDesigns.filter(design => design.imageUrl === args.selectedImage)
+    : baseDesigns
+  const originalContent = String(reviews?.[postIndex ?? 0]?.proposed_content ?? '')
+  const plan = await analyzeRevision({
+    textFeedback: (args.textFeedback ?? '').trim(),
+    designFeedback: (args.designFeedback ?? feedback).trim(),
+    originalContent,
+  })
+  const revisedText = plan.textInstruction ? await rewritePostCopy(originalContent, plan.textInstruction) : ''
+  if (!selectedDesigns.length && !revisedText) return
 
   try {
     const revised: DesignEntry[] = []
-    for (const d of baseDesigns) {
+    // تعديل التصميم المختار فقط؛ بقية الخيارات تبقى كما هي للمقارنة.
+    for (const d of plan.designInstruction ? selectedDesigns : []) {
       try {
-        const { imageUrl } = await editDesign({ designImageUrl: d.imageUrl as string, note: feedback, referenceImageUrls: referenceImages })
+        const { imageUrl } = await editDesign({ designImageUrl: d.imageUrl as string, note: plan.designInstruction, referenceImageUrls: referenceImages })
         revised.push({ title: `🔁 معدّل: ${d.title ?? 'تصميم'}`, imageUrl })
       } catch { /* تجاهل فشل تصميم واحد */ }
     }
-    if (!revised.length) return
-
-    const payload = { feedback, reference_images: referenceImages, at: new Date().toISOString(), designs: revised }
+    const payload = {
+      feedback, text_feedback: args.textFeedback ?? null, design_feedback: args.designFeedback ?? null,
+      analysis: plan.summary, revised_text: revisedText || null, revision_base_image: args.selectedImage ?? null,
+      reference_images: referenceImages, at: new Date().toISOString(), designs: revised,
+    }
     if (isPost) {
       const aiPosts: Record<string, any> = req.ai_posts && typeof req.ai_posts === 'object' ? { ...(req.ai_posts as any) } : {}
       aiPosts[postIndex] = { ...(aiPosts[postIndex] ?? {}), revised: payload }

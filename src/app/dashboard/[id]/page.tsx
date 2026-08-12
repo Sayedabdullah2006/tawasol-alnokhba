@@ -346,7 +346,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
           </div>
         )}
 
-        {request.status === 'content_review' && (
+        {request.status === 'content_review' && !request.post_reviews?.[0] && (
           <div className="mt-4 space-y-4">
             <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5">
               <div className="text-center mb-4">

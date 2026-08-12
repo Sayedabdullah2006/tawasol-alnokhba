@@ -973,12 +973,26 @@ export default function AIStudioPanel({
       </div>
 
       {/* ── التصاميم المعدّلة تلقائياً حسب ملاحظات العميل (مع الإبقاء على القديمة أعلاه) ── */}
-      {Array.isArray(saved.revised?.designs) && saved.revised.designs.length > 0 && (
+      {((Array.isArray(saved.revised?.designs) && saved.revised.designs.length > 0) || saved.revised?.revised_text) && (
         <div className={`${cardCls} border-amber-300`}>
           <StepHead n="🔁" title="التصاميم المعدّلة (حسب ملاحظات العميل)" subtitle="أُعيد توليدها آلياً — راجعها وأرسل الأنسب؛ التصاميم القديمة محفوظة أعلاه" tone="gold" />
           {saved.revised.feedback && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
               <span className="font-bold">✍️ ملاحظة العميل:</span> {saved.revised.feedback}
+            </div>
+          )}
+          {saved.revised.analysis && (
+            <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-xs text-sky-800">
+              <span className="font-bold">🔎 تحليل التعديل:</span> {saved.revised.analysis}
+            </div>
+          )}
+          {saved.revised.revised_text && (
+            <div className="bg-white border border-sky-200 rounded-xl p-3 text-xs text-dark whitespace-pre-line">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="font-bold text-sky-800">النص المقترح بعد التعديل</span>
+                <Button onClick={() => { setTweets(saved.revised.revised_text); setSelectedTweet(saved.revised.revised_text) }} variant="outline" size="sm">استخدم النص</Button>
+              </div>
+              {saved.revised.revised_text}
             </div>
           )}
           <div className="space-y-3">
