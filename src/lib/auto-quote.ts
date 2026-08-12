@@ -77,7 +77,8 @@ const SIMPLE_BASE: Record<string, ClientPrices> = {
   appointment: { individual: 1199, business: 2499, government: 4999 },
   award:       { individual: 599,  business: 1999 },
   cv:          { individual: 799  },
-  product:     { business: 2499 },
+  // للأفراد: تبدأ الباقة الأساسية من 3000 ر.س، ثم تطبق معاملات الباقات الأعلى.
+  product:     { individual: 3000, business: 2499 },
   charity:     { charity: 999 },
   government:  { government: 4499 },
   // الإعلان عن فعاليات ومؤتمرات (متاح: شركة/حكومة/خيرية)

@@ -38,7 +38,7 @@ interface PricingData {
 
 const defaultPricing: PricingData = {
   base_prices: {
-    individual: { inventions: 3000, competitions: 3000, books: 1200, events: 2500, certs: 800, graduation: 600, appointment: 1500, award: 2000, cv: 900, product: 2500, research: 500 },
+    individual: { inventions: 3000, competitions: 3000, books: 1200, events: 2500, certs: 800, graduation: 600, appointment: 1500, award: 2000, cv: 900, product: 3000, research: 500 },
     business: { inventions: 4500, competitions: 4500, books: 2000, events: 3500, certs: 1200, graduation: 1000, appointment: 2500, award: 3000, cv: 1500, product: 4000, research: 800 },
     government: { inventions: 6000, competitions: 6000, books: 3000, events: 5000, certs: 2000, graduation: 1500, appointment: 4000, award: 4500, cv: 2500, product: 6000, research: 1200, government: 4500 },
     charity: { inventions: 1500, competitions: 1500, books: 600, events: 1200, certs: 400, graduation: 300, appointment: 800, award: 1000, cv: 500, product: 1200, research: 250, charity: 400 }

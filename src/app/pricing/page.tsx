@@ -7,8 +7,8 @@ export const metadata = {
 const tiers = [
   {
     name: 'الباقة الأساسية',
-    startsFrom: 400,
-    blurb: 'مناسبة للمبادرات الفردية والمحتوى البسيط',
+    startsFrom: 3000,
+    blurb: 'لإطلاق منتج أو موقع أو تطبيق بصورة احترافية',
     features: [
       'منشور على قناة واحدة',
       'صياغة احترافية للمحتوى',
@@ -18,7 +18,7 @@ const tiers = [
   },
   {
     name: 'الباقة الاحترافية',
-    startsFrom: 1500,
+    startsFrom: 4380,
     blurb: 'الأنسب للأفراد والشركات الناشئة',
     highlighted: true,
     features: [
@@ -29,25 +29,14 @@ const tiers = [
     ],
   },
   {
-    name: 'الباقة المتقدمة',
-    startsFrom: 3000,
-    blurb: 'للحملات الكبرى والظهور الإعلامي الواسع',
+    name: 'باقة التميز',
+    startsFrom: 4800,
+    blurb: 'لإطلاق أوسع وأثر أطول لمنتجك أو تطبيقك',
     features: [
       'حملة متكاملة على جميع القنوات',
       'محتوى مرئي + انفوجرافيك',
       'تثبيت طويل + إعادة نشر',
       'تقرير أداء تفصيلي',
-    ],
-  },
-  {
-    name: 'باقة الصدارة',
-    startsFrom: 3500,
-    blurb: 'أوسع وصول وأكبر ظهور لخبرك',
-    features: [
-      'كل مزايا الباقة المتقدمة',
-      'منشور إعلاني مموّل يصل لجمهور جديد خارج متابعي الشبكة',
-      'تثبيت طويل + إعادة نشر',
-      'أولوية في التنفيذ',
     ],
   },
 ]
@@ -59,14 +48,14 @@ export default function PricingPage() {
           <div className="max-w-4xl mx-auto px-4 text-center">
             <h1 className="text-3xl md:text-5xl font-black mb-4">الأسعار</h1>
             <p className="text-cream/70 text-base md:text-lg max-w-2xl mx-auto">
-              خدماتنا تبدأ من <span className="font-black text-cream">400 ر.س</span> — يُحدَّد السعر النهائي حسب طبيعة المحتوى والخدمات الإضافية المطلوبة
+              باقات إطلاق المنتج أو الموقع أو التطبيق تبدأ من <span className="font-black text-cream">3,000 ر.س</span> — ويُحدَّد السعر النهائي حسب طبيعة المحتوى والخدمات الإضافية المطلوبة
             </p>
           </div>
         </section>
 
         <section className="py-16">
           <div className="max-w-6xl mx-auto px-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {tiers.map(t => (
                 <div key={t.name}
                   className={`rounded-2xl p-6 border-2 transition-all ${

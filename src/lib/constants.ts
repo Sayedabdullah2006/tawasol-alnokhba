@@ -28,7 +28,7 @@ export const CATEGORIES: Category[] = [
   { id: 'appointment', nameAr: 'تعيين منصب', icon: '👔', desc: 'تعيين أو ترقية مهنية' },
   { id: 'award', nameAr: 'جائزة خاصة', icon: '🥇', desc: 'جائزة أو تكريم', clientTypes: ['individual'] },
   { id: 'cv', nameAr: 'سيرة ذاتية', icon: '👤', desc: 'ملف شخصي احترافي', clientTypes: ['individual'] },
-  { id: 'product', nameAr: 'منتج تجاري', icon: '🚀', desc: 'منتج أو خدمة تجارية', clientTypes: ['business'] },
+  { id: 'product', nameAr: 'منتج / موقع / تطبيق', icon: '🚀', desc: 'إطلاق أو تطوير منتج أو موقع أو تطبيق', clientTypes: ['individual', 'business'] },
   { id: 'research', nameAr: 'بحث علمي', icon: '🔬', desc: 'بحث أو دراسة علمية', clientTypes: ['individual'] },
   { id: 'charity', nameAr: 'مبادرة خيرية', icon: '❤️', desc: 'مبادرة أو عمل خيري', clientTypes: ['charity'] },
   { id: 'government', nameAr: 'إعلان حكومي', icon: '🏛️', desc: 'خدمة أو إعلان حكومي', clientTypes: ['government'] },
