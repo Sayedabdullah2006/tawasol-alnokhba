@@ -169,7 +169,7 @@ export default function AdminRequestsPage() {
     })
     // عند تفعيل فلتر المكرر: تجميع طلبات كل مستخدم معاً (مع الحفاظ على ترتيب التاريخ داخل كل مجموعة)
     .sort((a, b) => {
-      const priority: Record<string, number> = { in_progress: 0, changes_requested: 1, scheduled: 2, completed: 3 }
+      const priority: Record<string, number> = { in_progress: 0, changes_requested: 1, content_review: 2, scheduled: 3, completed: 4 }
       const priorityDiff = (priority[a.status] ?? 4) - (priority[b.status] ?? 4)
       if (priorityDiff) return priorityDiff
       if (duplicatesOnly) {
