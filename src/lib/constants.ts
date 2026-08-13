@@ -135,6 +135,7 @@ export interface Package {
   features: string[]
   includedExtras: string[]
   allChannels: boolean
+  sponsoredCampaignBudget?: number
   highlighted?: boolean
   badge?: string
 }
@@ -152,6 +153,7 @@ export const PACKAGES: Package[] = [
     ],
     includedExtras: [],
     allChannels: false,
+    badge: 'تمارا · ادفع على 3 أقساط',
   },
   {
     id: 'pro',
@@ -163,9 +165,11 @@ export const PACKAGES: Package[] = [
       'صياغة الخبر',
       'تصميم خاص',
       'عمل منشن/تاق لحساب المستخدم',
+      'حملة إعلانية مموّلة بميزانية 100 ر.س',
     ],
     includedExtras: ['mention'],
     allChannels: true,
+    sponsoredCampaignBudget: 100,
     highlighted: true,
     badge: 'تمارا · ادفع على 3 أقساط',
   },
@@ -181,9 +185,11 @@ export const PACKAGES: Package[] = [
       'عمل منشن/تاق لحساب المستخدم',
       'التثبيت 6 ساعات في X',
       'رتويت بعد يوم/يومين',
+      'حملة إعلانية مموّلة بميزانية 250 ر.س',
     ],
     includedExtras: ['mention', 'pin6', 'repost'],
     allChannels: true,
+    sponsoredCampaignBudget: 250,
     badge: 'تمارا · ادفع على 3 أقساط',
   },
   {

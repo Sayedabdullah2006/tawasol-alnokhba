@@ -9,6 +9,7 @@ const tiers = [
     name: 'الباقة الأساسية',
     startsFrom: 3000,
     blurb: 'لإطلاق منتج أو موقع أو تطبيق بصورة احترافية',
+    badge: 'تمارا · ادفع على 3 أقساط',
     features: [
       'منشور على قناة واحدة',
       'صياغة احترافية للمحتوى',
@@ -20,23 +21,27 @@ const tiers = [
     name: 'الباقة الاحترافية',
     startsFrom: 4380,
     blurb: 'الأنسب للأفراد والشركات الناشئة',
+    badge: 'تمارا · ادفع على 3 أقساط',
     highlighted: true,
     features: [
       'نشر على عدة قنوات',
       'محتوى ثنائي اللغة',
       'مجموعة صور احترافية',
       'تثبيت قصير + إعادة نشر',
+      'حملة إعلانية مموّلة بميزانية 100 ر.س',
     ],
   },
   {
     name: 'باقة التميز',
     startsFrom: 4800,
     blurb: 'لإطلاق أوسع وأثر أطول لمنتجك أو تطبيقك',
+    badge: 'تمارا · ادفع على 3 أقساط',
     features: [
       'حملة متكاملة على جميع القنوات',
       'محتوى مرئي + انفوجرافيك',
       'تثبيت طويل + إعادة نشر',
       'تقرير أداء تفصيلي',
+      'حملة إعلانية مموّلة بميزانية 250 ر.س',
     ],
   },
 ]
@@ -70,6 +75,9 @@ export default function PricingPage() {
                   )}
                   <h2 className="text-xl font-black text-dark mb-1">{t.name}</h2>
                   <p className="text-xs text-muted mb-5">{t.blurb}</p>
+                  <span className="mb-4 inline-flex items-center gap-1 rounded-lg border border-pink-200 bg-pink-50 px-2 py-1 text-[10px] font-bold text-pink-600">
+                    🛍️ {t.badge}
+                  </span>
                   <div className="mb-5">
                     <div className="text-xs text-muted">تبدأ من</div>
                     <div className="flex items-baseline gap-1">
