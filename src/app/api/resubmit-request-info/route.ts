@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { notifyInfoResubmittedToAdmin } from '@/lib/email'
+import { normalizeImageUrls, normalizeSupportingDocuments } from '@/lib/request-attachments'
 
 /**
  * إعادة إرسال العميل لطلبه بعد تعديله (عند الحالة info_requested).
@@ -55,14 +56,18 @@ export async function POST(request: Request) {
           ...post,
           title: typeof edit.title === 'string' ? edit.title : post.title,
           content: typeof edit.content === 'string' ? edit.content : post.content,
-          images: Array.isArray(edit.images) ? edit.images : (post.images ?? []),
+          images: Array.isArray(edit.images) ? normalizeImageUrls(edit.images) : normalizeImageUrls(post.images),
+          supporting_documents: Array.isArray(edit.supportingDocuments)
+            ? normalizeSupportingDocuments(edit.supportingDocuments)
+            : (post.supporting_documents ?? []),
         }
       })
       update.campaign_posts = merged
     } else {
       if (typeof body.title === 'string') update.title = body.title.trim()
       if (typeof body.content === 'string') update.content = body.content.trim()
-      if (Array.isArray(body.contentImages)) update.content_images = body.contentImages
+      if (Array.isArray(body.contentImages)) update.content_images = normalizeImageUrls(body.contentImages)
+      if (Array.isArray(body.supportingDocuments)) update.supporting_documents = normalizeSupportingDocuments(body.supportingDocuments)
     }
 
     const { error } = await supabase

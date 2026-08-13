@@ -12,6 +12,8 @@ const adminNav: NavEntry[] = [
     icon: '📋',
     children: [
       { href: '/admin/requests', label: 'الطلبات', icon: '🧾' },
+      { href: '/admin/member-requests', label: 'طلبات الأعضاء', icon: '◈' },
+      { href: '/admin/memberships', label: 'الأعضاء', icon: '★' },
       { href: '/admin/influencers', label: 'المؤثرون', icon: '👥' },
       { href: '/admin/users', label: 'المستخدمون', icon: '👤' },
     ],

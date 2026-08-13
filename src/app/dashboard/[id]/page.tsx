@@ -15,6 +15,7 @@ import RequestInfoEditor from '@/components/dashboard/RequestInfoEditor'
 import RequestManageActions from '@/components/dashboard/RequestManageActions'
 import CampaignPostStatusList from '@/components/dashboard/CampaignPostStatusList'
 import ContentImagesUploader from '@/components/request/ContentImagesUploader'
+import SupportingDocumentsList from '@/components/request/SupportingDocumentsList'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useToast } from '@/components/ui/Toast'
@@ -163,6 +164,20 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           <div className="p-3 md:p-5 space-y-4">
+            {request.billing_source === 'membership' && (
+              <div className="rounded-xl border border-gold/30 bg-gold/10 p-4">
+                <p className="text-xs font-black text-dark">طلب من رصيد العضوية</p>
+                <p className="mt-1 text-sm leading-6 text-muted">
+                  {request.membership_credit_status === 'reserved'
+                    ? 'الطلب تحت مراجعة الإدارة، والرصيد والمزايا المختارة محجوزة مؤقتاً. تعود تلقائياً إلى عضويتك إذا رُفض الطلب.'
+                    : request.membership_credit_status === 'released'
+                      ? 'تمت إعادة رصيد المنشور والمزايا المحجوزة إلى عضويتك.'
+                      : request.membership_credit_status === 'consumed'
+                        ? 'اعتمدت الإدارة الطلب وبدأ التنفيذ من رصيد عضويتك.'
+                        : request.auto_quote_note || 'طلب مقدم من رصيد العضوية.'}
+                </p>
+              </div>
+            )}
             {/* Content — always visible */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
               <div>
@@ -211,6 +226,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
                 </div>
               </div>
             )}
+            <SupportingDocumentsList documents={request.supporting_documents} />
 
             {request.link && (
               <div>
@@ -237,7 +253,11 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
           <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">
             <div className="text-2xl mb-2">⏳</div>
             <p className="font-bold text-yellow-700 text-sm">طلبك قيد المراجعة</p>
-            <p className="text-xs text-yellow-600 mt-1">سيصلك العرض مع خيارات الخدمات الإضافية فور موافقة الإدارة على المحتوى</p>
+            <p className="text-xs text-yellow-600 mt-1">
+              {request.billing_source === 'membership'
+                ? 'تراجع الإدارة ملاءمة الطلب قبل بدء التنفيذ. الرصيد والمزايا محجوزة مؤقتاً، وتعود تلقائياً عند عدم قبول الطلب.'
+                : 'سيصلك العرض مع خيارات الخدمات الإضافية فور موافقة الإدارة على المحتوى'}
+            </p>
           </div>
         )}
 

@@ -22,6 +22,7 @@ export async function GET(request: Request) {
 
     const url = new URL(request.url)
     const status = url.searchParams.get('status')
+    const scope = url.searchParams.get('scope')
 
     let query = supabase
       .from('publish_requests')
@@ -29,6 +30,8 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: false })
 
     if (status) query = query.eq('status', status)
+    if (scope === 'membership') query = query.eq('billing_source', 'membership')
+    if (scope === 'direct') query = query.neq('billing_source', 'membership')
 
     const { data: requests } = await query
 

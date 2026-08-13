@@ -50,6 +50,7 @@ interface Payload {
   html: string
   replyTo?: string
   cc?: string | string[]
+  attachments?: Array<{ filename: string; content: string; contentType?: string }>
 }
 
 Deno.serve(async (req) => {
@@ -107,6 +108,11 @@ Deno.serve(async (req) => {
     text: plainText, // إضافة النسخة النصية البسيطة
     reply_to: payload.replyTo || REPLY_TO_EMAIL,
     cc: payload.cc, // إضافة CC للرسائل
+    attachments: payload.attachments?.map(item => ({
+      filename: item.filename,
+      content: item.content,
+      content_type: item.contentType,
+    })),
     headers: {
       'X-Mailer': 'Nukhba-Platform/2.0',
       'X-Priority': '3',

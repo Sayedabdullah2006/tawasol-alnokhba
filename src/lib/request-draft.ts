@@ -25,6 +25,7 @@ export function requestToDraft(r: Record<string, any>): Record<string, unknown> 
         content: p.content ?? '',
         preferredDate: p.preferred_date ?? '',
         images: Array.isArray(p.images) ? p.images : [],
+        supportingDocuments: Array.isArray(p.supporting_documents) ? p.supporting_documents : [],
         link: p.link ?? '',
         hashtags: p.hashtags ?? '',
       }))
@@ -47,6 +48,7 @@ export function requestToDraft(r: Record<string, any>): Record<string, unknown> 
       hashtags: r.hashtags ?? '',
       preferredDate: r.preferred_date ?? '',
       images: Array.isArray(r.content_images) ? r.content_images : [],
+      supportingDocuments: Array.isArray(r.supporting_documents) ? r.supporting_documents : [],
     },
     channels: Array.isArray(r.channels) ? r.channels : [],
     orgInfo: {

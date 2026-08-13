@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import {
   notifyPaymentConfirmedToClient,
   notifyInProgressToClient,
@@ -14,7 +14,7 @@ import { generateRequestNumber } from '@/lib/utils'
 // ── حماية انتقالات الحالة ──────────────────────────────────────────
 // يمنع الانتقال العشوائي بين الحالات ويحمي الحالات المالية النهائية
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  pending:         ['quoted', 'rejected', 'suspended'],
+  pending:         ['quoted', 'in_progress', 'rejected', 'suspended'],
   quoted:          ['approved', 'rejected', 'pending', 'suspended'],
   negotiation:     ['quoted', 'rejected', 'pending', 'suspended'],
   client_rejected: ['quoted', 'rejected', 'pending', 'suspended'],
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     // ── جلب الحالة الحالية قبل التحديث ──────────────────────────────
     const { data: current } = await supabase
       .from('publish_requests')
-      .select('status, admin_notes, suspended_from_status')
+      .select('status, admin_notes, suspended_from_status, billing_source, membership_credit_status')
       .eq('id', requestId)
       .single()
 
@@ -74,12 +74,28 @@ export async function POST(request: Request) {
     // The admin may schedule a request from any workflow state. This is useful when
     // the publishing decision supersedes an outstanding review or revision state.
     const isDirectSchedule = targetStatus === 'scheduled'
+    const membershipStart = current.billing_source === 'membership' && current.status === 'pending' && targetStatus === 'in_progress'
+    const membershipReject = current.billing_source === 'membership' && current.status === 'pending' && targetStatus === 'rejected'
+    const membershipCreditReserved = current.billing_source === 'membership' && current.membership_credit_status === 'reserved'
+    if (membershipCreditReserved && !['pending', 'in_progress', 'rejected', 'suspended'].includes(targetStatus)) {
+      return NextResponse.json({
+        error: 'طلب العضوية ما زال تحت المراجعة؛ يجب قبوله وبدء التنفيذ أو رفضه وإعادة الرصيد أولاً',
+      }, { status: 422 })
+    }
+    if (current.billing_source === 'membership' && current.status === 'rejected' && targetStatus === 'pending') {
+      return NextResponse.json({
+        error: 'لا يمكن إعادة فتح طلب عضوية أُعيد رصيده؛ يقدّم العميل طلباً جديداً من رصيده المتاح',
+      }, { status: 422 })
+    }
     if ((isResume && current.status !== 'suspended') || (!isResume && !isDirectSchedule && !allowed.includes(targetStatus))) {
       return NextResponse.json({
         error: `لا يمكن الانتقال من "${current.status}" إلى "${targetStatus}"`,
         currentStatus: current.status,
         allowedTransitions: allowed,
       }, { status: 422 })
+    }
+    if (current.status === 'pending' && targetStatus === 'in_progress' && !membershipStart) {
+      return NextResponse.json({ error: 'الانتقال المباشر إلى التنفيذ متاح لطلبات العضوية فقط' }, { status: 422 })
     }
 
     // ── تحديث قاعدة البيانات ──────────────────────────────────────────
@@ -90,27 +106,50 @@ export async function POST(request: Request) {
       ? (adminNotes.trim() || null)
       : current.admin_notes
 
-    const { data: updated, error } = await supabase
-      .from('publish_requests')
-      .update({
-        status:             targetStatus,
-        admin_notes:        resolvedAdminNotes,
-        suspended_from_status: targetStatus === 'suspended'
-          ? current.status
-          : (isResume || isDirectSchedule ? null : current.suspended_from_status),
-        last_status_change: now,
-        updated_at:         now,
-        // سجّل وقت تأكيد الدفع عند انتقال الطلب إلى "مدفوع" (تحويل بنكي)
-        ...(targetStatus === 'paid' || (current.status === 'payment_review' && targetStatus === 'in_progress')
-          ? { paid_at: now, payment_status: 'paid' }
-          : {}),
+    let updated: any = null
+    if (membershipStart || membershipReject) {
+      const service = await createServiceRoleClient()
+      const rpcName = membershipStart ? 'start_membership_request' : 'reject_membership_request'
+      const { error: resourceError } = await service.rpc(rpcName, {
+        p_request_id: requestId,
+        p_admin_notes: resolvedAdminNotes,
       })
-      .eq('id', requestId)
-      .select('id, request_number, client_name, client_email, final_total, admin_quoted_price, estimated_reach, admin_notes')
-      .single()
-
-    if (error) {
-      return NextResponse.json({ error: 'فشل تحديث الحالة' }, { status: 500 })
+      if (resourceError) {
+        console.error(`[MEMBERSHIP] ${rpcName} failed:`, resourceError)
+        return NextResponse.json({
+          error: membershipStart
+            ? 'تعذر استهلاك رصيد العضوية وبدء الطلب'
+            : 'تعذر إعادة رصيد العضوية ورفض الطلب',
+        }, { status: 409 })
+      }
+      const { data, error } = await service
+        .from('publish_requests')
+        .select('id, request_number, client_name, client_email, final_total, admin_quoted_price, estimated_reach, admin_notes')
+        .eq('id', requestId)
+        .single()
+      if (error) return NextResponse.json({ error: 'تم تحديث الطلب وتعذر تحميل بياناته' }, { status: 500 })
+      updated = data
+    } else {
+      const { data, error } = await supabase
+        .from('publish_requests')
+        .update({
+          status:             targetStatus,
+          admin_notes:        resolvedAdminNotes,
+          suspended_from_status: targetStatus === 'suspended'
+            ? current.status
+            : (isResume || isDirectSchedule ? null : current.suspended_from_status),
+          last_status_change: now,
+          updated_at:         now,
+          // سجّل وقت تأكيد الدفع عند انتقال الطلب إلى "مدفوع" (تحويل بنكي)
+          ...(targetStatus === 'paid' || (current.status === 'payment_review' && targetStatus === 'in_progress')
+            ? { paid_at: now, payment_status: 'paid' }
+            : {}),
+        })
+        .eq('id', requestId)
+        .select('id, request_number, client_name, client_email, final_total, admin_quoted_price, estimated_reach, admin_notes')
+        .single()
+      if (error) return NextResponse.json({ error: 'فشل تحديث الحالة' }, { status: 500 })
+      updated = data
     }
 
     // ── إخطار العميل بتغيير الحالة ───────────────────────────────────
@@ -137,7 +176,12 @@ export async function POST(request: Request) {
           p = notifyCompletedToClient(base)
           break
         case 'rejected':
-          p = notifyRejectedToClient({ ...base, reason: adminNotes ?? '' })
+          p = notifyRejectedToClient({
+            ...base,
+            reason: membershipReject
+              ? `${adminNotes?.trim() ? `${adminNotes.trim()}\n\n` : ''}تمت إعادة رصيد المنشور وأي مزايا محجوزة إلى عضويتك تلقائياً.`
+              : adminNotes ?? '',
+          })
           break
         case 'content_review':
         case 'payment_review':
@@ -174,6 +218,11 @@ export async function POST(request: Request) {
       }
     }
 
+    if (membershipStart) {
+      import('@/lib/auto-studio')
+        .then(module => module.autoRunRequestStudio(requestId))
+        .catch(error => console.error('[MEMBERSHIP] Auto studio failed after approval:', error))
+    }
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('Update error:', err)

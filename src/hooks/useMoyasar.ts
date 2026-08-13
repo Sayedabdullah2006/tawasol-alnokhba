@@ -104,26 +104,25 @@ export function useMoyasar(): UseMoyasarReturn {
           throw new Error('عنصر نموذج الدفع غير موجود في الصفحة');
         }
 
-        console.log('Initializing Moyasar with element:', element);
-        console.log('Element is connected to DOM:', element.isConnected);
-        console.log('Element parent:', element.parentElement);
-
         const publishableKey = getPublishableKey();
-        const callbackUrl = getCallbackUrl();
-        console.log('Moyasar publishable key:', publishableKey);
-        console.log('Moyasar callback URL:', callbackUrl);
-        console.log('Payment metadata:', metadata);
+        const isMembership = metadata?.resource_type === 'membership' && metadata?.membership_id;
+        const isMembershipTopup = metadata?.resource_type === 'membership_topup' && metadata?.topup_id;
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+        const callbackUrl = isMembershipTopup
+          ? `${siteUrl}/memberships/topup/payment/callback`
+          : isMembership
+            ? `${siteUrl}/memberships/payment/callback`
+            : getCallbackUrl();
 
         const paymentMethods = getPaymentMethods();
 
-        // ✅ Define config object first to avoid circular references
         const paymentConfig: MoyasarConfig = {
           element: element,
           amount: toHalalas(amount),
           currency: 'SAR',
           description,
-          publishable_api_key: getPublishableKey(),
-          callback_url: getCallbackUrl(),
+          publishable_api_key: publishableKey,
+          callback_url: callbackUrl,
           methods: paymentMethods as ('creditcard' | 'applepay')[],
           ...(paymentMethods.includes('applepay') && {
             apple_pay: {
@@ -132,14 +131,27 @@ export function useMoyasar(): UseMoyasarReturn {
           }),
           metadata,
           on_completed: (payment: MoyasarPayment) => {
-            console.log('🎉 Payment completed:', payment);
-            console.log('🔍 Payment status:', payment.status);
-            console.log('🆔 Request ID from metadata:', payment.metadata?.request_id);
+            if (isMembership) {
+              const membershipId = String(payment.metadata?.membership_id ?? metadata?.membership_id ?? '');
+              if (payment.status === 'paid' && membershipId) {
+                fetch(`/api/memberships/payment/verify?id=${payment.id}&membershipId=${membershipId}`, { method: 'GET' })
+                  .catch(error => console.error('[Moyasar] membership verify error:', error));
+              }
+              window.location.href = `/memberships/payment/callback?id=${payment.id}&membershipId=${membershipId}${payment.status === 'paid' ? '' : '&failed=true'}`;
+              return;
+            }
 
-            // Fire-and-forget verify call, then redirect immediately
+            if (isMembershipTopup) {
+              const topupId = String(payment.metadata?.topup_id ?? metadata?.topup_id ?? '');
+              if (payment.status === 'paid' && topupId) {
+                fetch(`/api/memberships/topups/payment/verify?id=${payment.id}&topupId=${topupId}`, { method: 'GET' })
+                  .catch(error => console.error('[Moyasar] membership topup verify error:', error));
+              }
+              window.location.href = `/memberships/topup/payment/callback?id=${payment.id}&topupId=${topupId}${payment.status === 'paid' ? '' : '&failed=true'}`;
+              return;
+            }
+
             if (payment.status === 'paid' && payment.metadata?.request_id) {
-              console.log('✅ Payment successful, firing verify and redirecting...');
-
               fetch(`/api/payment/verify?id=${payment.id}&requestId=${payment.metadata.request_id}`, {
                 method: 'GET'
               }).catch(error => {
@@ -148,24 +160,28 @@ export function useMoyasar(): UseMoyasarReturn {
 
               window.location.href = `/payment/callback?id=${payment.id}&requestId=${payment.metadata.request_id}`;
             } else {
-              console.warn('⚠️ Payment not paid or missing request_id');
-              console.log('⚠️ Payment status:', payment.status);
-              console.log('⚠️ Request ID:', payment.metadata?.request_id);
               window.location.href = `/payment/callback?id=${payment.id}&requestId=${payment.metadata?.request_id || ''}`;
             }
           },
           on_failed: (error: any) => {
-            console.error('[Moyasar] ❌ Payment failed:', error);
-            // ✅ Use paymentConfig directly — it IS defined before Moyasar.init is called
+            console.error('[Moyasar] Payment failed:', error);
+            const membershipId = paymentConfig.metadata?.membership_id ?? '';
+            const topupId = paymentConfig.metadata?.topup_id ?? '';
+            if (paymentConfig.metadata?.resource_type === 'membership_topup') {
+              window.location.href = `/memberships/topup/payment/callback?id=${error?.id ?? ''}&topupId=${topupId}&failed=true`;
+              return;
+            }
+            if (paymentConfig.metadata?.resource_type === 'membership') {
+              window.location.href = `/memberships/payment/callback?id=${error?.id ?? ''}&membershipId=${membershipId}&failed=true`;
+              return;
+            }
             const reqId = paymentConfig.metadata?.request_id ?? '';
             const paymentId = error?.id ?? '';
             window.location.href = `/payment/callback?id=${paymentId}&requestId=${reqId}&failed=true`;
           },
         };
 
-        console.log('Moyasar config:', paymentConfig);
         window.Moyasar.init(paymentConfig);
-        console.log('Moyasar initialized successfully');
       } catch (err) {
         console.error('Error initializing Moyasar:', err);
         throw new Error('فشل في تهيئة نموذج الدفع');

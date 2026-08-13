@@ -9,7 +9,7 @@ import ClientNameFixed from '@/components/ui/ClientNameFixed'
 
 const navLinks = [
   { href: '/', label: 'الرئيسية' },
-  { href: '/request', label: 'تقديم طلب' },
+  { href: '/request/start', label: 'تقديم طلب' },
 ]
 
 interface UserInfo {
@@ -139,6 +139,16 @@ export default function Header() {
                     {user.role === 'admin' ? '🛡️ لوحة الإدارة' : '📋 طلباتي'}
                   </Link>
 
+                  {user.role !== 'admin' && (
+                    <Link
+                      href="/dashboard/membership"
+                      onClick={() => setDropdownOpen(false)}
+                      className="flex items-center gap-2 px-4 py-3 text-sm text-dark hover:bg-cream transition-colors"
+                    >
+                      ★ عضويتي
+                    </Link>
+                  )}
+
                   {user.role === 'admin' && (
                     <Link
                       href="/dashboard"
@@ -150,7 +160,7 @@ export default function Header() {
                   )}
 
                   <Link
-                    href="/dashboard"
+                    href="/dashboard/profile"
                     onClick={() => setDropdownOpen(false)}
                     className="flex items-center gap-2 px-4 py-3 text-sm text-dark hover:bg-cream transition-colors"
                   >
@@ -232,6 +242,16 @@ export default function Header() {
                   >
                     <span className="text-xl">📋</span>
                     <span className="font-medium">لوحة العميل</span>
+                  </Link>
+                )}
+                {user.role !== 'admin' && (
+                  <Link
+                    href="/dashboard/membership"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-4 text-dark hover:bg-cream transition-colors border-b border-border"
+                  >
+                    <span className="text-xl">★</span>
+                    <span className="font-medium">عضويتي</span>
                   </Link>
                 )}
                 <Link

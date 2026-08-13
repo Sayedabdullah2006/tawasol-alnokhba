@@ -36,14 +36,43 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'الطلب ليس في مرحلة مراجعة المحتوى' }, { status: 400 })
     }
 
+    const now = new Date().toISOString()
+    const proposedImages = Array.isArray(existingRequest.proposed_images)
+      ? existingRequest.proposed_images.filter((image: unknown): image is string => typeof image === 'string' && image.length > 0)
+      : []
+    const chosenImage = typeof body.selectedImage === 'string' && proposedImages.includes(body.selectedImage)
+      ? body.selectedImage
+      : (proposedImages[0] ?? null)
+    const previousReviews = existingRequest.post_reviews && typeof existingRequest.post_reviews === 'object'
+      ? { ...existingRequest.post_reviews }
+      : {}
+    const previousPostReview = (previousReviews as Record<string, unknown>)[0]
+    const previousPostReviewData = previousPostReview && typeof previousPostReview === 'object' && !Array.isArray(previousPostReview)
+      ? previousPostReview as Record<string, unknown>
+      : {}
+
+    // Keep legacy single-post approvals compatible with the personal magazine.
+    const postReviews = {
+      ...previousReviews,
+      0: {
+        ...previousPostReviewData,
+        status: 'approved',
+        proposed_content: existingRequest.proposed_content ?? '',
+        proposed_images: proposedImages,
+        selected_image: chosenImage,
+        content_approved_at: now,
+      },
+    }
+
     // Update request status back to in_progress
     const { data: updatedRows, error } = await supabase
       .from('publish_requests')
       .update({
         status: 'in_progress',
-        content_approved_at: new Date().toISOString(),
+        content_approved_at: now,
+        post_reviews: postReviews,
         user_feedback: null, // Clear any previous feedback
-        updated_at: new Date().toISOString(),
+        updated_at: now,
       })
       .eq('id', requestId)
       .eq('status', 'content_review')

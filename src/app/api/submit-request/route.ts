@@ -4,6 +4,7 @@ import { generateRequestNumber } from '@/lib/utils'
 import { notifyNewRequestToAdmin, notifyRequestReceivedToClient, notifyQuoteApprovedAwaitingPaymentToClient } from '@/lib/email'
 import { CATEGORIES, ORDERABLE_PACKAGES } from '@/lib/constants'
 import { calculateAutoQuote, calculateCampaignQuote, CAMPAIGN_DISCOUNT_PCT } from '@/lib/auto-quote'
+import { normalizeImageUrls, normalizeSupportingDocuments } from '@/lib/request-attachments'
 
 // الحالات التي تُعدّ «طلباً قائماً» يمنع رفع طلب جديد (قبل الدفع/الاكتمال).
 // بعد الدفع (paid وما بعده) أو الإغلاق (مرفوض/مغلق/مكتمل) يُسمح بطلب جديد.
@@ -128,6 +129,7 @@ export async function POST(request: Request) {
         content: string
         preferred_date?: string | null
         images?: string[]
+        supporting_documents?: unknown
         link?: string | null
         hashtags?: string | null
       }> = Array.isArray(body.campaign_posts) ? body.campaign_posts : []
@@ -136,9 +138,15 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'الحملة تتطلب منشورين على الأقل' }, { status: 400 })
       }
 
+      const campaignPosts = campaignPostsRaw.map(post => ({
+        ...post,
+        images: normalizeImageUrls(post.images),
+        supporting_documents: normalizeSupportingDocuments(post.supporting_documents),
+      }))
+
       // احتساب سعر كل منشور
       const campaignCalc = calculateCampaignQuote(
-        campaignPostsRaw.map(p => ({
+        campaignPosts.map(p => ({
           category:   p.category ?? '',
           subOption:  p.sub_option
             ? (() => {
@@ -198,7 +206,7 @@ export async function POST(request: Request) {
       const campaignFinalPrice = campaignBaseTotal - campaignDiscountAmt
 
       // استخدم بيانات أول منشور لحقول title/content/category الإلزامية في الجدول
-      const firstPost = campaignPostsRaw[0]
+      const firstPost = campaignPosts[0]
 
       const { data, error } = await serviceClient
         .from('publish_requests')
@@ -219,20 +227,21 @@ export async function POST(request: Request) {
 
           // حقول الحملة
           request_type:         'campaign',
-          campaign_post_count:  campaignPostsRaw.length,
+          campaign_post_count:  campaignPosts.length,
           campaign_duration:    body.campaign_duration ?? null,
-          campaign_posts:       campaignPostsRaw,
+          campaign_posts:       campaignPosts,
           campaign_subtotal:    campaignSubtotalDisplay,
           campaign_discount_pct: CAMPAIGN_DISCOUNT_PCT,
 
           channels:         campaignChannels,
           extras:           campaignUserExtras,
-          num_posts:        campaignPostsRaw.length,
+          num_posts:        campaignPosts.length,
 
           link:             firstPost.link ?? null,
           hashtags:         firstPost.hashtags ?? null,
           preferred_date:   firstPost.preferred_date ?? null,
-          content_images:   Array.isArray(firstPost.images) ? firstPost.images : [],
+          content_images:   normalizeImageUrls(firstPost.images),
+          supporting_documents: normalizeSupportingDocuments(firstPost.supporting_documents),
 
           client_name:      body.client_name,
           client_phone:     body.client_phone,
@@ -421,7 +430,8 @@ export async function POST(request: Request) {
         link:             body.link,
         hashtags:         body.hashtags,
         preferred_date:   body.preferred_date,
-        content_images:   Array.isArray(body.content_images) ? body.content_images : [],
+        content_images:   normalizeImageUrls(body.content_images),
+        supporting_documents: normalizeSupportingDocuments(body.supporting_documents),
         client_name:      body.client_name,
         client_phone:     body.client_phone,
         client_email:     body.client_email,

@@ -192,7 +192,7 @@ export default function EmailToolsPage() {
                 id="test-html"
                 rows={4}
                 className="w-full px-3 py-2 border border-border rounded-lg resize-none"
-                placeholder="<div>محتوى تجريبي...</div>"
+                placeholder="<div>اكتب محتوى الرسالة هنا...</div>"
               />
             </div>
 

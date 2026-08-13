@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
+import { normalizeImageUrls, normalizeSupportingDocuments } from '@/lib/request-attachments'
 
 /**
  * يحفظ حالة الاستوديو (التصاميم المولّدة + صور المصدر المرفوعة) حتى تبقى بعد إعادة التحميل.
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
     const service = await createServiceRoleClient()
     const { data: reqRow } = await service
       .from('publish_requests')
-      .select('ai_posts, ai_designs, ai_uploaded_images')
+      .select('ai_posts, ai_designs, ai_uploaded_images, content_images, supporting_documents, campaign_posts')
       .eq('id', requestId)
       .single()
     if (!reqRow) return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 })
@@ -33,16 +34,25 @@ export async function POST(request: Request) {
       const aiPosts: Record<string, any> =
         reqRow.ai_posts && typeof reqRow.ai_posts === 'object' ? { ...reqRow.ai_posts } : {}
       const entry: Record<string, any> = { ...(aiPosts[postIndex] ?? {}) }
+      const post = Array.isArray(reqRow.campaign_posts) ? reqRow.campaign_posts[postIndex] : null
+      const supportingUrls = new Set(normalizeSupportingDocuments(post?.supporting_documents).map(document => document.url))
       if (Array.isArray(designs)) entry.designs = designs
-      if (Array.isArray(uploadedImages)) entry.uploaded_images = uploadedImages
-      if (Array.isArray(selectedImages)) entry.selected_images = selectedImages
+      if (Array.isArray(uploadedImages)) entry.uploaded_images = normalizeImageUrls(uploadedImages).filter(url => !supportingUrls.has(url))
+      if (Array.isArray(selectedImages)) {
+        const allowed = new Set([
+          ...normalizeImageUrls(post?.images),
+          ...normalizeImageUrls(entry.uploaded_images ?? entry.uploadedImages),
+        ].filter(url => !supportingUrls.has(url)))
+        entry.selected_images = normalizeImageUrls(selectedImages).filter(url => allowed.has(url))
+      }
       aiPosts[postIndex] = entry
       const { error } = await service.from('publish_requests').update({ ai_posts: aiPosts }).eq('id', requestId)
       if (error) throw new Error(error.message)
     } else {
       const upd: Record<string, unknown> = {}
+      const supportingUrls = new Set(normalizeSupportingDocuments(reqRow.supporting_documents).map(document => document.url))
       if (Array.isArray(designs)) upd.ai_designs = designs
-      if (Array.isArray(uploadedImages)) upd.ai_uploaded_images = uploadedImages
+      if (Array.isArray(uploadedImages)) upd.ai_uploaded_images = normalizeImageUrls(uploadedImages).filter(url => !supportingUrls.has(url))
       if (Object.keys(upd).length) {
         const { error } = await service.from('publish_requests').update(upd).eq('id', requestId)
         if (error) throw new Error(error.message)

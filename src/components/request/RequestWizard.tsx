@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useCategories, useSiteContent, type DBCategory, type SiteContent } from '@/lib/hooks'
 import { useToast } from '@/components/ui/Toast'
@@ -10,7 +10,7 @@ import type { Influencer } from '@/components/pricing/StepInfluencer'
 import type { RequestType } from './RStepRequestType'
 import type { ClientType } from './RStep1ClientType'
 import type { CampaignSetup } from './RStepCampaignSetup'
-import RStep3Details from './RStep3Details'
+import RStep3Details, { type ContentDetails } from './RStep3Details'
 import RStepExtras from './RStepExtras'
 import { type ContactData } from './RStep5Contact'
 import { TERMS_TEXT } from './RStep6Terms'
@@ -22,6 +22,13 @@ import RequestManageActions from '@/components/dashboard/RequestManageActions'
 import { getStatusLabel } from '@/lib/status-labels'
 import { COMPETITION_SUBCATEGORIES, getCompetitionPositions, ORDERABLE_PACKAGES, CATEGORY_CONDITIONS } from '@/lib/constants'
 import { AQ_EXTRAS_PRICES, calculateAutoQuote } from '@/lib/auto-quote'
+import MembershipTeaser from '@/components/memberships/MembershipTeaser'
+import MembershipBenefitPicker from '@/components/memberships/MembershipBenefitPicker'
+import {
+  membershipBenefitSelectionLabel,
+  type MembershipBenefitSelection,
+  type MembershipBenefitType,
+} from '@/lib/memberships'
 
 // القيم الافتراضية لمحتوى الموقع (تُستخدم حتى يصل المحتوى المعدَّل من القاعدة)
 // الشروط العامة محذوفة — يُكتفى بشروط القبول بحسب الفئة.
@@ -112,6 +119,11 @@ function FormSection({
 
 export default function RequestWizard() {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const membershipId = searchParams.get('membership')
+  const membershipMode = !!membershipId
+  const membershipPortalMode = membershipMode && pathname.startsWith('/dashboard/membership/request')
   const { showToast } = useToast()
   const { categories, loading: catsLoading } = useCategories()
   // محتوى الموقع القابل للتعديل من لوحة الأدمن (الشروط + شروط قبول الخبر)
@@ -120,12 +132,29 @@ export default function RequestWizard() {
   const [success, setSuccess] = useState(false)
   const [reviewing, setReviewing] = useState(false)
   const [requestNumber, setRequestNumber] = useState('')
+  const [membershipResult, setMembershipResult] = useState<{ membershipBalance: number | null; benefitBalances: { type: MembershipBenefitType; remaining: number }[] } | null>(null)
   const [influencers, setInfluencers] = useState<Influencer[]>([])
   const [loading, setLoading] = useState(true)
   const [hydrated, setHydrated] = useState(false)
   const draftRestored = useRef(false)
   // طلب قائم (قبل الدفع/الاكتمال) — يمنع تقديم طلب جديد. نحمل الصف كاملاً لإتاحة التعديل/الإلغاء.
   const [pendingQuote, setPendingQuote] = useState<any | null>(null)
+  const [membershipBenefits, setMembershipBenefits] = useState<any[]>([])
+  const [membershipWallet, setMembershipWallet] = useState<any>(null)
+  const [membershipPlanId, setMembershipPlanId] = useState<string | null>(null)
+  const [selectedMembershipBenefits, setSelectedMembershipBenefits] = useState<MembershipBenefitSelection[]>([])
+
+  useEffect(() => {
+    if (!membershipId) return
+    fetch(`/api/memberships/${membershipId}`).then(async response => {
+      if (!response.ok) return
+      const data = await response.json().catch(() => ({}))
+      const planId = typeof data.membership?.plan_id === 'string' ? data.membership.plan_id : null
+      setMembershipPlanId(planId)
+      setMembershipWallet(data.wallet ?? null)
+      setMembershipBenefits(data.benefitWallets ?? [])
+    }).catch(() => undefined)
+  }, [membershipId])
 
   // القسم المفتوح حالياً (أكورديون أحادي الفتح)
   const [openSection, setOpenSection] = useState(0)
@@ -138,8 +167,8 @@ export default function RequestWizard() {
   const [subOption, setSubOption]       = useState<string | null>(null)
   const [competitionSelection, setCompetitionSelection] =
     useState<{ subcategory: string; position: string } | null>(null)
-  const [details, setDetails] = useState({
-    title: '', content: '', link: '', hashtags: '', preferredDate: '', images: [] as string[],
+  const [details, setDetails] = useState<ContentDetails>({
+    title: '', content: '', link: '', hashtags: '', preferredDate: '', images: [], supportingDocuments: [],
   })
   const [channels, setChannels]         = useState<string[]>([])
   const [selectedExtras, setSelectedExtras] = useState<string[]>([])
@@ -172,7 +201,12 @@ export default function RequestWizard() {
   const needsSubOption = !!(selectedCat?.has_sub_option && selectedCat?.sub_options?.length)
   const isCompetitionCategory = category === 'competitions'
   // الوكالة ترى نفس فئات الأفراد (كل أنواع الأخبار)
-  const effectiveClientType = clientType === 'agency' ? 'individual' : clientType
+  const membershipClientType: ClientType | null = membershipPlanId
+    ? membershipPlanId === 'corporate' ? 'business' : 'individual'
+    : null
+  const effectiveClientType = membershipMode
+    ? membershipClientType
+    : clientType === 'agency' ? 'individual' : clientType
   const availableCategories = effectiveClientType
     ? categories.filter(c => !c.client_types || c.client_types.includes(effectiveClientType))
     : categories
@@ -242,7 +276,13 @@ export default function RequestWizard() {
           if (d.category)             setCategory(d.category)
           if (d.subOption)            setSubOption(d.subOption)
           if (d.competitionSelection) setCompetitionSelection(d.competitionSelection)
-          if (d.details)              setDetails(d.details)
+          if (d.details) {
+            setDetails({
+              ...d.details,
+              images: Array.isArray(d.details.images) ? d.details.images : [],
+              supportingDocuments: Array.isArray(d.details.supportingDocuments) ? d.details.supportingDocuments : [],
+            })
+          }
           if (Array.isArray(d.channels))        setChannels(d.channels)
           if (d.contact)              setContact(d.contact)
           if (d.orgInfo)              setOrgInfo(d.orgInfo)
@@ -253,7 +293,13 @@ export default function RequestWizard() {
             setSelectedPackage(d.selectedPackage)
           }
           if (d.basicChannel)         setBasicChannel(d.basicChannel)
-          if (Array.isArray(d.campaignPosts) && d.campaignPosts.length) setCampaignPosts(d.campaignPosts)
+          if (Array.isArray(d.campaignPosts) && d.campaignPosts.length) {
+            setCampaignPosts(d.campaignPosts.map((post: CampaignPostData) => ({
+              ...post,
+              images: Array.isArray(post.images) ? post.images : [],
+              supportingDocuments: Array.isArray(post.supportingDocuments) ? post.supportingDocuments : [],
+            })))
+          }
           showToast('تم استرجاع طلبك غير المكتمل ✨', 'info')
         }
       }
@@ -301,7 +347,7 @@ export default function RequestWizard() {
       : needsSubOption ? !!subOption : true
 
   const aboutComplete =
-    !!selectedInfluencer && !!requestType && !!clientType && (
+    !!selectedInfluencer && !!requestType && !!effectiveClientType && (
       requestType === 'campaign'
         ? campaignSetup.postCount >= 2
         : (!!category && subOptionSatisfied)
@@ -318,7 +364,7 @@ export default function RequestWizard() {
   // ── الباقات تُعرض للأفراد (المنشور الواحد + الحملة)، ولا تُعرض لفئة «أخرى» ──
   // فئة «أخرى» تُعامَل كالجهات: عرض مالي يدوي من الأدمن (بلا باقات ولا تسعير تلقائي).
   const isOtherCategory = category === 'Others'
-  const showPackages = clientType === 'individual' && !isOtherCategory
+  const showPackages = !membershipMode && clientType === 'individual' && !isOtherCategory
   // الباقة الأساسية تتطلّب اختيار قناة واحدة للنشر
   const basicNeedsChannel = showPackages && selectedPackage === 'basic'
   const packagesComplete = !showPackages || (!!selectedPackage && (!basicNeedsChannel || !!basicChannel))
@@ -390,8 +436,8 @@ export default function RequestWizard() {
   // أول متطلب ناقص — يُعرض كتلميح فوق زر الإرسال
   const missingHint = (): string | null => {
     if (!requestType) return 'اختر نوع الطلب'
-    if (!clientType) return 'اختر صفة مقدّم الطلب'
-    if (clientType !== 'individual' && orgInfo.name.trim() === '') return 'أدخل اسم الجهة'
+    if (!effectiveClientType) return membershipMode ? 'جارٍ التحقق من باقة العضوية' : 'اختر صفة مقدّم الطلب'
+    if (effectiveClientType !== 'individual' && orgInfo.name.trim() === '') return 'أدخل اسم الجهة'
     if (requestType === 'single') {
       if (!category) return 'اختر فئة المحتوى'
       if (!subOptionSatisfied) return 'أكمل الخيار الفرعي للفئة'
@@ -421,10 +467,10 @@ export default function RequestWizard() {
         body = {
           request_type:     'campaign',
           influencer_id:    selectedInfluencer,
-          client_type:      clientType,
-          org_name:           clientType !== 'individual' ? (orgInfo.name.trim() || null) : null,
-          org_representative: clientType !== 'individual' ? (orgInfo.representative.trim() || null) : null,
-          org_license:        clientType !== 'individual' ? (orgInfo.license.trim() || null) : null,
+          client_type:      effectiveClientType,
+          org_name:           effectiveClientType !== 'individual' ? (orgInfo.name.trim() || null) : null,
+          org_representative: effectiveClientType !== 'individual' ? (orgInfo.representative.trim() || null) : null,
+          org_license:        effectiveClientType !== 'individual' ? (orgInfo.license.trim() || null) : null,
           channels,
           selected_extras:  selectedExtras,
           discount_code:    discountCode.trim() || null,
@@ -447,6 +493,7 @@ export default function RequestWizard() {
             content:        p.content,
             preferred_date: p.preferredDate || null,
             images:         p.images,
+            supporting_documents: p.supportingDocuments,
             link:           p.link || null,
             hashtags:       p.hashtags || null,
           })),
@@ -456,10 +503,10 @@ export default function RequestWizard() {
         body = {
           request_type:    'single',
           influencer_id:   selectedInfluencer,
-          client_type:     clientType,
-          org_name:           clientType !== 'individual' ? (orgInfo.name.trim() || null) : null,
-          org_representative: clientType !== 'individual' ? (orgInfo.representative.trim() || null) : null,
-          org_license:        clientType !== 'individual' ? (orgInfo.license.trim() || null) : null,
+          client_type:     effectiveClientType,
+          org_name:           effectiveClientType !== 'individual' ? (orgInfo.name.trim() || null) : null,
+          org_representative: effectiveClientType !== 'individual' ? (orgInfo.representative.trim() || null) : null,
+          org_license:        effectiveClientType !== 'individual' ? (orgInfo.license.trim() || null) : null,
           category,
           sub_option:      subOptionData,
           title:           details.title,
@@ -468,6 +515,7 @@ export default function RequestWizard() {
           hashtags:        details.hashtags || null,
           preferred_date:  details.preferredDate || null,
           content_images:  details.images,
+          supporting_documents: details.supportingDocuments,
           client_name:     contact.fullName,
           client_phone:    contact.phone,
           client_email:    contact.email,
@@ -481,7 +529,11 @@ export default function RequestWizard() {
         }
       }
 
-      const res = await fetch('/api/submit-request', {
+      if (membershipMode) {
+        body.membership_id = membershipId
+        body.membership_benefits = selectedMembershipBenefits
+      }
+      const res = await fetch(membershipMode ? '/api/memberships/submit-request' : '/api/submit-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -491,6 +543,14 @@ export default function RequestWizard() {
       if (!res.ok) throw new Error(data.error ?? 'حدث خطأ')
 
       try { localStorage.removeItem(DRAFT_KEY) } catch { /* تجاهل */ }
+
+      if (membershipMode) {
+        setRequestNumber(data.requestNumber)
+        setMembershipResult({ membershipBalance: data.membershipBalance ?? null, benefitBalances: data.benefitBalances ?? [] })
+        setSuccess(true)
+        showToast(`تم إرسال الطلب وحجز الرصيد${data.membershipBalance != null ? ` · المتبقي ${data.membershipBalance}` : ''}`)
+        return
+      }
 
       // ── تسجيل دخول تلقائي للضيف الجديد حتى يتابع طلبه ويدفع بلا حاجز ──
       let signedIn = false
@@ -541,10 +601,10 @@ export default function RequestWizard() {
   }
 
   if (loading || catsLoading) return <LoadingSpinner size="lg" />
-  if (success) return <SuccessScreen requestNumber={requestNumber} />
+  if (success) return <SuccessScreen requestNumber={requestNumber} membershipBalance={membershipResult?.membershipBalance} benefitBalances={membershipResult?.benefitBalances} />
 
   // طلب قائم بانتظار الموافقة — يُمنع تقديم طلب جديد حتى اتخاذ إجراء
-  if (pendingQuote) {
+  if (pendingQuote && !membershipMode) {
     const statusInfo = getStatusLabel(pendingQuote.status, 'client')
     return (
       <div className="min-h-screen px-4 py-12 flex items-center justify-center">
@@ -583,7 +643,7 @@ export default function RequestWizard() {
       ? `حملة من ${campaignPosts.length} منشورات`
       : details.title
     const checkoutTotal = estimatedTotal != null ? estimatedTotal + extrasTotal : null
-    const totalLabel = checkoutTotal != null
+    const totalLabel = membershipMode ? 'رصيد واحد' : checkoutTotal != null
       ? `${checkoutTotal.toLocaleString('ar-SA')} ر.س`
       : 'سيصلك عرض سعر بعد المراجعة'
     const canSelectExtras = requestType === 'single' && selectedPackage === 'basic' && estimatedTotal != null
@@ -617,6 +677,20 @@ export default function RequestWizard() {
               </div>
             </section>
 
+            {membershipMode && selectedMembershipBenefits.length > 0 && (
+              <section className="rounded-2xl border border-green/20 bg-green/5 p-5">
+                <h2 className="font-black text-dark">المزايا المختارة</h2>
+                <div className="mt-3 space-y-2">
+                  {selectedMembershipBenefits.map(selection => (
+                    <div key={selection.type} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
+                      <span className="font-bold text-dark">{membershipBenefitSelectionLabel(selection)}</span>
+                      <span className="text-xs font-black text-green">خصم وحدة واحدة</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {selectedPackageData && (
               <section className="bg-card border border-border rounded-2xl p-5">
                 <div className="flex items-start justify-between gap-3 mb-3">
@@ -646,7 +720,7 @@ export default function RequestWizard() {
               />
             )}
 
-            {clientType === 'individual' && estimatedTotal != null && (
+            {!membershipMode && clientType === 'individual' && estimatedTotal != null && (
               <section className="bg-card border border-border rounded-2xl p-5">
                 <label className={fieldLabel}>كوبون الخصم</label>
                 <input
@@ -664,8 +738,8 @@ export default function RequestWizard() {
             <section className="bg-card border border-border rounded-2xl p-5">
               <div className="flex justify-between items-center gap-4">
                 <div>
-                  <h2 className="font-black text-dark">ملخص الدفع</h2>
-                  <p className="text-xs text-muted mt-1">{discountCode.trim() ? 'سيُحدّث المبلغ بعد التحقق من الكوبون.' : 'السعر قبل الخصم إن وجد.'}</p>
+                  <h2 className="font-black text-dark">{membershipMode ? 'ملخص الرصيد' : 'ملخص الدفع'}</h2>
+                  <p className="text-xs text-muted mt-1">{membershipMode ? 'سيُحجز الرصيد عند الإرسال ويُستهلك عند بدء التنفيذ.' : discountCode.trim() ? 'سيُحدّث المبلغ بعد التحقق من الكوبون.' : 'السعر قبل الخصم إن وجد.'}</p>
                 </div>
                 <span className="text-green font-black text-lg text-left">{totalLabel}</span>
               </div>
@@ -677,7 +751,7 @@ export default function RequestWizard() {
             <button type="button" onClick={() => setShowTerms(true)} className="text-green font-medium underline">الشروط والأحكام وسياسة الخصوصية</button>
           </p>
           <Button onClick={handleSubmit} loading={submitting} disabled={submitting} className="w-full" size="lg">
-            {clientType === 'individual' ? 'المتابعة إلى الدفع' : 'إرسال الطلب للمراجعة'}
+            {membershipMode ? 'إرسال الطلب من رصيد العضوية' : clientType === 'individual' ? 'المتابعة إلى الدفع' : 'إرسال الطلب للمراجعة'}
           </Button>
         </div>
 
@@ -729,14 +803,23 @@ export default function RequestWizard() {
   ]
   const progressDone = progressSteps.filter(Boolean).length
   const progressPct = Math.round((progressDone / progressSteps.length) * 100)
+  const membershipAvailable = membershipWallet
+    ? membershipWallet.total_credits - membershipWallet.reserved_credits - membershipWallet.used_credits
+    : null
 
   // ── العرض ───────────────────────────────────────────────────────
   return (
     <div className="min-h-screen pb-36 lg:pb-10">
       <div className="max-w-6xl mx-auto w-full px-4 pt-6">
-        <div className="max-w-3xl mx-auto text-center mb-5">
+        <div className="relative max-w-3xl mx-auto text-center mb-5">
+          {membershipMode && membershipAvailable != null && (
+            <div className="mb-4 inline-flex items-center gap-3 rounded-lg border border-gold/30 bg-white/80 px-4 py-2 text-right shadow-sm lg:absolute lg:left-0 lg:top-0 lg:mb-0">
+              <div><p className="text-[10px] font-bold text-muted">رصيد النشر المتبقي</p><p className="text-xs text-muted">بعد هذا الطلب: {Math.max(0, membershipAvailable - 1)}</p></div>
+              <strong className="text-2xl text-green">{membershipAvailable}</strong>
+            </div>
+          )}
           <h1 className="text-2xl md:text-3xl font-black text-dark mb-1">طلب نشر جديد</h1>
-          <p className="text-sm text-muted">عبّئ بياناتك بسرعة — وبمجرد الإرسال يظهر سعرك ويصلك العرض</p>
+          <p className="text-sm text-muted">{membershipMode ? 'قدّم الخبر من رصيد عضويتك دون المرور بالدفع' : 'عبّئ بياناتك بسرعة — وبمجرد الإرسال يظهر سعرك ويصلك العرض'}</p>
         </div>
 
         {/* شريط التقدّم */}
@@ -753,15 +836,16 @@ export default function RequestWizard() {
           </div>
         </div>
 
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start lg:gap-6 xl:gap-8">
-        <main className="min-w-0 max-w-2xl mx-auto w-full lg:max-w-none lg:mx-0">
+        {!membershipMode && <div className="mb-4 lg:hidden"><MembershipTeaser compact /></div>}
+        <div className={cn(!membershipPortalMode && 'lg:grid lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start lg:gap-6 xl:gap-8')}>
+        <main className={cn('min-w-0 mx-auto w-full', membershipPortalMode ? 'max-w-4xl' : 'max-w-2xl lg:max-w-none lg:mx-0')}>
         <div className="space-y-3">
 
           {/* ① عن الطلب ─────────────────────────────────────────── */}
           <FormSection
             index={1}
             title="عن الطلب"
-            subtitle="الحساب ونوع الطلب وصفتك والفئة"
+            subtitle={membershipMode ? 'الحساب ونوع الطلب والفئة' : 'الحساب ونوع الطلب وصفتك والفئة'}
             complete={aboutComplete}
             open={openSection === 0}
             onToggle={() => setOpenSection(openSection === 0 ? -1 : 0)}
@@ -769,8 +853,9 @@ export default function RequestWizard() {
             <div className="space-y-4">
               <div>
                 <label className={fieldLabel}>نوع الطلب *</label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className={membershipMode ? 'grid grid-cols-1 gap-3' : 'grid grid-cols-2 gap-3'}>
                   {REQUEST_TYPE_OPTIONS.map(o => {
+                    if (membershipMode && o.id === 'campaign') return null
                     const active = requestType === o.id
                     return (
                       <button
@@ -794,7 +879,7 @@ export default function RequestWizard() {
                 )}
               </div>
 
-              <div>
+              {!membershipMode && <div>
                 <label className={fieldLabel}>صفة مقدّم الطلب *</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {CLIENT_TYPE_OPTIONS.map(o => {
@@ -816,10 +901,10 @@ export default function RequestWizard() {
                   })}
                 </div>
                 <p className="text-xs text-amber-600 mt-2">⚠️ يجب اختيار الصفة الصحيحة؛ فقد يؤدي الاختيار غير الصحيح إلى إلغاء الطلب وعدم الأهلية لاسترجاع المبلغ، وفق سياسة الاسترجاع والأنظمة النافذة.</p>
-              </div>
+              </div>}
 
               {/* بيانات الجهة — لغير الأفراد (شركة / حكومة / جمعية / وكالة) */}
-              {clientType && clientType !== 'individual' && (
+              {effectiveClientType && effectiveClientType !== 'individual' && (
                 <div className="space-y-3 bg-muted/5 rounded-xl p-3 border border-border">
                   <div>
                     <label className={fieldLabel}>اسم الجهة *</label>
@@ -866,10 +951,10 @@ export default function RequestWizard() {
                         setSubOption(null)
                         setCompetitionSelection(null)
                       }}
-                      disabled={!clientType}
-                      className={cn(selectCls, !clientType && 'opacity-50 cursor-not-allowed')}
+                      disabled={!effectiveClientType}
+                      className={cn(selectCls, !effectiveClientType && 'opacity-50 cursor-not-allowed')}
                     >
-                      <option value="">{clientType ? '— اختر الفئة —' : 'اختر صفتك أولاً'}</option>
+                      <option value="">{effectiveClientType ? '— اختر الفئة —' : membershipMode ? 'جارٍ تحميل العضوية...' : 'اختر صفتك أولاً'}</option>
                       {availableCategories.map(c => (
                         <option key={c.id} value={c.id}>{c.icon} {c.name_ar}</option>
                       ))}
@@ -1018,7 +1103,16 @@ export default function RequestWizard() {
                 categoryConditions={siteContent.category_conditions}
               />
             ) : (
-              <RStep3Details data={details} onChange={setDetails} />
+              <>
+                <RStep3Details data={details} onChange={setDetails} />
+                {membershipMode && membershipBenefits.length > 0 && (
+                  <MembershipBenefitPicker
+                    wallets={membershipBenefits}
+                    value={selectedMembershipBenefits}
+                    onChange={setSelectedMembershipBenefits}
+                  />
+                )}
+              </>
             )}
 
             <div className="flex justify-end pt-4">
@@ -1167,46 +1261,17 @@ export default function RequestWizard() {
         </div>
         </main>
 
-        <aside className="hidden lg:block sticky top-6">
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-3 mb-5">
-              <h2 className="font-black text-dark">سلة الطلب</h2>
-              <span className="text-xs font-bold text-green">{progressPct}% مكتمل</span>
+        {!membershipPortalMode && <aside className="hidden lg:block sticky top-6">
+          {membershipMode ? (
+            <div className="overflow-hidden rounded-lg border border-gold/40 bg-dark p-6 text-white shadow-xl">
+              <p className="text-xs font-bold text-gold">طلب ضمن العضوية</p>
+              <h2 className="mt-2 text-2xl font-black">رصيدك يغطي هذا الطلب</h2>
+              <p className="mt-3 text-sm leading-7 text-white/65">لن يظهر دفع أو اختيار باقة. بعد الإرسال يُحجز رصيد واحد حتى تبدأ الإدارة التنفيذ.</p>
+              <div className="my-5 border-y border-white/10 py-4"><strong className="text-3xl text-gold">1</strong><span className="mr-2 text-sm text-white/60">رصيد لهذا المنشور</span></div>
+              <button type="button" onClick={() => router.push('/dashboard/membership')} className="w-full rounded-lg border border-white/20 px-4 py-3 text-sm font-bold hover:bg-white/10">العودة إلى عضويتي</button>
             </div>
-
-            <div className="space-y-3 text-sm">
-              <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
-                <span className="text-muted">الخدمة</span>
-                <span className="font-bold text-dark text-left">{requestType === 'campaign' ? 'حملة متعددة' : requestType === 'single' ? 'منشور واحد' : 'لم تختر بعد'}</span>
-              </div>
-              <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
-                <span className="text-muted">المحتوى</span>
-                <span className="font-bold text-dark text-left line-clamp-2">{requestType === 'campaign' ? `${campaignPosts.length} منشورات` : details.title || 'أضف عنوان المنشور'}</span>
-              </div>
-              <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
-                <span className="text-muted">الباقة</span>
-                <span className="font-bold text-dark text-left">{selectedPackageData?.name ?? (showPackages ? 'اختر الباقة' : 'عرض سعر يدوي')}</span>
-              </div>
-              {selectedPackageData && (
-                <ul className="space-y-1.5 pb-3 border-b border-border">
-                  {selectedPackageData.features.slice(0, 3).map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-xs text-dark">
-                      <span className="text-green">✓</span>
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="flex items-end justify-between gap-3 pt-1">
-                <span className="font-black text-dark">الإجمالي المتوقع</span>
-                <span className="text-green font-black text-lg text-left">{estimatedTotal != null ? `${estimatedTotal.toLocaleString('ar-SA')} ر.س` : 'يحدد لاحقًا'}</span>
-              </div>
-            </div>
-
-            {!canSubmit && missingHint() && <p className="text-xs text-muted mt-4">{missingHint()}</p>}
-            <Button onClick={openReview} disabled={!canSubmit} className="w-full mt-5">مراجعة الطلب</Button>
-          </div>
-        </aside>
+          ) : <MembershipTeaser />}
+        </aside>}
       </div>
       </div>
 

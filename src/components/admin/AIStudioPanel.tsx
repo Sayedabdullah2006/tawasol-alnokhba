@@ -70,7 +70,7 @@ export default function AIStudioPanel({
         revised: request.ai_revised_designs ?? null,
       }
 
-  // صور المصدر الأصلية للخبر (حملة: صور المنشور، مفرد: صور الطلب)
+  // صور المصدر الأصلية للخبر فقط. supporting_documents مستبعدة عمداً من الاستوديو.
   const baseImages: string[] = isPost
     ? (Array.isArray(postImages) ? postImages : [])
     : (Array.isArray(request.content_images) ? request.content_images : [])
@@ -135,7 +135,9 @@ export default function AIStudioPanel({
   // ── State (prefilled from saved studio state when re-opened) ──
   // يمكن اختيار أكثر من صورة مصدر تُضمَّن جميعها ويُبنى عليها التحليل والاتجاهات والتصميم.
   const [selectedImages, setSelectedImages] = useState<string[]>(
-    saved.selectedImages.length ? saved.selectedImages : (saved.sourceImage ? [saved.sourceImage] : (contentImages.length === 1 ? [contentImages[0]] : []))
+    saved.selectedImages.length
+      ? saved.selectedImages.filter((url: string) => contentImages.includes(url))
+      : (saved.sourceImage && contentImages.includes(saved.sourceImage) ? [saved.sourceImage] : (contentImages.length === 1 ? [contentImages[0]] : []))
   )
   const [extraInfo, setExtraInfo] = useState('')
   const toggleImage = (url: string) =>

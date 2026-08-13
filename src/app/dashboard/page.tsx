@@ -50,7 +50,7 @@ export default function DashboardPage() {
           <h1 className="mt-1 text-2xl font-black text-dark sm:text-3xl">مرحباً، {userName}</h1>
           <p className="mt-2 text-sm text-muted">تابع طلباتك واعتمد المحتوى في مكان واحد.</p>
         </div>
-        <Link href="/request" className="rounded-lg bg-green px-5 py-3 text-sm font-bold text-white shadow-md shadow-green/20 transition hover:bg-green/90">+ تقديم طلب جديد</Link>
+        <Link href="/request/start" className="rounded-lg bg-green px-5 py-3 text-sm font-bold text-white shadow-md shadow-green/20 transition hover:bg-green/90">+ تقديم طلب جديد</Link>
       </section>
 
       {requests.length === 0 ? (
@@ -58,7 +58,7 @@ export default function DashboardPage() {
           title="لا توجد طلبات بعد"
           description="قدّم طلبك الأول وابدأ بنشر إنجازاتك"
           actionLabel="قدّم طلبك الأول"
-          actionHref="/request"
+          actionHref="/request/start"
         />
       ) : (
         <div className="grid gap-3">

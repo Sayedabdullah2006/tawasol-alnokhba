@@ -11,17 +11,12 @@ export function getSecretKey(): string {
   const isProduction = process.env.NODE_ENV === 'production';
   const key = isProduction
     ? process.env.MOYASAR_SECRET_KEY
-    : process.env.MOYASAR_SECRET_KEY_Test;
+    : process.env.MOYASAR_SECRET_KEY_Test || process.env.MOYASAR_SECRET_KEY;
 
   if (!key) {
-    const varName = isProduction ? 'MOYASAR_SECRET_KEY' : 'MOYASAR_SECRET_KEY_Test';
+    const varName = isProduction ? 'MOYASAR_SECRET_KEY' : 'MOYASAR_SECRET_KEY_Test or MOYASAR_SECRET_KEY';
     throw new Error(`${varName} is not configured for ${process.env.NODE_ENV} environment`);
   }
-
-  // Log key type for debugging (safely)
-  const keyType = key.startsWith('sk_live_') ? 'LIVE' :
-                 key.startsWith('sk_test_') ? 'TEST' : 'INVALID';
-  console.log(`[MOYASAR] Using ${keyType} secret key for ${process.env.NODE_ENV}`);
 
   return key;
 }
@@ -35,11 +30,6 @@ export function getPublishableKey(): string {
   if (!key) {
     throw new Error('NEXT_PUBLIC_MOYASAR_PUBLISHABLE_KEY is not configured');
   }
-
-  // Log key type for debugging (safely)
-  const keyType = key.startsWith('pk_live_') ? 'LIVE' :
-                 key.startsWith('pk_test_') ? 'TEST' : 'INVALID';
-  console.log(`[MOYASAR] Using ${keyType} publishable key`);
 
   return key;
 }
@@ -80,7 +70,9 @@ export const MOYASAR_API_URL = 'https://api.moyasar.com/v1';
  * Build callback URL for payment completion
  */
 export function getCallbackUrl(): string {
-  return `${process.env.NEXT_PUBLIC_SITE_URL}/payment/callback`;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+  if (!siteUrl) throw new Error('NEXT_PUBLIC_SITE_URL is not configured');
+  return `${siteUrl}/payment/callback`;
 }
 
 /**

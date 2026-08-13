@@ -33,18 +33,24 @@ const QUICK_STATUS_TRANSITIONS: Record<string, string[]> = {
   auto_closed: ['pending'],
 }
 
-const quickStatusTransitionsFor = (status: string): string[] => {
-  const transitions = QUICK_STATUS_TRANSITIONS[status] ?? []
+const quickStatusTransitionsFor = (status: string, billingSource?: string): string[] => {
+  if (status === 'rejected' && billingSource === 'membership') return []
+  const baseTransitions = QUICK_STATUS_TRANSITIONS[status] ?? []
+  if (status === 'pending' && billingSource === 'membership') {
+    return ['in_progress', 'rejected', 'suspended']
+  }
+  const transitions = baseTransitions
   return status === 'scheduled' || transitions.includes('scheduled')
     ? transitions
     : [...transitions, 'scheduled']
 }
 
-export default function AdminRequestsPage() {
+export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'membership' }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
   const { showToast } = useToast()
+  const membershipOnly = scope === 'membership'
   const [loading, setLoading] = useState(true)
   const [pageLoading, setPageLoading] = useState(false)
   const [requests, setRequests] = useState<any[]>([])
@@ -115,12 +121,16 @@ export default function AdminRequestsPage() {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
     if (profile?.role !== 'admin') { router.push('/dashboard'); return }
 
-    const { data: summaries } = await supabase
+    let summariesQuery = supabase
       .from('publish_requests')
-      .select('id,user_id,client_name,client_email,client_phone,title,content,admin_notes,status,created_at,request_number')
+      .select('id,user_id,client_name,client_email,client_phone,title,content,admin_notes,status,created_at,request_number,billing_source,membership_id,membership_credits,membership_credit_status')
       // الطلب الذي ألغاه العميل لا يحتاج متابعة في لوحة الإدارة.
       .neq('status', 'cancelled')
       .order('created_at', { ascending: false })
+    summariesQuery = membershipOnly
+      ? summariesQuery.eq('billing_source', 'membership')
+      : summariesQuery.neq('billing_source', 'membership')
+    const { data: summaries } = await summariesQuery
 
     setRequestSummaries(summaries ?? [])
 
@@ -144,7 +154,7 @@ export default function AdminRequestsPage() {
       setRefundsByRequest(mapped)
     }
     setLoading(false)
-  }, [supabase, router])
+  }, [supabase, router, membershipOnly])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -441,6 +451,7 @@ export default function AdminRequestsPage() {
   const handleExport = () => {
     const params = new URLSearchParams()
     if (statusFilter) params.set('status', statusFilter)
+    params.set('scope', membershipOnly ? 'membership' : 'direct')
     window.open(`/api/export-csv?${params.toString()}`)
   }
 
@@ -493,7 +504,9 @@ export default function AdminRequestsPage() {
     setQuickNote(request.admin_notes ?? '')
   }
 
-  const quickActionLabel = (currentStatus: string, nextStatus: string) => {
+  const quickActionLabel = (currentStatus: string, nextStatus: string, billingSource?: string) => {
+    if (billingSource === 'membership' && currentStatus === 'pending' && nextStatus === 'in_progress') return 'قبول الطلب وبدء التنفيذ'
+    if (billingSource === 'membership' && currentStatus === 'pending' && nextStatus === 'rejected') return 'رفض الطلب وإعادة الرصيد'
     if (nextStatus === 'suspended') return 'تعليق الطلب'
     if (nextStatus === 'resume') return 'استئناف الطلب'
     if (currentStatus === 'approved' && nextStatus === 'paid') return 'تأكيد الدفع'
@@ -504,7 +517,7 @@ export default function AdminRequestsPage() {
 
   const openQuickAction = (request: any, event: React.MouseEvent) => {
     event.stopPropagation()
-    const options = quickStatusTransitionsFor(request.status)
+    const options = quickStatusTransitionsFor(request.status, request.billing_source)
     setQuickActionTarget(request)
     setQuickActionStatus(options[0] ?? '')
     setQuickActionNotes(request.admin_notes ?? '')
@@ -529,7 +542,7 @@ export default function AdminRequestsPage() {
         return
       }
 
-      showToast(`تم ${quickActionLabel(quickActionTarget.status, quickActionStatus)} بنجاح`)
+      showToast(`تم ${quickActionLabel(quickActionTarget.status, quickActionStatus, quickActionTarget.billing_source)} بنجاح`)
       setQuickActionTarget(null)
       setQuickActionStatus('')
       setQuickActionNotes('')
@@ -879,8 +892,8 @@ export default function AdminRequestsPage() {
   return (
     <div className="mx-auto max-w-7xl p-4 md:p-6">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div><h1 className="text-2xl font-black text-dark">إدارة الطلبات</h1><p className="mt-1 text-sm text-muted">تابع الطلبات، تواصل مع العملاء، وراجع تفاصيل التنفيذ.</p></div>
-        <span className="rounded-full bg-cream px-3 py-1.5 text-xs font-bold text-muted">{requestSummaries.length} طلب نشط</span>
+        <div><h1 className="text-2xl font-black text-dark">{membershipOnly ? 'طلبات الأعضاء' : 'إدارة الطلبات'}</h1><p className="mt-1 text-sm text-muted">{membershipOnly ? 'راجع طلبات النشر المقدمة من أرصدة العضويات واتخذ إجراء التنفيذ.' : 'تابع الطلبات المباشرة، تواصل مع العملاء، وراجع تفاصيل التنفيذ.'}</p></div>
+        <span className="rounded-full bg-cream px-3 py-1.5 text-xs font-bold text-muted">{requestSummaries.length} {membershipOnly ? 'طلب عضوية' : 'طلب نشط'}</span>
       </div>
 
       <div className="mb-4 rounded-lg border border-border bg-card p-3 sm:p-4">
@@ -909,9 +922,9 @@ export default function AdminRequestsPage() {
             ⚙️ فلاتر إضافية
             {(userFilter || duplicatesOnly) && <span className="mr-2 rounded-full bg-green px-1.5 py-0.5 text-[10px] text-white">مفعلة</span>}
           </button>
-          <Button onClick={() => setShowExternalForm(true)} className="bg-green-600 hover:bg-green-700">
+          {!membershipOnly && <Button onClick={() => setShowExternalForm(true)} className="bg-green-600 hover:bg-green-700">
             ➕ تسجيل طلب خارجي
-          </Button>
+          </Button>}
           <button
             type="button"
             onClick={handleExport}
@@ -930,25 +943,27 @@ export default function AdminRequestsPage() {
           >
             🤖
           </button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowBulkConfirm(true)}
-            disabled={quotedCount === 0}
-            className="min-h-[34px] shrink-0 whitespace-nowrap border-orange-300 px-2 py-1 text-xs text-orange-700 hover:bg-orange-50 disabled:opacity-50"
-            title={`تذكير العروض (${quotedCount})`}
-          >
-            🔔 تذكير ({quotedCount})
-          </Button>
-          <button
-            type="button"
-            onClick={() => setShowBulkReviewConfirm(true)}
-            title="إرسال طلب تقييم للطلبات المكتملة"
-            aria-label="إرسال طلب تقييم للطلبات المكتملة"
-            className="inline-flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center rounded-lg border border-gold/50 bg-gold/10 px-2 text-base text-gold transition hover:bg-gold/20"
-          >
-            ★
-          </button>
+          {!membershipOnly && <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowBulkConfirm(true)}
+              disabled={quotedCount === 0}
+              className="min-h-[34px] shrink-0 whitespace-nowrap border-orange-300 px-2 py-1 text-xs text-orange-700 hover:bg-orange-50 disabled:opacity-50"
+              title={`تذكير العروض (${quotedCount})`}
+            >
+              🔔 تذكير ({quotedCount})
+            </Button>
+            <button
+              type="button"
+              onClick={() => setShowBulkReviewConfirm(true)}
+              title="إرسال طلب تقييم للطلبات المكتملة"
+              aria-label="إرسال طلب تقييم للطلبات المكتملة"
+              className="inline-flex min-h-[34px] min-w-[34px] shrink-0 items-center justify-center rounded-lg border border-gold/50 bg-gold/10 px-2 text-base text-gold transition hover:bg-gold/20"
+            >
+              ★
+            </button>
+          </>}
         </div>
 
         <div className="mt-3 flex gap-2 overflow-x-auto border-t border-border pt-3" aria-label="فلاتر الإجراءات السريعة">
@@ -1097,6 +1112,7 @@ export default function AdminRequestsPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs font-bold text-muted">{generateRequestNumber(r.request_number)}</span>
                       <StatusBadge status={r.status} userRole="admin" emphasizeCompleted />
+                      {membershipOnly && <span className="rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-[10px] font-bold text-dark">طلب من رصيد العضوية</span>}
                       {r.is_external && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">خارجي</span>}
                     </div>
                     <button type="button" onClick={() => openRequest(r)} className="mt-2 block text-right text-sm font-black leading-6 text-dark hover:text-green sm:text-base">{r.title || 'طلب بدون عنوان'}</button>
@@ -1110,6 +1126,7 @@ export default function AdminRequestsPage() {
                       {r.status === 'completed' && !review?.rating && !review?.invitation_sent_at && <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-slate-500">التقييم: لم يُرسل</span>}
                       {hasRefund && <span className={`rounded-full px-2.5 py-1 ${pendingRefund ? 'bg-orange-50 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>{pendingRefund ? 'استرجاع قيد المعالجة' : `مسترجع ${formatNumber(completedRefundAmount)} ر.س`}</span>}
                       {r.refund_timing && <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">مدة الاسترجاع: {r.refund_timing}</span>}
+                      {membershipOnly && <span className="rounded-full bg-cyan-50 px-2.5 py-1 text-cyan-800">الرصيد: {r.membership_credit_status === 'reserved' ? 'محجوز' : r.membership_credit_status === 'consumed' ? 'مستخدم' : r.membership_credit_status === 'released' ? 'مُعاد' : 'غير مخصوم'}</span>}
                     </div>
                     {r.status === 'completed' && review?.comment && <div className="mt-3 rounded-lg border border-gold/20 bg-gold/5 px-3 py-2 text-xs leading-5 text-dark"><span className="font-black text-gold">رأي العميل: </span>{review.comment}</div>}
                     {r.admin_notes?.trim() && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700"><span className="font-black">ملاحظة الإدارة: </span>{r.admin_notes.trim()}</div>}
@@ -1169,9 +1186,9 @@ export default function AdminRequestsPage() {
                   <button onClick={() => setExpandedRequests(current => ({ ...current, [r.id]: !expanded }))} className="rounded-lg border border-border bg-white px-3 py-1.5 text-xs font-bold text-dark hover:bg-cream">{expanded ? 'إخفاء التفاصيل ▲' : 'مزيد من التفاصيل ▼'}</button>
                   <button
                     onClick={(e) => openQuickAction(r, e)}
-                    disabled={quickStatusTransitionsFor(r.status).length === 0}
+                    disabled={quickStatusTransitionsFor(r.status, r.billing_source).length === 0}
                     className="rounded-lg bg-green px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-green/90 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-                    title={quickStatusTransitionsFor(r.status).length ? 'تنفيذ إجراء سريع' : 'لا يوجد إجراء سريع متاح لهذه الحالة'}
+                    title={quickStatusTransitionsFor(r.status, r.billing_source).length ? 'تنفيذ إجراء سريع' : 'لا يوجد إجراء سريع متاح لهذه الحالة'}
                   >
                     إجراءات
                   </button>
@@ -1500,13 +1517,13 @@ export default function AdminRequestsPage() {
               <button type="button" onClick={() => setQuickActionTarget(null)} disabled={savingQuickAction} className="grid h-8 w-8 place-items-center rounded-lg text-lg text-muted hover:bg-slate-100" aria-label="إغلاق">×</button>
             </div>
 
-            {quickStatusTransitionsFor(quickActionTarget.status).length > 0 ? (
+            {quickStatusTransitionsFor(quickActionTarget.status, quickActionTarget.billing_source).length > 0 ? (
               <>
                 <label className="mt-5 block text-sm font-bold text-dark">
                   الإجراء
                   <select value={quickActionStatus} onChange={event => setQuickActionStatus(event.target.value)} className="mt-2 min-h-[46px] w-full rounded-lg border border-border bg-white px-3 text-sm text-dark outline-none focus:border-green">
-                    {quickStatusTransitionsFor(quickActionTarget.status).map(status => (
-                      <option key={status} value={status}>{quickActionLabel(quickActionTarget.status, status)}</option>
+                    {quickStatusTransitionsFor(quickActionTarget.status, quickActionTarget.billing_source).map(status => (
+                      <option key={status} value={status}>{quickActionLabel(quickActionTarget.status, status, quickActionTarget.billing_source)}</option>
                     ))}
                   </select>
                 </label>
@@ -1514,7 +1531,15 @@ export default function AdminRequestsPage() {
                   ملاحظة للإدارة (اختيارية)
                   <textarea value={quickActionNotes} onChange={event => setQuickActionNotes(event.target.value)} rows={3} className="mt-2 w-full resize-y rounded-lg border border-border bg-white px-3 py-2 text-sm font-normal text-dark outline-none focus:border-green" placeholder="تظهر في بطاقة الطلب ويمكن تضمينها في إشعار الحالة." />
                 </label>
-                <p className="mt-3 text-xs leading-5 text-muted">{quickActionStatus === 'suspended' || quickActionStatus === 'resume' ? 'إجراء داخلي فقط: لن يصل إلى العميل أي إشعار.' : 'سيُطبّق الإجراء وفق مسار الحالة المعتمد، ويصل إشعار للعميل عند الحاجة.'}</p>
+                <p className="mt-3 text-xs leading-5 text-muted">
+                  {quickActionStatus === 'suspended' || quickActionStatus === 'resume'
+                    ? 'إجراء داخلي فقط: لن يصل إلى العميل أي إشعار.'
+                    : quickActionTarget.billing_source === 'membership' && quickActionTarget.status === 'pending'
+                      ? quickActionStatus === 'in_progress'
+                        ? 'سيُستهلك الرصيد والمزايا المحجوزة ويبدأ تنفيذ الطلب.'
+                        : 'سيُرفض الطلب ويُعاد الرصيد والمزايا المحجوزة تلقائياً.'
+                      : 'سيُطبّق الإجراء وفق مسار الحالة المعتمد، ويصل إشعار للعميل عند الحاجة.'}
+                </p>
                 <div className="mt-5 flex gap-3">
                   <button type="button" onClick={() => setQuickActionTarget(null)} disabled={savingQuickAction} className="flex-1 rounded-lg border border-border bg-white px-4 py-2.5 text-sm font-bold text-dark hover:bg-cream disabled:opacity-50">إلغاء</button>
                   <button type="button" onClick={handleQuickAction} disabled={!quickActionStatus || savingQuickAction} className="flex-1 rounded-lg bg-green px-4 py-2.5 text-sm font-black text-white hover:bg-green/90 disabled:opacity-50">{savingQuickAction ? 'جارٍ التنفيذ...' : 'تأكيد الإجراء'}</button>
@@ -1956,4 +1981,8 @@ export default function AdminRequestsPage() {
 
     </div>
   )
+}
+
+export default function AdminDirectRequestsPage() {
+  return <AdminRequestsPage scope="direct" />
 }

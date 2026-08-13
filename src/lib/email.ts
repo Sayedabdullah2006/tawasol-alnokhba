@@ -10,7 +10,9 @@ import { sendEnhancedEmail, htmlToText } from './email-deliverability'
 const ADMIN_EMAIL = 'first1saudi@gmail.com'
 const ADMIN_CC_EMAIL = 'first1saudi@gmail.com' // نسخة لجميع إيميلات العملاء
 
-export async function sendEmail(to: string | string[], subject: string, html: string): Promise<boolean> {
+export type EmailAttachment = { filename: string; content: string; contentType?: string }
+
+export async function sendEmail(to: string | string[], subject: string, html: string, attachments?: EmailAttachment[]): Promise<boolean> {
   if (!to || (Array.isArray(to) && to.length === 0)) return false
 
   try {
@@ -23,7 +25,8 @@ export async function sendEmail(to: string | string[], subject: string, html: st
         to,
         subject,
         html,
-        cc: ADMIN_CC_EMAIL // نسخة للإدارة
+        cc: ADMIN_CC_EMAIL, // نسخة للإدارة
+        attachments,
       },
     })
 

@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
 import ContentImagesUploader from '@/components/request/ContentImagesUploader'
+import SupportingDocumentsUploader from '@/components/request/SupportingDocumentsUploader'
+import type { SupportingDocument } from '@/lib/request-attachments'
 
 interface Props {
   request: any
@@ -13,6 +15,7 @@ interface PostEdit {
   title: string
   content: string
   images: string[]
+  supportingDocuments: SupportingDocument[]
 }
 
 /**
@@ -30,6 +33,7 @@ export default function RequestInfoEditor({ request }: Props) {
   const [title, setTitle] = useState<string>(request.title ?? '')
   const [content, setContent] = useState<string>(request.content ?? '')
   const [images, setImages] = useState<string[]>(Array.isArray(request.content_images) ? request.content_images : [])
+  const [supportingDocuments, setSupportingDocuments] = useState<SupportingDocument[]>(Array.isArray(request.supporting_documents) ? request.supporting_documents : [])
 
   // حملة
   const [posts, setPosts] = useState<PostEdit[]>(
@@ -38,6 +42,7 @@ export default function RequestInfoEditor({ request }: Props) {
           title: p.title ?? '',
           content: p.content ?? '',
           images: Array.isArray(p.images) ? p.images : [],
+          supportingDocuments: Array.isArray(p.supporting_documents) ? p.supporting_documents : [],
         }))
       : []
   )
@@ -61,7 +66,7 @@ export default function RequestInfoEditor({ request }: Props) {
     try {
       const payload: any = { requestId: request.id }
       if (isCampaign) payload.campaignPosts = posts
-      else { payload.title = title; payload.content = content; payload.contentImages = images }
+      else { payload.title = title; payload.content = content; payload.contentImages = images; payload.supportingDocuments = supportingDocuments }
 
       const res = await fetch('/api/resubmit-request-info', {
         method: 'POST',
@@ -122,8 +127,12 @@ export default function RequestInfoEditor({ request }: Props) {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-dark mb-1">الصور</label>
+                <label className="block text-xs font-medium text-dark mb-1">الصور الشخصية للتصميم</label>
                 <ContentImagesUploader images={p.images} onChange={imgs => updatePost(i, { images: imgs })} maxImages={8} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-dark mb-1">الوثائق الداعمة إن وجدت</label>
+                <SupportingDocumentsUploader documents={p.supportingDocuments} onChange={documents => updatePost(i, { supportingDocuments: documents })} />
               </div>
             </div>
           ))}
@@ -147,8 +156,12 @@ export default function RequestInfoEditor({ request }: Props) {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-dark mb-1">الصور المرفقة</label>
+            <label className="block text-xs font-medium text-dark mb-1">الصور الشخصية للتصميم</label>
             <ContentImagesUploader images={images} onChange={setImages} maxImages={8} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-dark mb-1">الوثائق الداعمة إن وجدت</label>
+            <SupportingDocumentsUploader documents={supportingDocuments} onChange={setSupportingDocuments} />
           </div>
         </div>
       )}

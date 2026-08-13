@@ -19,6 +19,24 @@ export function getTamaraCallbackUrls(requestId: string) {
   }
 }
 
+export function getTamaraMembershipCallbackUrls(membershipId: string) {
+  const base = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://nukhba.media'
+  return {
+    success: `${base}/memberships/payment/tamara/callback?status=approved&membershipId=${membershipId}`,
+    failure: `${base}/memberships/payment/tamara/callback?status=failed&membershipId=${membershipId}`,
+    cancel: `${base}/memberships/payment/tamara/callback?status=cancelled&membershipId=${membershipId}`,
+  }
+}
+
+export function getTamaraMembershipTopupCallbackUrls(topupId: string) {
+  const base = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://nukhba.media'
+  return {
+    success: `${base}/memberships/topup/payment/tamara/callback?status=approved&topupId=${topupId}`,
+    failure: `${base}/memberships/topup/payment/tamara/callback?status=failed&topupId=${topupId}`,
+    cancel: `${base}/memberships/topup/payment/tamara/callback?status=cancelled&topupId=${topupId}`,
+  }
+}
+
 /**
  * Normalize a Saudi phone number to 9 digits (no country code).
  * Tamara expects: 501234567

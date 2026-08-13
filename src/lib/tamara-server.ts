@@ -8,10 +8,15 @@ import { createServiceRoleClient } from '@/lib/supabase-server'
 import {
   TAMARA_API_URL,
   getTamaraCallbackUrls,
+  getTamaraMembershipCallbackUrls,
+  getTamaraMembershipTopupCallbackUrls,
   normalizeSaudiPhone,
   splitName,
 } from '@/lib/tamara'
 import { notifyPaymentConfirmedToClient } from '@/lib/email'
+import { finishMembershipActivation } from '@/lib/membership-payment'
+import { applyPaidMembershipTopup } from '@/lib/membership-topup-payment'
+import { formatMembershipTopupNumber, getMembershipTopupItem } from '@/lib/membership-topups'
 
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
 
@@ -205,13 +210,119 @@ export async function createTamaraCheckoutSession(
   return { success: true, checkoutUrl: checkout_url, orderId: order_id, checkoutId: checkout_id }
 }
 
+export async function createTamaraMembershipCheckoutSession(
+  membershipId: string
+): Promise<TamaraCheckoutResult> {
+  const supabase = await createServiceRoleClient()
+  const { data: membership, error } = await supabase
+    .from('memberships')
+    .select('*, membership_plans(name_ar)')
+    .eq('id', membershipId)
+    .single()
+
+  if (error || !membership) return { success: false, error: 'العضوية غير موجودة' }
+  if (membership.status !== 'pending_payment') return { success: false, error: 'العضوية غير جاهزة للدفع' }
+  const total = Number(membership.total_amount)
+  if (!(total > 0)) return { success: false, error: 'مبلغ العضوية غير صحيح' }
+
+  const { first, last } = splitName(membership.client_name || 'عميل')
+  const body = {
+    order_reference_id: membership.id,
+    order_number: `MBR-${String(membership.membership_number).padStart(5, '0')}`,
+    total_amount: { amount: total, currency: 'SAR' },
+    shipping_amount: { amount: 0, currency: 'SAR' },
+    tax_amount: { amount: Number(membership.vat_amount), currency: 'SAR' },
+    description: `اشتراك ${membership.membership_plans?.name_ar ?? 'عضوية تواصل النخبة'}`,
+    country_code: 'SA',
+    payment_type: 'PAY_BY_INSTALMENTS',
+    instalments: 3,
+    locale: 'ar_SA',
+    items: [{
+      reference_id: membership.id,
+      type: 'Digital',
+      name: membership.membership_plans?.name_ar ?? 'عضوية تواصل النخبة',
+      sku: `MEM-${membership.plan_id}-${membership.duration_months}`,
+      quantity: 1,
+      total_amount: { amount: total, currency: 'SAR' },
+    }],
+    consumer: {
+      first_name: first,
+      last_name: last,
+      phone_number: normalizeSaudiPhone(membership.client_phone ?? ''),
+      email: membership.client_email,
+    },
+    shipping_address: {
+      first_name: first,
+      last_name: last,
+      line1: 'خدمة عضوية رقمية',
+      city: 'الرياض',
+      country_code: 'SA',
+    },
+    merchant_url: getTamaraMembershipCallbackUrls(membership.id),
+  }
+
+  const response = await fetch(`${TAMARA_API_URL}/checkout`, {
+    method: 'POST',
+    headers: { Authorization: authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    console.error('[TAMARA_MEMBERSHIP] Checkout failed:', response.status, data)
+    return { success: false, error: (data as any)?.message ?? 'تعذر إنشاء جلسة تمارا للعضوية' }
+  }
+
+  await supabase.from('memberships').update({
+    tamara_order_id: data.order_id,
+    payment_provider: 'tamara',
+    updated_at: new Date().toISOString(),
+  }).eq('id', membership.id)
+  return { success: true, checkoutUrl: data.checkout_url, orderId: data.order_id, checkoutId: data.checkout_id }
+}
+
+export async function createTamaraMembershipTopupCheckoutSession(
+  topupId: string
+): Promise<TamaraCheckoutResult> {
+  const supabase = await createServiceRoleClient()
+  const { data: topup, error } = await supabase.from('membership_topups')
+    .select('*, memberships(client_name, client_email, client_phone, status, ends_at)')
+    .eq('id', topupId)
+    .single()
+  if (error || !topup) return { success: false, error: 'عملية تعزيز الرصيد غير موجودة' }
+  if (topup.status !== 'pending_payment') return { success: false, error: 'عملية تعزيز الرصيد غير جاهزة للدفع' }
+  if (topup.memberships?.status !== 'active' || new Date(topup.memberships.ends_at) <= new Date()) return { success: false, error: 'العضوية غير نشطة' }
+  const total = Number(topup.total_amount)
+  const item = getMembershipTopupItem(topup.item_type)
+  const { first, last } = splitName(topup.memberships.client_name || 'عميل')
+  const body = {
+    order_reference_id: topup.id,
+    order_number: formatMembershipTopupNumber(topup.topup_number),
+    total_amount: { amount: total, currency: 'SAR' },
+    shipping_amount: { amount: 0, currency: 'SAR' },
+    tax_amount: { amount: Number(topup.vat_amount), currency: 'SAR' },
+    description: `تعزيز رصيد العضوية - ${item?.label ?? 'رصيد إضافي'}`,
+    country_code: 'SA', payment_type: 'PAY_BY_INSTALMENTS', instalments: 3, locale: 'ar_SA',
+    items: [{ reference_id: topup.id, type: 'Digital', name: `${item?.label ?? 'تعزيز رصيد العضوية'} × ${topup.quantity}`, sku: `TOPUP-${topup.item_type}`, quantity: 1, total_amount: { amount: total, currency: 'SAR' } }],
+    consumer: { first_name: first, last_name: last, phone_number: normalizeSaudiPhone(topup.memberships.client_phone ?? ''), email: topup.memberships.client_email },
+    shipping_address: { first_name: first, last_name: last, line1: 'خدمة عضوية رقمية', city: 'الرياض', country_code: 'SA' },
+    merchant_url: getTamaraMembershipTopupCallbackUrls(topup.id),
+  }
+  const response = await fetch(`${TAMARA_API_URL}/checkout`, { method: 'POST', headers: { Authorization: authHeader(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) return { success: false, error: (data as any)?.message ?? 'تعذر إنشاء جلسة تمارا لتعزيز الرصيد' }
+  await supabase.from('membership_topups').update({ payment_provider: 'tamara', provider_payment_id: data.order_id, updated_at: new Date().toISOString() }).eq('id', topup.id)
+  return { success: true, checkoutUrl: data.checkout_url, orderId: data.order_id, checkoutId: data.checkout_id }
+}
+
 // ─── Fetch Order Details ──────────────────────────────────────────────────────
 
-/**
- * Fetch order details from Tamara API to verify amount before processing.
- * Returns the total amount in SAR, or null if the request fails.
- */
-async function fetchTamaraOrderAmount(tamaraOrderId: string): Promise<number | null> {
+interface TamaraOrderPaymentDetails {
+  amount: number
+  currency: string
+  referenceId: string
+}
+
+async function fetchTamaraOrderPaymentDetails(tamaraOrderId: string): Promise<TamaraOrderPaymentDetails | null> {
   try {
     const res = await fetch(`${TAMARA_API_URL}/orders/${tamaraOrderId}`, {
       headers: { 'Authorization': authHeader() },
@@ -220,12 +331,78 @@ async function fetchTamaraOrderAmount(tamaraOrderId: string): Promise<number | n
       console.error('[TAMARA] Failed to fetch order details:', res.status)
       return null
     }
-    const data = await res.json() as { total_amount?: { amount?: number } }
-    return Number(data.total_amount?.amount ?? 0) || null
+    const data = await res.json() as { order_reference_id?: string; total_amount?: { amount?: number; currency?: string } }
+    const amount = Number(data.total_amount?.amount ?? 0)
+    const currency = String(data.total_amount?.currency ?? '').toUpperCase()
+    const referenceId = String(data.order_reference_id ?? '')
+    if (!(amount > 0) || !currency || !referenceId) return null
+    return { amount, currency, referenceId }
   } catch (err) {
     console.error('[TAMARA] Error fetching order:', err)
     return null
   }
+}
+
+async function fetchTamaraOrderAmount(tamaraOrderId: string): Promise<number | null> {
+  const payment = await fetchTamaraOrderPaymentDetails(tamaraOrderId)
+  return payment?.amount ?? null
+}
+
+export async function handleTamaraMembershipApproved(
+  tamaraOrderId: string,
+  membershipReferenceId: string
+): Promise<{ success: boolean; reason: string }> {
+  const supabase = await createServiceRoleClient()
+  const { data: byOrder } = await supabase.from('memberships').select('*').eq('tamara_order_id', tamaraOrderId).limit(1).maybeSingle()
+  const { data: byReference } = !byOrder && membershipReferenceId
+    ? await supabase.from('memberships').select('*').eq('id', membershipReferenceId).limit(1).maybeSingle()
+    : { data: null }
+  const membership = byOrder ?? byReference
+  if (!membership) return { success: false, reason: 'membership_not_found' }
+  if (membership.status === 'active' && membership.payment_status === 'paid') {
+    return { success: true, reason: 'already_processed' }
+  }
+
+  const paymentDetails = await fetchTamaraOrderPaymentDetails(tamaraOrderId)
+  if (!paymentDetails) return { success: false, reason: 'amount_verification_failed' }
+  if (paymentDetails.referenceId !== membership.id) return { success: false, reason: 'reference_mismatch' }
+  if (paymentDetails.currency !== 'SAR') return { success: false, reason: 'currency_mismatch' }
+  const paidAmount = paymentDetails.amount
+  if (paidAmount !== Number(membership.total_amount)) return { success: false, reason: 'amount_mismatch' }
+  if (!(await authorizeTamaraOrder(tamaraOrderId))) return { success: false, reason: 'authorization_failed' }
+
+  const { data: activated, error } = await supabase.rpc('activate_membership', {
+    p_membership_id: membership.id,
+    p_provider: 'tamara',
+    p_provider_payment_id: tamaraOrderId,
+    p_provider_response: { order_id: tamaraOrderId, order_reference_id: paymentDetails.referenceId, amount: paidAmount, currency: paymentDetails.currency },
+  })
+  if (error) return { success: false, reason: error.message }
+  const activeMembership = Array.isArray(activated) ? activated[0] : activated
+  if (activeMembership) void finishMembershipActivation(activeMembership)
+  return { success: true, reason: 'verified_and_activated' }
+}
+
+export async function handleTamaraMembershipTopupApproved(
+  tamaraOrderId: string,
+  topupReferenceId: string
+): Promise<{ success: boolean; reason: string }> {
+  const supabase = await createServiceRoleClient()
+  const { data: byOrder } = await supabase.from('membership_topups').select('*').eq('provider_payment_id', tamaraOrderId).limit(1).maybeSingle()
+  const { data: byReference } = !byOrder && topupReferenceId
+    ? await supabase.from('membership_topups').select('*').eq('id', topupReferenceId).limit(1).maybeSingle()
+    : { data: null }
+  const topup = byOrder ?? byReference
+  if (!topup) return { success: false, reason: 'membership_topup_not_found' }
+  if (topup.status === 'paid') return { success: true, reason: 'already_processed' }
+  const paymentDetails = await fetchTamaraOrderPaymentDetails(tamaraOrderId)
+  if (!paymentDetails) return { success: false, reason: 'amount_verification_failed' }
+  if (paymentDetails.referenceId !== topup.id) return { success: false, reason: 'reference_mismatch' }
+  if (paymentDetails.currency !== 'SAR') return { success: false, reason: 'currency_mismatch' }
+  const paidAmount = paymentDetails.amount
+  if (paidAmount !== Number(topup.total_amount)) return { success: false, reason: 'amount_mismatch' }
+  if (!(await authorizeTamaraOrder(tamaraOrderId))) return { success: false, reason: 'authorization_failed' }
+  return applyPaidMembershipTopup({ topupId: topup.id, provider: 'tamara', providerPaymentId: tamaraOrderId, providerResponse: { order_id: tamaraOrderId, order_reference_id: paymentDetails.referenceId, amount: paidAmount, currency: paymentDetails.currency } })
 }
 
 // ─── Authorize Order ──────────────────────────────────────────────────────────

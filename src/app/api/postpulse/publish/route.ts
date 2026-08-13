@@ -26,6 +26,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'النص أو التصميم مطلوب' }, { status: 400 })
   }
 
+  if (body.requestId) {
+    const service = await createServiceRoleClient()
+    const { data: requestRow } = await service
+      .from('publish_requests')
+      .select('billing_source, membership_credit_status')
+      .eq('id', body.requestId)
+      .maybeSingle()
+    if (requestRow?.billing_source === 'membership' && requestRow.membership_credit_status === 'reserved') {
+      return NextResponse.json({ error: 'طلب العضوية ما زال تحت المراجعة؛ يجب قبوله قبل النشر' }, { status: 409 })
+    }
+  }
+
   try {
     // 1) رفع التصميم (إن وُجد) للحصول على مسار الوسائط
     const attachmentPaths: string[] = []

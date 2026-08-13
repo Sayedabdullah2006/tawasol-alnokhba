@@ -52,6 +52,26 @@ export async function POST(request: NextRequest) {
     // يدعم الصيغة القديمة والجديدة لأسماء أحداث ميسر.
     if ((payload.type === 'payment.paid' || payload.type === 'payment_paid') && payload.data) {
       const { id: paymentId, metadata } = payload.data;
+      if (metadata?.resource_type === 'membership_topup' && metadata?.topup_id) {
+        try {
+          const { verifyAndApplyMembershipTopup } = await import('@/lib/membership-topup-payment');
+          const result = await verifyAndApplyMembershipTopup(paymentId, metadata.topup_id);
+          console.log('[WEBHOOK] Membership topup result:', result.reason);
+        } catch (processError) {
+          console.error('[WEBHOOK] Error processing membership topup:', processError);
+        }
+        return NextResponse.json({ received: true });
+      }
+      if (metadata?.resource_type === 'membership' && metadata?.membership_id) {
+        try {
+          const { verifyAndActivateMembership } = await import('@/lib/membership-payment');
+          const result = await verifyAndActivateMembership(paymentId, metadata.membership_id);
+          console.log('[WEBHOOK] Membership result:', result.reason);
+        } catch (processError) {
+          console.error('[WEBHOOK] Error processing membership payment:', processError);
+        }
+        return NextResponse.json({ received: true });
+      }
       const requestId = metadata?.request_id;
 
       if (!requestId) {

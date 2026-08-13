@@ -25,7 +25,7 @@ export async function DELETE(request: NextRequest) {
     // Verify the request exists first
     const { data: existingRequest, error: fetchError } = await supabase
       .from('publish_requests')
-      .select('id, client_name, title, request_number')
+      .select('id, client_name, title, request_number, billing_source, membership_credit_status')
       .eq('id', requestId)
       .single();
 
@@ -34,6 +34,13 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json(
         { error: 'الطلب غير موجود' },
         { status: 404 }
+      );
+    }
+
+    if (existingRequest.billing_source === 'membership' && existingRequest.membership_credit_status === 'reserved') {
+      return NextResponse.json(
+        { error: 'ارفض طلب العضوية أولاً لإعادة الرصيد المحجوز قبل الحذف' },
+        { status: 409 }
       );
     }
 
@@ -101,7 +108,7 @@ export async function POST(request: NextRequest) {
     // Verify the request exists first
     const { data: existingRequest, error: fetchError } = await supabase
       .from('publish_requests')
-      .select('id, client_name, title, request_number, status')
+      .select('id, client_name, title, request_number, status, billing_source, membership_credit_status')
       .eq('id', requestId)
       .single();
 
@@ -110,6 +117,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'الطلب غير موجود' },
         { status: 404 }
+      );
+    }
+
+    if (existingRequest.billing_source === 'membership' && existingRequest.membership_credit_status === 'reserved') {
+      return NextResponse.json(
+        { error: 'ارفض طلب العضوية أولاً لإعادة الرصيد المحجوز قبل الحذف' },
+        { status: 409 }
       );
     }
 

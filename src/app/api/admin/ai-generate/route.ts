@@ -8,6 +8,7 @@ import { buildCompactImagePrompt, buildStudioSafetyFallbackPrompt, prepareConcep
 import { compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
 import { completeGenerationJob, failGenerationJob, startGenerationJob, throwIfGenerationCancelled } from '@/lib/generation-jobs'
 import { selectEditorialTemplate } from '@/lib/editorial-template-selector'
+import { normalizeImageUrls, normalizeSupportingDocuments } from '@/lib/request-attachments'
 
 export const dynamic = 'force-dynamic'
 // Image generation can be slow — give it room.
@@ -50,13 +51,13 @@ export async function POST(req: Request) {
 
   // ── دعم اختيار أكثر من صورة مصدر تُضمَّن جميعها في التحليل والاتجاهات والتصميم ──
   // التوافق الخلفي: إن لم تُرسل sourceImages نستخدم sourceImage المفردة.
-  const sourceImages: string[] =
+  const requestedSourceImages: string[] = normalizeImageUrls(
     Array.isArray(body.sourceImages) && body.sourceImages.length
-      ? body.sourceImages.filter((u): u is string => typeof u === 'string' && !!u)
+      ? body.sourceImages
       : sourceImage
         ? [sourceImage]
-        : []
-  const primarySource: string | null = sourceImages[0] ?? null
+        : [],
+  )
   // معلومات إضافية يدخلها الأدمن قبل التحليل (تُدمج مع نص الخبر).
   const extraInfoText =
     typeof extraInfo === 'string' && extraInfo.trim()
@@ -76,20 +77,43 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 })
   }
 
+  if (reqRow.billing_source === 'membership' && reqRow.membership_credit_status === 'reserved') {
+    return NextResponse.json({
+      error: 'طلب العضوية ما زال تحت مراجعة الإدارة. اقبل الطلب وابدأ التنفيذ قبل التوليد.',
+    }, { status: 409 })
+  }
+
   // ── تحديد المصدر: منشور حملة محدّد أم الطلب المفرد ─────────────
   // عند تمرير postIndex نتعامل مع منشور بعينه من campaign_posts،
   // ونخزّن مخرجات الذكاء الاصطناعي داخل ai_posts[postIndex] بدل أعمدة الطلب.
   const isCampaignPost =
     typeof postIndex === 'number' && Number.isInteger(postIndex) && postIndex >= 0
 
+  const campaignPost = isCampaignPost && Array.isArray(reqRow.campaign_posts)
+    ? reqRow.campaign_posts[postIndex as number]
+    : null
+  if (isCampaignPost && !campaignPost) {
+    return NextResponse.json({ error: 'منشور الحملة غير موجود' }, { status: 404 })
+  }
+
+  const studioState = isCampaignPost ? (reqRow.ai_posts?.[postIndex as number] ?? {}) : reqRow
+  const baseImages = normalizeImageUrls(isCampaignPost ? campaignPost?.images : reqRow.content_images)
+  const adminUploads = normalizeImageUrls(isCampaignPost ? studioState?.uploaded_images : reqRow.ai_uploaded_images)
+  const supportingDocuments = normalizeSupportingDocuments(
+    isCampaignPost ? campaignPost?.supporting_documents : reqRow.supporting_documents,
+  )
+  const supportingUrls = new Set(supportingDocuments.map(document => document.url))
+  const allowedImages = new Set([...baseImages, ...adminUploads].filter(url => !supportingUrls.has(url)))
+  const sourceImages = requestedSourceImages.filter(url => allowedImages.has(url))
+  if (requestedSourceImages.length !== sourceImages.length) {
+    return NextResponse.json({ error: 'يمكن استخدام الصور الشخصية أو صور الاستوديو فقط كمراجع للتصميم' }, { status: 400 })
+  }
+  const primarySource: string | null = sourceImages[0] ?? null
+
   let newsText: string
   let priorAnalysis: unknown
   if (isCampaignPost) {
-    const posts = Array.isArray(reqRow.campaign_posts) ? reqRow.campaign_posts : []
-    const post = posts[postIndex as number]
-    if (!post) {
-      return NextResponse.json({ error: 'منشور الحملة غير موجود' }, { status: 404 })
-    }
+    const post = campaignPost
     newsText = `العنوان: ${post.title ?? ''}\nالمحتوى: ${post.content ?? ''}`
     if (typeof reqRow.client_name === 'string' && reqRow.client_name.trim()) {
       newsText += `\n\nاسم صاحب الإنجاز (معلومة موثقة من الطلب، استخدمه حرفياً في حقل name ولا تُسقطه): ${reqRow.client_name.trim()}`

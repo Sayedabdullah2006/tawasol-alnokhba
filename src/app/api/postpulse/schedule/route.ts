@@ -29,6 +29,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'حدّد تاريخ ووقت الجدولة' }, { status: 400 })
   }
 
+  if (body.requestId) {
+    const service = await createServiceRoleClient()
+    const { data: requestRow } = await service
+      .from('publish_requests')
+      .select('billing_source, membership_credit_status')
+      .eq('id', body.requestId)
+      .maybeSingle()
+    if (requestRow?.billing_source === 'membership' && requestRow.membership_credit_status === 'reserved') {
+      return NextResponse.json({ error: 'طلب العضوية ما زال تحت المراجعة؛ يجب قبوله قبل الجدولة' }, { status: 409 })
+    }
+  }
+
   // تفسير الوقت كتوقيت السعودية (UTC+3) → ISO بتوقيت UTC
   const scheduledTime = new Date(`${local}:00+03:00`)
   if (isNaN(scheduledTime.getTime())) return NextResponse.json({ error: 'تاريخ غير صالح' }, { status: 400 })

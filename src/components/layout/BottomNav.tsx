@@ -17,12 +17,14 @@ interface BottomNavProps {
 export default function BottomNav({ items }: BottomNavProps) {
   const pathname = usePathname()
 
+  if (pathname.startsWith('/dashboard/membership/request')) return null
+
   return (
     <nav className="glass-panel fixed bottom-3 left-3 right-3 z-40 rounded-lg md:hidden">
       <div className="overflow-x-auto overscroll-x-contain touch-pan-x" dir="rtl" aria-label="التنقل الإداري">
         <div className="flex w-max min-w-full gap-1 px-2 py-2 snap-x snap-proximity">
           {items.map(item => {
-            const isActive = pathname === item.href
+            const isActive = pathname === item.href.split(/[?#]/)[0]
             return (
               <Link
                 key={item.href}

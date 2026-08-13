@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import MembershipPlanBadge from '@/components/memberships/MembershipPlanBadge'
 
 // ورقة (رابط مباشر) أو قسم رئيسي يحوي روابط فرعية → قائمة شجرية.
 export interface NavLeaf {
@@ -22,12 +23,17 @@ function isGroup(e: NavEntry): e is NavGroup {
   return (e as NavGroup).children !== undefined
 }
 
+function isActivePath(pathname: string, href: string) {
+  return pathname === href.split(/[?#]/)[0]
+}
+
 interface SidebarProps {
   items: NavEntry[]
   title: string
+  membershipPlanId?: string
 }
 
-export default function Sidebar({ items, title }: SidebarProps) {
+export default function Sidebar({ items, title, membershipPlanId }: SidebarProps) {
   const pathname = usePathname()
 
   // الأقسام مفتوحة افتراضياً (شجرة واضحة كاملة)، مع إمكانية الطيّ.
@@ -41,8 +47,9 @@ export default function Sidebar({ items, title }: SidebarProps) {
       'glass-panel hidden shrink-0 flex-col overflow-visible border-l-0 md:sticky md:top-[88px] md:mr-3 md:flex md:h-[calc(100vh-104px)] md:rounded-lg md:transition-[width] md:duration-200',
       sidebarCollapsed ? 'w-[72px]' : 'w-64'
     )}>
-      <div className={cn('flex items-center border-b border-white/60', sidebarCollapsed ? 'justify-center p-2' : 'justify-between p-4')}>
-        {!sidebarCollapsed && <h2 className="font-black text-dark text-sm">{title}</h2>}
+      <div className={cn('flex items-center border-b border-white/60', sidebarCollapsed ? 'flex-col justify-center gap-1 p-2' : 'justify-between p-4')}>
+        {sidebarCollapsed && membershipPlanId && <MembershipPlanBadge planId={membershipPlanId} size="sm" />}
+        {!sidebarCollapsed && <div className="flex min-w-0 items-center gap-2">{membershipPlanId && <MembershipPlanBadge planId={membershipPlanId} size="sm" />}<h2 className="truncate font-black text-dark text-sm">{title}</h2></div>}
         <button
           type="button"
           onClick={() => setSidebarCollapsed(current => !current)}
@@ -57,7 +64,7 @@ export default function Sidebar({ items, title }: SidebarProps) {
       {sidebarCollapsed ? (
         <nav className="flex-1 space-y-2 overflow-y-auto px-2 py-3" aria-label={title}>
           {items.flatMap(entry => isGroup(entry) ? entry.children : [entry]).map(item => (
-            <CollapsedLink key={item.href} item={item} active={pathname === item.href} />
+            <CollapsedLink key={item.href} item={item} active={isActivePath(pathname, item.href)} />
           ))}
         </nav>
       ) : (
@@ -72,7 +79,7 @@ export default function Sidebar({ items, title }: SidebarProps) {
                 onToggle={() => toggle(entry.label)}
               />
             ) : (
-              <LeafLink key={entry.href} item={entry} active={pathname === entry.href} />
+              <LeafLink key={entry.href} item={entry} active={isActivePath(pathname, entry.href)} />
             )
           )}
         </nav>
@@ -92,7 +99,7 @@ function Group({
   open: boolean
   onToggle: () => void
 }) {
-  const hasActiveChild = group.children.some(c => c.href === pathname)
+  const hasActiveChild = group.children.some(c => isActivePath(pathname, c.href))
   return (
     <div>
       <button
@@ -112,7 +119,7 @@ function Group({
       {open && (
         <div className="mt-1 mr-4 pr-3 border-r-2 border-border/60 space-y-1">
           {group.children.map(child => (
-            <LeafLink key={child.href} item={child} active={pathname === child.href} sub />
+            <LeafLink key={child.href} item={child} active={isActivePath(pathname, child.href)} sub />
           ))}
         </div>
       )}

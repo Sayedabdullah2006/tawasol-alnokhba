@@ -7,7 +7,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyTamaraWebhookToken, handleTamaraOrderApproved } from '@/lib/tamara-server'
+import { verifyTamaraWebhookToken, handleTamaraMembershipApproved, handleTamaraMembershipTopupApproved, handleTamaraOrderApproved } from '@/lib/tamara-server'
+import { createServiceRoleClient } from '@/lib/supabase-server'
 import { completeProviderRefund } from '@/lib/refund-webhooks'
 
 export async function POST(request: NextRequest) {
@@ -55,7 +56,25 @@ export async function POST(request: NextRequest) {
       return ok()
     }
 
-    const result = await handleTamaraOrderApproved(order_id, order_reference_id ?? '')
+    const service = await createServiceRoleClient()
+    const { data: topupByOrder } = await service.from('membership_topups').select('id').eq('provider_payment_id', order_id).limit(1).maybeSingle()
+    const { data: topupByReference } = !topupByOrder && order_reference_id
+      ? await service.from('membership_topups').select('id').eq('id', order_reference_id).limit(1).maybeSingle()
+      : { data: null }
+    const topup = topupByOrder ?? topupByReference
+    if (topup) {
+      const result = await handleTamaraMembershipTopupApproved(order_id, order_reference_id ?? '')
+      console.log('[TAMARA_WEBHOOK] Membership topup result:', result)
+      return ok()
+    }
+    const { data: membershipByOrder } = await service.from('memberships').select('id').eq('tamara_order_id', order_id).limit(1).maybeSingle()
+    const { data: membershipByReference } = !membershipByOrder && order_reference_id
+      ? await service.from('memberships').select('id').eq('id', order_reference_id).limit(1).maybeSingle()
+      : { data: null }
+    const membership = membershipByOrder ?? membershipByReference
+    const result = membership
+      ? await handleTamaraMembershipApproved(order_id, order_reference_id ?? '')
+      : await handleTamaraOrderApproved(order_id, order_reference_id ?? '')
     console.log('[TAMARA_WEBHOOK] Processing result:', result)
 
     return ok()

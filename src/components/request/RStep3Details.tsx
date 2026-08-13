@@ -3,14 +3,17 @@
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
 import ContentImagesUploader from './ContentImagesUploader'
+import SupportingDocumentsUploader from './SupportingDocumentsUploader'
+import type { SupportingDocument } from '@/lib/request-attachments'
 
-interface ContentDetails {
+export interface ContentDetails {
   title: string
   content: string
   link: string
   hashtags: string
   preferredDate: string
   images: string[]
+  supportingDocuments: SupportingDocument[]
 }
 
 interface Props {
@@ -50,12 +53,19 @@ export default function RStep3Details({ data, onChange }: Props) {
           required
         />
 
-        <div>
-          <label className="text-sm font-medium text-dark block mb-2">الصور المرفقة (اختياري)</label>
+        <div className="rounded-lg border border-green/25 bg-green/5 p-4">
+          <label className="mb-1 block text-sm font-black text-dark">ارفع هنا الصور الشخصية للتصميم</label>
+          <p className="mb-3 text-xs leading-5 text-muted">هذه الصور فقط ستُستخدم كصور مرجعية عند توليد التصاميم.</p>
           <ContentImagesUploader
             images={data.images}
             onChange={imgs => update('images', imgs)}
           />
+        </div>
+
+        <div className="rounded-lg border border-border bg-cream/40 p-4">
+          <label className="mb-1 block text-sm font-black text-dark">ارفع هنا الوثائق الداعمة إن وجدت</label>
+          <p className="mb-3 text-xs leading-5 text-muted">مثل الشهادات أو خطابات الإثبات أو ملفات الخبر. لن تُستخدم هذه الملفات داخل التصميم.</p>
+          <SupportingDocumentsUploader documents={data.supportingDocuments ?? []} onChange={documents => update('supportingDocuments', documents)} />
         </div>
 
       </div>

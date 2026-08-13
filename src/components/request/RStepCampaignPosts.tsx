@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils'
 import { CATEGORY_CONDITIONS } from '@/lib/constants'
 import type { DBCategory } from '@/lib/hooks'
 import ContentImagesUploader from './ContentImagesUploader'
+import SupportingDocumentsUploader from './SupportingDocumentsUploader'
+import type { SupportingDocument } from '@/lib/request-attachments'
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -15,6 +17,7 @@ export interface CampaignPostData {
   content: string
   preferredDate: string
   images: string[]
+  supportingDocuments: SupportingDocument[]
   link: string
   hashtags: string
 }
@@ -22,7 +25,7 @@ export interface CampaignPostData {
 export function makeEmptyPost(): CampaignPostData {
   return {
     category: '', subOption: null, title: '', content: '',
-    preferredDate: '', images: [], link: '', hashtags: '',
+    preferredDate: '', images: [], supportingDocuments: [], link: '', hashtags: '',
   }
 }
 
@@ -269,13 +272,22 @@ function PostCard({ index, post, onChange, clientType, categories, categoryCondi
             />
           </div>
 
-          {/* الصور */}
-          <div>
-            <label className={label}>صور المحتوى</label>
+          <div className="rounded-lg border border-green/25 bg-green/5 p-3">
+            <label className={label}>ارفع هنا الصور الشخصية للتصميم</label>
+            <p className="mb-2 text-[11px] leading-5 text-muted">هذه الصور فقط ستدخل ضمن مراجع توليد تصميم هذا المنشور.</p>
             <ContentImagesUploader
               images={post.images}
               onChange={imgs => onChange({ ...post, images: imgs })}
               maxImages={4}
+            />
+          </div>
+          <div className="rounded-lg border border-border bg-cream/40 p-3">
+            <label className={label}>ارفع هنا الوثائق الداعمة إن وجدت</label>
+            <p className="mb-2 text-[11px] leading-5 text-muted">للمراجعة والإثبات فقط، ولا تُستخدم في التصميم.</p>
+            <SupportingDocumentsUploader
+              documents={post.supportingDocuments ?? []}
+              onChange={supportingDocuments => onChange({ ...post, supportingDocuments })}
+              maxFiles={4}
             />
           </div>
         </div>

@@ -84,10 +84,13 @@ export async function autoRunRequestStudio(requestId: string): Promise<void> {
   const sc = await createServiceRoleClient()
   const { data: req } = await sc
     .from('publish_requests')
-    .select('id, request_number, title, content, content_images, campaign_posts, ai_auto_generated_at, client_name')
+    // content_images هي الصور الشخصية المسموح بها للتصميم؛ الوثائق الداعمة لا تُقرأ هنا.
+    .select('id, request_number, title, content, content_images, campaign_posts, ai_auto_generated_at, client_name, billing_source, membership_credit_status, status')
     .eq('id', requestId)
     .single()
   if (!req) return
+  // طلب العضوية لا يبدأ إنتاجه إلا بعد اعتماد الإدارة واستهلاك الرصيد المحجوز.
+  if (req.billing_source === 'membership' && (req.status !== 'in_progress' || req.membership_credit_status !== 'consumed')) return
   // للطلبات المفردة فقط في هذه المرحلة (الحملات لاحقاً)
   if (Array.isArray(req.campaign_posts) && req.campaign_posts.length) return
   if (req.ai_auto_generated_at) return // سبق التوليد التلقائي

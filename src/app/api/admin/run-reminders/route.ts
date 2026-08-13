@@ -83,6 +83,7 @@ async function getStaleRequests() {
     .from('publish_requests')
     .select('id, request_number, client_name, client_email, status, created_at, last_status_change')
     .eq('status', 'pending')
+    .or('billing_source.is.null,billing_source.neq.membership')
     .lt('created_at', sevenDaysAgo)
     .not('client_email', 'is', null)
 

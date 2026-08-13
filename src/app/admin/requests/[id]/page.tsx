@@ -20,6 +20,7 @@ import ImageEditSchedule from '@/components/admin/ImageEditSchedule'
 import PostReviewStatus from '@/components/admin/PostReviewStatus'
 import CampaignPostStatusManager from '@/components/admin/CampaignPostStatusManager'
 import EditableNewsContent from '@/components/admin/EditableNewsContent'
+import SupportingDocumentsList from '@/components/request/SupportingDocumentsList'
 import { getReviewItems, getPostReviews } from '@/lib/review-items'
 import { getAdminActions, waitingForClient, isFinalStatus, messageColors } from '@/lib/admin-actions'
 
@@ -382,6 +383,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
 
   const adminActions = getAdminActions(request.status as any)
   const isPendingPhase = request.status === 'pending' || request.status === 'client_rejected'
+  const isPendingMembership = request.status === 'pending' && request.billing_source === 'membership'
   const canConfirmPayment = ['approved', 'payment_review'].includes(request.status)
 
   const TABS: { key: TabKey; label: string }[] = [
@@ -697,15 +699,57 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
           <div className="bg-card rounded-2xl border border-border p-5">
             <h3 className="font-bold text-dark mb-4">إجراءات الطلب</h3>
 
-            <div className={`rounded-xl p-4 mb-4 border ${messageColors[adminActions.message.type]}`}>
+            <div className={`rounded-xl p-4 mb-4 border ${messageColors[isPendingMembership ? 'warning' : adminActions.message.type]}`}>
               <div className="flex items-center gap-2">
-                <span className="text-lg">{adminActions.message.icon}</span>
-                <p className="text-sm font-medium">{adminActions.message.text}</p>
+                <span className="text-lg">{isPendingMembership ? '◉' : adminActions.message.icon}</span>
+                <p className="text-sm font-medium">
+                  {isPendingMembership
+                    ? 'طلب من رصيد العضوية يحتاج مراجعة الإدارة قبل بدء التنفيذ. الرصيد والمزايا المختارة محجوزة مؤقتاً.'
+                    : adminActions.message.text}
+                </p>
               </div>
             </div>
 
             {isPendingPhase ? (
-              composingQuote ? (
+              isPendingMembership ? (
+                rejecting ? (
+                  <div className="space-y-3">
+                    <h4 className="font-bold text-dark">رفض طلب العضوية</h4>
+                    <p className="text-xs leading-5 text-muted">اشرح سبب الرفض للعميل. عند التأكيد سيُعاد رصيد المنشور وجميع المزايا المحجوزة تلقائياً.</p>
+                    <textarea
+                      value={rejectReason}
+                      onChange={e => setRejectReason(e.target.value)}
+                      autoFocus
+                      className="w-full px-4 py-3 rounded-xl border border-border bg-white text-sm min-h-[120px] resize-y"
+                      placeholder="اكتب سبب عدم مناسبة الطلب للتنفيذ..."
+                    />
+                    <div className="flex gap-2">
+                      <Button variant="ghost" onClick={() => { setRejecting(false); setRejectReason('') }} className="flex-1">إلغاء</Button>
+                      <Button onClick={handleReject} loading={saving} disabled={!rejectReason.trim()} className="flex-1">رفض وإعادة الرصيد</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="rounded-xl border border-gold/30 bg-gold/10 p-3 text-xs leading-5 text-dark">
+                      راجع ملاءمة الخبر وصحة البيانات والصور. عند القبول يبدأ التنفيذ ويُستهلك الرصيد المحجوز نهائياً.
+                    </div>
+                    <Button
+                      onClick={() => {
+                        if (confirm('هل راجعت الطلب وتريد قبوله وبدء التنفيذ؟ سيُستهلك الرصيد المحجوز.')) {
+                          handleUpdateStatus('in_progress', 'تمت مراجعة طلب العضوية وقبوله لبدء التنفيذ')
+                        }
+                      }}
+                      loading={saving}
+                      className="w-full"
+                    >
+                      قبول الطلب وبدء التنفيذ
+                    </Button>
+                    <Button variant="outline" onClick={() => setRejecting(true)} className="w-full border-red-200 text-red-700 hover:bg-red-50">
+                      رفض الطلب وإعادة الرصيد
+                    </Button>
+                  </div>
+                )
+              ) : composingQuote ? (
                 <QuoteComposer
                   request={request}
                   onSent={() => router.push('/admin/requests')}
@@ -1096,6 +1140,14 @@ function DetailsTab({ request }: { request: any }) {
             </div>
           )}
 
+          {request.billing_source === 'membership' && (
+            <InfoRow label="طلب العضوية">
+              <span className="rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-sm font-bold text-dark">
+                {request.auto_quote_note || 'طلب مدفوع من رصيد العضوية'}
+              </span>
+            </InfoRow>
+          )}
+
           {/* عنوان/نص الخبر — قابل للتعديل من الأدمن */}
           <EditableNewsContent
             requestId={request.id}
@@ -1142,6 +1194,7 @@ function DetailsTab({ request }: { request: any }) {
               </div>
             </div>
           )}
+          <SupportingDocumentsList documents={request.supporting_documents} />
         </div>
       </div>
 
@@ -1231,6 +1284,7 @@ function DetailsTab({ request }: { request: any }) {
                         ))}
                       </div>
                     )}
+                    <SupportingDocumentsList documents={post.supporting_documents} />
                   </div>
                 </div>
               )
