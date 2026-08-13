@@ -1,15 +1,13 @@
 name: Daily First1Saudi Education
 
 on:
-  schedule:
-    - cron: '15 5 * * *'
   workflow_dispatch:
 
 jobs:
   daily-education:
     runs-on: ubuntu-latest
     steps:
-      - name: Generate and schedule the educational batch when due
+      - name: Confirm educational automation is disabled
         run: |
           response=$(curl -s -X POST \
             "${{ secrets.APP_BASE_URL }}/api/cron/daily-education" \
@@ -17,4 +15,4 @@ jobs:
             -H "Content-Type: application/json" \
             --max-time 290)
           echo "$response"
-          echo "$response" | grep -q '"success":true'
+          echo "$response" | grep -q '"disabled":true'

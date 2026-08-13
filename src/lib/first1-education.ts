@@ -348,13 +348,6 @@ export async function ensureDailyFirst1Education(): Promise<{ created: boolean; 
     await service.from('first1_education_batches').update({ state: 'failed', updated_at: new Date().toISOString() }).eq('batch_date', today)
     throw error
   }
-  const { times: occupied, educationalDays } = await schedulingOccupancy()
-  const slots = prepared.map(() => {
-    const slot = nextAvailableSlot(occupied, educationalDays)
-    occupied.push(slot.toISOString())
-    educationalDays.add(riyadhDay(slot))
-    return slot
-  })
   const { data: inserted, error: insertError } = await service.from('social_schedule').insert(prepared.map((entry, index) => ({
     wp_post_id: -Number(`8${today.replace(/-/g, '')}${index + 1}`),
     post_url: entry.topic.sourceUrl,
@@ -389,37 +382,10 @@ export async function ensureDailyFirst1Education(): Promise<{ created: boolean; 
     // يبقى مسار الجدولة مستقلاً عن السجل التحريري الإضافي.
   }
 
-  const scheduledFor: string[] = []
-  const failures: string[] = []
-  for (const [index, entry] of prepared.entries()) {
-    try {
-      const media = await uploadMediaFromUrl(entry.designUrl)
-      const published = await publishNow({ content: entry.content.caption, attachmentPaths: [media.path], scheduledTime: slots[index].toISOString() })
-      await service.from('postpulse_posts').insert({
-        schedule_id: published.scheduleId,
-        content: entry.content.caption,
-        design_url: entry.designUrl,
-        accounts: published.accountIds,
-        status: 'scheduled',
-        scheduled_for: slots[index].toISOString(),
-        event_raw: published.result as object,
-      })
-      await service.from('social_schedule').update({ status: 'scheduled' }).eq('id', inserted[index].id)
-      scheduledFor.push(slots[index].toISOString())
-    } catch {
-      failures.push(entry.content.title)
-    }
-  }
-  if (failures.length) {
-    await service.from('first1_education_batches').update({
-      state: 'partial', scheduled_count: scheduledFor.length, updated_at: new Date().toISOString(),
-    }).eq('batch_date', today)
-    throw new Error(`تم حفظ دفعة المحتوى، لكن تعذّرت جدولة: ${failures.join('، ')}`)
-  }
   await service.from('first1_education_batches').update({
-    state: 'scheduled', scheduled_count: scheduledFor.length, updated_at: new Date().toISOString(),
+    state: 'generated', scheduled_count: 0, updated_at: new Date().toISOString(),
   }).eq('batch_date', today)
-  return { created: true, scheduledFor, itemIds: inserted.map(row => String(row.id)), titles: prepared.map(entry => entry.content.title) }
+  return { created: true, scheduledFor: [], itemIds: inserted.map(row => String(row.id)), titles: prepared.map(entry => entry.content.title) }
 }
 
 /** يعيد توزيع المنشورات التثقيفية المستقبلية فقط، من دون المساس بما نُشر فعلياً. */

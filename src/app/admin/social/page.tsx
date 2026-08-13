@@ -242,7 +242,7 @@ export default function AdminSocialPage() {
       const json = await res.json().catch(() => ({}))
       if (!res.ok || json.success === false) throw new Error(json.error || 'فشل توليد المحتوى التثقيفي')
       await Promise.all([load(), loadOccasions()])
-      alert(json.created ? 'تم توليد 3 منشورات تثقيفية وجدولتها في المواعيد الشاغرة' : 'دفعة المحتوى التثقيفي الحالية موجودة بالفعل')
+      alert(json.created ? 'تم توليد 3 منشورات تثقيفية وحفظها للمراجعة دون جدولة' : 'دفعة المحتوى التثقيفي الحالية موجودة بالفعل')
     } catch (e) {
       alert(e instanceof Error ? e.message : 'فشل توليد المحتوى التثقيفي')
     } finally {
@@ -463,7 +463,7 @@ export default function AdminSocialPage() {
       <section className="flex flex-col gap-3 rounded-2xl border border-green/25 bg-green/5 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-black text-dark">محتوى أول سعودي التثقيفي</h2>
-          <p className="mt-1 text-sm text-muted">3 منشورات أسبوعياً: يوم نشر ثم يوم خال، مع إنفوجرافيك وجدولة تلقائية في المواعيد الشاغرة.</p>
+          <p className="mt-1 text-sm text-muted">توليد يدوي عند الحاجة مع إنفوجرافيك، وحفظ المحتوى للمراجعة دون جدولة أو نشر تلقائي.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -480,7 +480,7 @@ export default function AdminSocialPage() {
             disabled={educationBusy || previewBusy}
             className="shrink-0 rounded-xl bg-green px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60"
           >
-            {educationBusy ? 'جارٍ التوليد والجدولة...' : 'توليد وجدولة دفعة تثقيفية'}
+            {educationBusy ? 'جارٍ التوليد والحفظ...' : 'توليد دفعة تثقيفية'}
           </button>
         </div>
       </section>
