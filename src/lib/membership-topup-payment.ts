@@ -21,7 +21,7 @@ async function sendTopupReceipt(topup: any) {
     <div style="max-width:620px;margin:auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #dce3ef">
       <div style="background:#102b5c;padding:28px;color:#fff;text-align:right"><h1 style="margin:0;font-size:24px">تم تعزيز رصيد عضويتك</h1><p style="margin:8px 0 0;color:#d4b66f">${number}</p></div>
       <div style="padding:28px;text-align:right;line-height:1.9"><p>مرحباً ${topup.memberships?.client_name ?? 'عميلنا العزيز'}،</p><p>اكتمل السداد، وأضيفت <strong>${topup.quantity} × ${item?.shortLabel ?? 'ميزة إضافية'}</strong> إلى عضويتك.</p>
-      <div style="background:#f7f9fd;border-right:4px solid #c9a961;padding:16px;margin:20px 0"><strong>الإجمالي:</strong> ${Number(topup.total_amount).toLocaleString('ar-SA')} ر.س شامل الضريبة<br/><strong>الصلاحية:</strong> حتى نهاية العضوية الحالية.</div>
+      <div style="background:#f7f9fd;border-right:4px solid #c9a961;padding:16px;margin:20px 0"><strong>الإجمالي:</strong> ${Number(topup.total_amount).toLocaleString('ar-SA')} ر.س<br/><strong>الصلاحية:</strong> حتى نهاية العضوية الحالية.</div>
       <p style="text-align:center"><a href="${dashboard}" style="display:inline-block;background:#14366e;color:white;padding:12px 26px;border-radius:8px;text-decoration:none;font-weight:bold">عرض الرصيد</a></p></div>
     </div></div>`
   try {

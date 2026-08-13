@@ -6,9 +6,6 @@
 
 import { EXTRAS } from '@/lib/constants'
 
-// لا يوجد ضريبة قيمة مضافة في هذا النظام
-export const AQ_VAT = 0
-
 // ─── معامل القنوات ───
 // السعر ثابت بغضّ النظر عن عدد القنوات: المعامل = 1 دائماً مهما تعددت القنوات.
 // (CHANNEL_RATE = 0 ⇒ لا توجد زيادة على القنوات الإضافية)
@@ -58,7 +55,7 @@ export const AQ_EXTRAS_LIST = [
   'pin6', 'pin12', 'report',
 ]
 
-// ─── جدول الأسعار الأساسية (بدون VAT) ───
+// ─── جدول الأسعار الأساسية ───
 // individual = فرد | business = شركة | government = حكومة | charity = خيرية
 
 type ClientType = 'individual' | 'business' | 'government' | 'charity' | 'agency'
@@ -139,7 +136,6 @@ export interface AQResult {
   extrasBreakdown: { id: string; name: string; price: number }[]
   extrasTotal: number
   subtotal: number
-  vatAmount: number
   total: number
 }
 
@@ -280,8 +276,7 @@ export function calculateAutoQuote(input: AQInput): AQResult {
 
   const extrasTotal = extrasBreakdown.reduce((s, e) => s + e.price, 0)
   const subtotal = basePrice + extrasTotal
-  const vatAmount = Math.round(subtotal * AQ_VAT)
-  const total = subtotal + vatAmount
+  const total = subtotal
 
   return {
     singleChannelBase,
@@ -292,7 +287,6 @@ export function calculateAutoQuote(input: AQInput): AQResult {
     extrasBreakdown,
     extrasTotal,
     subtotal,
-    vatAmount,
     total,
   }
 }

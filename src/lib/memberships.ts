@@ -67,6 +67,27 @@ export type MembershipPrice = {
   benefits: Record<MembershipBenefitType, number>
 }
 
+// أسعار المقارنة هي أسعار شراء الوحدات نفسها بصورة منفصلة داخل المنصة.
+// لا تدخل الخدمات غير المسعّرة منفردة، مثل المجلة والخطط والأولوية، في قيمة التوفير.
+export const MEMBERSHIP_UNIT_REFERENCE_PRICES = {
+  publication_credit: 750,
+  reshare_quote: 150,
+  pin: 100,
+  paid_campaign: 1000,
+} as const
+
+export function getMembershipSavings(price: MembershipPrice) {
+  const regularValue =
+    price.credits * MEMBERSHIP_UNIT_REFERENCE_PRICES.publication_credit
+    + price.benefits.reshare_quote * MEMBERSHIP_UNIT_REFERENCE_PRICES.reshare_quote
+    + price.benefits.pin * MEMBERSHIP_UNIT_REFERENCE_PRICES.pin
+    + price.benefits.paid_campaign * MEMBERSHIP_UNIT_REFERENCE_PRICES.paid_campaign
+  const savingAmount = Math.max(0, regularValue - price.total)
+  const savingPercent = regularValue > 0 ? Math.round((savingAmount / regularValue) * 100) : 0
+
+  return { regularValue, savingAmount, savingPercent }
+}
+
 export const MEMBERSHIP_PLANS = [
   {
     id: 'silver',

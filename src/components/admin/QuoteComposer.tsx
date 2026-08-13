@@ -204,11 +204,10 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
             <span className="font-bold text-gold">{formatNumber(autoPrice)} ر.س</span>
           </div>
           {autoBreakdown && (
-            <div className="text-xs text-muted space-y-0.5 pt-2 border-t border-border mt-2">
-              <div>الأساس: {formatNumber(autoBreakdown.basePrice)} · نطاق ×{autoBreakdown.scopeMultiplier} · صور ×{autoBreakdown.imageMultiplier}</div>
-              {autoBreakdown.discountPct > 0 && <div>خصم {autoBreakdown.discountPct}% = −{formatNumber(autoBreakdown.discountAmount)}</div>}
-              <div>ضريبة 15% = +{formatNumber(autoBreakdown.vatAmount)}</div>
-            </div>
+              <div className="text-xs text-muted space-y-0.5 pt-2 border-t border-border mt-2">
+                <div>الأساس: {formatNumber(autoBreakdown.basePrice)} · نطاق ×{autoBreakdown.scopeMultiplier} · صور ×{autoBreakdown.imageMultiplier}</div>
+                {autoBreakdown.discountPct > 0 && <div>خصم {autoBreakdown.discountPct}% = −{formatNumber(autoBreakdown.discountAmount)}</div>}
+              </div>
           )}
         </div>
 

@@ -12,7 +12,6 @@ export type ContractMembership = {
   plan_id: string
   duration_months: number
   subtotal: number | string
-  vat_amount: number | string
   total_amount: number | string
   starts_at: string
   ends_at: string
@@ -85,7 +84,7 @@ async function contractSvg(membership: ContractMembership) {
     ${detailField('رقم الجوال', membership.client_phone || 'غير مسجل', 636, 410, 532)}
     ${detailField('الباقة ومدة العضوية', `${plan.name} · ${membership.duration_months} أشهر`, 72, 410, 540)}
     ${detailField('مدة العقد', `${start} إلى ${end}`, 636, 504, 532)}
-    ${detailField('الإجمالي شامل الضريبة', `${total} ر.س`, 72, 504, 540)}
+    ${detailField('إجمالي العضوية', `${total} ر.س`, 72, 504, 540)}
 
     <rect x="72" y="614" width="1096" height="358" rx="16" fill="#f7f9fd" stroke="#d7dfec"/>
     ${rtlText('ملخص الرصيد والمزايا', 1138, 660, 24, 700, '#102b5c')}

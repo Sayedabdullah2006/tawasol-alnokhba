@@ -442,7 +442,7 @@ export async function POST(request: Request) {
 
         base_price:            storedBasePrice,
         extras_total:          storedExtrasTotal,
-        vat_amount:            priceCalc.vatAmount,
+        vat_amount:            0,
         total_amount:          storedTotalAmount,
         admin_offered_extras:  [],
         user_selected_extras:  packageIncludedExtras,

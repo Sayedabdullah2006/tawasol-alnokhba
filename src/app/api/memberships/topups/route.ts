@@ -33,8 +33,8 @@ export async function POST(request: NextRequest) {
     quantity: pricing.quantity,
     unit_price: pricing.item.unitPrice,
     unit_budget: pricing.item.unitBudget,
-    subtotal: pricing.subtotal,
-    vat_amount: pricing.vatAmount,
+    subtotal: pricing.total,
+    vat_amount: 0,
     total_amount: pricing.total,
   }).select('id, topup_number, total_amount').single()
 

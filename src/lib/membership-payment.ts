@@ -10,7 +10,7 @@ function membershipEmailHtml(args: { name: string; plan: string; number: string;
     <div style="max-width:620px;margin:auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #dce3ef">
       <div style="background:#102b5c;padding:30px;color:#fff;text-align:right"><h1 style="margin:0;font-size:25px">تم تفعيل عضويتك</h1><p style="margin:8px 0 0;color:#d4b66f">${args.number}</p></div>
       <div style="padding:30px;text-align:right;line-height:1.9"><p>مرحباً ${args.name}،</p><p>اكتمل سداد وتفعيل <strong>${args.plan}</strong> لمدة ${args.months} أشهر. أصبح رصيد العضوية الكامل ومزايا باقتك جاهزة، ويمكنك الآن رفع طلباتك من صفحة عضويتي.</p>
-      <div style="background:#f7f9fd;border-right:4px solid #c9a961;padding:16px;margin:22px 0"><strong>المبلغ المدفوع:</strong> ${args.total.toLocaleString('ar-SA')} ر.س شامل الضريبة<br/><strong>العقد:</strong> مرفق بهذه الرسالة ومحفوظ في حسابك.</div>
+      <div style="background:#f7f9fd;border-right:4px solid #c9a961;padding:16px;margin:22px 0"><strong>المبلغ المدفوع:</strong> ${args.total.toLocaleString('ar-SA')} ر.س<br/><strong>العقد:</strong> مرفق بهذه الرسالة ومحفوظ في حسابك.</div>
       <p style="text-align:center"><a href="${dashboard}" style="display:inline-block;background:#14366e;color:white;padding:12px 26px;border-radius:8px;text-decoration:none;font-weight:bold">فتح عضويتي</a></p>
       <p style="color:#71809a;font-size:13px">نتطلع لأن نكون معك في إنجازك القادم، وفي كل خطوة تستحق أن تصل.</p></div>
     </div></div>`

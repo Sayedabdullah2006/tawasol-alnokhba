@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
-import { getMembershipPlan, MEMBERSHIP_TERMS_TEXT } from '@/lib/memberships'
+import { getMembershipPlan, getMembershipSavings, MEMBERSHIP_TERMS_TEXT } from '@/lib/memberships'
 import { formatNumber } from '@/lib/utils'
 import Button from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
@@ -15,6 +15,7 @@ export default function MembershipCheckout({ planId, duration }: { planId: strin
   const { showToast } = useToast()
   const plan = getMembershipPlan(planId)
   const price = plan?.prices.find(item => item.months === duration)
+  const savings = price ? getMembershipSavings(price) : null
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
@@ -95,7 +96,7 @@ export default function MembershipCheckout({ planId, duration }: { planId: strin
           <div className="p-5">
             <ul className="space-y-2 text-sm">{plan.features.map(item => <li key={item} className="flex gap-2"><span className="text-gold">✓</span><span>{item}</span></li>)}</ul>
             <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg bg-white/10 p-3 text-xs"><div><span className="text-white/60">رصيد النشر</span><strong className="mt-1 block text-lg">{price.credits}</strong></div><div><span className="text-white/60">اقتباس/إعادة نشر</span><strong className="mt-1 block text-lg">{price.benefits.reshare_quote || '—'}</strong></div><div><span className="text-white/60">تثبيت</span><strong className="mt-1 block text-lg">{price.benefits.pin || '—'}</strong></div><div><span className="text-white/60">حملات ممولة</span><strong className="mt-1 block text-lg">{price.benefits.paid_campaign || '—'}</strong></div></div>
-            <div className="my-5 border-y border-white/10 py-4"><p className="text-xs text-white/60">الإجمالي شامل الضريبة</p><p className="mt-1 text-3xl font-black text-gold">{formatNumber(price.total)} ر.س</p></div>
+            <div className="my-5 border-y border-white/10 py-4"><div className="mb-2 flex items-center justify-between gap-2 text-xs"><span className="rounded-full bg-gold px-2.5 py-1 font-black text-dark">وفّر حتى {savings?.savingPercent ?? 0}%</span><span className="text-white/55">بدلاً من <del>{formatNumber(savings?.regularValue ?? price.total)} ر.س</del></span></div><p className="text-xs text-white/60">إجمالي العضوية</p><p className="mt-1 text-3xl font-black text-gold">{formatNumber(price.total)} ر.س</p><p className="mt-1 text-xs font-bold text-gold">توفر {formatNumber(savings?.savingAmount ?? 0)} ر.س عند استخدام كامل الرصيد والمزايا</p></div>
             <Button onClick={submit} loading={submitting} disabled={submitting || !terms || !privacy || !name.trim()} className="w-full !bg-gold !text-dark hover:!bg-[#d8bd7c]">المتابعة إلى الدفع</Button>
             <p className="mt-3 text-center text-[10px] leading-5 text-white/50">إنشاء العضوية لا يخصم أي مبلغ حتى تختار وسيلة الدفع وتكملها.</p>
           </div>

@@ -100,8 +100,6 @@ export const getDiscountPct = (numPosts: number): number => {
   return DISCOUNT_TABLE[numPosts] ?? 0
 }
 
-export const VAT_RATE = 0.15
-
 // ─── Types ───
 
 export interface PriceInput {
@@ -136,7 +134,6 @@ export interface PriceBreakdown {
   discountPct: number
   discountAmount: number
   subtotalAfterDiscount: number
-  vatAmount: number
   totalFinal: number
   perPostFinal: number
   scopeMultiplier: number
@@ -173,7 +170,7 @@ export function calculateReach(input: ReachInput): number {
 }
 
 // ⚠️ مصدر الأسعار الوحيد المعتمد = محرك auto-quote (calculateAutoQuote).
-// تفوّض هذه الدالة الحساب إليه (الأسعار حسب الفئة × نوع العميل، بلا ضريبة ولا
+// تفوّض هذه الدالة الحساب إليه (الأسعار حسب الفئة × نوع العميل، دون
 // معاملات نطاق/صور) وتُعيد النتيجة بنفس شكل PriceBreakdown ليبقى كل المستهلكين
 // (مُنشئ عرض الأدمن، حاسبة الأسعار) يعملون دون تغيير ومع أسعار موحّدة معتمدة.
 export function calculatePrice(input: PriceInput): PriceBreakdown {
@@ -219,8 +216,6 @@ export function calculatePrice(input: PriceInput): PriceBreakdown {
   const discountAmount = subtotalBeforeDiscount * (discountPct / 100)
   const subtotalAfterDiscount = subtotalBeforeDiscount - discountAmount
 
-  // لا ضريبة (مطابقةً لـ auto-quote: AQ_VAT = 0)
-  const vatAmount = 0
   const totalFinal = subtotalAfterDiscount
 
   return {
@@ -240,7 +235,6 @@ export function calculatePrice(input: PriceInput): PriceBreakdown {
     discountPct,
     discountAmount,
     subtotalAfterDiscount,
-    vatAmount,
     totalFinal,
     perPostFinal: input.numPosts > 0 ? totalFinal / input.numPosts : 0,
     scopeMultiplier,

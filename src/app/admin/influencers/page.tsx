@@ -33,7 +33,6 @@ interface PricingData {
   image_multipliers: { one: number; multi: number }
   discount_table: Record<string, number>
   max_discount: number
-  vat_rate: number
 }
 
 const defaultPricing: PricingData = {
@@ -53,7 +52,6 @@ const defaultPricing: PricingData = {
   image_multipliers: { one: 1.0, multi: 1.2 },
   discount_table: { '1': 0, '2': 5, '3': 10, '4': 15, '5': 20, '6': 25, '7': 30, '8': 35, '9': 40, '10': 45 },
   max_discount: 50,
-  vat_rate: 0.15,
 }
 
 export default function AdminInfluencersPage() {
@@ -169,7 +167,6 @@ export default function AdminInfluencersPage() {
         image_multipliers: data.image_multipliers ?? defaultPricing.image_multipliers,
         discount_table: data.discount_table ?? defaultPricing.discount_table,
         max_discount: data.max_discount ?? defaultPricing.max_discount,
-        vat_rate: data.vat_rate ?? defaultPricing.vat_rate,
       })
     } else {
       setPricing({ ...defaultPricing })
@@ -360,18 +357,6 @@ export default function AdminInfluencersPage() {
                 value={pricing.max_discount}
                 onChange={e => setPricing({ ...pricing, max_discount: parseInt(e.target.value) || 0 })} />
               <span className="text-xs text-muted">% (الحد الأقصى)</span>
-            </div>
-          </div>
-
-          {/* VAT */}
-          <div className="bg-card rounded-2xl border border-border p-5">
-            <h2 className="font-bold text-dark text-lg mb-4">ضريبة القيمة المضافة</h2>
-            <div className="flex items-center gap-3">
-              <input type="number" dir="ltr" step="0.01" min="0" max="1"
-                className="w-24 px-3 py-2 rounded-lg border border-border bg-cream text-sm text-center"
-                value={pricing.vat_rate}
-                onChange={e => setPricing({ ...pricing, vat_rate: parseFloat(e.target.value) || 0 })} />
-              <span className="text-sm text-muted">({(pricing.vat_rate * 100).toFixed(0)}%)</span>
             </div>
           </div>
 

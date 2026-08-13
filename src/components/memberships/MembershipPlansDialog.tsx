@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MEMBERSHIP_PLANS } from '@/lib/memberships'
+import { getMembershipSavings, MEMBERSHIP_PLANS } from '@/lib/memberships'
 import { formatNumber } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import MembershipPlanBadge from './MembershipPlanBadge'
@@ -49,6 +49,7 @@ export default function MembershipPlansDialog({ open, onClose }: { open: boolean
             {MEMBERSHIP_PLANS.map(plan => {
               const price = plan.prices.find(item => item.months === duration)!
               const monthly = Math.round(price.total / duration)
+              const savings = getMembershipSavings(price)
               const platinum = plan.id === 'platinum'
               const corporate = plan.id === 'corporate'
               return (
@@ -64,11 +65,17 @@ export default function MembershipPlansDialog({ open, onClose }: { open: boolean
                   </div>
                   <p className={cn('mt-2 min-h-20 text-sm leading-6', platinum ? 'text-white/70' : 'text-muted')}>{plan.description}</p>
                   <div className="my-5 border-y border-current/10 py-4">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <span className={cn('rounded-full px-2.5 py-1 font-black', platinum ? 'bg-gold text-dark' : 'bg-green/10 text-green')}>وفّر حتى {savings.savingPercent}%</span>
+                      <span className={platinum ? 'text-white/55' : 'text-muted'}>القيمة منفصلة: <del>{formatNumber(savings.regularValue)} ر.س</del></span>
+                    </div>
                     <div className="flex items-end gap-2">
                       <span className="text-3xl font-black">{formatNumber(price.total)}</span>
-                      <span className={platinum ? 'text-white/60' : 'text-muted'}>ر.س شامل الضريبة</span>
+                      <span className={platinum ? 'text-white/60' : 'text-muted'}>ر.س</span>
                     </div>
                     <p className={cn('mt-1 text-xs', platinum ? 'text-white/55' : 'text-muted')}>ما يعادل {formatNumber(monthly)} ر.س شهرياً</p>
+                    <p className={cn('mt-1 text-xs font-bold', platinum ? 'text-gold' : 'text-green')}>إجمالي التوفير {formatNumber(savings.savingAmount)} ر.س</p>
+                    <p className={cn('mt-1 text-[10px]', platinum ? 'text-white/50' : 'text-muted')}>عند استخدام كامل الرصيد والمزايا المشمولة</p>
                   </div>
                   <div className={cn('mb-4 grid grid-cols-2 gap-2 rounded-md p-3 text-xs', platinum ? 'bg-white/10' : 'bg-cream')}>
                     <div><span className={platinum ? 'text-white/60' : 'text-muted'}>رصيد النشر</span><strong className="mt-1 block text-base">{price.credits}</strong></div>
@@ -88,7 +95,7 @@ export default function MembershipPlansDialog({ open, onClose }: { open: boolean
               )
             })}
           </div>
-          <p className="mt-5 text-center text-xs leading-6 text-muted">الرصيد صالح طوال مدة العضوية وينتهي المتبقي بانتهائها. لا يوجد تجديد تلقائي، ويصلك عقد PDF بعد التفعيل.</p>
+          <p className="mt-5 text-center text-xs leading-6 text-muted">نسبة التوفير مقارنة بشراء أرصدة النشر والمزايا المشمولة بصورة منفصلة، ولا تشمل قيمة المجلة أو الخطط أو الأولوية. الرصيد صالح طوال مدة العضوية وينتهي المتبقي بانتهائها.</p>
         </div>
       </div>
     </div>

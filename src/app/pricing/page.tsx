@@ -76,7 +76,7 @@ export default function PricingPage() {
                       <span className="text-4xl font-black text-gold">{t.startsFrom.toLocaleString('ar-SA')}</span>
                       <span className="text-sm text-muted">ر.س</span>
                     </div>
-                    <div className="text-xs text-muted">شامل ضريبة القيمة المضافة</div>
+                    <div className="text-xs text-muted">السعر النهائي للخدمة</div>
                   </div>
                   <ul className="space-y-2 mb-6 text-sm text-dark">
                     {t.features.map(f => {

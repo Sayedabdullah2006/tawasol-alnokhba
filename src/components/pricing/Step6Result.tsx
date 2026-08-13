@@ -135,18 +135,6 @@ export default function Step6Result({ breakdown, scope, images, numPosts, extras
             </>
           )}
 
-          <div className="border-t border-border pt-2 flex justify-between">
-            <span className="text-muted">المجموع قبل الضريبة</span>
-            <span>{formatNumber(b.subtotalAfterDiscount)} ر.س</span>
-          </div>
-
-          {b.totalFinal > 0 && (
-            <div className="flex justify-between">
-              <span className="text-muted">ضريبة القيمة المضافة 15%</span>
-              <span>+{formatNumber(b.vatAmount)} ر.س</span>
-            </div>
-          )}
-
           <div className="border-t-2 border-gold pt-3 mt-3 flex justify-between items-center">
             <span className="text-lg font-black text-dark">💰 الإجمالي</span>
             <span className="text-2xl font-black text-gold">{formatNumber(b.totalFinal)} ر.س</span>
