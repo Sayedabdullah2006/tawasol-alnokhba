@@ -3,7 +3,27 @@ import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supab
 
 export const dynamic = 'force-dynamic'
 
+const PRODUCTION_ORIGIN = 'https://nukhba.media'
+
+function redirectOrigin(request: NextRequest) {
+  if (process.env.NODE_ENV !== 'production') return request.nextUrl.origin
+
+  for (const value of [process.env.NEXT_PUBLIC_SITE_URL, process.env.APP_BASE_URL]) {
+    if (!value) continue
+    try {
+      const configured = new URL(value)
+      const isLocal = configured.hostname === 'localhost' || configured.hostname === '127.0.0.1'
+      if (configured.protocol === 'https:' && !isLocal) return configured.origin
+    } catch {
+      // Ignore malformed deployment values and use the canonical production origin.
+    }
+  }
+
+  return PRODUCTION_ORIGIN
+}
+
 export async function GET(request: NextRequest) {
+  const origin = redirectOrigin(request)
   const auth = await createServerSupabaseClient()
   const { data: { user } } = await auth.auth.getUser()
 
@@ -21,9 +41,9 @@ export async function GET(request: NextRequest) {
       .maybeSingle()
 
     if (membership) {
-      return NextResponse.redirect(new URL(`/dashboard/membership/request?membership=${membership.id}`, request.url))
+      return NextResponse.redirect(new URL(`/dashboard/membership/request?membership=${membership.id}`, origin))
     }
   }
 
-  return NextResponse.redirect(new URL('/request', request.url))
+  return NextResponse.redirect(new URL('/request', origin))
 }

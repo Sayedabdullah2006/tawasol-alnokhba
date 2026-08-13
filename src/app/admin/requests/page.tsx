@@ -15,6 +15,7 @@ import ClientNameFixed from '@/components/ui/ClientNameFixed'
 import NameDisplayTest from '@/components/debug/NameDisplayTest'
 
 const REQUESTS_PER_PAGE = 10
+const REFUND_QUICK_ACTION = '__refund__'
 
 const QUICK_STATUS_TRANSITIONS: Record<string, string[]> = {
   pending: ['rejected', 'suspended'],
@@ -505,6 +506,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
   }
 
   const quickActionLabel = (currentStatus: string, nextStatus: string, billingSource?: string) => {
+    if (nextStatus === REFUND_QUICK_ACTION) return 'استرجاع مبلغ'
     if (billingSource === 'membership' && currentStatus === 'pending' && nextStatus === 'in_progress') return 'قبول الطلب وبدء التنفيذ'
     if (billingSource === 'membership' && currentStatus === 'pending' && nextStatus === 'rejected') return 'رفض الطلب وإعادة الرصيد'
     if (nextStatus === 'suspended') return 'تعليق الطلب'
@@ -515,9 +517,26 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
     return REQUEST_STATUSES[nextStatus as keyof typeof REQUEST_STATUSES]?.label ?? nextStatus
   }
 
+  const canRefundRequest = (request: any) => {
+    const refunds = refundsByRequest[request.id] ?? []
+    const hasPendingRefund = refunds.some(refund => refund.status === 'pending')
+    const completedRefundAmount = refunds
+      .filter(refund => refund.status === 'completed')
+      .reduce((total, refund) => total + Number(refund.amount), 0)
+    const paidAmount = Number(request.final_total ?? request.admin_quoted_price ?? 0)
+    const isPaid = Boolean(request.payment_status === 'paid' || request.paid_at || request.moyasar_payment_id || request.tamara_order_id)
+
+    return !hasPendingRefund && isPaid && request.status !== 'refunded' && completedRefundAmount < paidAmount
+  }
+
+  const quickActionsFor = (request: any) => {
+    const actions = quickStatusTransitionsFor(request.status, request.billing_source)
+    return canRefundRequest(request) ? [...actions, REFUND_QUICK_ACTION] : actions
+  }
+
   const openQuickAction = (request: any, event: React.MouseEvent) => {
     event.stopPropagation()
-    const options = quickStatusTransitionsFor(request.status, request.billing_source)
+    const options = quickActionsFor(request)
     setQuickActionTarget(request)
     setQuickActionStatus(options[0] ?? '')
     setQuickActionNotes(request.admin_notes ?? '')
@@ -525,6 +544,14 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
 
   const handleQuickAction = async () => {
     if (!quickActionTarget || !quickActionStatus) return
+    if (quickActionStatus === REFUND_QUICK_ACTION) {
+      const request = quickActionTarget
+      setQuickActionTarget(null)
+      setQuickActionStatus('')
+      setQuickActionNotes('')
+      openRefund(request)
+      return
+    }
     setSavingQuickAction(true)
     try {
       const response = await fetch('/api/update-status', {
@@ -1104,7 +1131,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
             const hasRefund = refunds.length > 0
             const pendingRefund = refunds.find(refund => refund.status === 'pending')
             const pendingManualRefund = pendingRefund?.provider === 'manual' ? pendingRefund : null
-            const canRefund = !pendingRefund && Boolean(r.payment_status === 'paid' || r.paid_at || r.moyasar_payment_id || r.tamara_order_id) && r.status !== 'refunded' && completedRefundAmount < Number(r.final_total ?? r.admin_quoted_price ?? 0)
+            const quickActions = quickActionsFor(r)
             return (
               <article key={r.id} className="rounded-lg border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
@@ -1186,9 +1213,9 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
                   <button onClick={() => setExpandedRequests(current => ({ ...current, [r.id]: !expanded }))} className="rounded-lg border border-border bg-white px-3 py-1.5 text-xs font-bold text-dark hover:bg-cream">{expanded ? 'إخفاء التفاصيل ▲' : 'مزيد من التفاصيل ▼'}</button>
                   <button
                     onClick={(e) => openQuickAction(r, e)}
-                    disabled={quickStatusTransitionsFor(r.status, r.billing_source).length === 0}
+                    disabled={quickActions.length === 0}
                     className="rounded-lg bg-green px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-green/90 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-                    title={quickStatusTransitionsFor(r.status, r.billing_source).length ? 'تنفيذ إجراء سريع' : 'لا يوجد إجراء سريع متاح لهذه الحالة'}
+                    title={quickActions.length ? 'تنفيذ إجراء سريع' : 'لا يوجد إجراء سريع متاح لهذه الحالة'}
                   >
                     إجراءات
                   </button>
@@ -1200,7 +1227,6 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
                       {sendingReviewInvitationId === r.id ? 'جارٍ الإرسال...' : review?.invitation_sent_at ? 'إعادة إرسال التقييم' : 'طلب تقييم'}
                     </button>
                   )}
-                  {canRefund && <button onClick={() => openRefund(r)} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100" title="استرجاع مبلغ للعميل">استرجاع مبلغ</button>}
                   {hasRefund && r.client_email && (
                     <button onClick={() => resendRefundRequestEmail(refunds[0])} disabled={resendingRefundId === refunds[0]?.id} className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-800 hover:bg-orange-100 disabled:opacity-50" title="إرسال إشعار بأن طلب الاسترجاع قيد المعالجة">
                       {resendingRefundId === refunds[0]?.id ? 'جارٍ الإرسال...' : 'إعادة إرسال إشعار الاسترجاع'}
@@ -1517,12 +1543,12 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
               <button type="button" onClick={() => setQuickActionTarget(null)} disabled={savingQuickAction} className="grid h-8 w-8 place-items-center rounded-lg text-lg text-muted hover:bg-slate-100" aria-label="إغلاق">×</button>
             </div>
 
-            {quickStatusTransitionsFor(quickActionTarget.status, quickActionTarget.billing_source).length > 0 ? (
+            {quickActionsFor(quickActionTarget).length > 0 ? (
               <>
                 <label className="mt-5 block text-sm font-bold text-dark">
                   الإجراء
                   <select value={quickActionStatus} onChange={event => setQuickActionStatus(event.target.value)} className="mt-2 min-h-[46px] w-full rounded-lg border border-border bg-white px-3 text-sm text-dark outline-none focus:border-green">
-                    {quickStatusTransitionsFor(quickActionTarget.status, quickActionTarget.billing_source).map(status => (
+                    {quickActionsFor(quickActionTarget).map(status => (
                       <option key={status} value={status}>{quickActionLabel(quickActionTarget.status, status, quickActionTarget.billing_source)}</option>
                     ))}
                   </select>
@@ -1532,7 +1558,9 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
                   <textarea value={quickActionNotes} onChange={event => setQuickActionNotes(event.target.value)} rows={3} className="mt-2 w-full resize-y rounded-lg border border-border bg-white px-3 py-2 text-sm font-normal text-dark outline-none focus:border-green" placeholder="تظهر في بطاقة الطلب ويمكن تضمينها في إشعار الحالة." />
                 </label>
                 <p className="mt-3 text-xs leading-5 text-muted">
-                  {quickActionStatus === 'suspended' || quickActionStatus === 'resume'
+                  {quickActionStatus === REFUND_QUICK_ACTION
+                    ? 'ستفتح نافذة الاسترجاع لمراجعة المبلغ والسبب ومزود الدفع قبل التنفيذ.'
+                    : quickActionStatus === 'suspended' || quickActionStatus === 'resume'
                     ? 'إجراء داخلي فقط: لن يصل إلى العميل أي إشعار.'
                     : quickActionTarget.billing_source === 'membership' && quickActionTarget.status === 'pending'
                       ? quickActionStatus === 'in_progress'
