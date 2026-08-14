@@ -148,6 +148,7 @@ type AdminRequest = {
   auto_quote_note?: string | null
   auto_quote_tier?: string | null
   billing_source?: string | null
+  payment_status?: string | null
   payment_method?: string | null
   moyasar_payment_id?: string | null
   tamara_order_id?: string | null
@@ -1547,6 +1548,14 @@ function DetailsTab({ request }: { request: AdminRequest }) {
             )}
             {request.tamara_order_id && (
               <InfoRow label="معرّف Tamara"><span dir="ltr" className="font-mono text-xs text-muted">{request.tamara_order_id}</span></InfoRow>
+            )}
+            {request.billing_source !== 'membership' && Number(request.final_total ?? request.admin_quoted_price ?? 0) > 0 && (
+              <a
+                href={`/api/invoices/request/${request.id}`}
+                className="mt-3 inline-flex w-full items-center justify-center rounded-lg border border-dark/15 bg-white px-4 py-2.5 text-sm font-bold text-dark transition hover:border-green hover:text-green"
+              >
+                تحميل فاتورة الخدمة PDF
+              </a>
             )}
           </div>
         </div>

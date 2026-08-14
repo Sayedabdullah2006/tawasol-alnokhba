@@ -177,11 +177,20 @@ export async function POST(request: Request) {
         case 'paid':
           p = notifyPaymentConfirmedToClient({
             ...base,
+            requestId,
             total: Number(updated.final_total ?? updated.admin_quoted_price ?? 0),
+            payment: { provider: 'دفع معتمد من الإدارة', paidAt: now },
           })
           break
         case 'in_progress':
-          p = notifyInProgressToClient(base)
+          p = current.status === 'payment_review'
+            ? notifyPaymentConfirmedToClient({
+                ...base,
+                requestId,
+                total: Number(updated.final_total ?? updated.admin_quoted_price ?? 0),
+                payment: { provider: 'تحويل بنكي', method: 'تحويل بنكي معتمد', paidAt: now },
+              })
+            : notifyInProgressToClient(base)
           break
         case 'completed':
           p = notifyCompletedToClient(base)

@@ -1254,6 +1254,9 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: RequestScope }
             const pendingRefund = refunds.find(refund => refund.status === 'pending')
             const pendingManualRefund = pendingRefund?.provider === 'manual' ? pendingRefund : null
             const quickActions = quickActionsFor(r)
+            const invoiceAvailable = r.billing_source !== 'membership'
+              && Number(total ?? 0) > 0
+              && Boolean(r.payment_status === 'paid' || r.paid_at || r.moyasar_payment_id || r.tamara_order_id)
             return (
               <article key={r.id} className="rounded-lg border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
@@ -1349,6 +1352,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: RequestScope }
                   <button onClick={(e) => openQuickNote(r, e)} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${r.admin_notes?.trim() ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>📝 {r.admin_notes?.trim() ? 'تعديل الملاحظة' : 'إضافة ملاحظة'}</button>
                   <button onClick={(e) => handleSendReminder(r, e)} disabled={sendingReminderId === r.id || !r.client_email} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50" title="إرسال تذكير بالبريد">{sendingReminderId === r.id ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" /> : '✉'}</button>
                   <button onClick={(e) => handleWhatsApp(r, e)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 p-1.5 hover:bg-green/15" title="مراسلة العميل عبر واتساب"><Image src="/whatsapp-icon.avif" alt="واتساب" width={20} height={20} className="h-full w-full object-contain" /></button>
+                  {invoiceAvailable && <a href={`/api/invoices/request/${r.id}`} className="rounded-lg border border-dark/15 bg-white px-3 py-1.5 text-xs font-bold text-dark transition hover:border-green hover:text-green" title="تحميل فاتورة الخدمة">تحميل الفاتورة</a>}
                   {r.status === 'completed' && r.client_email && !review?.rating && (
                     <button onClick={() => sendReviewInvitation(r)} disabled={sendingReviewInvitationId === r.id} className="rounded-lg border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-bold text-dark hover:bg-gold/20 disabled:opacity-50">
                       {sendingReviewInvitationId === r.id ? 'جارٍ الإرسال...' : review?.invitation_sent_at ? 'إعادة إرسال التقييم' : 'طلب تقييم'}

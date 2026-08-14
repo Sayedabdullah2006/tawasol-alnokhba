@@ -18,6 +18,11 @@ interface Props {
     admin_notes?: string | null
     auto_quote_tier?: string | null
     selected_package?: string | null
+    billing_source?: string | null
+    payment_status?: string | null
+    paid_at?: string | null
+    moyasar_payment_id?: string | null
+    tamara_order_id?: string | null
   }
 }
 
@@ -27,6 +32,9 @@ export default function RequestCard({ request: r }: Props) {
   const showPrice = r.status !== 'pending' && priceToShow != null
   const effectiveStatus = (r.status === 'approved' && r.receipt_url) ? 'payment_review' : r.status
   const selectedPackage = PACKAGES.find(pkg => pkg.id === (r.auto_quote_tier ?? r.selected_package))
+  const invoiceAvailable = r.billing_source !== 'membership'
+    && Number(priceToShow ?? 0) > 0
+    && Boolean(r.payment_status === 'paid' || r.paid_at || r.moyasar_payment_id || r.tamara_order_id)
 
   // قطع المحتوى لعرض جزء منه فقط
   const truncateContent = (text: string, maxLength: number = 80) => {
@@ -61,7 +69,13 @@ export default function RequestCard({ request: r }: Props) {
 
         <div className="mt-4 flex items-end justify-between gap-3 border-t border-border pt-3">
           <div><p className="text-[10px] font-bold text-muted">إجمالي الطلب</p><p className="mt-0.5 text-base font-black text-dark">{showPrice ? `${formatNumber(priceToShow!)} ر.س` : '—'}</p></div>
-          <div className="text-left"><p className="text-[11px] text-muted">{formatDate(r.created_at)}</p><Link href={`/dashboard/${r.id}`} className="mt-1 inline-block text-xs font-bold text-green hover:underline">عرض تفاصيل الطلب</Link></div>
+          <div className="text-left">
+            <p className="text-[11px] text-muted">{formatDate(r.created_at)}</p>
+            <div className="mt-1 flex flex-wrap justify-end gap-2">
+              {invoiceAvailable && <a href={`/api/invoices/request/${r.id}`} className="text-xs font-bold text-dark hover:text-green hover:underline">تحميل الفاتورة</a>}
+              <Link href={`/dashboard/${r.id}`} className="text-xs font-bold text-green hover:underline">عرض تفاصيل الطلب</Link>
+            </div>
+          </div>
         </div>
     </article>
   )

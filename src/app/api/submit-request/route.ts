@@ -283,7 +283,7 @@ export async function POST(request: Request) {
                 approved_at:        now,
                 auto_quoted_at:     now,
                 auto_quote_note:    campaignPkg
-                  ? `حملة ${campaignPostsRaw.length} منشورات — باقة: ${campaignPkg.name} — خصم ${CAMPAIGN_DISCOUNT_PCT}%${campaignPkg.sponsoredCampaignBudget ? ` — حملة ممولة: ${campaignPkg.sponsoredCampaignBudget} ر.س` : ''}`
+                  ? `حملة ${campaignPostsRaw.length} منشورات — باقة: ${campaignPkg.name} — خصم ${CAMPAIGN_DISCOUNT_PCT}%${campaignPkg.sponsoredCampaignBudget ? ' — حملة ممولة' : ''}`
                   : `حملة ${campaignPostsRaw.length} منشورات — خصم ${CAMPAIGN_DISCOUNT_PCT}%`,
               }
             : {
@@ -474,7 +474,7 @@ export async function POST(request: Request) {
               auto_quote_tier:    selectedPackage,
               auto_quoted_at:     now,
               auto_quote_note:    pkg
-                ? `باقة: ${pkg.name} — فئة: ${body.category}${pkg.sponsoredCampaignBudget ? ` — حملة ممولة: ${pkg.sponsoredCampaignBudget} ر.س` : ''}`
+                ? `باقة: ${pkg.name} — فئة: ${body.category}${pkg.sponsoredCampaignBudget ? ' — حملة ممولة' : ''}`
                 : `تسعير تلقائي — فئة: ${body.category}، إضافات: ${selectedExtras.length}`,
             }
           : {

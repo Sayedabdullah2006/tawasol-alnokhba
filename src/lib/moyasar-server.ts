@@ -252,9 +252,16 @@ export async function verifyAndUpdatePayment(paymentId: string, requestId?: stri
     if (originalOrder.client_email) {
       notifyPaymentConfirmedToClient({
         email: originalOrder.client_email,
+        requestId: String(targetRequestId),
         requestNumber: String(originalOrder.request_number),
         clientName: originalOrder.client_name ?? '',
         total: toSAR(payment.amount),
+        payment: {
+          provider: 'ميسر',
+          method: `${payment.source?.company?.toUpperCase() ?? 'CARD'} ***${payment.source?.number?.slice(-4) ?? '****'}`,
+          reference: payment.source?.reference_number ?? payment.id,
+          paidAt: payment.created_at ?? new Date().toISOString(),
+        },
       }).catch((err: unknown) => {
         console.error('[MOYASAR_VERIFY] ⚠️ Payment confirmation email failed (non-blocking):', err);
       });

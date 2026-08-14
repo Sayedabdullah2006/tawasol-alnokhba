@@ -548,9 +548,16 @@ export async function handleTamaraOrderApproved(
     )
     notifyPaymentConfirmedToClient({
       email:         clientEmail,
+      requestId,
       requestNumber: String(emailData?.request_number ?? ''),
       clientName:    emailData?.client_name ?? '',
       total,
+      payment: {
+        provider: 'تمارا',
+        method: 'تمارا - تقسيط',
+        reference: tamaraOrderId,
+        paidAt: new Date().toISOString(),
+      },
     }).catch((err: unknown) => {
       console.error('[TAMARA] Email send failed (non-blocking):', err)
     })

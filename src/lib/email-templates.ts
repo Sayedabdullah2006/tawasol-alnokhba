@@ -365,6 +365,8 @@ export function paymentConfirmedToClient(d: {
   requestNumber: string
   clientName: string
   total: number
+  invoiceNumber?: string
+  invoiceDownloadUrl?: string
 }) {
   return {
     subject: `✅ تم تأكيد دفعك · ${d.requestNumber}`,
@@ -374,11 +376,13 @@ export function paymentConfirmedToClient(d: {
       <div style="background:#F7F4ED; border-radius:10px; padding:14px; margin-bottom:16px; font-size:13px;">
         <p style="margin:4px 0;"><strong>طلب:</strong> ${escapeHtml(d.requestNumber)}</p>
         <p style="margin:4px 0;"><strong>المبلغ:</strong> ${d.total.toLocaleString('ar-SA')} ر.س</p>
+        ${d.invoiceNumber ? `<p style="margin:4px 0;"><strong>رقم الفاتورة:</strong> <span dir="ltr">${escapeHtml(d.invoiceNumber)}</span></p>` : ''}
       </div>
       <p style="margin:0 0 20px 0; font-size:13px; line-height:1.8;">
-        طلبك الآن في قائمة التنفيذ. سنبدأ النشر قريباً وسنخبرك فور الانتهاء.
+        طلبك الآن في قائمة التنفيذ. أرفقنا فاتورة الخدمة بصيغة PDF، ويمكنك تحميلها في أي وقت من صفحة طلباتك.
+        سنبدأ النشر قريباً وسنخبرك فور الانتهاء.
       </p>
-      <p style="margin:0; text-align:center;">${button('عرض الطلب', `${SITE_URL}/dashboard`)}</p>
+      <p style="margin:0; text-align:center;">${button(d.invoiceDownloadUrl ? 'تحميل الفاتورة' : 'عرض الطلب', d.invoiceDownloadUrl ?? `${SITE_URL}/dashboard`)}</p>
     `),
   }
 }

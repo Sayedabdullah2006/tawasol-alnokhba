@@ -128,6 +128,9 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
   const effectiveStatus: string = (request.status === 'approved' && request.receipt_url)
     ? 'payment_review'
     : request.status
+  const invoiceAvailable = request.billing_source !== 'membership'
+    && Number(request.final_total ?? request.admin_quoted_price ?? 0) > 0
+    && Boolean(request.payment_status === 'paid' || request.paid_at || request.moyasar_payment_id || request.tamara_order_id)
 
   return (
     <div className="mobile-container-safe">
@@ -344,6 +347,14 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
                   <span>الإجمالي</span>
                   <span className="text-gold text-lg">{formatNumber(request.final_total)} ر.س</span>
                 </div>
+                {invoiceAvailable && (
+                  <a
+                    href={`/api/invoices/request/${request.id}`}
+                    className="mt-3 inline-flex w-full items-center justify-center rounded-lg border border-dark/15 bg-white px-4 py-2.5 text-sm font-bold text-dark transition hover:border-green hover:text-green"
+                  >
+                    تحميل فاتورة الخدمة PDF
+                  </a>
+                )}
               </>
             )}
             {Number(request.estimated_reach ?? 0) > 0 && (

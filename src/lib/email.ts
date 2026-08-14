@@ -6,6 +6,7 @@
 import { createServiceRoleClient } from './supabase-server'
 import * as templates from './email-templates'
 import { sendEnhancedEmail, htmlToText } from './email-deliverability'
+import { ensureServiceInvoice, markServiceInvoiceEmailed, type PaymentInvoiceOverrides } from './service-invoice'
 
 const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL?.trim() || 'first1saudi@gmail.com'
 const ADMIN_CC_EMAIL = process.env.ADMIN_CC_EMAIL?.trim() || ADMIN_EMAIL // نسخة لجميع إيميلات العملاء
@@ -81,10 +82,29 @@ export async function notifyFreeGiftToClient(args: {
 }
 
 export async function notifyPaymentConfirmedToClient(args: {
-  email: string; requestNumber: string; clientName: string; total: number
+  email: string; requestId: string; requestNumber: string; clientName: string; total: number
+  payment?: PaymentInvoiceOverrides
 }) {
-  const t = templates.paymentConfirmedToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  try {
+    const invoice = await ensureServiceInvoice(args.requestId, args.payment)
+    const invoiceDownloadUrl = `${process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') || 'https://nukhba.media'}/api/invoices/request/${args.requestId}`
+    const t = templates.paymentConfirmedToClient({
+      ...args,
+      invoiceNumber: invoice.invoiceNumber,
+      invoiceDownloadUrl,
+    })
+    const sent = await sendEmail(args.email, t.subject, t.html, [{
+      filename: invoice.filename,
+      content: invoice.pdf.toString('base64'),
+      contentType: 'application/pdf',
+    }])
+    if (sent) await markServiceInvoiceEmailed(invoice.id)
+    return sent
+  } catch (error) {
+    console.error('[INVOICE] Failed to create or attach payment invoice:', error)
+    const t = templates.paymentConfirmedToClient(args)
+    return sendEmail(args.email, t.subject, t.html)
+  }
 }
 
 export async function notifyFreeApprovedToClient(args: {
