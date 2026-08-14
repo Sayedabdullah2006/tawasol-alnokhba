@@ -68,6 +68,22 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="mx-auto max-w-6xl px-4 pt-12 md:pt-16">
+        <div className="glass-panel relative min-h-[430px] overflow-hidden rounded-lg md:min-h-[360px]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/inventor-store-hero.webp" alt="نموذج اختراع قيد التطوير" className="absolute inset-0 h-full w-full object-cover object-[30%_center]" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(247,250,253,.08),rgba(247,250,253,.72)_45%,rgba(247,250,253,.98)_72%)] max-md:bg-[linear-gradient(180deg,rgba(247,250,253,.08),rgba(247,250,253,.94)_65%)]" />
+          <div className="relative z-10 flex min-h-[430px] items-end p-6 sm:p-8 md:min-h-[360px] md:items-center md:p-10">
+            <div className="max-w-xl md:mr-auto">
+              <div className="flex items-center gap-2"><span className="rounded-full bg-gold px-2.5 py-1 text-[10px] font-black text-dark">جديد</span><span className="text-xs font-black text-green">مسار المخترع</span></div>
+              <h2 className="mt-4 text-3xl font-black leading-tight text-dark md:text-4xl">خدمات رقمية تحوّل اختراعك إلى قصة واضحة قابلة للعرض</h2>
+              <p className="mt-4 text-sm leading-7 text-muted">ملفات تعريفية، عروض مستثمرين، إنفوجرافيك، فيديو وصفحات رقمية ضمن متجر متخصص للمخترعين.</p>
+              <Link href="/inventor-store" className="mt-6 inline-flex rounded-lg bg-green px-6 py-3 text-sm font-black text-white shadow-lg shadow-green/20 transition hover:bg-green/90">تصفح مسار المخترع</Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="mx-auto max-w-6xl px-4 py-16 md:py-20">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
           <div><p className="text-xs font-bold text-gold">تجربة واضحة من أول خطوة</p><h2 className="mt-2 text-2xl font-black text-dark md:text-3xl">لماذا تواصل النخبة؟</h2></div>

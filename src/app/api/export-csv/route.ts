@@ -31,9 +31,20 @@ export async function GET(request: Request) {
 
     if (status) query = query.eq('status', status)
     if (scope === 'membership') query = query.eq('billing_source', 'membership')
-    if (scope === 'direct') query = query.neq('billing_source', 'membership')
+    if (scope === 'direct' || scope === 'inventor-store') query = query.neq('billing_source', 'membership')
 
-    const { data: requests } = await query
+    const { data: rawRequests } = await query
+    const isStoreRequest = (subOption: unknown) => {
+      if (typeof subOption !== 'string') return false
+      try { return JSON.parse(subOption)?.source === 'inventor_store' } catch { return false }
+    }
+    let requests = rawRequests ?? []
+    if (scope === 'inventor-store') requests = requests.filter(request => isStoreRequest(request.sub_option))
+    if (scope === 'direct') requests = requests.filter(request => !isStoreRequest(request.sub_option))
+    const service = url.searchParams.get('service')
+    if (scope === 'inventor-store' && service) requests = requests.filter(request => {
+      try { return JSON.parse(request.sub_option)?.product_slug === service } catch { return false }
+    })
 
     if (!requests || requests.length === 0) {
       return new NextResponse('لا توجد بيانات', { status: 404 })

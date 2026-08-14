@@ -7,8 +7,8 @@ import { createServiceRoleClient } from './supabase-server'
 import * as templates from './email-templates'
 import { sendEnhancedEmail, htmlToText } from './email-deliverability'
 
-const ADMIN_EMAIL = 'first1saudi@gmail.com'
-const ADMIN_CC_EMAIL = 'first1saudi@gmail.com' // نسخة لجميع إيميلات العملاء
+const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL?.trim() || 'first1saudi@gmail.com'
+const ADMIN_CC_EMAIL = process.env.ADMIN_CC_EMAIL?.trim() || ADMIN_EMAIL // نسخة لجميع إيميلات العملاء
 
 export type EmailAttachment = { filename: string; content: string; contentType?: string }
 
@@ -19,13 +19,17 @@ export async function sendEmail(to: string | string[], subject: string, html: st
     console.log(`[EMAIL] Sending basic email: ${subject} to ${Array.isArray(to) ? to.join(', ') : to}`)
 
     // Use basic email service directly (enhanced system temporarily disabled)
+    const recipients = Array.isArray(to) ? to : [to]
+    const cc = ADMIN_CC_EMAIL && !recipients.some(email => email.trim().toLowerCase() === ADMIN_CC_EMAIL.toLowerCase())
+      ? ADMIN_CC_EMAIL
+      : undefined
     const client = await createServiceRoleClient()
     const { data, error } = await client.functions.invoke('send-email', {
       body: {
         to,
         subject,
         html,
-        cc: ADMIN_CC_EMAIL, // نسخة للإدارة
+        cc,
         attachments,
       },
     })
@@ -47,6 +51,11 @@ export async function sendEmail(to: string | string[], subject: string, html: st
 
 export async function notifyNewRequestToAdmin(d: templates.ClientRequestData) {
   const t = templates.newRequestToAdmin(d)
+  return sendEmail(ADMIN_EMAIL, t.subject, t.html)
+}
+
+export async function notifyAdminIntake(d: templates.AdminIntakeNotificationData) {
+  const t = templates.adminIntakeNotification(d)
   return sendEmail(ADMIN_EMAIL, t.subject, t.html)
 }
 

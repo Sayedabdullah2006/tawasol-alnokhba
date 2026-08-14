@@ -23,6 +23,7 @@ import EditableNewsContent from '@/components/admin/EditableNewsContent'
 import SupportingDocumentsList from '@/components/request/SupportingDocumentsList'
 import { getReviewItems, getPostReviews } from '@/lib/review-items'
 import { getAdminActions, waitingForClient, isFinalStatus, messageColors } from '@/lib/admin-actions'
+import { parseStoreRequestMeta } from '@/lib/inventor-store-studios'
 
 // ── مساعدات عرض البيانات ───────────────────────────────────────────
 
@@ -385,10 +386,11 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   const isPendingPhase = request.status === 'pending' || request.status === 'client_rejected'
   const isPendingMembership = request.status === 'pending' && request.billing_source === 'membership'
   const canConfirmPayment = ['approved', 'payment_review'].includes(request.status)
+  const storeRequestMeta = parseStoreRequestMeta(request.sub_option)
 
   const TABS: { key: TabKey; label: string }[] = [
     { key: 'details', label: '📋 تفاصيل الطلب' },
-    { key: 'content', label: '🎨 المحتوى والتصاميم' },
+    ...(!storeRequestMeta ? [{ key: 'content' as TabKey, label: '🎨 المحتوى والتصاميم' }] : []),
     { key: 'actions', label: '⚙️ الإجراءات' },
     { key: 'log',     label: '🕓 سجل الإجراءات' },
   ]
@@ -420,7 +422,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
 
         {/* ── Header ───────────────────────────────────────────────── */}
         <div className="mb-5">
-          <Link href="/admin/requests" className="inline-flex items-center gap-2 text-green hover:underline mb-4">
+          <Link href={storeRequestMeta ? '/admin/inventor-store-requests' : '/admin/requests'} className="inline-flex items-center gap-2 text-green hover:underline mb-4">
             ← العودة للطلبات
           </Link>
           <div className="flex items-center justify-between flex-wrap gap-3">
@@ -435,6 +437,18 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
         </div>
 
         {/* ── Tabs ─────────────────────────────────────────────────── */}
+        {storeRequestMeta && (
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gold/45 bg-gold/10 p-4">
+            <div>
+              <strong className="block text-dark">هذا طلب من متجر مسار المخترع</strong>
+              <span className="text-sm text-muted">تنفيذ المخرجات وإصداراتها يتم داخل استديو الخدمة المخصص.</span>
+            </div>
+            <Link href={`/admin/inventor-store-requests/${request.id}`} className="rounded-lg bg-dark px-4 py-2.5 text-sm font-bold text-white">
+              فتح استديو الخدمة
+            </Link>
+          </div>
+        )}
+
         <div className="mb-5 flex gap-1 border-b border-border overflow-x-auto">
           {TABS.map(t => (
             <button
@@ -1010,6 +1024,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
             </div>
           </div>
         </div>
+
       )}
 
       {/* ── Dialog حذف الطلب ─────────────────────────────────────────── */}

@@ -9,6 +9,7 @@ import ClientNameFixed from '@/components/ui/ClientNameFixed'
 
 const navLinks = [
   { href: '/', label: 'الرئيسية' },
+  { href: '/inventor-store', label: 'مسار المخترع', badge: 'جديد' },
   { href: '/request/start', label: 'تقديم طلب' },
 ]
 
@@ -100,8 +101,9 @@ export default function Header() {
         {/* Desktop nav */}
         <nav className="hidden items-center gap-2 md:flex">
           {navLinks.map(l => (
-            <Link key={l.href} href={l.href} className="rounded-lg px-3 py-2 text-sm font-medium text-dark/80 transition-colors hover:bg-white/60 hover:text-green">
-              {l.label}
+            <Link key={l.href} href={l.href} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-dark/80 transition-colors hover:bg-white/60 hover:text-green">
+              <span>{l.label}</span>
+              {l.badge && <span className="rounded-full bg-gold/15 px-1.5 py-0.5 text-[9px] font-black text-dark">{l.badge}</span>}
             </Link>
           ))}
 
@@ -277,7 +279,7 @@ export default function Header() {
                     i < navLinks.length - 1 && 'border-b border-border'
                   )}
                 >
-                  {l.label}
+                  <span className="flex items-center gap-2">{l.label}{l.badge && <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-black">{l.badge}</span>}</span>
                 </Link>
               ))}
             </div>

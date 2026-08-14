@@ -30,7 +30,14 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
   const [scope, setScope] = useState<'single' | 'all'>(request.scope ?? initialScope)
   const [images, setImages] = useState<'one' | 'multi'>(request.images ?? 'one')
   const [numPosts, setNumPosts] = useState<number>(request.num_posts ?? 1)
-  const [manualPrice, setManualPrice] = useState<string>('')
+  const storeProduct = useMemo(() => {
+    if (request.category !== 'Others' || typeof request.sub_option !== 'string') return null
+    try {
+      const parsed = JSON.parse(request.sub_option)
+      return parsed?.source === 'inventor_store' ? parsed as { product_name?: string; listed_price?: number } : null
+    } catch { return null }
+  }, [request.category, request.sub_option])
+  const [manualPrice, setManualPrice] = useState<string>(() => storeProduct?.listed_price ? String(storeProduct.listed_price) : '')
   const [isFree, setIsFree] = useState(false)
   const [selectedExtrasToOffer, setSelectedExtrasToOffer] = useState<string[]>([])
   // رسالة اعتذار احترافية تُعبّأ تلقائياً عند إرسال عرض جديد لطلب رفضه العميل
@@ -150,6 +157,12 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
 
   return (
     <div className="space-y-4">
+      {storeProduct && (
+        <div className="rounded-xl border border-gold/40 bg-gold/10 p-4 text-sm">
+          <p className="font-black text-dark">طلب من متجر مسار المخترع</p>
+          <p className="mt-1 text-muted">{storeProduct.product_name} · السعر المعلن {formatNumber(Number(storeProduct.listed_price || 0))} ر.س</p>
+        </div>
+      )}
       {userChannels.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs">
           <span className="text-blue-700 font-bold">القنوات التي اختارها العميل: </span>
@@ -173,7 +186,7 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
       <div className={`bg-cream rounded-xl p-4 space-y-3 ${isFree ? 'opacity-50 pointer-events-none' : ''}`}>
         <h3 className="font-bold text-dark text-sm">إعدادات الحاسبة</h3>
 
-        <div className="grid grid-cols-2 gap-3 text-sm">
+        {!storeProduct && <div className="grid grid-cols-2 gap-3 text-sm">
           <div>
             <label className="text-muted block mb-1">نطاق النشر</label>
             <select value={scope} onChange={e => setScope(e.target.value as 'single' | 'all')}
@@ -196,9 +209,9 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
               onChange={e => setNumPosts(Math.max(1, parseInt(e.target.value) || 1))}
               className="w-full px-3 py-2 rounded-lg border border-border bg-white text-sm" />
           </div>
-        </div>
+        </div>}
 
-        <div className="bg-white rounded-lg p-3 text-sm space-y-1">
+        {!storeProduct && <div className="bg-white rounded-lg p-3 text-sm space-y-1">
           <div className="flex justify-between">
             <span className="text-muted">السعر التلقائي من الحاسبة:</span>
             <span className="font-bold text-gold">{formatNumber(autoPrice)} ر.س</span>
@@ -209,7 +222,7 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
                 {autoBreakdown.discountPct > 0 && <div>خصم {autoBreakdown.discountPct}% = −{formatNumber(autoBreakdown.discountAmount)}</div>}
               </div>
           )}
-        </div>
+        </div>}
 
         <div>
           <label className="text-muted block mb-1 text-sm">تعديل السعر يدوياً (اختياري)</label>

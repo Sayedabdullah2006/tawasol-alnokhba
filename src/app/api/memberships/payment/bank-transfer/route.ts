@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { formatMembershipNumber } from '@/lib/memberships'
-import { sendEmail } from '@/lib/email'
+import { notifyAdminIntake } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   const auth = await createServerSupabaseClient()
@@ -17,6 +17,20 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ error: 'تعذر حفظ إيصال التحويل' }, { status: 500 })
   await service.from('membership_payments').insert({ membership_id: membershipId, provider: 'bank_transfer', amount: membership.total_amount, status: 'pending', provider_response: { receipt_url: receiptUrl } })
   const number = formatMembershipNumber(membership.membership_number)
-  void sendEmail('first1saudi@gmail.com', `تحويل عضوية بانتظار التحقق · ${number}`, `<div dir="rtl" style="font-family:Arial,sans-serif"><h2>تحويل عضوية بانتظار التحقق</h2><p>العميل: ${membership.client_name}</p><p>العضوية: ${membership.membership_plans?.name_ar}</p><p>المبلغ: ${membership.total_amount} ر.س</p><p><a href="${process.env.NEXT_PUBLIC_SITE_URL}/admin/memberships">مراجعة العضوية</a></p></div>`)
+  void notifyAdminIntake({
+    subject: 'تحويل عضوية بانتظار التحقق',
+    heading: 'رفع العميل إيصال تحويل ويحتاج تحقق الإدارة',
+    referenceNumber: number,
+    referenceLabel: 'رقم العضوية',
+    clientName: membership.client_name,
+    clientEmail: membership.client_email,
+    clientPhone: membership.client_phone,
+    itemLabel: 'العضوية',
+    itemName: membership.membership_plans?.name_ar ?? 'عضوية تواصل النخبة',
+    statusLabel: 'بانتظار التحقق من التحويل البنكي',
+    amount: Number(membership.total_amount),
+    actionLabel: 'مراجعة التحويل',
+    actionUrl: 'https://nukhba.media/admin/memberships',
+  })
   return NextResponse.json({ success: true })
 }

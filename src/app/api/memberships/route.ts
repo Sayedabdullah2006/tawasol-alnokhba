@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
-import { MEMBERSHIP_TERMS_TEXT, MEMBERSHIP_TERMS_VERSION } from '@/lib/memberships'
+import { formatMembershipNumber, MEMBERSHIP_TERMS_TEXT, MEMBERSHIP_TERMS_VERSION } from '@/lib/memberships'
+import { notifyAdminIntake } from '@/lib/email'
 
 const VALID_DURATIONS = new Set([3, 6, 12])
 
@@ -123,6 +124,22 @@ export async function POST(request: NextRequest) {
     console.error('[MEMBERSHIP] create failed:', error)
     return NextResponse.json({ error: 'تعذر إنشاء العضوية، حاول مجدداً' }, { status: 500 })
   }
+
+  await notifyAdminIntake({
+    subject: 'طلب عضوية جديد',
+    heading: 'أنشأ عميل طلب عضوية جديداً',
+    referenceNumber: formatMembershipNumber(membership.membership_number),
+    referenceLabel: 'رقم العضوية',
+    clientName: payload.client_name,
+    clientEmail: email,
+    clientPhone: payload.client_phone,
+    itemLabel: 'العضوية',
+    itemName: `${plan.name_ar} · ${durationMonths} أشهر`,
+    statusLabel: 'بانتظار إتمام الدفع',
+    amount: Number(membership.total_amount),
+    actionLabel: 'فتح إدارة العضويات',
+    actionUrl: 'https://nukhba.media/admin/memberships',
+  })
 
   return NextResponse.json({ membership })
 }

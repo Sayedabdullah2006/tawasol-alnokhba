@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CATEGORIES, PACKAGES, REQUEST_STATUSES } from '@/lib/constants'
 import { formatNumber, formatDate, generateRequestNumber } from '@/lib/utils'
-import { fixTextDirection } from '@/lib/text-utils'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -13,6 +13,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useToast } from '@/components/ui/Toast'
 import ClientNameFixed from '@/components/ui/ClientNameFixed'
 import NameDisplayTest from '@/components/debug/NameDisplayTest'
+import { INVENTOR_STORE_PRODUCTS } from '@/lib/inventor-store'
 
 const REQUESTS_PER_PAGE = 10
 const REFUND_QUICK_ACTION = '__refund__'
@@ -34,7 +35,7 @@ const QUICK_STATUS_TRANSITIONS: Record<string, string[]> = {
   auto_closed: ['pending'],
 }
 
-const quickStatusTransitionsFor = (status: string, billingSource?: string): string[] => {
+const quickStatusTransitionsFor = (status: string, billingSource?: string | null): string[] => {
   if (status === 'rejected' && billingSource === 'membership') return []
   const baseTransitions = QUICK_STATUS_TRANSITIONS[status] ?? []
   if (status === 'pending' && billingSource === 'membership') {
@@ -46,18 +47,91 @@ const quickStatusTransitionsFor = (status: string, billingSource?: string): stri
     : [...transitions, 'scheduled']
 }
 
-export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'membership' }) {
+type RequestScope = 'direct' | 'membership' | 'inventor-store'
+
+type AdminRequest = {
+  id: string
+  user_id?: string | null
+  request_number: number
+  client_name?: string | null
+  client_email?: string | null
+  client_phone?: string | null
+  client_mobile?: string | null
+  phone?: string | null
+  title?: string | null
+  content?: string | null
+  admin_notes?: string | null
+  admin_thumbnail_url?: string | null
+  status: string
+  created_at: string
+  billing_source?: string | null
+  membership_id?: string | null
+  membership_credits?: number | null
+  membership_credit_status?: string | null
+  sub_option?: unknown
+  content_images?: unknown
+  final_total?: number | null
+  admin_quoted_price?: number | null
+  payment_status?: string | null
+  paid_at?: string | null
+  moyasar_payment_id?: string | null
+  tamara_order_id?: string | null
+  offer_discount_sent_at?: string | null
+  offer_original_price?: number | null
+  offer_discount_pct?: number | null
+  remainingRefundAmount?: number
+  selected_package?: string | null
+  category?: string | null
+  auto_quote_tier?: string | null
+  campaign_post_count?: number | null
+  num_posts?: number | null
+  request_type?: string | null
+  is_external?: boolean | null
+  link?: string | null
+  refund_timing?: string | null
+}
+
+type RequestReview = {
+  request_id: string
+  rating?: number | null
+  comment?: string | null
+  invitation_sent_at?: string | null
+}
+
+type RefundRecord = {
+  id: string
+  request_id: string
+  status: string
+  amount: number
+  provider?: string | null
+}
+
+const formatRequestNumber = (serial: AdminRequest['request_number']): string =>
+  generateRequestNumber(serial)
+
+const getStoreRequestMeta = (request: { sub_option?: unknown }) => {
+  if (typeof request.sub_option !== 'string') return null
+  try {
+    const parsed = JSON.parse(request.sub_option)
+    return parsed?.source === 'inventor_store' ? parsed as { product_slug?: string; product_name?: string; listed_price?: number } : null
+  } catch { return null }
+}
+
+export function AdminRequestsPage({ scope = 'direct' }: { scope?: RequestScope }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const { showToast } = useToast()
   const membershipOnly = scope === 'membership'
+  const storeOnly = scope === 'inventor-store'
+  const directOnly = scope === 'direct'
   const [loading, setLoading] = useState(true)
   const [pageLoading, setPageLoading] = useState(false)
-  const [requests, setRequests] = useState<any[]>([])
-  const [requestSummaries, setRequestSummaries] = useState<any[]>([])
+  const [requests, setRequests] = useState<AdminRequest[]>([])
+  const [requestSummaries, setRequestSummaries] = useState<AdminRequest[]>([])
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
   const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') ?? '')
+  const [serviceFilter, setServiceFilter] = useState(() => searchParams.get('service') ?? '')
   const [duplicatesOnly, setDuplicatesOnly] = useState(() => searchParams.get('duplicates') === '1')
   const [currentPage, setCurrentPage] = useState(() => Math.max(1, Number(searchParams.get('page')) || 1))
   // فلتر المستخدم: مفتاح المستخدم المختار + نص البحث في القائمة + إظهار القائمة
@@ -67,36 +141,36 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(() => Boolean(searchParams.get('user')) || searchParams.get('duplicates') === '1')
   const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [requestToDelete, setRequestToDelete] = useState<any>(null)
+  const [requestToDelete, setRequestToDelete] = useState<AdminRequest | null>(null)
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null)
   const [sendingBulkReminder, setSendingBulkReminder] = useState(false)
   const [showBulkConfirm, setShowBulkConfirm] = useState(false)
   const [bulkApplyDiscount, setBulkApplyDiscount] = useState(false)
   const [bulkDiscountPct, setBulkDiscountPct] = useState<number>(10)
-  const [reminderTarget, setReminderTarget] = useState<any | null>(null)
+  const [reminderTarget, setReminderTarget] = useState<AdminRequest | null>(null)
   const [singleApplyDiscount, setSingleApplyDiscount] = useState(false)
   const [singleDiscountPct, setSingleDiscountPct] = useState<number>(10)
-  const [quickNoteTarget, setQuickNoteTarget] = useState<any | null>(null)
+  const [quickNoteTarget, setQuickNoteTarget] = useState<AdminRequest | null>(null)
   const [quickNote, setQuickNote] = useState('')
   const [savingQuickNote, setSavingQuickNote] = useState(false)
-  const [quickActionTarget, setQuickActionTarget] = useState<any | null>(null)
+  const [quickActionTarget, setQuickActionTarget] = useState<AdminRequest | null>(null)
   const [quickActionStatus, setQuickActionStatus] = useState('')
   const [quickActionNotes, setQuickActionNotes] = useState('')
   const [savingQuickAction, setSavingQuickAction] = useState(false)
-  const [thumbnailTarget, setThumbnailTarget] = useState<any | null>(null)
+  const [thumbnailTarget, setThumbnailTarget] = useState<AdminRequest | null>(null)
   const [savingThumbnail, setSavingThumbnail] = useState(false)
-  const [reviewsByRequest, setReviewsByRequest] = useState<Record<string, any>>({})
+  const [reviewsByRequest, setReviewsByRequest] = useState<Record<string, RequestReview>>({})
   const [sendingReviewInvitationId, setSendingReviewInvitationId] = useState<string | null>(null)
   const [showBulkReviewConfirm, setShowBulkReviewConfirm] = useState(false)
   const [sendingBulkReviewInvitations, setSendingBulkReviewInvitations] = useState(false)
-  const [refundTarget, setRefundTarget] = useState<any | null>(null)
+  const [refundTarget, setRefundTarget] = useState<AdminRequest | null>(null)
   const [refundAmount, setRefundAmount] = useState('')
   const [refundReason, setRefundReason] = useState('')
   const [processingRefund, setProcessingRefund] = useState(false)
   const [confirmingRefundId, setConfirmingRefundId] = useState<string | null>(null)
   const [resendingRefundId, setResendingRefundId] = useState<string | null>(null)
-  const [refundsByRequest, setRefundsByRequest] = useState<Record<string, any[]>>({})
-  const [revivalTarget, setRevivalTarget] = useState<any | null>(null)
+  const [refundsByRequest, setRefundsByRequest] = useState<Record<string, RefundRecord[]>>({})
+  const [revivalTarget, setRevivalTarget] = useState<AdminRequest | null>(null)
   const [revivalDiscountPct, setRevivalDiscountPct] = useState(15)
   const [revivalValidDays, setRevivalValidDays] = useState(3)
   const [revivalMessage, setRevivalMessage] = useState('')
@@ -124,7 +198,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
 
     let summariesQuery = supabase
       .from('publish_requests')
-      .select('id,user_id,client_name,client_email,client_phone,title,content,admin_notes,status,created_at,request_number,billing_source,membership_id,membership_credits,membership_credit_status')
+      .select('id,user_id,client_name,client_email,client_phone,title,content,admin_notes,status,created_at,request_number,billing_source,membership_id,membership_credits,membership_credit_status,sub_option')
       // الطلب الذي ألغاه العميل لا يحتاج متابعة في لوحة الإدارة.
       .neq('status', 'cancelled')
       .order('created_at', { ascending: false })
@@ -133,12 +207,19 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
       : summariesQuery.neq('billing_source', 'membership')
     const { data: summaries } = await summariesQuery
 
-    setRequestSummaries(summaries ?? [])
+    const scopedSummaries = (summaries ?? []).filter(request => {
+      const isStoreRequest = Boolean(getStoreRequestMeta(request))
+      if (storeOnly) return isStoreRequest
+      if (directOnly) return !isStoreRequest
+      return true
+    })
+    setRequestSummaries(scopedSummaries)
 
     const reviewResponse = await fetch('/api/admin/request-reviews')
     if (reviewResponse.ok) {
       const reviewData = await reviewResponse.json().catch(() => ({ reviews: [] }))
-      const mapped = (reviewData.reviews ?? []).reduce((acc: Record<string, any>, review: any) => {
+      const reviews = Array.isArray(reviewData.reviews) ? reviewData.reviews as RequestReview[] : []
+      const mapped = reviews.reduce((acc: Record<string, RequestReview>, review) => {
         acc[review.request_id] = review
         return acc
       }, {})
@@ -148,16 +229,20 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
     const refundsResponse = await fetch('/api/admin/refund')
     if (refundsResponse.ok) {
       const refundsData = await refundsResponse.json().catch(() => ({ refunds: [] }))
-      const mapped = (refundsData.refunds ?? []).reduce((acc: Record<string, any[]>, refund: any) => {
+      const refunds = Array.isArray(refundsData.refunds) ? refundsData.refunds as RefundRecord[] : []
+      const mapped = refunds.reduce((acc: Record<string, RefundRecord[]>, refund) => {
         acc[refund.request_id] = [...(acc[refund.request_id] ?? []), refund]
         return acc
       }, {})
       setRefundsByRequest(mapped)
     }
     setLoading(false)
-  }, [supabase, router, membershipOnly])
+  }, [supabase, router, membershipOnly, storeOnly, directOnly])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadData() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadData])
 
   // تبقى الفلاتر عند تحديث الصفحة، ويصبح الرابط نفسه قابلاً للمشاركة.
   useEffect(() => {
@@ -168,24 +253,25 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
     }
     setParam('q', search.trim())
     setParam('status', statusFilter)
+    setParam('service', storeOnly ? serviceFilter : '')
     setParam('user', userFilter)
     setParam('duplicates', duplicatesOnly ? '1' : '')
     setParam('page', currentPage > 1 ? String(currentPage) : '')
     const query = params.toString()
     const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}`
     window.history.replaceState(window.history.state, '', nextUrl)
-  }, [search, statusFilter, userFilter, duplicatesOnly, currentPage])
+  }, [search, statusFilter, serviceFilter, storeOnly, userFilter, duplicatesOnly, currentPage])
 
   // Removed drawer useEffect
 
   // مفتاح هوية صاحب الطلب — user_id أولاً، وإلا البريد، وإلا الجوال.
   // نتجاهل القيم النائبة ('-' أو الفارغة) — مثل الطلبات الخارجية — ونعطيها
   // مفتاحاً فريداً لكل طلب حتى لا تُجمَّع طلبات أشخاص مختلفين معاً.
-  const cleanId = (v: any): string => {
+  const cleanId = (v: unknown): string => {
     const s = String(v ?? '').trim().toLowerCase()
     return s && s !== '-' ? s : ''
   }
-  const ownerKey = (r: any): string =>
+  const ownerKey = (r: AdminRequest): string =>
     r.user_id || cleanId(r.client_email) || cleanId(r.client_phone) || `req:${r.id}`
 
   // عدد طلبات كل مستخدم (لتحديد المكررين وعرض الشارة)
@@ -195,7 +281,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
     return acc
   }, {})
 
-  const isDuplicate = (r: any): boolean => {
+  const isDuplicate = (r: AdminRequest): boolean => {
     const key = ownerKey(r)
     return !!key && (requestCountByOwner[key] ?? 0) > 1
   }
@@ -238,6 +324,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
       if (userFilter && ownerKey(r) !== userFilter) return false
       if (duplicatesOnly && !isDuplicate(r)) return false
       if (statusFilter && r.status !== statusFilter) return false
+      if (storeOnly && serviceFilter && getStoreRequestMeta(r)?.product_slug !== serviceFilter) return false
       if (search) {
         const q = search.toLowerCase()
         return (
@@ -246,7 +333,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
           r.title?.toLowerCase().includes(q) ||
           r.content?.toLowerCase().includes(q) ||
           r.admin_notes?.toLowerCase().includes(q) ||
-          generateRequestNumber(r.request_number).toLowerCase().includes(q)
+          formatRequestNumber(r.request_number).toLowerCase().includes(q)
         )
       }
       return true
@@ -258,15 +345,13 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
   const pageRequestIds = filteredRequestSummaries
     .slice((safeCurrentPage - 1) * REQUESTS_PER_PAGE, safeCurrentPage * REQUESTS_PER_PAGE)
     .map(request => request.id)
-
-  useEffect(() => {
-    if (currentPage !== safeCurrentPage) setCurrentPage(safeCurrentPage)
-  }, [currentPage, safeCurrentPage])
+  const pageRequestIdsKey = pageRequestIds.join('|')
 
   useEffect(() => {
     const loadPage = async () => {
+      const requestIds = pageRequestIdsKey ? pageRequestIdsKey.split('|') : []
       if (loading) return
-      if (pageRequestIds.length === 0) {
+      if (requestIds.length === 0) {
         setRequests([])
         return
       }
@@ -275,17 +360,17 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
       const { data, error } = await supabase
         .from('publish_requests')
         .select('*')
-        .in('id', pageRequestIds)
+        .in('id', requestIds)
 
       if (!error) {
         const requestsById = new Map((data ?? []).map(request => [request.id, request]))
-        setRequests(pageRequestIds.map(id => requestsById.get(id)).filter(Boolean))
+        setRequests(requestIds.map(id => requestsById.get(id)).filter((request): request is AdminRequest => Boolean(request)))
       }
       setPageLoading(false)
     }
 
     loadPage()
-  }, [loading, supabase, safeCurrentPage, pageRequestIds.join('|')])
+  }, [loading, supabase, pageRequestIdsKey])
 
   const filteredRequests = requests
 
@@ -299,7 +384,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
   }
 
   // The admin can choose one existing request image for the card without changing source images.
-  const getRequestThumbnail = (request: any): string | null => {
+  const getRequestThumbnail = (request: AdminRequest): string | null => {
     const images = request.content_images
     if (!Array.isArray(images)) return null
 
@@ -338,7 +423,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
     }
   }
 
-  const sendReviewInvitation = async (request: any) => {
+  const sendReviewInvitation = async (request: AdminRequest) => {
     setSendingReviewInvitationId(request.id)
     try {
       const response = await fetch('/api/admin/request-review-invitation', {
@@ -363,7 +448,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
     }
   }
 
-  const openRefund = (request: any) => {
+  const openRefund = (request: AdminRequest) => {
     const completedRefunds = (refundsByRequest[request.id] ?? []).filter(refund => refund.status === 'completed')
     const paidAmount = Number(request.final_total ?? request.admin_quoted_price ?? 0)
     const refundedAmount = completedRefunds.reduce((total, refund) => total + Number(refund.amount), 0)
@@ -376,7 +461,8 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
   const submitRefund = async () => {
     if (!refundTarget) return
     const amount = Number(refundAmount)
-    if (!Number.isFinite(amount) || amount <= 0 || amount > refundTarget.remainingRefundAmount + 0.001) {
+    const remainingRefundAmount = refundTarget.remainingRefundAmount ?? 0
+    if (!Number.isFinite(amount) || amount <= 0 || amount > remainingRefundAmount + 0.001) {
       showToast('أدخل مبلغاً ضمن الرصيد القابل للاسترجاع', 'error')
       return
     }
@@ -406,7 +492,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
     }
   }
 
-  const confirmManualRefund = async (refund: any) => {
+  const confirmManualRefund = async (refund: RefundRecord) => {
     if (!window.confirm('هل تؤكد تنفيذ التحويل البنكي للاسترجاع؟ سيُشعر العميل بإتمام الاسترجاع.')) return
     setConfirmingRefundId(refund.id)
     try {
@@ -425,7 +511,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
     }
   }
 
-  const resendRefundRequestEmail = async (refund: any) => {
+  const resendRefundRequestEmail = async (refund: RefundRecord) => {
     setResendingRefundId(refund.id)
     try {
       const response = await fetch(`/api/admin/refund/${refund.id}/resend-request`, { method: 'POST' })
@@ -442,9 +528,8 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
     }
   }
 
-  const openRequest = (req: any) => {
-    // Navigate to full-page request view
-    router.push(`/admin/requests/${req.id}`)
+  const openRequest = (req: AdminRequest) => {
+    router.push(storeOnly ? `/admin/inventor-store-requests/${req.id}` : `/admin/requests/${req.id}`)
   }
 
   // Removed drawer handler functions - now using full-page view
@@ -452,11 +537,12 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
   const handleExport = () => {
     const params = new URLSearchParams()
     if (statusFilter) params.set('status', statusFilter)
-    params.set('scope', membershipOnly ? 'membership' : 'direct')
+    params.set('scope', scope)
+    if (storeOnly && serviceFilter) params.set('service', serviceFilter)
     window.open(`/api/export-csv?${params.toString()}`)
   }
 
-  const handleDeleteClick = (request: any, event: React.MouseEvent) => {
+  const handleDeleteClick = (request: AdminRequest, event: React.MouseEvent) => {
     event.stopPropagation() // منع فتح صفحة الطلب
     console.log('🗑️ Delete clicked for request:', request.id, request.client_name)
     setRequestToDelete(request)
@@ -477,7 +563,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
       const data = await response.json()
 
       if (response.ok && data.success) {
-        showToast(`تم حذف طلب ${generateRequestNumber(requestToDelete.request_number)} نهائياً`, 'success')
+        showToast(`تم حذف طلب ${formatRequestNumber(requestToDelete.request_number)} نهائياً`, 'success')
         // إزالة الطلب من القائمة
         setRequests(prev => prev.filter(r => r.id !== requestToDelete.id))
         setRequestSummaries(prev => prev.filter(r => r.id !== requestToDelete.id))
@@ -499,13 +585,13 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
     setRequestToDelete(null)
   }
 
-  const openQuickNote = (request: any, event: React.MouseEvent) => {
+  const openQuickNote = (request: AdminRequest, event: React.MouseEvent) => {
     event.stopPropagation()
     setQuickNoteTarget(request)
     setQuickNote(request.admin_notes ?? '')
   }
 
-  const quickActionLabel = (currentStatus: string, nextStatus: string, billingSource?: string) => {
+  const quickActionLabel = (currentStatus: string, nextStatus: string, billingSource?: string | null) => {
     if (nextStatus === REFUND_QUICK_ACTION) return 'استرجاع مبلغ'
     if (billingSource === 'membership' && currentStatus === 'pending' && nextStatus === 'in_progress') return 'قبول الطلب وبدء التنفيذ'
     if (billingSource === 'membership' && currentStatus === 'pending' && nextStatus === 'rejected') return 'رفض الطلب وإعادة الرصيد'
@@ -517,7 +603,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
     return REQUEST_STATUSES[nextStatus as keyof typeof REQUEST_STATUSES]?.label ?? nextStatus
   }
 
-  const canRefundRequest = (request: any) => {
+  const canRefundRequest = (request: AdminRequest) => {
     const refunds = refundsByRequest[request.id] ?? []
     const hasPendingRefund = refunds.some(refund => refund.status === 'pending')
     const completedRefundAmount = refunds
@@ -529,12 +615,12 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
     return !hasPendingRefund && isPaid && request.status !== 'refunded' && completedRefundAmount < paidAmount
   }
 
-  const quickActionsFor = (request: any) => {
+  const quickActionsFor = (request: AdminRequest) => {
     const actions = quickStatusTransitionsFor(request.status, request.billing_source)
     return canRefundRequest(request) ? [...actions, REFUND_QUICK_ACTION] : actions
   }
 
-  const openQuickAction = (request: any, event: React.MouseEvent) => {
+  const openQuickAction = (request: AdminRequest, event: React.MouseEvent) => {
     event.stopPropagation()
     const options = quickActionsFor(request)
     setQuickActionTarget(request)
@@ -611,7 +697,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
     }
   }
 
-  const openRevival = (request: any, event: React.MouseEvent) => {
+  const openRevival = (request: AdminRequest, event: React.MouseEvent) => {
     event.stopPropagation()
     const currentPrice = Number(request.final_total ?? request.admin_quoted_price ?? 0)
     setRevivalTarget(request)
@@ -738,7 +824,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
     }
   }
 
-  const handleSendReminder = (request: any, event: React.MouseEvent) => {
+  const handleSendReminder = (request: AdminRequest, event: React.MouseEvent) => {
     event.stopPropagation() // منع فتح صفحة الطلب
     setSingleApplyDiscount(false)
     setSingleDiscountPct(10)
@@ -746,7 +832,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
   }
 
   // هل طُبِّق خصم على هذا الطلب؟ (تُحدِّد نوع رسالة الواتساب)
-  const hasDiscount = (request: any) => Boolean(request.offer_discount_sent_at)
+  const hasDiscount = (request: AdminRequest) => Boolean(request.offer_discount_sent_at)
 
   // تطبيع رقم الجوال إلى صيغة دولية بدون رمز '+' (افتراضي السعودية 966)
   const normalizePhone = (raw: string) => {
@@ -762,9 +848,9 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
   }
 
   // نص رسالة الخصم عبر واتساب — يطابق محتوى قالب البريد quotedDiscountTemplate
-  const buildDiscountWhatsAppMessage = (request: any) => {
+  const buildDiscountWhatsAppMessage = (request: AdminRequest) => {
     const clientName = request.client_name || 'عزيزنا'
-    const requestNumber = generateRequestNumber(request.request_number)
+    const requestNumber = formatRequestNumber(request.request_number)
     const oldPrice = Number(request.offer_original_price ?? request.admin_quoted_price ?? 0)
     const newPrice = Number(request.final_total ?? request.admin_quoted_price ?? 0)
     const discountPct = request.offer_discount_pct != null
@@ -788,9 +874,9 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
   }
 
   // رسالة عامة عند عدم وجود خصم مُطبَّق على الطلب
-  const buildGeneralWhatsAppMessage = (request: any) => {
+  const buildGeneralWhatsAppMessage = (request: AdminRequest) => {
     const clientName = request.client_name || 'عزيزنا'
-    const requestNumber = generateRequestNumber(request.request_number)
+    const requestNumber = formatRequestNumber(request.request_number)
 
     return [
       `مرحباً ${clientName}،`,
@@ -803,7 +889,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
     ].join('\n')
   }
 
-  const handleWhatsApp = (request: any, event: React.MouseEvent) => {
+  const handleWhatsApp = (request: AdminRequest, event: React.MouseEvent) => {
     event.stopPropagation() // منع فتح صفحة الطلب
     const normalizedPhone = normalizePhone(
       request.client_phone ?? request.phone ?? request.client_mobile ?? ''
@@ -846,7 +932,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
       const data = await response.json()
 
       if (response.ok && data.success) {
-        const requestNum = generateRequestNumber(request.request_number)
+        const requestNum = formatRequestNumber(request.request_number)
         if (data.priceUpdated) {
           showToast(`تم إرسال خصم ${singleDiscountPct}% لطلب ${requestNum} وتحديث السعر`, 'success')
           loadData() // refresh prices
@@ -919,8 +1005,8 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
   return (
     <div className="mx-auto max-w-7xl p-4 md:p-6">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div><h1 className="text-2xl font-black text-dark">{membershipOnly ? 'طلبات الأعضاء' : 'إدارة الطلبات'}</h1><p className="mt-1 text-sm text-muted">{membershipOnly ? 'راجع طلبات النشر المقدمة من أرصدة العضويات واتخذ إجراء التنفيذ.' : 'تابع الطلبات المباشرة، تواصل مع العملاء، وراجع تفاصيل التنفيذ.'}</p></div>
-        <span className="rounded-full bg-cream px-3 py-1.5 text-xs font-bold text-muted">{requestSummaries.length} {membershipOnly ? 'طلب عضوية' : 'طلب نشط'}</span>
+        <div><h1 className="text-2xl font-black text-dark">{storeOnly ? 'طلبات مسار المخترع' : membershipOnly ? 'طلبات الأعضاء' : 'إدارة الطلبات'}</h1><p className="mt-1 text-sm text-muted">{storeOnly ? 'راجع طلبات الخدمات الرقمية للمخترعين وأرسل العرض المناسب قبل الدفع.' : membershipOnly ? 'راجع طلبات النشر المقدمة من أرصدة العضويات واتخذ إجراء التنفيذ.' : 'تابع الطلبات المباشرة، تواصل مع العملاء، وراجع تفاصيل التنفيذ.'}</p></div>
+        <span className="rounded-full bg-cream px-3 py-1.5 text-xs font-bold text-muted">{requestSummaries.length} {storeOnly ? 'طلب متجر' : membershipOnly ? 'طلب عضوية' : 'طلب نشط'}</span>
       </div>
 
       <div className="mb-4 rounded-lg border border-border bg-card p-3 sm:p-4">
@@ -941,6 +1027,15 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
               <option key={k} value={k}>{v.label}</option>
             ))}
           </select>
+          {storeOnly && <select
+            value={serviceFilter}
+            onChange={e => { setServiceFilter(e.target.value); setCurrentPage(1) }}
+            className="min-h-[48px] max-w-full rounded-lg border border-border bg-card px-4 py-2 text-sm sm:max-w-64"
+            aria-label="فلترة حسب خدمة مسار المخترع"
+          >
+            <option value="">جميع خدمات المسار</option>
+            {INVENTOR_STORE_PRODUCTS.map(product => <option key={product.slug} value={product.slug}>{product.name}</option>)}
+          </select>}
           <button
             type="button"
             onClick={() => setShowAdvancedFilters(value => !value)}
@@ -949,7 +1044,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
             ⚙️ فلاتر إضافية
             {(userFilter || duplicatesOnly) && <span className="mr-2 rounded-full bg-green px-1.5 py-0.5 text-[10px] text-white">مفعلة</span>}
           </button>
-          {!membershipOnly && <Button onClick={() => setShowExternalForm(true)} className="bg-green-600 hover:bg-green-700">
+          {directOnly && <Button onClick={() => setShowExternalForm(true)} className="bg-green-600 hover:bg-green-700">
             ➕ تسجيل طلب خارجي
           </Button>}
           <button
@@ -970,7 +1065,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
           >
             🤖
           </button>
-          {!membershipOnly && <>
+          {directOnly && <>
             <Button
               variant="outline"
               size="sm"
@@ -1093,8 +1188,8 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
             <div className="text-xs text-yellow-600 space-y-1">
               <div>إجمالي الطلبات: {requestSummaries.length}</div>
               <div>الطلبات المفلترة: {filteredRequestSummaries.length}</div>
-              <div>حالة البحث: "{search || 'فارغ'}"</div>
-              <div>فلتر الحالة: "{statusFilter || 'جميع الحالات'}"</div>
+              <div>حالة البحث: «{search || 'فارغ'}»</div>
+              <div>فلتر الحالة: «{statusFilter || 'جميع الحالات'}»</div>
               {filteredRequestSummaries.length > 0 && (
                 <div>عينة من البيانات: {JSON.stringify({
                   id: filteredRequestSummaries[0]?.id?.substring(0, 8),
@@ -1111,7 +1206,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
               names={filteredRequestSummaries
                 .slice(0, 3)
                 .map(r => r.client_name)
-                .filter(Boolean)}
+                .filter((name): name is string => Boolean(name))}
             />
           )}
         </>
@@ -1137,9 +1232,10 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-muted">{generateRequestNumber(r.request_number)}</span>
+                      <span className="font-mono text-xs font-bold text-muted">{formatRequestNumber(r.request_number)}</span>
                       <StatusBadge status={r.status} userRole="admin" emphasizeCompleted />
                       {membershipOnly && <span className="rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-[10px] font-bold text-dark">طلب من رصيد العضوية</span>}
+                      {storeOnly && <span className="rounded-full border border-cyan-300 bg-cyan-50 px-2 py-0.5 text-[10px] font-bold text-cyan-800">طلب من مسار المخترع</span>}
                       {r.is_external && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">خارجي</span>}
                     </div>
                     <button type="button" onClick={() => openRequest(r)} className="mt-2 block text-right text-sm font-black leading-6 text-dark hover:text-green sm:text-base">{r.title || 'طلب بدون عنوان'}</button>
@@ -1154,6 +1250,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
                       {hasRefund && <span className={`rounded-full px-2.5 py-1 ${pendingRefund ? 'bg-orange-50 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>{pendingRefund ? 'استرجاع قيد المعالجة' : `مسترجع ${formatNumber(completedRefundAmount)} ر.س`}</span>}
                       {r.refund_timing && <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">مدة الاسترجاع: {r.refund_timing}</span>}
                       {membershipOnly && <span className="rounded-full bg-cyan-50 px-2.5 py-1 text-cyan-800">الرصيد: {r.membership_credit_status === 'reserved' ? 'محجوز' : r.membership_credit_status === 'consumed' ? 'مستخدم' : r.membership_credit_status === 'released' ? 'مُعاد' : 'غير مخصوم'}</span>}
+                      {storeOnly && getStoreRequestMeta(r) && <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-800">{getStoreRequestMeta(r)?.product_name} · {formatNumber(Number(getStoreRequestMeta(r)?.listed_price || 0))} ر.س معلن</span>}
                     </div>
                     {r.status === 'completed' && review?.comment && <div className="mt-3 rounded-lg border border-gold/20 bg-gold/5 px-3 py-2 text-xs leading-5 text-dark"><span className="font-black text-gold">رأي العميل: </span>{review.comment}</div>}
                     {r.admin_notes?.trim() && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700"><span className="font-black">ملاحظة الإدارة: </span>{r.admin_notes.trim()}</div>}
@@ -1169,10 +1266,13 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
                           className="flex h-full w-full items-center justify-center"
                           title="عرض الصورة المرفقة"
                         >
-                          <img
+                          <Image
                             src={thumbnailUrl}
-                            alt={`صورة مرفقة للطلب ${generateRequestNumber(r.request_number)}`}
-                            className="h-full w-full object-contain"
+                            alt={`صورة مرفقة للطلب ${formatRequestNumber(r.request_number)}`}
+                            fill
+                            unoptimized
+                            sizes="(max-width: 1024px) 100vw, 280px"
+                            className="object-contain"
                           />
                         </a>
                         {Array.isArray(r.content_images) && r.content_images.filter((image: unknown) => typeof image === 'string' && !!image.trim()).length > 1 && (
@@ -1221,7 +1321,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
                   </button>
                   <button onClick={(e) => openQuickNote(r, e)} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${r.admin_notes?.trim() ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>📝 {r.admin_notes?.trim() ? 'تعديل الملاحظة' : 'إضافة ملاحظة'}</button>
                   <button onClick={(e) => handleSendReminder(r, e)} disabled={sendingReminderId === r.id || !r.client_email} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50" title="إرسال تذكير بالبريد">{sendingReminderId === r.id ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" /> : '✉'}</button>
-                  <button onClick={(e) => handleWhatsApp(r, e)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 p-1.5 hover:bg-green/15" title="مراسلة العميل عبر واتساب"><img src="/whatsapp-icon.avif" alt="واتساب" className="h-full w-full object-contain" /></button>
+                  <button onClick={(e) => handleWhatsApp(r, e)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 p-1.5 hover:bg-green/15" title="مراسلة العميل عبر واتساب"><Image src="/whatsapp-icon.avif" alt="واتساب" width={20} height={20} className="h-full w-full object-contain" /></button>
                   {r.status === 'completed' && r.client_email && !review?.rating && (
                     <button onClick={() => sendReviewInvitation(r)} disabled={sendingReviewInvitationId === r.id} className="rounded-lg border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-bold text-dark hover:bg-gold/20 disabled:opacity-50">
                       {sendingReviewInvitationId === r.id ? 'جارٍ الإرسال...' : review?.invitation_sent_at ? 'إعادة إرسال التقييم' : 'طلب تقييم'}
@@ -1292,7 +1392,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
                     onClick={() => openRequest(r)}
                     className="border-t border-border hover:bg-cream/50 cursor-pointer transition-colors"
                   >
-                    <td className="px-4 py-3 font-mono text-xs">{generateRequestNumber(r.request_number)}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{formatRequestNumber(r.request_number)}</td>
 
                     {/* العنوان والمحتوى */}
                     <td className="px-3 py-3 max-w-xs">
@@ -1350,7 +1450,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
                     {/* المبلغ */}
                     <td className="px-3 py-3 text-sm">
                       {r.final_total ?? r.admin_quoted_price
-                        ? formatNumber(r.final_total ?? r.admin_quoted_price)
+                        ? formatNumber(r.final_total ?? r.admin_quoted_price ?? 0)
                         : <span className="text-muted text-xs">—</span>}
                     </td>
 
@@ -1396,7 +1496,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
                           className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                           title={hasDiscount(r) ? "إرسال رسالة الخصم عبر واتساب" : "مراسلة العميل عبر واتساب"}
                         >
-                          <img src="/whatsapp-icon.avif" alt="واتساب" className="h-4 w-4 object-contain" />
+                          <Image src="/whatsapp-icon.avif" alt="واتساب" width={16} height={16} className="h-4 w-4 object-contain" />
                         </button>
 
                         {/* زر إرسال عرض جديد — يظهر فقط للطلبات التي رفضها العميل */}
@@ -1474,8 +1574,8 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
                       disabled={savingThumbnail}
                       className={`overflow-hidden rounded-xl border-2 p-2 text-right transition ${isSelected ? 'border-green bg-green/5' : 'border-border bg-white hover:border-green/60'} disabled:cursor-wait disabled:opacity-60`}
                     >
-                      <span className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-lg bg-cream/50 p-1">
-                        <img src={imageUrl} alt={`صورة مرفقة ${index + 1}`} className="h-full w-full object-contain" />
+                      <span className="relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-lg bg-cream/50 p-1">
+                        <Image src={imageUrl} alt={`صورة مرفقة ${index + 1}`} fill unoptimized sizes="(max-width: 640px) 50vw, 220px" className="object-contain p-1" />
                       </span>
                       <span className="mt-2 block text-xs font-bold text-dark">صورة {index + 1}</span>
                       <span className={`mt-0.5 block text-[10px] font-bold ${isSelected ? 'text-green' : 'text-muted'}`}>{isSelected ? 'المحددة حالياً' : 'اختيار هذه الصورة'}</span>
@@ -1502,14 +1602,14 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold text-red-600">استرجاع مبلغ للعميل</p>
-                  <h3 className="mt-1 text-lg font-black text-dark">{generateRequestNumber(refundTarget.request_number)}</h3>
+                  <h3 className="mt-1 text-lg font-black text-dark">{formatRequestNumber(refundTarget.request_number)}</h3>
                   <p className="mt-1 text-sm text-muted">وسيلة الدفع: {provider}</p>
                 </div>
                 <button type="button" onClick={() => setRefundTarget(null)} disabled={processingRefund} className="grid h-8 w-8 place-items-center rounded-lg text-lg text-muted hover:bg-slate-100" aria-label="إغلاق">×</button>
               </div>
 
               <div className="mt-4 rounded-lg border border-border bg-cream/40 px-4 py-3 text-sm">
-                <div className="flex justify-between gap-3"><span className="text-muted">المتاح للاسترجاع</span><strong className="text-dark">{formatNumber(refundTarget.remainingRefundAmount)} ر.س</strong></div>
+                <div className="flex justify-between gap-3"><span className="text-muted">المتاح للاسترجاع</span><strong className="text-dark">{formatNumber(refundTarget.remainingRefundAmount ?? 0)} ر.س</strong></div>
                 <div className="mt-2 border-t border-border pt-2 text-xs leading-5 text-muted">سيظهر للعميل أن انعكاس المبلغ متوقع خلال <strong className="text-dark">{timing}</strong>.</div>
               </div>
 
@@ -1517,7 +1617,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
               {!isManual && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-800">سيتم تنفيذ الاسترجاع فور تأكيدك عبر {provider}. لا يمكن التراجع عن العملية من المنصة.</div>}
 
               <label className="mt-4 block text-sm font-bold text-dark">مبلغ الاسترجاع
-                <div className="relative mt-2"><input type="number" min="0.01" max={refundTarget.remainingRefundAmount} step="0.01" value={refundAmount} onChange={event => setRefundAmount(event.target.value)} className="min-h-[46px] w-full rounded-lg border border-border bg-white px-3 pl-12 text-sm outline-none focus:border-red-400" /><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">ر.س</span></div>
+                <div className="relative mt-2"><input type="number" min="0.01" max={refundTarget.remainingRefundAmount ?? 0} step="0.01" value={refundAmount} onChange={event => setRefundAmount(event.target.value)} className="min-h-[46px] w-full rounded-lg border border-border bg-white px-3 pl-12 text-sm outline-none focus:border-red-400" /><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">ر.س</span></div>
               </label>
               <label className="mt-4 block text-sm font-bold text-dark">سبب الاسترجاع
                 <textarea value={refundReason} onChange={event => setRefundReason(event.target.value)} maxLength={1000} rows={4} className="mt-2 w-full resize-y rounded-lg border border-border bg-white px-3 py-2 text-sm font-normal text-dark outline-none focus:border-red-400" placeholder="يُحفظ في سجل الإدارة ولا يظهر للعميل." />
@@ -1536,7 +1636,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
           <div className="w-full max-w-md rounded-lg border border-white/70 bg-white p-5 shadow-xl sm:p-6" onClick={event => event.stopPropagation()} dir="rtl">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-bold text-gold">إجراء سريع للطلب {generateRequestNumber(quickActionTarget.request_number)}</p>
+                <p className="text-xs font-bold text-gold">إجراء سريع للطلب {formatRequestNumber(quickActionTarget.request_number)}</p>
                 <h3 className="mt-1 text-lg font-black text-dark">تحديث حالة الطلب</h3>
                 <p className="mt-1 text-sm text-muted">{quickActionTarget.client_name || 'العميل'} · {quickActionTarget.title || 'طلب بدون عنوان'}</p>
               </div>
@@ -1589,7 +1689,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
               <div className="mb-5">
                 <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700">طلب أُغلق تلقائياً</span>
                 <h3 className="mt-3 text-xl font-black text-dark">إحياء الطلب وإرسال عرض عودة</h3>
-                <p className="mt-1 text-sm text-muted">{generateRequestNumber(revivalTarget.request_number)} · {revivalTarget.client_name || 'العميل'}</p>
+                <p className="mt-1 text-sm text-muted">{formatRequestNumber(revivalTarget.request_number)} · {revivalTarget.client_name || 'العميل'}</p>
               </div>
 
               <div className="grid gap-3 rounded-xl border border-border bg-cream/35 p-4 sm:grid-cols-2">
@@ -1627,7 +1727,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
             <div className="mb-4">
               <h3 className="text-lg font-black text-red-700">ملاحظة الإدارة</h3>
               <p className="mt-1 text-sm text-muted">
-                {generateRequestNumber(quickNoteTarget.request_number)} · تظهر للعميل باللون الأحمر في بطاقة الطلب.
+                {formatRequestNumber(quickNoteTarget.request_number)} · تظهر للعميل باللون الأحمر في بطاقة الطلب.
               </p>
             </div>
             <textarea
@@ -1668,14 +1768,14 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
               <div className="text-5xl mb-2">📧</div>
               <h3 className="text-lg font-bold text-blue-700 mb-1">إرسال تذكير للعميل</h3>
               <p className="text-sm text-gray-600">
-                الطلب: <strong>{generateRequestNumber(reminderTarget.request_number)}</strong>
+                الطلب: <strong>{formatRequestNumber(reminderTarget.request_number)}</strong>
               </p>
               <p className="text-xs text-muted mt-1">
                 {reminderTarget.client_name || '—'} · {reminderTarget.client_email}
               </p>
               {(reminderTarget.final_total ?? reminderTarget.admin_quoted_price) && (
                 <p className="text-xs text-muted mt-1">
-                  السعر الحالي: <strong className="text-gold">{formatNumber(reminderTarget.final_total ?? reminderTarget.admin_quoted_price)} ر.س</strong>
+                  السعر الحالي: <strong className="text-gold">{formatNumber(reminderTarget.final_total ?? reminderTarget.admin_quoted_price ?? 0)} ر.س</strong>
                 </p>
               )}
             </div>
@@ -1712,13 +1812,13 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
                       onChange={e => setSingleDiscountPct(parseFloat(e.target.value) || 0)}
                       className="w-full px-3 py-2 rounded-lg border border-orange-300 bg-white text-sm"
                     />
-                    {(reminderTarget.admin_quoted_price ?? reminderTarget.final_total) > 0 && singleDiscountPct > 0 && singleDiscountPct < 100 && (
+                    {(reminderTarget.admin_quoted_price ?? reminderTarget.final_total ?? 0) > 0 && singleDiscountPct > 0 && singleDiscountPct < 100 && (
                       <p className="text-xs text-orange-700 mt-2 leading-relaxed">
                         السعر بعد الخصم:{' '}
                         <strong>
                           {formatNumber(
                             Math.round(
-                              (reminderTarget.admin_quoted_price ?? reminderTarget.final_total) *
+                              (reminderTarget.admin_quoted_price ?? reminderTarget.final_total ?? 0) *
                                 (1 - singleDiscountPct / 100) * 100
                             ) / 100
                           )}{' '}
@@ -1727,7 +1827,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
                         {' '}(توفير{' '}
                         {formatNumber(
                           Math.round(
-                            (reminderTarget.admin_quoted_price ?? reminderTarget.final_total) *
+                            (reminderTarget.admin_quoted_price ?? reminderTarget.final_total ?? 0) *
                               (singleDiscountPct / 100) * 100
                           ) / 100
                         )}
@@ -1739,7 +1839,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
               </>
             ) : (
               <p className="text-xs text-muted text-center bg-blue-50 border border-blue-200 rounded-xl py-2 px-3 mb-4">
-                💡 خيار الخصم متاح فقط للطلبات بحالة "بانتظار موافقة العميل"
+                💡 خيار الخصم متاح فقط للطلبات بحالة «بانتظار موافقة العميل»
               </p>
             )}
 
@@ -1863,7 +1963,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: 'direct' | 'me
               <div className="text-6xl mb-4">⚠️</div>
               <h3 className="text-xl font-bold text-red-700 mb-2">تأكيد حذف الطلب</h3>
               <p className="text-sm text-gray-600">
-                هل أنت متأكد من حذف طلب <strong>{generateRequestNumber(requestToDelete.request_number)}</strong>؟
+                هل أنت متأكد من حذف طلب <strong>{formatRequestNumber(requestToDelete.request_number)}</strong>؟
               </p>
               <div className="mt-4 p-4 bg-gray-50 rounded-xl text-right">
                 <div className="text-sm font-bold text-gray-700 mb-1">تفاصيل الطلب:</div>

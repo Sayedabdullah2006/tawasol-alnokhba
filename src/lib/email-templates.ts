@@ -137,6 +137,22 @@ export interface ClientRequestData {
   requestId?: string // معرّف الطلب — لرابط متابعة مباشر في الإيميل
 }
 
+export interface AdminIntakeNotificationData {
+  subject: string
+  heading: string
+  referenceNumber: string
+  referenceLabel?: string
+  clientName: string
+  clientEmail: string
+  clientPhone?: string | null
+  itemLabel: string
+  itemName: string
+  statusLabel: string
+  amount?: number | null
+  actionLabel: string
+  actionUrl: string
+}
+
 const CHANNEL_LABELS: Record<string, string> = {
   x: 'X', ig: 'Instagram', li: 'LinkedIn', tk: 'TikTok',
 }
@@ -181,6 +197,28 @@ export function newRequestToAdmin(d: ClientRequestData) {
         <p style="margin:6px 0 0 0; font-size:12px; color:#6B7C99; white-space:pre-line; line-height:1.7;">${escapeHtml(d.content)}</p>
       </div>
       <p style="margin:0; text-align:center;">${button('فتح في لوحة الإدارة', `${SITE_URL}/admin/requests`)}</p>
+    `),
+  }
+}
+
+// Generic operational alert — to admin
+export function adminIntakeNotification(d: AdminIntakeNotificationData) {
+  return {
+    subject: `${d.subject} · ${d.referenceNumber}`,
+    html: wrap(`
+      <p style="margin:0 0 16px 0; font-size:16px; font-weight:bold;">${escapeHtml(d.heading)}</p>
+      <div style="background:#F7F4ED; border-radius:10px; padding:14px; margin-bottom:14px;">
+        <p style="margin:0 0 8px 0; font-size:13px;"><strong>${escapeHtml(d.referenceLabel ?? 'الرقم المرجعي')}:</strong> ${escapeHtml(d.referenceNumber)}</p>
+        <p style="margin:4px 0; font-size:13px;"><strong>العميل:</strong> ${escapeHtml(d.clientName)}</p>
+        <p style="margin:4px 0; font-size:13px;"><strong>البريد:</strong> <span dir="ltr">${escapeHtml(d.clientEmail)}</span></p>
+        ${d.clientPhone ? `<p style="margin:4px 0; font-size:13px;"><strong>الجوال:</strong> <span dir="ltr">${escapeHtml(d.clientPhone)}</span></p>` : ''}
+      </div>
+      <div style="background:#F7F4ED; border-radius:10px; padding:14px; margin-bottom:18px;">
+        <p style="margin:4px 0; font-size:13px;"><strong>${escapeHtml(d.itemLabel)}:</strong> ${escapeHtml(d.itemName)}</p>
+        <p style="margin:4px 0; font-size:13px;"><strong>الحالة:</strong> ${escapeHtml(d.statusLabel)}</p>
+        ${typeof d.amount === 'number' ? `<p style="margin:4px 0; font-size:13px;"><strong>القيمة:</strong> ${d.amount.toLocaleString('ar-SA')} ر.س</p>` : ''}
+      </div>
+      <p style="margin:0; text-align:center;">${button(d.actionLabel, d.actionUrl)}</p>
     `),
   }
 }

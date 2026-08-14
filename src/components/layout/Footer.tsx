@@ -21,6 +21,7 @@ export default function Footer() {
             <nav className="flex flex-col gap-2 text-xs md:text-sm">
               <Link href="/" className="text-cream/70 hover:text-gold transition-colors">الرئيسية</Link>
               <Link href="/services" className="text-cream/70 hover:text-gold transition-colors">الخدمات</Link>
+              <Link href="/inventor-store" className="font-bold text-gold hover:text-cream transition-colors">مسار المخترع</Link>
               <Link href="/pricing" className="text-cream/70 hover:text-gold transition-colors">الأسعار</Link>
               <Link href="/policies" className="text-cream/70 hover:text-gold transition-colors">السياسات</Link>
               <Link href="/refund-policy" className="font-bold text-gold hover:text-cream transition-colors">سياسة الاسترجاع</Link>
