@@ -3,8 +3,9 @@
  * يتحقق من الطلبات التي لم تُحدث حالتها رغم وجود دفعات ناجحة
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
+import type { MoyasarPayment } from '@/types/moyasar'
 
 export async function GET() {
   console.log('[PENDING_PAYMENTS] 🔍 Starting pending payments check...')
@@ -66,10 +67,10 @@ export async function GET() {
         })
 
         if (searchResponse.ok) {
-          const { payments } = await searchResponse.json()
+          const { payments } = await searchResponse.json() as { payments?: MoyasarPayment[] }
 
           // البحث عن دفعة مطابقة بواسطة metadata
-          const match = payments?.find((p: any) =>
+          const match = payments?.find((p) =>
             p.metadata?.request_id === request.id &&
             p.status === 'paid'
           )

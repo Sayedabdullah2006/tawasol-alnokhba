@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import type { PostReview } from '@/lib/review-items'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { notifyContentApprovedToAdmin } from '@/lib/email'
 
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'انتهت مرحلة مراجعة المحتوى لهذا الطلب' }, { status: 409 })
     }
 
-    const reviews: Record<string, any> =
+    const reviews: Record<string, PostReview> =
       existingRequest.post_reviews && typeof existingRequest.post_reviews === 'object'
         ? { ...existingRequest.post_reviews }
         : {}
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
 
     const now = new Date().toISOString()
     // وسم آخر جولة في السجل بأنها معتمدة + التصميم المختار
-    const history: any[] = Array.isArray(entry.history) ? [...entry.history] : []
+    const history: NonNullable<PostReview['history']> = Array.isArray(entry.history) ? [...entry.history] : []
     if (history.length) history[history.length - 1] = { ...history[history.length - 1], approved: true, selected_image: chosen, approved_at: now }
 
     reviews[postIndex] = {
@@ -79,7 +80,7 @@ export async function POST(request: Request) {
     // هل اعتُمدت كل منشورات الطلب الآن؟ (المفرد = منشور واحد)
     const isCampaign = existingRequest.request_type === 'campaign' && Array.isArray(existingRequest.campaign_posts)
     const totalPosts = isCampaign ? existingRequest.campaign_posts.length : 1
-    const approvedCount = Object.values(reviews).filter((e: any) => e?.status === 'approved').length
+    const approvedCount = Object.values(reviews).filter(entry => entry?.status === 'approved').length
     const allApproved = approvedCount >= totalPosts
 
     const upd: Record<string, unknown> = { post_reviews: reviews, updated_at: now }

@@ -1,9 +1,10 @@
 'use client'
 
 import { getReviewItems, getPostStatuses } from '@/lib/review-items'
+import type { PublishRequest } from '@/types/publish-request'
 
 interface Props {
-  request: any
+  request: PublishRequest
 }
 
 /**

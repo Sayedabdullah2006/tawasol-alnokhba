@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
@@ -21,14 +21,12 @@ export default function LoginPage() {
   const [sending, setSending] = useState(false)
   const captchaOn = turnstileEnabled()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
   // تمرير وجهة العودة (?next=) إلى رابط إنشاء الحساب حتى يعود العميل لطلبه
-  const [nextParam, setNextParam] = useState('')
-  useEffect(() => {
-    const n = new URLSearchParams(window.location.search).get('next')
-    if (n && n.startsWith('/') && !n.startsWith('//')) setNextParam(n)
-  }, [])
+  const requestedNext = searchParams.get('next')
+  const nextParam = requestedNext?.startsWith('/') && !requestedNext.startsWith('//') ? requestedNext : ''
   const registerHref = nextParam ? `/auth/register?next=${encodeURIComponent(nextParam)}` : '/auth/register'
 
   const finishLogin = async (userId: string) => {

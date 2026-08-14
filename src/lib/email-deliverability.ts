@@ -251,7 +251,7 @@ export async function sendEnhancedEmail(payload: EnhancedEmailPayload): Promise<
 }
 
 // Enhanced wrapper for existing email functions
-export function withDeliverabilityEnhancements<T extends any[]>(
+export function withDeliverabilityEnhancements<T extends unknown[]>(
   originalFunction: (...args: T) => Promise<boolean>,
   options?: DeliverabilityOptions
 ) {

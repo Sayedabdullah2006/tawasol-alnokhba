@@ -20,13 +20,30 @@ const BANK_INFO = {
 
 type Method = 'bank' | 'online' | 'tamara'
 
+interface PaymentRequest {
+  id: string
+  user_id: string
+  request_number: number
+  status: string
+  category: string
+  receipt_url?: string | null
+  final_total?: number | null
+  admin_quoted_price?: number | null
+  estimated_reach?: number | null
+  admin_offered_extras?: Array<{ id: string; name: string; price: number }> | null
+  user_selected_extras?: string[] | null
+  discount_pct?: number | null
+  discount_amount?: number | null
+  discount_code?: string | null
+}
+
 export default function PaymentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
   const supabase = createClient()
   const { showToast } = useToast()
 
-  const [request, setRequest] = useState<any>(null)
+  const [request, setRequest] = useState<PaymentRequest | null>(null)
   const [loading, setLoading] = useState(true)
   const [method, setMethod] = useState<Method>('online')
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
@@ -56,7 +73,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
         return
       }
 
-      setRequest(data)
+      setRequest(data as PaymentRequest)
       setReceiptUrl(data.receipt_url ?? null)
       setLoading(false)
     }
@@ -126,13 +143,13 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.success) {
         showToast(`تم تطبيق خصم ${data.discountPct}%`)
-        setRequest((prev: any) => ({
+        setRequest((prev) => prev ? ({
           ...prev,
           final_total: data.total,
           discount_pct: data.discountPct,
           discount_amount: data.discountAmount,
           discount_code: data.code,
-        }))
+        }) : prev)
       } else {
         showToast(data.error ?? 'فشل تطبيق الكود', 'error')
       }
@@ -149,6 +166,9 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
   const cat = CATEGORIES.find(c => c.id === request.category)
   const isPaid = request.status === 'paid'
   const totalDue = Number(request.final_total ?? request.admin_quoted_price ?? 0)
+  const quotedPrice = Number(request.admin_quoted_price ?? 0)
+  const discountAmount = Number(request.discount_amount ?? 0)
+  const estimatedReach = Number(request.estimated_reach ?? 0)
   const offered = (request.admin_offered_extras ?? []) as { id: string; name: string; price: number }[]
   const selected = (request.user_selected_extras ?? []) as string[]
   const extrasDetail = offered.filter(e => selected.includes(e.id))
@@ -170,7 +190,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
           <div className="bg-cream rounded-xl p-4 text-sm space-y-2">
             <div className="flex justify-between">
               <span className="text-muted">{cat?.icon} {cat?.nameAr}</span>
-              <span className="font-medium">{formatNumber(request.admin_quoted_price ?? 0)} ر.س</span>
+              <span className="font-medium">{formatNumber(quotedPrice)} ر.س</span>
             </div>
             {extrasDetail.map(e => (
               <div key={e.id} className="flex justify-between text-xs">
@@ -178,10 +198,10 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                 <span>+{formatNumber(e.price)} ر.س</span>
               </div>
             ))}
-            {request.discount_amount > 0 && (
+            {discountAmount > 0 && (
               <div className="flex justify-between text-xs text-green font-semibold">
                 <span>خصم{request.discount_code ? ` (${request.discount_code})` : ''} {request.discount_pct ? `${request.discount_pct}%` : ''}</span>
-                <span>−{formatNumber(request.discount_amount)} ر.س</span>
+                <span>−{formatNumber(discountAmount)} ر.س</span>
               </div>
             )}
             <div className="flex justify-between border-t border-border pt-2 mt-2">
@@ -207,10 +227,10 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
                 </div>
               </div>
             )}
-            {request.estimated_reach > 0 && (
+            {estimatedReach > 0 && (
               <div className="flex justify-between text-xs pt-2 border-t border-border">
                 <span className="text-muted">الوصول المتوقع</span>
-                <span className="font-bold text-green">{formatNumberShort(request.estimated_reach)} متابع</span>
+                <span className="font-bold text-green">{formatNumberShort(estimatedReach)} متابع</span>
               </div>
             )}
           </div>

@@ -41,24 +41,47 @@ export interface PostReview {
     feedback_at?: string
     reference_images?: string[]
     approved?: boolean
+    approved_at?: string
     selected_image?: string | null
   }>
 }
 
-export function getReviewItems(request: any): ReviewItem[] {
+type ReviewRequestSource = {
+  request_type?: unknown
+  campaign_posts?: unknown
+  title?: unknown
+  content?: unknown
+  post_reviews?: unknown
+  post_statuses?: unknown
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+}
+
+export function getReviewItems(request: ReviewRequestSource | null | undefined): ReviewItem[] {
   const posts = request?.campaign_posts
   if (request?.request_type === 'campaign' && Array.isArray(posts) && posts.length > 0) {
-    return posts.map((p: any, i: number) => ({
+    return posts.map((post, i: number) => {
+      const p = asRecord(post)
+      return {
       index: i,
-      title: (p?.title as string) || `منشور ${i + 1}`,
-      content: (p?.content as string) || '',
-    }))
+      title: typeof p.title === 'string' ? p.title : `منشور ${i + 1}`,
+      content: typeof p.content === 'string' ? p.content : '',
+      }
+    })
   }
-  return [{ index: 0, title: (request?.title as string) || 'الخبر', content: (request?.content as string) || '' }]
+  return [{
+    index: 0,
+    title: typeof request?.title === 'string' ? request.title : 'الخبر',
+    content: typeof request?.content === 'string' ? request.content : '',
+  }]
 }
 
 /** يعيد كائن post_reviews كـ Record آمن (أو فارغ). */
-export function getPostReviews(request: any): Record<string, PostReview> {
+export function getPostReviews(request: ReviewRequestSource | null | undefined): Record<string, PostReview> {
   const pr = request?.post_reviews
   return pr && typeof pr === 'object' && !Array.isArray(pr) ? (pr as Record<string, PostReview>) : {}
 }
@@ -66,7 +89,7 @@ export function getPostReviews(request: any): Record<string, PostReview> {
 export type PostStatus = 'in_progress' | 'completed'
 
 /** يعيد كائن post_statuses (حالة نشر كل منشور). الافتراضي: قيد التنفيذ. */
-export function getPostStatuses(request: any): Record<string, PostStatus> {
+export function getPostStatuses(request: ReviewRequestSource | null | undefined): Record<string, PostStatus> {
   const ps = request?.post_statuses
   return ps && typeof ps === 'object' && !Array.isArray(ps) ? (ps as Record<string, PostStatus>) : {}
 }

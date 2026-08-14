@@ -11,31 +11,22 @@ type PageState = 'loading' | 'success' | 'processing' | 'failed' | 'cancelled'
 export default function TamaraCallbackPage() {
   const searchParams = useSearchParams()
   const router       = useRouter()
-  const [state, setState] = useState<PageState>('loading')
-  const [requestId,  setRequestId]  = useState<string | null>(null)
+  const status = searchParams.get('status')
+  const requestId = searchParams.get('requestId')
+  const [state, setState] = useState<PageState>(() => {
+    if (status === 'cancelled') return 'cancelled'
+    if (status === 'failed') return 'failed'
+    return status === 'approved' && requestId ? 'loading' : 'processing'
+  })
 
   useEffect(() => {
-    const status = searchParams.get('status')
-    const reqId  = searchParams.get('requestId')
-    setRequestId(reqId)
-
-    if (status === 'cancelled') {
-      setState('cancelled')
-      return
-    }
-
-    if (status === 'failed') {
-      setState('failed')
-      return
-    }
-
-    if (status === 'approved' && reqId) {
+    if (status === 'approved' && requestId) {
       // Poll DB up to 8 seconds — the webhook may have already fired
       let attempts = 0
       const interval = setInterval(async () => {
         attempts++
         try {
-          const res  = await fetch(`/api/payment/tamara/status?requestId=${reqId}`)
+          const res  = await fetch(`/api/payment/tamara/status?requestId=${requestId}`)
           const data = await res.json()
 
           if (data.status === 'in_progress') {
@@ -55,9 +46,7 @@ export default function TamaraCallbackPage() {
       }, 2000)
       return () => clearInterval(interval)
     }
-
-    setState('processing')
-  }, [searchParams])
+  }, [requestId, status])
 
   if (state === 'loading') {
     return (

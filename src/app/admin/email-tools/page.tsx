@@ -13,19 +13,27 @@ interface TestResult {
     isSpammy: boolean
   }
   error?: string
-  testDetails?: any
+  testDetails?: unknown
+}
+interface ContentValidation {
+  validation: NonNullable<TestResult['validation']>
+  suggestions?: string[]
+}
+interface BestPractices {
+  categories: { subject: string[]; content: string[]; technical: string[] }
+  practices: string[]
 }
 
 export default function EmailToolsPage() {
   const [loading, setLoading] = useState(false)
   const [testEmail, setTestEmail] = useState('first1saudi@gmail.com')
   const [testResult, setTestResult] = useState<TestResult | null>(null)
-  const [contentValidation, setContentValidation] = useState<any>(null)
-  const [bestPractices, setBestPractices] = useState<any>(null)
+  const [contentValidation, setContentValidation] = useState<ContentValidation | null>(null)
+  const [bestPractices, setBestPractices] = useState<BestPractices | null>(null)
 
   const supabase = createClient()
 
-  const callEmailAPI = async (action: string, params: any = {}) => {
+  const callEmailAPI = async (action: string, params: Record<string, unknown> = {}) => {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
       throw new Error('غير مصرح')

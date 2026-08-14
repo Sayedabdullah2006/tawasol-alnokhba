@@ -142,8 +142,11 @@ export default function InsoCoveragePage() {
 
   useEffect(() => {
     if (!designRevealTarget) return
-    document.getElementById(`inso-item-${designRevealTarget}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    setDesignRevealTarget(null)
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(`inso-item-${designRevealTarget}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setDesignRevealTarget(null)
+    })
+    return () => window.cancelAnimationFrame(frame)
   }, [designRevealTarget])
 
   const replace = (item: InsoCoverageItem) => {

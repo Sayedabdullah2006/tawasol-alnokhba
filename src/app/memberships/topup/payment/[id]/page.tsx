@@ -12,11 +12,21 @@ import { formatNumber } from '@/lib/utils'
 
 type Method = 'online' | 'tamara'
 
+interface MembershipTopup {
+  id: string
+  membership_id: string
+  item_type: string
+  quantity: number
+  topup_number: number | string
+  total_amount: number | string
+  status: string
+}
+
 export default function MembershipTopupPaymentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
   const { showToast } = useToast()
-  const [topup, setTopup] = useState<any>(null)
+  const [topup, setTopup] = useState<MembershipTopup | null>(null)
   const [loading, setLoading] = useState(true)
   const [method, setMethod] = useState<Method>('online')
   const [submitting, setSubmitting] = useState(false)
@@ -26,7 +36,7 @@ export default function MembershipTopupPaymentPage({ params }: { params: Promise
       if (response.status === 401) { router.replace(`/auth/login?next=${encodeURIComponent(`/memberships/topup/payment/${id}`)}`); return }
       const data = await response.json().catch(() => ({}))
       if (!response.ok || data.topup?.status !== 'pending_payment') { router.replace('/dashboard/membership'); return }
-      setTopup(data.topup); setLoading(false)
+      setTopup(data.topup as MembershipTopup); setLoading(false)
     })
   }, [id, router])
 

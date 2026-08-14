@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import type { PostReview } from '@/lib/review-items'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { notifyContentReadyForReview } from '@/lib/email'
 import { validateRequestId, validateContent, ValidationException, formatValidationErrors } from '@/lib/validation'
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'الطلب ليس في مرحلة التنفيذ' }, { status: 400 })
     }
 
-    const reviews: Record<string, any> =
+    const reviews: Record<string, PostReview> =
       existingRequest.post_reviews && typeof existingRequest.post_reviews === 'object'
         ? { ...existingRequest.post_reviews }
         : {}
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
     const images = Array.isArray(proposedImages) ? proposedImages : []
 
     // سجل الجولات: نضيف كل إرسال كجولة (تصاميم + نص + وقت) للاحتفاظ بالهيستوري كاملاً
-    const history: any[] = Array.isArray(prevEntry?.history) ? [...prevEntry.history] : []
+    const history: NonNullable<PostReview['history']> = Array.isArray(prevEntry?.history) ? [...prevEntry.history] : []
     history.push({ content: proposedContent.trim(), images, sent_at: now })
 
     reviews[postIndex] = {

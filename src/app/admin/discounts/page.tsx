@@ -42,8 +42,17 @@ export default function AdminDiscountsPage() {
       if (!user) { router.push('/auth/login'); return }
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       if (profile?.role !== 'admin') { router.push('/dashboard'); return }
-      fetchCodes()
-      fetchQuotedCount()
+      const [codesResponse, countResponse] = await Promise.all([
+        fetch('/api/admin/discounts'),
+        fetch('/api/admin/send-discount-email'),
+      ])
+      const [codesJson, countJson] = await Promise.all([
+        codesResponse.json(),
+        countResponse.json(),
+      ])
+      setCodes(codesJson.data ?? [])
+      setQuotedCount(countJson.count ?? 0)
+      setLoading(false)
     })
   }, [router])
 

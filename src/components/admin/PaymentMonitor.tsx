@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
 import { formatNumber, formatDate } from '@/lib/utils'
 import Button from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
@@ -21,34 +20,37 @@ interface PaymentFixed {
   paymentId: string
 }
 
+interface PaymentSummary {
+  totalChecked: number
+  fixed: number
+  issues: number
+}
+
 export default function PaymentMonitor() {
-  const supabase = createClient()
   const { showToast } = useToast()
   const [loading, setLoading] = useState(false)
   const [lastCheck, setLastCheck] = useState<string | null>(null)
   const [issues, setIssues] = useState<PaymentIssue[]>([])
   const [fixed, setFixed] = useState<PaymentFixed[]>([])
-  const [summary, setSummary] = useState<any>(null)
+  const [summary, setSummary] = useState<PaymentSummary | null>(null)
 
   useEffect(() => {
-    // جلب آخر حالة فحص
-    loadLastStatus()
-  }, [])
-
-  const loadLastStatus = async () => {
-    try {
-      const savedData = localStorage.getItem('payment-monitor-last-check')
-      if (savedData) {
-        const data = JSON.parse(savedData)
-        setLastCheck(data.timestamp)
-        setIssues(data.issues || [])
-        setFixed(data.fixed || [])
-        setSummary(data.summary || null)
+    const timer = window.setTimeout(() => {
+      try {
+        const savedData = localStorage.getItem('payment-monitor-last-check')
+        if (savedData) {
+          const data = JSON.parse(savedData)
+          setLastCheck(data.timestamp)
+          setIssues(data.issues || [])
+          setFixed(data.fixed || [])
+          setSummary(data.summary || null)
+        }
+      } catch (error) {
+        console.error('Error loading last status:', error)
       }
-    } catch (error) {
-      console.error('Error loading last status:', error)
-    }
-  }
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   const runCheck = async () => {
     setLoading(true)
@@ -115,7 +117,7 @@ export default function PaymentMonitor() {
         // إزالة من قائمة المشاكل
         setIssues(prev => prev.filter(i => i.requestNumber !== requestNumber))
 
-      } catch (error) {
+      } catch {
         showToast('فشل تحديث الطلب', 'error')
       }
     }
@@ -222,7 +224,7 @@ export default function PaymentMonitor() {
         <ul className="text-sm text-blue-600 space-y-1">
           <li>• شغل هذا الفحص دورياً (كل ساعة أو ساعتين)</li>
           <li>• تأكد من أن webhook من ميسر يعمل بشكل صحيح</li>
-          <li>• راجع طلبات "معتمد" التي تبقى أكثر من ساعة بدون دفع</li>
+          <li>• راجع طلبات &quot;معتمد&quot; التي تبقى أكثر من ساعة بدون دفع</li>
           <li>• تواصل مع العملاء عند وجود مشاكل في الدفع</li>
         </ul>
       </div>

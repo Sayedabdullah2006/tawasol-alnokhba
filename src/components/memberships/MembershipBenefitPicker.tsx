@@ -7,7 +7,7 @@ import {
   type MembershipBenefitType,
 } from '@/lib/memberships'
 
-type BenefitWallet = {
+export type MembershipBenefitWallet = {
   id: string
   benefit_type: MembershipBenefitType
   total_units: number
@@ -17,7 +17,7 @@ type BenefitWallet = {
 }
 
 type Props = {
-  wallets: BenefitWallet[]
+  wallets: MembershipBenefitWallet[]
   value: MembershipBenefitSelection[]
   onChange: (value: MembershipBenefitSelection[]) => void
 }

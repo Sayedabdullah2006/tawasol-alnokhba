@@ -32,6 +32,17 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   auto_closed:     ['pending'],
 }
 
+type UpdatedRequest = {
+  id: string
+  request_number: number
+  client_name: string | null
+  client_email: string
+  final_total: number | null
+  admin_quoted_price: number | null
+  estimated_reach: number | null
+  admin_notes: string | null
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createServerSupabaseClient()
@@ -106,7 +117,7 @@ export async function POST(request: Request) {
       ? (adminNotes.trim() || null)
       : current.admin_notes
 
-    let updated: any = null
+    let updated: UpdatedRequest | null = null
     if (membershipStart || membershipReject) {
       const service = await createServiceRoleClient()
       const rpcName = membershipStart ? 'start_membership_request' : 'reject_membership_request'

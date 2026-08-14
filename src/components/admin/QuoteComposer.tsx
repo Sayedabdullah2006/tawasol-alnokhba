@@ -7,9 +7,10 @@ import { useExtras } from '@/lib/hooks'
 import { useToast } from '@/components/ui/Toast'
 import { formatNumber, formatNumberShort } from '@/lib/utils'
 import Button from '@/components/ui/Button'
+import type { PublishRequest, RequestInfluencer } from '@/types/publish-request'
 
 interface Props {
-  request: any
+  request: PublishRequest
   onSent: () => void
   onCancel: () => void
 }
@@ -19,16 +20,19 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
   const { showToast } = useToast()
   const { extras: dbExtras, loading: extrasLoading } = useExtras()
 
-  const [influencer, setInfluencer] = useState<any>(null)
-  const [pricingConfig, setPricingConfig] = useState<any>(null)
+  const [influencer, setInfluencer] = useState<RequestInfluencer | null>(null)
+  const [pricingConfig, setPricingConfig] = useState<{
+    base_prices?: Record<string, Record<string, number>>
+    extras_prices?: Record<string, Record<string, number>>
+  } | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
   // Admin-editable inputs — defaults derived from user-chosen channels
   const userChannels: string[] = Array.isArray(request.channels) ? request.channels : []
   const initialScope: 'single' | 'all' = userChannels.length > 1 ? 'all' : 'single'
-  const [scope, setScope] = useState<'single' | 'all'>(request.scope ?? initialScope)
-  const [images, setImages] = useState<'one' | 'multi'>(request.images ?? 'one')
+  const [scope, setScope] = useState<'single' | 'all'>(request.scope === 'all' ? 'all' : initialScope)
+  const [images, setImages] = useState<'one' | 'multi'>(request.images === 'multi' ? 'multi' : 'one')
   const [numPosts, setNumPosts] = useState<number>(request.num_posts ?? 1)
   const storeProduct = useMemo(() => {
     if (request.category !== 'Others' || typeof request.sub_option !== 'string') return null
@@ -51,11 +55,11 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
       if (request.influencer_id) {
         const { data: inf } = await supabase
           .from('influencers').select('*').eq('id', request.influencer_id).single()
-        setInfluencer(inf)
+        setInfluencer(inf as RequestInfluencer | null)
 
         const { data: pc } = await supabase
           .from('pricing_config').select('*').eq('influencer_id', request.influencer_id).single()
-        if (pc) setPricingConfig(pc)
+        if (pc) setPricingConfig(pc as typeof pricingConfig)
       }
       setLoading(false)
     }
@@ -67,12 +71,14 @@ export default function QuoteComposer({ request, onSent, onCancel }: Props) {
     try {
       return calculatePrice({
         category: request.category,
-        subOption: request.sub_option,
+        subOption: typeof request.sub_option === 'string' ? request.sub_option : null,
         scope, images,
         extras: [],
-        numPosts,
+        numPosts: Number(numPosts),
         influencerPriceMultiplier: influencer?.price_multiplier ?? 1.0,
-        clientType: request.client_type ?? 'individual',
+        clientType: ['business', 'government', 'charity'].includes(request.client_type ?? '')
+          ? request.client_type as 'business' | 'government' | 'charity'
+          : 'individual',
         customPricing: pricingConfig ? {
           base_prices: pricingConfig.base_prices ?? {},
           extras_prices: pricingConfig.extras_prices ?? {}

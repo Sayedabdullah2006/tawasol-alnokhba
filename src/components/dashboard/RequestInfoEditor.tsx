@@ -6,9 +6,10 @@ import Button from '@/components/ui/Button'
 import ContentImagesUploader from '@/components/request/ContentImagesUploader'
 import SupportingDocumentsUploader from '@/components/request/SupportingDocumentsUploader'
 import type { SupportingDocument } from '@/lib/request-attachments'
+import type { PublishRequest } from '@/types/publish-request'
 
 interface Props {
-  request: any
+  request: PublishRequest
 }
 
 interface PostEdit {
@@ -27,23 +28,31 @@ export default function RequestInfoEditor({ request }: Props) {
   const { showToast } = useToast()
   const [loading, setLoading] = useState(false)
 
-  const isCampaign = request.request_type === 'campaign' && Array.isArray(request.campaign_posts) && request.campaign_posts.length > 0
+  const campaignPosts = Array.isArray(request.campaign_posts) ? request.campaign_posts : []
+  const isCampaign = request.request_type === 'campaign' && campaignPosts.length > 0
 
   // طلب مفرد
   const [title, setTitle] = useState<string>(request.title ?? '')
   const [content, setContent] = useState<string>(request.content ?? '')
   const [images, setImages] = useState<string[]>(Array.isArray(request.content_images) ? request.content_images : [])
-  const [supportingDocuments, setSupportingDocuments] = useState<SupportingDocument[]>(Array.isArray(request.supporting_documents) ? request.supporting_documents : [])
+  const [supportingDocuments, setSupportingDocuments] = useState<SupportingDocument[]>(
+    Array.isArray(request.supporting_documents) ? request.supporting_documents as SupportingDocument[] : [],
+  )
 
   // حملة
   const [posts, setPosts] = useState<PostEdit[]>(
     isCampaign
-      ? (request.campaign_posts as any[]).map(p => ({
-          title: p.title ?? '',
-          content: p.content ?? '',
-          images: Array.isArray(p.images) ? p.images : [],
-          supportingDocuments: Array.isArray(p.supporting_documents) ? p.supporting_documents : [],
-        }))
+      ? campaignPosts.map((value: unknown) => {
+          const p = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+          return {
+            title: typeof p.title === 'string' ? p.title : '',
+            content: typeof p.content === 'string' ? p.content : '',
+            images: Array.isArray(p.images) ? p.images.filter((image): image is string => typeof image === 'string') : [],
+            supportingDocuments: Array.isArray(p.supporting_documents)
+              ? p.supporting_documents as SupportingDocument[]
+              : [],
+          }
+        })
       : []
   )
 
@@ -64,9 +73,21 @@ export default function RequestInfoEditor({ request }: Props) {
 
     setLoading(true)
     try {
-      const payload: any = { requestId: request.id }
+      const payload: {
+        requestId: string
+        campaignPosts?: PostEdit[]
+        title?: string
+        content?: string
+        contentImages?: string[]
+        supportingDocuments?: SupportingDocument[]
+      } = { requestId: request.id }
       if (isCampaign) payload.campaignPosts = posts
-      else { payload.title = title; payload.content = content; payload.contentImages = images; payload.supportingDocuments = supportingDocuments }
+      else {
+        payload.title = title
+        payload.content = content
+        payload.contentImages = images
+        payload.supportingDocuments = supportingDocuments
+      }
 
       const res = await fetch('/api/resubmit-request-info', {
         method: 'POST',

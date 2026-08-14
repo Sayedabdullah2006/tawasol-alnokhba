@@ -9,6 +9,10 @@ import {
   sendReminder
 } from '@/lib/email-reminders'
 import { waitingForClient } from '@/lib/admin-actions'
+import type { RequestStatus } from '@/lib/constants'
+
+type ReminderRunResult = Record<string, unknown>
+type ReminderStatsSummary = Record<string, { total: number; byNumber: Record<number, number> }>
 
 export async function POST(request: NextRequest) {
   try {
@@ -257,7 +261,7 @@ async function handleRunDailyJob() {
     let processedCount = 0
     let sentCount = 0
     let skippedCount = 0
-    const results: any[] = []
+    const results: ReminderRunResult[] = []
 
     for (const request of requests) {
       try {
@@ -359,7 +363,7 @@ async function handleTestSingleReminder(requestId: string) {
     }
 
     // تحقق من الحالة
-    if (!waitingForClient(reminderData.status as any)) {
+    if (!waitingForClient(reminderData.status as RequestStatus)) {
       return NextResponse.json({
         error: 'Request status does not require client action',
         status: reminderData.status,
@@ -402,7 +406,7 @@ async function handleCheckReminderStatus(requestId: string) {
     }
 
     const canSendReminder = shouldSendReminder(reminderData)
-    const requiresAction = waitingForClient(reminderData.status as any)
+    const requiresAction = waitingForClient(reminderData.status as RequestStatus)
 
     // احصل على سجل التذكيرات
     const supabase = await createServiceRoleClient()
@@ -462,7 +466,7 @@ async function handleGetReminderStats() {
       acc[key].total++
       acc[key].byNumber[log.reminder_number] = (acc[key].byNumber[log.reminder_number] || 0) + 1
       return acc
-    }, {} as any) || {}
+    }, {} as ReminderStatsSummary) || {}
 
     return NextResponse.json({
       last30Days: statsSummary,

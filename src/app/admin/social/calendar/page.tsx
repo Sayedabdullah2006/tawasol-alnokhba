@@ -25,6 +25,8 @@ const STATUS: Record<string, { t: string; c: string }> = {
   failed: { t: 'فشل', c: 'bg-red-100 text-red-700' },
 }
 
+const INITIAL_KSA_DATE = new Date(Date.now() + 3 * 3600 * 1000)
+
 // تحويل ISO UTC إلى حقول جدار ساعة السعودية (UTC+3)
 function ksa(iso: string) {
   const d = new Date(new Date(iso).getTime() + 3 * 3600 * 1000)
@@ -42,11 +44,10 @@ export default function ScheduleCalendarPage() {
   const [items, setItems] = useState<SchedItem[]>([])
   const [view, setView] = useState<'month' | 'week'>('month')
   // مؤشر الشهر/الأسبوع المعروض (بتوقيت السعودية)
-  const nowKsa = new Date(Date.now() + 3 * 3600 * 1000)
-  const [cy, setCy] = useState(nowKsa.getUTCFullYear())
-  const [cm, setCm] = useState(nowKsa.getUTCMonth())
+  const [cy, setCy] = useState(INITIAL_KSA_DATE.getUTCFullYear())
+  const [cm, setCm] = useState(INITIAL_KSA_DATE.getUTCMonth())
   const [weekStart, setWeekStart] = useState<Date>(() => {
-    const t = new Date(Date.UTC(nowKsa.getUTCFullYear(), nowKsa.getUTCMonth(), nowKsa.getUTCDate()))
+    const t = new Date(Date.UTC(INITIAL_KSA_DATE.getUTCFullYear(), INITIAL_KSA_DATE.getUTCMonth(), INITIAL_KSA_DATE.getUTCDate()))
     t.setUTCDate(t.getUTCDate() - t.getUTCDay()) // الأحد
     return t
   })
@@ -74,7 +75,6 @@ export default function ScheduleCalendarPage() {
       setLoading(false)
     }
     init()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, router])
 
   // فتح نافذة الجدولة مع تعبئة تاريخ اليوم المختار (اختياري)

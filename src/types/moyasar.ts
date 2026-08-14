@@ -12,6 +12,9 @@ export enum PaymentStatus {
   PARTIALLY_REFUNDED = 'partially_refunded'
 }
 
+export type PaymentMetadataValue = string | number | boolean | null | undefined;
+export type PaymentMetadata = Record<string, PaymentMetadataValue>;
+
 export interface MoyasarSource {
   type: 'creditcard' | 'applepay' | 'stcpay' | 'applypay';
   name?: string;
@@ -20,6 +23,8 @@ export interface MoyasarSource {
   month?: number;
   year?: number;
   company?: string;
+  reference_number?: string;
+  authorization_code?: string;
 }
 
 export interface MoyasarPayment {
@@ -42,7 +47,7 @@ export interface MoyasarPayment {
   callback_url: string;
   created_at: string;
   updated_at: string;
-  metadata?: Record<string, any>;
+  metadata?: PaymentMetadata;
   source: MoyasarSource;
 }
 
@@ -58,9 +63,17 @@ export interface MoyasarConfig {
     label: string;
     validate_merchant_url?: string;
   };
-  metadata?: Record<string, any>;
+  metadata?: PaymentMetadata;
   on_completed?: (payment: MoyasarPayment) => void;
-  on_failed?: (error: any) => void;
+  on_failed?: (error: MoyasarPaymentFailure) => void;
+}
+
+export interface MoyasarPaymentFailure {
+  id?: string;
+  message?: string;
+  type?: string;
+  code?: string;
+  [key: string]: unknown;
 }
 
 export interface MoyasarError {
@@ -70,7 +83,7 @@ export interface MoyasarError {
   source?: string;
 }
 
-export interface MoyasarApiResponse<T = any> {
+export interface MoyasarApiResponse<T = unknown> {
   data?: T;
   error?: MoyasarError;
   message?: string;

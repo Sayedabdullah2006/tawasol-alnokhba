@@ -4,10 +4,34 @@ import { useState } from 'react'
 import ImageLightbox from '@/components/ui/ImageLightbox'
 import ScheduleSuggestions from '@/components/admin/ScheduleSuggestions'
 import ContentImagesUploader from '@/components/request/ContentImagesUploader'
-import { getReviewItems, getPostReviews } from '@/lib/review-items'
+import { getReviewItems, getPostReviews, type PostReview } from '@/lib/review-items'
+import type { PublishRequest } from '@/types/publish-request'
+
+type ReviewRound = NonNullable<PostReview['history']>[number]
+
+interface RevisionResult {
+  revised_text?: string
+  designs?: Array<{ title?: string; imageUrl?: string }>
+}
+
+function asRevision(value: unknown): RevisionResult | null {
+  return value && typeof value === 'object' ? value as RevisionResult : null
+}
+
+function getRevision(request: PublishRequest, index: number): RevisionResult | null {
+  const posts = request.ai_posts
+  if (posts && typeof posts === 'object') {
+    const post = (posts as Record<number, unknown>)[index]
+    if (post && typeof post === 'object') {
+      const revised = (post as Record<string, unknown>).revised
+      if (revised) return asRevision(revised)
+    }
+  }
+  return index === 0 ? asRevision(request.ai_revised_designs) : null
+}
 
 interface Props {
-  request: any
+  request: PublishRequest
   view?: 'current' | 'history'
   // تعديل المحتوى/الصور المُرسلة لخبر قبل موافقة العميل (يفتح محرّر الإرسال مملوءاً)
   onEdit?: (index: number, content: string, images: string[]) => void
@@ -95,7 +119,7 @@ export default function PostReviewStatus({ request, onEdit, view = 'current' }: 
         {items.map(item => {
           const review = reviews[item.index]
           if (!review) return null
-          const rounds: any[] = Array.isArray(review.history) && review.history.length
+          const rounds: ReviewRound[] = Array.isArray(review.history) && review.history.length
             ? review.history
             : [{ content: review.proposed_content, images: review.proposed_images, feedback: review.user_feedback, approved: review.status === 'approved', selected_image: review.selected_image }]
           return (
@@ -162,8 +186,7 @@ export default function PostReviewStatus({ request, onEdit, view = 'current' }: 
           const status = isLegacySingleRevision ? 'changes_requested' : (r.status ?? 'content_review')
           const meta = STATUS_META[status] ?? STATUS_META.content_review
           const images: string[] = Array.isArray(r.proposed_images) ? r.proposed_images : []
-          const revision = request?.ai_posts?.[item.index]?.revised
-            ?? (item.index === 0 ? request?.ai_revised_designs : null)
+          const revision = getRevision(request, item.index)
           const feedback = r.user_feedback ?? (!isCampaign ? request?.user_feedback : null)
           const textFeedback = r.text_feedback
           const designFeedback = r.design_feedback
@@ -279,7 +302,7 @@ export default function PostReviewStatus({ request, onEdit, view = 'current' }: 
 
               {/* 📜 سجل التصاميم المُرسلة عبر الجولات + ملاحظات العميل لكل جولة */}
               {['history'].includes(view) && (() => {
-                const rounds: any[] = Array.isArray(r.history) && r.history.length
+                const rounds: ReviewRound[] = Array.isArray(r.history) && r.history.length
                   ? r.history
                   : (images.length ? [{ images, content: r.proposed_content, feedback: r.user_feedback, approved: status === 'approved', selected_image: r.selected_image }] : [])
                 if (!rounds.length) return null

@@ -19,6 +19,8 @@ const OPENAI_MODEL = 'gpt-5.5'
 
 type Step = 'analyze' | 'tweets' | 'concepts' | 'image'
 
+type CampaignContextPost = Record<string, unknown>
+
 export async function POST(req: Request) {
   // ── Admin auth ────────────────────────────────────────────────
   const supabase = await createServerSupabaseClient()
@@ -130,9 +132,12 @@ export async function POST(req: Request) {
   let campaignContext = ''
   if (isCampaignPost) {
     const posts = Array.isArray(reqRow.campaign_posts) ? reqRow.campaign_posts : []
-    const otherPosts: Array<{ post: any; index: number }> = posts
-      .map((post: any, index: number) => ({ post, index }))
-      .filter((entry: { post: any; index: number }) => entry.index !== postIndex)
+    const otherPosts: Array<{ post: CampaignContextPost; index: number }> = posts
+      .map((value: unknown, index: number) => ({
+        post: value && typeof value === 'object' ? value as CampaignContextPost : {},
+        index,
+      }))
+      .filter((entry: { post: CampaignContextPost; index: number }) => entry.index !== postIndex)
       .slice(0, 8)
     if (otherPosts.length) {
       campaignContext =

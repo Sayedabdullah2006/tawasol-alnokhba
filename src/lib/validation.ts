@@ -18,7 +18,7 @@ export class ValidationException extends Error {
 
 // Text validation
 export function validateText(
-  text: string | undefined | null,
+  text: unknown,
   fieldName: string,
   options: {
     required?: boolean
@@ -83,7 +83,7 @@ export function validateText(
 
 // Number validation
 export function validateNumber(
-  value: any,
+  value: unknown,
   fieldName: string,
   options: {
     required?: boolean
@@ -167,7 +167,7 @@ export function validateEmail(email: string | undefined | null, fieldName: strin
 }
 
 // Request validation helpers
-export function validateRequestId(requestId: any): string {
+export function validateRequestId(requestId: unknown): string {
   if (!requestId || typeof requestId !== 'string') {
     throw new ValidationException([{
       field: 'requestId',
@@ -177,7 +177,7 @@ export function validateRequestId(requestId: any): string {
   return requestId
 }
 
-export function validateRejectionReason(reason: any): string {
+export function validateRejectionReason(reason: unknown): string {
   return validateText(reason, 'سبب الرفض', {
     required: true,
     minLength: 10,
@@ -185,7 +185,7 @@ export function validateRejectionReason(reason: any): string {
   })!
 }
 
-export function validateNegotiationReason(reason: any): string {
+export function validateNegotiationReason(reason: unknown): string {
   return validateText(reason, 'سبب التفاوض', {
     required: true,
     minLength: 10,
@@ -193,7 +193,7 @@ export function validateNegotiationReason(reason: any): string {
   })!
 }
 
-export function validateProposedPrice(price: any, originalPrice?: number): number | null {
+export function validateProposedPrice(price: unknown, originalPrice?: number): number | null {
   const validated = validateNumber(price, 'السعر المقترح', {
     required: false,
     min: 0,
@@ -213,7 +213,7 @@ export function validateProposedPrice(price: any, originalPrice?: number): numbe
   return validated
 }
 
-export function validateDiscountPercentage(percentage: any): number {
+export function validateDiscountPercentage(percentage: unknown): number {
   return validateNumber(percentage, 'نسبة الخصم', {
     required: true,
     min: 1,
@@ -222,7 +222,7 @@ export function validateDiscountPercentage(percentage: any): number {
   })!
 }
 
-export function validatePrice(price: any): number {
+export function validatePrice(price: unknown): number {
   return validateNumber(price, 'السعر', {
     required: true,
     min: 0,
@@ -230,14 +230,14 @@ export function validatePrice(price: any): number {
   })!
 }
 
-export function validateAdminNotes(notes: any): string | null {
+export function validateAdminNotes(notes: unknown): string | null {
   return validateText(notes, 'ملاحظات الإدارة', {
     required: false,
     maxLength: 2000
   })
 }
 
-export function validateUserFeedback(feedback: any): string {
+export function validateUserFeedback(feedback: unknown): string {
   return validateText(feedback, 'ملاحظات العميل', {
     required: true,
     minLength: 5,
@@ -245,7 +245,7 @@ export function validateUserFeedback(feedback: any): string {
   })!
 }
 
-export function validateContent(content: any): string {
+export function validateContent(content: unknown): string {
   return validateText(content, 'المحتوى المقترح', {
     required: true,
     minLength: 10,
@@ -282,7 +282,7 @@ export function formatValidationErrors(errors: ValidationError[]): string {
 }
 
 // Wrap API handlers with validation error handling
-export function withValidation<T extends any[], R>(
+export function withValidation<T extends unknown[], R>(
   handler: (...args: T) => Promise<R>
 ) {
   return async (...args: T): Promise<R> => {

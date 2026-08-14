@@ -19,6 +19,10 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 type StepId = 'influencer' | 'category' | 'subOption' | 'scope' | 'images' | 'extras' | 'posts' | 'result'
 
+interface PricingConfig {
+  extras_prices?: Record<string, number>
+}
+
 export default function PricingWizard() {
   const router = useRouter()
   const { categories, loading: catsLoading } = useCategories()
@@ -26,7 +30,7 @@ export default function PricingWizard() {
   const [stepIndex, setStepIndex] = useState(0)
   const [influencers, setInfluencers] = useState<Influencer[]>([])
   const [loading, setLoading] = useState(true)
-  const [pricingConfig, setPricingConfig] = useState<any>(null)
+  const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null)
 
   const [selectedInfluencer, setSelectedInfluencer] = useState<string | null>(null)
   const [category, setCategory] = useState<string | null>(null)

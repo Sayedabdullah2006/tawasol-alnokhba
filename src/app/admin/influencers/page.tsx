@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/ui/Toast'
@@ -56,10 +56,11 @@ const defaultPricing: PricingData = {
 
 export default function AdminInfluencersPage() {
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const { showToast } = useToast()
   const [loading, setLoading] = useState(true)
-  const [influencers, setInfluencers] = useState<any[]>([])
+  type InfluencerRow = typeof emptyForm & { id: string; is_active: boolean }
+  const [influencers, setInfluencers] = useState<InfluencerRow[]>([])
   const [saving, setSaving] = useState(false)
 
   // Add/Edit influencer
@@ -68,7 +69,7 @@ export default function AdminInfluencersPage() {
   const [form, setForm] = useState({ ...emptyForm })
 
   // Pricing editor
-  const [pricingInfluencer, setPricingInfluencer] = useState<any>(null)
+  const [pricingInfluencer, setPricingInfluencer] = useState<InfluencerRow | null>(null)
   const [pricing, setPricing] = useState<PricingData>({ ...defaultPricing })
   const [activeClientType, setActiveClientType] = useState<ClientType>('individual')
 
@@ -83,13 +84,16 @@ export default function AdminInfluencersPage() {
     setLoading(false)
   }, [supabase, router])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadData() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadData])
 
   // ─── Influencer CRUD ───
 
   const openAddForm = () => { setEditId(null); setForm({ ...emptyForm }); setShowForm(true) }
 
-  const openEditForm = (inf: any) => {
+  const openEditForm = (inf: InfluencerRow) => {
     setEditId(inf.id)
     setForm({
       name_ar: inf.name_ar ?? '', name_en: inf.name_en ?? '',
@@ -134,7 +138,7 @@ export default function AdminInfluencersPage() {
 
   // ─── Pricing Editor ───
 
-  const openPricing = async (inf: any) => {
+  const openPricing = async (inf: InfluencerRow) => {
     setPricingInfluencer(inf)
     const { data } = await supabase.from('pricing_config').select('*').eq('influencer_id', inf.id).single()
     if (data) {

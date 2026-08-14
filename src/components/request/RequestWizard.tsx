@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, type ReactNode } from 'react'
+import { useState, useEffect, useMemo, type ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useCategories, useSiteContent, type DBCategory, type SiteContent } from '@/lib/hooks'
@@ -20,10 +20,11 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
 import RequestManageActions from '@/components/dashboard/RequestManageActions'
 import { getStatusLabel } from '@/lib/status-labels'
-import { COMPETITION_SUBCATEGORIES, getCompetitionPositions, ORDERABLE_PACKAGES, CATEGORY_CONDITIONS } from '@/lib/constants'
+import { COMPETITION_SUBCATEGORIES, getCompetitionPositions, ORDERABLE_PACKAGES, CATEGORY_CONDITIONS, type RequestStatus } from '@/lib/constants'
 import { AQ_EXTRAS_PRICES, calculateAutoQuote } from '@/lib/auto-quote'
 import MembershipTeaser from '@/components/memberships/MembershipTeaser'
-import MembershipBenefitPicker from '@/components/memberships/MembershipBenefitPicker'
+import MembershipBenefitPicker, { type MembershipBenefitWallet } from '@/components/memberships/MembershipBenefitPicker'
+import RequestReviewsTrust from './RequestReviewsTrust'
 import {
   membershipBenefitSelectionLabel,
   type MembershipBenefitSelection,
@@ -69,6 +70,31 @@ const DURATION_OPTIONS = [
 // مفتاح حفظ المسودة محلياً + مدة صلاحيتها (7 أيام)
 const DRAFT_KEY = 'tn_request_draft_v1'
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
+type PendingQuote = Record<string, unknown> & {
+  id: string
+  status: RequestStatus
+}
+
+type MembershipCreditWallet = {
+  total_credits: number
+  reserved_credits: number
+  used_credits: number
+}
+
+type MembershipDetailsResponse = {
+  membership?: { plan_id?: string | null } | null
+  wallet?: MembershipCreditWallet | null
+  benefitWallets?: MembershipBenefitWallet[]
+}
+
+function resizeCampaignPosts(posts: CampaignPostData[], postCount: number): CampaignPostData[] {
+  if (posts.length === postCount) return posts
+  if (posts.length < postCount) {
+    return [...posts, ...Array.from({ length: postCount - posts.length }, makeEmptyPost)]
+  }
+  return posts.slice(0, postCount)
+}
 
 // أنماط مشتركة للحقول
 const selectCls = 'w-full rounded-xl border-2 border-border bg-white px-3 py-3 text-sm text-dark focus:outline-none focus:border-green transition-colors'
@@ -136,11 +162,10 @@ export default function RequestWizard() {
   const [influencers, setInfluencers] = useState<Influencer[]>([])
   const [loading, setLoading] = useState(true)
   const [hydrated, setHydrated] = useState(false)
-  const draftRestored = useRef(false)
   // طلب قائم (قبل الدفع/الاكتمال) — يمنع تقديم طلب جديد. نحمل الصف كاملاً لإتاحة التعديل/الإلغاء.
-  const [pendingQuote, setPendingQuote] = useState<any | null>(null)
-  const [membershipBenefits, setMembershipBenefits] = useState<any[]>([])
-  const [membershipWallet, setMembershipWallet] = useState<any>(null)
+  const [pendingQuote, setPendingQuote] = useState<PendingQuote | null>(null)
+  const [membershipBenefits, setMembershipBenefits] = useState<MembershipBenefitWallet[]>([])
+  const [membershipWallet, setMembershipWallet] = useState<MembershipCreditWallet | null>(null)
   const [membershipPlanId, setMembershipPlanId] = useState<string | null>(null)
   const [selectedMembershipBenefits, setSelectedMembershipBenefits] = useState<MembershipBenefitSelection[]>([])
 
@@ -148,11 +173,11 @@ export default function RequestWizard() {
     if (!membershipId) return
     fetch(`/api/memberships/${membershipId}`).then(async response => {
       if (!response.ok) return
-      const data = await response.json().catch(() => ({}))
+      const data = await response.json().catch(() => ({})) as MembershipDetailsResponse
       const planId = typeof data.membership?.plan_id === 'string' ? data.membership.plan_id : null
       setMembershipPlanId(planId)
       setMembershipWallet(data.wallet ?? null)
-      setMembershipBenefits(data.benefitWallets ?? [])
+      setMembershipBenefits(Array.isArray(data.benefitWallets) ? data.benefitWallets : [])
     }).catch(() => undefined)
   }, [membershipId])
 
@@ -170,7 +195,6 @@ export default function RequestWizard() {
   const [details, setDetails] = useState<ContentDetails>({
     title: '', content: '', link: '', hashtags: '', preferredDate: '', images: [], supportingDocuments: [],
   })
-  const [channels, setChannels]         = useState<string[]>([])
   const [selectedExtras, setSelectedExtras] = useState<string[]>([])
   const [discountCode, setDiscountCode] = useState('')
   const [contact, setContact]           = useState<ContactData>({ fullName: '', phone: '', email: '', city: '', xHandle: '' })
@@ -188,15 +212,6 @@ export default function RequestWizard() {
   const [campaignPosts, setCampaignPosts] = useState<CampaignPostData[]>([makeEmptyPost(), makeEmptyPost()])
 
   // مزامنة طول مصفوفة المنشورات مع عدد المنشورات
-  useEffect(() => {
-    setCampaignPosts(prev => {
-      const n = campaignSetup.postCount
-      if (prev.length === n) return prev
-      if (prev.length < n) return [...prev, ...Array.from({ length: n - prev.length }, makeEmptyPost)]
-      return prev.slice(0, n)
-    })
-  }, [campaignSetup.postCount])
-
   const selectedCat: DBCategory | null = categories.find(c => c.id === category) ?? null
   const needsSubOption = !!(selectedCat?.has_sub_option && selectedCat?.sub_options?.length)
   const isCompetitionCategory = category === 'competitions'
@@ -213,14 +228,15 @@ export default function RequestWizard() {
   const selectedInf = influencers.find(i => i.id === selectedInfluencer) ?? null
 
   // قنوات الحساب المتاحة (لاختيار قناة الباقة الأساسية)
-  const availableChannels: string[] = selectedInf
+  const availableChannels = useMemo(() => selectedInf
     ? [
         selectedInf.x_followers  ? 'x'  : null,
         selectedInf.ig_followers ? 'ig' : null,
         selectedInf.li_followers ? 'li' : null,
         selectedInf.tk_followers ? 'tk' : null,
-      ].filter(Boolean) as string[]
-    : []
+      ].filter((channel): channel is string => channel !== null)
+    : [], [selectedInf])
+  const channels = availableChannels
 
   // ── تحميل البيانات ──────────────────────────────────────────────
   useEffect(() => {
@@ -255,7 +271,7 @@ export default function RequestWizard() {
           .order('created_at', { ascending: false })
           .limit(1)
           .then(({ data }) => {
-            if (data && data.length > 0) setPendingQuote(data[0])
+            if (data && data.length > 0) setPendingQuote(data[0] as PendingQuote)
           })
       }
     })
@@ -263,13 +279,14 @@ export default function RequestWizard() {
 
   // ── استرجاع مسودة غير مكتملة (مرة واحدة عند الفتح) ──────────────
   useEffect(() => {
-    if (draftRestored.current) return
-    draftRestored.current = true
-    try {
-      const raw = localStorage.getItem(DRAFT_KEY)
-      if (raw) {
-        const d = JSON.parse(raw)
-        if (d && typeof d.savedAt === 'number' && Date.now() - d.savedAt < DRAFT_TTL_MS) {
+    let cancelled = false
+    const restoreDraft = () => {
+      if (cancelled) return
+      try {
+        const raw = localStorage.getItem(DRAFT_KEY)
+        if (raw) {
+          const d = JSON.parse(raw)
+          if (d && typeof d.savedAt === 'number' && Date.now() - d.savedAt < DRAFT_TTL_MS) {
           if (d.selectedInfluencer)   setSelectedInfluencer(d.selectedInfluencer)
           if (d.requestType)          setRequestType(d.requestType)
           if (d.clientType)           setClientType(d.clientType)
@@ -283,7 +300,6 @@ export default function RequestWizard() {
               supportingDocuments: Array.isArray(d.details.supportingDocuments) ? d.details.supportingDocuments : [],
             })
           }
-          if (Array.isArray(d.channels))        setChannels(d.channels)
           if (d.contact)              setContact(d.contact)
           if (d.orgInfo)              setOrgInfo(d.orgInfo)
           if (d.campaignSetup)        setCampaignSetup(d.campaignSetup)
@@ -303,23 +319,15 @@ export default function RequestWizard() {
           showToast('تم استرجاع طلبك غير المكتمل ✨', 'info')
         }
       }
-    } catch { /* مسودة تالفة — نتجاهلها */ }
-    setHydrated(true)
+      } catch { /* Ignore corrupt drafts. */ }
+      setHydrated(true)
+    }
+    queueMicrotask(restoreDraft)
+    return () => { cancelled = true }
   }, [showToast])
 
   // ── عند اختيار الحساب: النشر تلقائياً على كل قنواته المتاحة ───
   // السعر موحّد لكل القنوات، فلا حاجة لاختيار القناة يدوياً
-  useEffect(() => {
-    if (!selectedInf) return
-    const available = [
-      selectedInf.x_followers  ? 'x'  : null,
-      selectedInf.ig_followers ? 'ig' : null,
-      selectedInf.li_followers ? 'li' : null,
-      selectedInf.tk_followers ? 'tk' : null,
-    ].filter(Boolean) as string[]
-    setChannels(available)
-  }, [selectedInf])
-
   // ── حفظ المسودة تلقائياً بعد أي تغيير ───────────────────────────
   useEffect(() => {
     if (!hydrated) return
@@ -396,7 +404,7 @@ export default function RequestWizard() {
         if (!p.category) return null
         sum += calculateAutoQuote({
           category: p.category,
-          subOption: (p as any).subOption ?? null,
+          subOption: p.subOption ?? null,
           clientType: 'individual',
           selectedExtras: [],
           channelCount: 1,
@@ -836,6 +844,8 @@ export default function RequestWizard() {
           </div>
         </div>
 
+        <RequestReviewsTrust />
+
         {!membershipMode && <div className="mb-4 lg:hidden"><MembershipTeaser compact /></div>}
         <div className={cn(!membershipPortalMode && 'lg:grid lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start lg:gap-6 xl:gap-8')}>
         <main className={cn('min-w-0 mx-auto w-full', membershipPortalMode ? 'max-w-4xl' : 'max-w-2xl lg:max-w-none lg:mx-0')}>
@@ -1024,7 +1034,11 @@ export default function RequestWizard() {
                     <label className={fieldLabel}>عدد المنشورات *</label>
                     <select
                       value={campaignSetup.postCount}
-                      onChange={e => setCampaignSetup({ ...campaignSetup, postCount: Number(e.target.value) })}
+                      onChange={e => {
+                        const postCount = Number(e.target.value)
+                        setCampaignSetup({ ...campaignSetup, postCount })
+                        setCampaignPosts(prev => resizeCampaignPosts(prev, postCount))
+                      }}
                       className={selectCls}
                     >
                       {Array.from({ length: 9 }, (_, i) => i + 2).map(n => (

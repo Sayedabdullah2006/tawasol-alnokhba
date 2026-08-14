@@ -48,8 +48,8 @@ export default function RequestReviewPage() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'تعذّر حفظ التقييم')
       setSaved(true)
-    } catch (reason: any) {
-      setError(reason.message || 'تعذّر حفظ التقييم')
+    } catch (reason: unknown) {
+      setError(reason instanceof Error ? reason.message : 'تعذّر حفظ التقييم')
     } finally {
       setSaving(false)
     }

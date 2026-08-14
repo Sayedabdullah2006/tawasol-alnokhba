@@ -6,9 +6,10 @@ import Button from '@/components/ui/Button'
 import ImageLightbox from '@/components/ui/ImageLightbox'
 import ContentImagesUploader from '@/components/request/ContentImagesUploader'
 import { getReviewItems, getPostReviews } from '@/lib/review-items'
+import type { PublishRequest } from '@/types/publish-request'
 
 interface Props {
-  request: any
+  request: PublishRequest
 }
 
 /**

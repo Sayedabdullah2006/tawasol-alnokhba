@@ -3,6 +3,12 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { notifyInfoResubmittedToAdmin } from '@/lib/email'
 import { normalizeImageUrls, normalizeSupportingDocuments } from '@/lib/request-attachments'
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+}
+
 /**
  * إعادة إرسال العميل لطلبه بعد تعديله (عند الحالة info_requested).
  * - طلب مفرد: يحدّث title / content / content_images.
@@ -49,8 +55,10 @@ export async function POST(request: Request) {
 
     if (isCampaign) {
       // دمج التعديلات لكل منشور بالفهرس مع الحفاظ على الحقول الأخرى
-      const incoming: any[] = Array.isArray(body.campaignPosts) ? body.campaignPosts : []
-      const merged = (existing.campaign_posts as any[]).map((post, i) => {
+      const incoming = Array.isArray(body.campaignPosts) ? body.campaignPosts.map(asRecord) : []
+      const existingPosts: unknown[] = existing.campaign_posts
+      const merged = existingPosts.map((rawPost, i) => {
+        const post = asRecord(rawPost)
         const edit = incoming[i] ?? {}
         return {
           ...post,

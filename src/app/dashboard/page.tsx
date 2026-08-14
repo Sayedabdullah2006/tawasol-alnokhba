@@ -7,13 +7,14 @@ import RequestCard from '@/components/dashboard/RequestCard'
 import EmptyState from '@/components/ui/EmptyState'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Link from 'next/link'
+import type { PublishRequest } from '@/types/publish-request'
 
 export default function DashboardPage() {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [userName, setUserName] = useState('')
-  const [requests, setRequests] = useState<any[]>([])
+  const [requests, setRequests] = useState<PublishRequest[]>([])
 
   useEffect(() => {
     const load = async () => {
@@ -34,7 +35,7 @@ export default function DashboardPage() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
-      setRequests(reqs ?? [])
+      setRequests((reqs ?? []) as PublishRequest[])
       setLoading(false)
     }
     load()

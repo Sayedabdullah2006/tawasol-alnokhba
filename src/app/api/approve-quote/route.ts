@@ -11,13 +11,29 @@ interface OfferedExtra {
   reachBoost: number
 }
 
+type ServiceClient = Awaited<ReturnType<typeof createServiceRoleClient>>
+type ExtrasRequest = {
+  admin_offered_extras?: OfferedExtra[] | null
+  influencer_id?: string | null
+  category?: string | null
+}
+type DiscountRow = {
+  id: string
+  code: string
+  is_active: boolean
+  expires_at: string
+  max_uses: number | null
+  used_count: number
+  discount_pct: number
+}
+
 // Resolve the catalog of valid extras for a request:
 //   1. If admin offered extras → use those (admin-controlled list).
 //   2. Else → fall back to all active extras from the DB, priced from the
 //      influencer's pricing_config or the default price.
 async function resolveAvailableExtras(
-  serviceClient: any,
-  request: any
+  serviceClient: ServiceClient,
+  request: ExtrasRequest
 ): Promise<Map<string, OfferedExtra>> {
   const offered = (request.admin_offered_extras ?? []) as OfferedExtra[]
   if (offered.length > 0) return new Map(offered.map(e => [e.id, e]))
@@ -96,7 +112,7 @@ export async function POST(request: Request) {
 
     // تطبيق كود الخصم على الاعتماد (فقط إذا لم يُطبَّق مسبقاً عند الإرسال)
     let finalTotal = rawTotal
-    let discountRow: any = null
+    let discountRow: DiscountRow | null = null
     if (discountCode && !req.discount_code) {
       const { data: dc } = await serviceClient
         .from('discount_codes')

@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 export default function PaymentDebugPage() {
   const [requestId, setRequestId] = useState('');
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
 
   const testUpdate = async () => {
@@ -59,7 +59,7 @@ export default function PaymentDebugPage() {
         </button>
       </div>
 
-      {result && (
+      {result !== null && (
         <div className="mt-6 p-4 bg-gray-50 rounded-md">
           <h3 className="text-lg font-medium mb-2">النتيجة:</h3>
           <pre className="text-sm overflow-auto">

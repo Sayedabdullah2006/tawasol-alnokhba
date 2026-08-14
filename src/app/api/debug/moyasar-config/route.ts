@@ -3,10 +3,10 @@
  * يساعد في التحقق من إعدادات Moyasar دون كشف المفاتيح السرية
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getPublishableKey, getSecretKey } from '@/lib/moyasar';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const config = {
       environment: process.env.NODE_ENV || 'development',
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     // Test key loading
     try {
-      const pubKey = getPublishableKey();
+      getPublishableKey();
       config.variables.publishableKey.canLoad = true;
     } catch (error) {
       config.variables.publishableKey.canLoad = false;
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-      const secKey = getSecretKey();
+      getSecretKey();
       config.variables.secretKey.canLoad = true;
     } catch (error) {
       config.variables.secretKey.canLoad = false;

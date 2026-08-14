@@ -27,12 +27,12 @@ export default function RStep5Contact({ data, onChange }: Props) {
 
   // Validate email on blur — keep it permissive while typing
   useEffect(() => {
-    if (!data.email.trim()) {
-      setEmailError(null)
-      setEmailSuggestion(null)
-      return
-    }
     const t = setTimeout(() => {
+      if (!data.email.trim()) {
+        setEmailError(null)
+        setEmailSuggestion(null)
+        return
+      }
       const v = validateEmail(data.email)
       if (v.valid) {
         setEmailError(null)

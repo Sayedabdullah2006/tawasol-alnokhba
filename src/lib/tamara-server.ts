@@ -18,6 +18,25 @@ import { finishMembershipActivation } from '@/lib/membership-payment'
 import { applyPaidMembershipTopup } from '@/lib/membership-topup-payment'
 import { formatMembershipTopupNumber, getMembershipTopupItem } from '@/lib/membership-topups'
 
+interface TamaraProviderData extends Record<string, unknown> {
+  id?: string
+  refund_id?: string
+  message?: string
+  status?: string
+  order_status?: string
+  order_id?: string
+  checkout_id?: string
+  checkout_url?: string
+}
+
+interface PaymentEmailRow {
+  client_email?: string | null
+  client_name?: string | null
+  request_number?: string | number | null
+  final_total?: string | number | null
+  admin_quoted_price?: string | number | null
+}
+
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
 
 function getApiToken(): string {
@@ -39,12 +58,12 @@ function authHeader(): string {
   return `Bearer ${getApiToken()}`
 }
 
-export async function refundTamaraOrder(orderId: string, amount: number, comment: string, merchantRefundId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+export async function refundTamaraOrder(orderId: string, amount: number, comment: string, merchantRefundId: string): Promise<{ success: boolean; data?: TamaraProviderData; error?: string }> {
   try {
     const orderResponse = await fetch(`${TAMARA_API_URL}/merchants/orders/${orderId}`, {
       headers: { Authorization: authHeader() },
     })
-    const order = await orderResponse.json().catch(() => ({}))
+    const order = await orderResponse.json().catch(() => ({})) as TamaraProviderData
     const orderStatus = String(order.status ?? order.order_status ?? '').toLowerCase()
     if (!orderResponse.ok || !['fully_captured', 'partially_captured'].includes(orderStatus)) {
       return { success: false, error: 'لا يمكن استرجاع طلب تمارا قبل أن يصبح ملتقطاً بالكامل أو جزئياً' }
@@ -59,7 +78,7 @@ export async function refundTamaraOrder(orderId: string, amount: number, comment
         merchant_refund_id: merchantRefundId,
       }),
     })
-    const data = await response.json().catch(() => ({}))
+    const data = await response.json().catch(() => ({})) as TamaraProviderData
     if (!response.ok) return { success: false, error: data.message ?? `Tamara refund failed (${response.status})` }
     return { success: true, data }
   } catch (error) {
@@ -188,17 +207,17 @@ export async function createTamaraCheckoutSession(
     body: JSON.stringify(body),
   })
 
-  const data = await res.json().catch(() => ({}))
+  const data = await res.json().catch(() => ({})) as TamaraProviderData
 
   if (!res.ok) {
     console.error('[TAMARA] Checkout creation failed:', res.status, data)
     return {
       success: false,
-      error: (data as any)?.message ?? 'فشل في إنشاء جلسة الدفع مع تمارا',
+      error: data.message ?? 'فشل في إنشاء جلسة الدفع مع تمارا',
     }
   }
 
-  const { order_id, checkout_id, checkout_url } = data as any
+  const { order_id, checkout_id, checkout_url } = data
 
   // Store tamara_order_id immediately so webhook can find the request
   await supabase
@@ -266,10 +285,10 @@ export async function createTamaraMembershipCheckoutSession(
     headers: { Authorization: authHeader(), 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  const data = await response.json().catch(() => ({}))
+  const data = await response.json().catch(() => ({})) as TamaraProviderData
   if (!response.ok) {
     console.error('[TAMARA_MEMBERSHIP] Checkout failed:', response.status, data)
-    return { success: false, error: (data as any)?.message ?? 'تعذر إنشاء جلسة تمارا للعضوية' }
+    return { success: false, error: data.message ?? 'تعذر إنشاء جلسة تمارا للعضوية' }
   }
 
   await supabase.from('memberships').update({
@@ -308,8 +327,8 @@ export async function createTamaraMembershipTopupCheckoutSession(
     merchant_url: getTamaraMembershipTopupCallbackUrls(topup.id),
   }
   const response = await fetch(`${TAMARA_API_URL}/checkout`, { method: 'POST', headers: { Authorization: authHeader(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  const data = await response.json().catch(() => ({}))
-  if (!response.ok) return { success: false, error: (data as any)?.message ?? 'تعذر إنشاء جلسة تمارا لتعزيز الرصيد' }
+  const data = await response.json().catch(() => ({})) as TamaraProviderData
+  if (!response.ok) return { success: false, error: data.message ?? 'تعذر إنشاء جلسة تمارا لتعزيز الرصيد' }
   await supabase.from('membership_topups').update({ payment_provider: 'tamara', provider_payment_id: data.order_id, updated_at: new Date().toISOString() }).eq('id', topup.id)
   return { success: true, checkoutUrl: data.checkout_url, orderId: data.order_id, checkoutId: data.checkout_id }
 }
@@ -521,16 +540,16 @@ export async function handleTamaraOrderApproved(
   }
 
   // Send confirmation email (non-blocking)
-  const emailData = emailRow ?? target
-  const clientEmail = (emailData as any)?.client_email
+  const emailData = (emailRow ?? target) as PaymentEmailRow | null
+  const clientEmail = emailData?.client_email
   if (clientEmail) {
     const total = Number(
-      (emailData as any)?.final_total ?? (emailData as any)?.admin_quoted_price ?? 0
+      emailData?.final_total ?? emailData?.admin_quoted_price ?? 0
     )
     notifyPaymentConfirmedToClient({
       email:         clientEmail,
-      requestNumber: String((emailData as any)?.request_number ?? ''),
-      clientName:    (emailData as any)?.client_name ?? '',
+      requestNumber: String(emailData?.request_number ?? ''),
+      clientName:    emailData?.client_name ?? '',
       total,
     }).catch((err: unknown) => {
       console.error('[TAMARA] Email send failed (non-blocking):', err)

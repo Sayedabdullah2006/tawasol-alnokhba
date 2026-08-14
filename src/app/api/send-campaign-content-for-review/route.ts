@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { notifyCampaignReadyForReview } from '@/lib/email'
+import type { PostReview } from '@/lib/review-items'
+
+type StudioEntry = {
+  tweets?: { raw?: string }
+  designs?: Array<{ imageUrl?: string }>
+}
+type CampaignPost = { title?: string; content?: string; preferred_date?: string }
+type RequestedReviewItem = { content?: string; images?: string[] }
 
 /** يرسل الحملة كاملة إلى العميل برسالة واحدة، مع حفظ مراجعة مستقلة لكل منشور. */
 export async function POST(request: Request) {
@@ -28,23 +36,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'الطلب ليس في مرحلة تجهيز المحتوى' }, { status: 400 })
     }
 
-    const aiPosts = row.ai_posts && typeof row.ai_posts === 'object' ? row.ai_posts as Record<string, any> : {}
-    const reviews = row.post_reviews && typeof row.post_reviews === 'object' ? { ...row.post_reviews as Record<string, any> } : {}
+    const aiPosts = row.ai_posts && typeof row.ai_posts === 'object' ? row.ai_posts as Record<string, StudioEntry> : {}
+    const reviews = row.post_reviews && typeof row.post_reviews === 'object' ? { ...row.post_reviews as Record<string, PostReview> } : {}
     const now = new Date().toISOString()
     const summaries: Array<{ title: string; content: string; proposedDate?: string | null; images: string[] }> = []
     const campaignPosts = [...row.campaign_posts]
 
     for (let index = 0; index < row.campaign_posts.length; index += 1) {
-      const post = row.campaign_posts[index] as Record<string, any>
+      const post = row.campaign_posts[index] as CampaignPost
       const requestedDate = proposedDates && typeof proposedDates === 'object' && typeof proposedDates[index] === 'string' && /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2})?$/.test(proposedDates[index])
         ? proposedDates[index]
         : (typeof post.preferred_date === 'string' ? post.preferred_date : null)
       const studio = aiPosts[index] ?? {}
       const fallbackContent = String(studio?.tweets?.raw ?? post.content ?? '').trim()
       const fallbackImages = Array.isArray(studio?.designs)
-        ? studio.designs.map((design: any) => design?.imageUrl).filter((url: unknown): url is string => typeof url === 'string' && url.length > 0)
+        ? studio.designs.map(design => design?.imageUrl).filter((url): url is string => typeof url === 'string' && url.length > 0)
         : []
-      const requestedItem = reviewItems && typeof reviewItems === 'object' ? reviewItems[index] : null
+      const requestedItem = reviewItems && typeof reviewItems === 'object' ? (reviewItems[index] as RequestedReviewItem | undefined) : null
       const content = typeof requestedItem?.content === 'string' ? requestedItem.content.trim() : fallbackContent
       // لا نستخدم fallback للتصاميم: الإرسال يتطلب قائمة اختيار صريحة من نافذة المراجعة.
       const images = Array.isArray(requestedItem?.images)

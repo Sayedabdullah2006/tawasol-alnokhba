@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import type { PostReview } from '@/lib/review-items'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { notifyContentChangesRequested } from '@/lib/email'
 import { validateRequestId, validateUserFeedback, ValidationException, formatValidationErrors } from '@/lib/validation'
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'انتهت مرحلة مراجعة المحتوى لهذا الطلب' }, { status: 409 })
     }
 
-    const reviews: Record<string, any> =
+    const reviews: Record<string, PostReview> =
       existingRequest.post_reviews && typeof existingRequest.post_reviews === 'object'
         ? { ...existingRequest.post_reviews }
         : {}
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
     }
 
     // أرفق ملاحظة العميل بآخر جولة في السجل (هيستوري التصاميم + الملاحظات)
-    const history: any[] = Array.isArray(entry.history) ? [...entry.history] : []
+    const history: NonNullable<PostReview['history']> = Array.isArray(entry.history) ? [...entry.history] : []
     if (history.length) history[history.length - 1] = {
       ...history[history.length - 1], feedback, text_feedback: textFeedback || null, design_feedback: designFeedback || null,
       revision_base_image: selectedImage, feedback_at: new Date().toISOString(), reference_images: referenceImages,

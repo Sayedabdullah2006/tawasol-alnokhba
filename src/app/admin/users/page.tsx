@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useToast } from '@/components/ui/Toast'
@@ -24,7 +24,7 @@ interface UserData {
 
 export default function AdminUsersPage() {
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const { showToast } = useToast()
   const [loading, setLoading] = useState(true)
   const [users, setUsers] = useState<UserData[]>([])
@@ -60,7 +60,10 @@ export default function AdminUsersPage() {
     setLoading(false)
   }, [supabase, router])
 
-  useEffect(() => { loadUsers() }, [loadUsers])
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadUsers() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadUsers])
 
   useEffect(() => {
     document.body.style.overflow = (pwUser || incOpen) ? 'hidden' : ''

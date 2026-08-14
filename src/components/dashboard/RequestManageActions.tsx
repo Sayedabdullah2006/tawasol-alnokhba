@@ -16,7 +16,16 @@ export default function RequestManageActions({
   onCancelled,
   className = '',
 }: {
-  request: Record<string, any>
+  request: {
+    [key: string]: unknown
+    id: string
+    status: string
+    payment_status?: string | null
+    paid_at?: string | null
+    tamara_order_id?: string | null
+    moyasar_payment_id?: string | null
+    receipt_url?: string | null
+  }
   onCancelled?: () => void
   className?: string
 }) {

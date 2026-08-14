@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * Test Moyasar API connectivity
  * Run with: node test-moyasar.js

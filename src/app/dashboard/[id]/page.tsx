@@ -4,7 +4,7 @@ import { useState, useEffect, use } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { CATEGORIES } from '@/lib/constants'
+import { CATEGORIES, type RequestStatus } from '@/lib/constants'
 import { formatNumber, formatDate, formatNumberShort, generateRequestNumber } from '@/lib/utils'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import ProgressTracker from '@/components/dashboard/ProgressTracker'
@@ -19,14 +19,16 @@ import SupportingDocumentsList from '@/components/request/SupportingDocumentsLis
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useToast } from '@/components/ui/Toast'
+import type { PublishRequest, RequestInfluencer } from '@/types/publish-request'
+import { getPostReviews } from '@/lib/review-items'
 
 export default function RequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
   const supabase = createClient()
   const { showToast } = useToast()
-  const [request, setRequest] = useState<any>(null)
-  const [influencer, setInfluencer] = useState<any>(null)
+  const [request, setRequest] = useState<PublishRequest | null>(null)
+  const [influencer, setInfluencer] = useState<RequestInfluencer | null>(null)
   const [providingFeedback, setProvidingFeedback] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [feedbackReferenceImages, setFeedbackReferenceImages] = useState<string[]>([])
@@ -42,12 +44,12 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
         .single()
 
       if (!data) { router.push('/dashboard'); return }
-      setRequest(data)
+      setRequest(data as PublishRequest)
 
       if (data.influencer_id) {
         const { data: inf } = await supabase
           .from('influencers').select('*').eq('id', data.influencer_id).single()
-        setInfluencer(inf)
+        setInfluencer(inf as RequestInfluencer | null)
       }
 
       setLoading(false)
@@ -56,6 +58,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
   }, [id, router, supabase])
 
   const handleApproveContent = async () => {
+    if (!request) return
     setSubmitting(true)
     try {
       const res = await fetch('/api/approve-content', {
@@ -80,6 +83,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const handleRequestChanges = async () => {
+    if (!request) return
     if (!feedback.trim()) {
       showToast('يرجى كتابة ملاحظاتك', 'error')
       return
@@ -134,7 +138,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
 
         {/* Progress على الموبايل في الأعلى */}
         <div className="block md:hidden mb-6">
-          <ProgressTracker status={request.status} />
+          <ProgressTracker status={request.status as RequestStatus} />
         </div>
 
         {/* Layout عمودين على Desktop */}
@@ -143,7 +147,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
           {/* العمود الأيسر: Progress Tracker (1/4) - مخفي على الموبايل */}
           <div className="hidden md:block md:col-span-1">
             <div className="sticky top-6">
-              <ProgressTracker status={request.status} />
+              <ProgressTracker status={request.status as RequestStatus} />
             </div>
           </div>
 
@@ -266,7 +270,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
             <QuoteApproval
               requestId={request.id}
               quotedPrice={Number(request.admin_quoted_price)}
-              offeredExtras={request.admin_offered_extras ?? []}
+              offeredExtras={(request.admin_offered_extras ?? []) as { id: string; name: string; price: number; reachBoost: number }[]}
               influencer={influencer}
               scope={scope}
               adminNotes={request.admin_notes}
@@ -274,7 +278,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
               negotiationRound={request.negotiation_round ?? 0}
               quoteExpiresAt={request.quote_expires_at}
               category={request.category}
-              subOption={request.sub_option}
+              subOption={typeof request.sub_option === 'string' ? request.sub_option : null}
             />
           </div>
         )}
@@ -292,12 +296,12 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
                 influencer={influencer}
                 scope={scope}
                 onUpdated={(newTotal, newReach, newSelected) => {
-                  setRequest((prev: any) => ({
+                  setRequest((prev) => prev ? ({
                     ...prev,
                     final_total: newTotal,
                     estimated_reach: newReach,
                     user_selected_extras: newSelected,
-                  }))
+                  }) : prev)
                 }}
               />
             )}
@@ -330,10 +334,10 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
                   <span className="text-muted">السعر الرئيسي</span>
                   <span>{formatNumber(request.admin_quoted_price ?? 0)} ر.س</span>
                 </div>
-                {request.extras_selected_total > 0 && (
+                {Number(request.extras_selected_total ?? 0) > 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted">خدمات إضافية</span>
-                    <span>+{formatNumber(request.extras_selected_total)} ر.س</span>
+                    <span>+{formatNumber(Number(request.extras_selected_total ?? 0))} ر.س</span>
                   </div>
                 )}
                 <div className="flex justify-between border-t border-border pt-2 mt-2 font-bold">
@@ -342,10 +346,10 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
                 </div>
               </>
             )}
-            {request.estimated_reach > 0 && (
+            {Number(request.estimated_reach ?? 0) > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted">الوصول المتوقع</span>
-                <span className="font-bold text-green">{formatNumberShort(request.estimated_reach)} متابع</span>
+                <span className="font-bold text-green">{formatNumberShort(Number(request.estimated_reach ?? 0))} متابع</span>
               </div>
             )}
           </div>
@@ -366,7 +370,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
           </div>
         )}
 
-        {request.status === 'content_review' && !request.post_reviews?.[0] && (
+        {request.status === 'content_review' && !getPostReviews(request)[0] && (
           <div className="mt-4 space-y-4">
             <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5">
               <div className="text-center mb-4">
@@ -483,7 +487,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
           </div>
         )}
 
-        {(request.refund_amount != null || ['refund_pending', 'refunded', 'partially_refunded'].includes(request.payment_status)) && (
+        {(request.refund_amount != null || ['refund_pending', 'refunded', 'partially_refunded'].includes(request.payment_status ?? '')) && (
           <div className={`mt-4 rounded-2xl border p-4 ${request.status === 'refund_pending' || request.payment_status === 'refund_pending' ? 'border-orange-200 bg-orange-50' : 'border-green/20 bg-green/5'}`}>
             <p className={`font-bold text-sm ${request.status === 'refund_pending' || request.payment_status === 'refund_pending' ? 'text-orange-800' : 'text-green'}`}>
               {request.status === 'refund_pending' || request.payment_status === 'refund_pending' ? 'طلب الاسترجاع قيد المعالجة' : 'تم تنفيذ استرجاع المبلغ'}

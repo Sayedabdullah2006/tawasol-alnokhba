@@ -35,7 +35,7 @@ export default function RStepExtras({ selected, onChange, basePrice, baseLabel }
         أضف خدمات إضافية
       </h2>
       <p className="text-sm text-muted text-center mb-5">
-        اختياري — يمكن تخطي هذه الخطوة بالضغط على "التالي"
+        اختياري — يمكن تخطي هذه الخطوة بالضغط على &quot;التالي&quot;
       </p>
 
       <div className="grid grid-cols-2 gap-3 mb-4">

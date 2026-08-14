@@ -41,7 +41,10 @@ export default function MemberMagazine() {
     setLoading(false)
   }
 
-  useEffect(() => { void load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load() }, 0)
+    return () => window.clearTimeout(timer)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const shareUrl = useMemo(() => magazine && typeof window !== 'undefined'
     ? `${window.location.origin}/m/${magazine.shareToken}`

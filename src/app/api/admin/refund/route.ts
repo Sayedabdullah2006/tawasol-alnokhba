@@ -61,7 +61,7 @@ export async function POST(request: Request) {
   // قبول مزود الدفع لطلب الاسترجاع ليس تأكيداً لوصول المبلغ إلى العميل.
   // يبقى السجل قيد المعالجة حتى يصل إشعار المزود النهائي عبر الـWebhook.
   let status: 'pending' | 'failed' = provider === 'manual' ? 'pending' : 'failed'
-  let providerResponse: any = null
+  let providerResponse: (Record<string, unknown> & { error?: string; id?: string; refund_id?: string }) | null = null
   let providerRefundId: string | null = null
 
   if (provider === 'moyasar') {

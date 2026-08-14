@@ -4,7 +4,7 @@ import { useState, useEffect, use } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { CATEGORIES, EXTRAS, PACKAGES, REQUEST_STATUSES } from '@/lib/constants'
+import { CATEGORIES, EXTRAS, PACKAGES, REQUEST_STATUSES, type RequestStatus } from '@/lib/constants'
 import { formatNumber, formatDate, generateRequestNumber } from '@/lib/utils'
 import { useToast } from '@/components/ui/Toast'
 import StatusBadge from '@/components/dashboard/StatusBadge'
@@ -22,6 +22,7 @@ import CampaignPostStatusManager from '@/components/admin/CampaignPostStatusMana
 import EditableNewsContent from '@/components/admin/EditableNewsContent'
 import SupportingDocumentsList from '@/components/request/SupportingDocumentsList'
 import { getReviewItems, getPostReviews } from '@/lib/review-items'
+import type { PostReview } from '@/lib/review-items'
 import { getAdminActions, waitingForClient, isFinalStatus, messageColors } from '@/lib/admin-actions'
 import { parseStoreRequestMeta } from '@/lib/inventor-store-studios'
 
@@ -72,6 +73,96 @@ const INVENTION_LABELS: Record<string, string> = {
 
 const EXTRAS_MAP = Object.fromEntries(EXTRAS.map(e => [e.id, e]))
 
+type AdminStudioState = {
+  analysis?: unknown
+  tweets?: { raw?: string } | null
+  design_concepts?: { items?: Array<Record<string, unknown>> } | null
+  chosen_concept?: { text?: string } | null
+  image_prompt?: string
+  source_image?: string | null
+  selected_images?: string[]
+  designs?: Array<{ imageUrl?: string }>
+  uploaded_images?: string[]
+  revised?: unknown
+}
+
+type AdminRequest = {
+  id: string
+  request_number: number
+  status: RequestStatus
+  request_type?: string | null
+  title?: string | null
+  content?: string | null
+  category: string
+  sub_option?: string | null
+  client_name?: string | null
+  client_email?: string | null
+  client_phone?: string | null
+  client_city?: string | null
+  client_type?: string | null
+  org_name?: string | null
+  org_representative?: string | null
+  org_license?: string | null
+  x_handle?: string | null
+  influencer?: { name_ar?: string | null; name_en?: string | null } | null
+  campaign_posts?: Array<Record<string, unknown>> | null
+  campaign_post_count?: number | null
+  campaign_duration?: string | null
+  campaign_discount_pct?: number | null
+  campaign_subtotal?: number | null
+  ai_posts?: Record<string, AdminStudioState> | null
+  ai_analysis?: unknown
+  ai_tweets?: { raw?: string } | null
+  ai_design_concepts?: { items?: Array<Record<string, unknown>> } | null
+  ai_chosen_concept?: { text?: string } | null
+  ai_image_prompt?: string | null
+  ai_source_image?: string | null
+  ai_designs?: unknown[] | null
+  ai_uploaded_images?: string[] | null
+  ai_revised_designs?: unknown
+  post_reviews?: Record<string, PostReview> | null
+  post_statuses?: Record<string, string> | null
+  channels?: string[] | null
+  hashtags?: string | null
+  link?: string | null
+  preferred_date?: string | null
+  content_images?: string[] | null
+  supporting_documents?: unknown
+  user_selected_extras?: string[] | null
+  proposed_images?: string[] | null
+  proposed_content?: string | null
+  user_feedback?: string | null
+  admin_info_request?: string | null
+  admin_notes?: string | null
+  admin_quoted_price: number
+  original_quoted_price?: number | null
+  final_total?: number | null
+  base_price: number
+  extras_total?: number | null
+  extras_selected_total?: number | null
+  client_proposed_price: number
+  negotiated_discount_percentage: number
+  negotiation_reason?: string | null
+  negotiation_rejected?: boolean | null
+  negotiation_round: number
+  auto_quote_note?: string | null
+  auto_quote_tier?: string | null
+  billing_source?: string | null
+  payment_method?: string | null
+  moyasar_payment_id?: string | null
+  tamara_order_id?: string | null
+  receipt_url: string
+  client_rejection_reason?: string | null
+  created_at: string
+  updated_at?: string | null
+  auto_quoted_at?: string | null
+  negotiated_at?: string | null
+  paid_at?: string | null
+  content_sent_at?: string | null
+  content_approved_at?: string | null
+  feedback_sent_at?: string | null
+}
+
 function parseSubOption(raw: string | null | undefined): { subcategory?: string; position?: string } | string | null {
   if (!raw) return null
   try {
@@ -87,8 +178,8 @@ function renderSubOptionLabel(category: string, raw: string | null | undefined):
   const parsed = parseSubOption(raw)
   if (!parsed) return null
   if (category === 'competitions' && typeof parsed === 'object') {
-    const sub = (parsed as any).subcategory
-    const pos = (parsed as any).position
+    const sub = parsed.subcategory ?? ''
+    const pos = parsed.position ?? ''
     return `${COMPETITION_SUBCAT_LABELS[sub] ?? sub} — ${COMPETITION_POS_LABELS[pos] ?? pos}`
   }
   if (category === 'inventions' && typeof parsed === 'string') {
@@ -108,7 +199,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   const supabase = createClient()
   const { showToast } = useToast()
   const [loading, setLoading] = useState(true)
-  const [request, setRequest] = useState<any>(null)
+  const [request, setRequest] = useState<AdminRequest | null>(null)
   const [adminNotes, setAdminNotes] = useState('')
   const [newStatus, setNewStatus] = useState('')
   const [saving, setSaving] = useState(false)
@@ -152,7 +243,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
 
       if (!req) { router.push('/admin/requests'); return }
 
-      setRequest(req)
+      setRequest(req as AdminRequest)
       setNewStatus(req.status)
       setAdminNotes(req.admin_notes ?? '')
       setLoading(false)
@@ -199,7 +290,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
         .eq('id', id)
         .single()
       if (updatedReq) {
-        setRequest(updatedReq)
+        setRequest(updatedReq as AdminRequest)
         setNewStatus(updatedReq.status)
         setAdminNotes(updatedReq.admin_notes ?? '')
       }
@@ -233,7 +324,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
         showToast(data.error ?? 'تعذّر حفظ ملاحظة الإدارة', 'error')
         return
       }
-      setRequest((current: typeof request) => current ? { ...current, admin_notes: data.adminNotes } : current)
+      setRequest(current => current ? { ...current, admin_notes: data.adminNotes } : current)
       showToast(adminNotes.trim() ? 'تم حفظ ملاحظة الإدارة' : 'تم حذف ملاحظة الإدارة')
     } catch {
       showToast('خطأ في الاتصال بالخادم', 'error')
@@ -382,7 +473,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   if (loading) return <LoadingSpinner size="lg" />
   if (!request) return null
 
-  const adminActions = getAdminActions(request.status as any)
+  const adminActions = getAdminActions(request.status)
   const isPendingPhase = request.status === 'pending' || request.status === 'client_rejected'
   const isPendingMembership = request.status === 'pending' && request.billing_source === 'membership'
   const canConfirmPayment = ['approved', 'payment_review'].includes(request.status)
@@ -946,7 +1037,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                   <Button onClick={() => handleUpdateStatus('resume')} loading={saving} className="w-full bg-green hover:bg-green/90">
                     ▶️ استئناف الطلب إلى مرحلته السابقة
                   </Button>
-                ) : !isFinalStatus(request.status as any) && (
+                ) : !isFinalStatus(request.status) && (
                   <Button
                     variant="outline"
                     onClick={() => {
@@ -958,7 +1049,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                     ⏸️ تعليق الطلب دون إشعار العميل
                   </Button>
                 )}
-                {waitingForClient(request.status as any) && !adminActions.showStatusUpdate && !canConfirmPayment && (
+                {waitingForClient(request.status) && !adminActions.showStatusUpdate && !canConfirmPayment && (
                   <div className="text-center py-6">
                     <div className="inline-flex items-center gap-2 text-muted">
                       <span className="text-lg">⏳</span>
@@ -966,7 +1057,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                     </div>
                   </div>
                 )}
-                {isFinalStatus(request.status as any) && (
+                {isFinalStatus(request.status) && (
                   <div className="text-center py-6">
                     <div className="inline-flex items-center gap-2 text-muted">
                       <span className="text-lg">{request.status === 'completed' ? '🎉' : '📋'}</span>
@@ -1060,7 +1151,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
 
 // ── تبويب التفاصيل (عرض فقط) ──────────────────────────────────────
 
-function DetailsTab({ request }: { request: any }) {
+function DetailsTab({ request }: { request: AdminRequest }) {
   const cat = CATEGORIES.find(c => c.id === request.category)
   const selectedExtras: string[] = Array.isArray(request.user_selected_extras) ? request.user_selected_extras : []
   const subOptionLabel = renderSubOptionLabel(request.category, request.sub_option)
@@ -1474,10 +1565,10 @@ function DetailsTab({ request }: { request: any }) {
 
 // ── تبويب سجل الإجراءات (خط زمني للقراءة فقط) ─────────────────────
 
-function ActivityTab({ request }: { request: any }) {
+function ActivityTab({ request }: { request: AdminRequest }) {
   type Ev = { t: string; icon: string; label: string }
   const evs: Ev[] = []
-  const add = (t: any, icon: string, label: string) => { if (t) evs.push({ t, icon, label }) }
+  const add = (t: string | null | undefined, icon: string, label: string) => { if (t) evs.push({ t, icon, label }) }
 
   add(request.created_at, '📝', 'إنشاء الطلب')
   add(request.auto_quoted_at, '🤖', 'تسعير تلقائي وإرسال العرض')

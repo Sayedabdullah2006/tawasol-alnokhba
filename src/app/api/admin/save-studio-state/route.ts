@@ -31,9 +31,9 @@ export async function POST(request: Request) {
     if (!reqRow) return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 })
 
     if (postIndex !== null) {
-      const aiPosts: Record<string, any> =
-        reqRow.ai_posts && typeof reqRow.ai_posts === 'object' ? { ...reqRow.ai_posts } : {}
-      const entry: Record<string, any> = { ...(aiPosts[postIndex] ?? {}) }
+      const aiPosts: Record<string, Record<string, unknown>> =
+        reqRow.ai_posts && typeof reqRow.ai_posts === 'object' ? { ...reqRow.ai_posts } as Record<string, Record<string, unknown>> : {}
+      const entry: Record<string, unknown> = { ...(aiPosts[postIndex] ?? {}) }
       const post = Array.isArray(reqRow.campaign_posts) ? reqRow.campaign_posts[postIndex] : null
       const supportingUrls = new Set(normalizeSupportingDocuments(post?.supporting_documents).map(document => document.url))
       if (Array.isArray(designs)) entry.designs = designs

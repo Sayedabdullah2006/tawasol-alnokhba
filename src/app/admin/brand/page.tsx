@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useToast } from '@/components/ui/Toast'
@@ -12,7 +12,7 @@ const ALLOWED = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
 
 export default function AdminBrandPage() {
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const { showToast } = useToast()
   const [loading, setLoading] = useState(true)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
@@ -34,7 +34,10 @@ export default function AdminBrandPage() {
     setLoading(false)
   }, [supabase, router])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [load])
 
   const handleFile = async (file: File | null | undefined) => {
     if (!file) return

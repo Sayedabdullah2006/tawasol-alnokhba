@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/ui/Toast'
@@ -10,23 +10,41 @@ import Modal from '@/components/ui/Modal'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 type Tab = 'categories' | 'extras'
+type CategoryRow = {
+  id: string
+  name_ar: string
+  icon: string
+  description?: string | null
+  sort_order: number
+  client_types?: string[] | null
+  is_active: boolean
+}
+type ExtraRow = {
+  id: string
+  name_ar: string
+  icon: string
+  default_price: number
+  category_only?: string | null
+  sort_order: number
+  is_active: boolean
+}
 
 export default function AdminCategoriesPage() {
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const { showToast } = useToast()
   const [tab, setTab] = useState<Tab>('categories')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
   // Categories
-  const [categories, setCategories] = useState<any[]>([])
+  const [categories, setCategories] = useState<CategoryRow[]>([])
   const [showCatForm, setShowCatForm] = useState(false)
   const [editCatId, setEditCatId] = useState<string | null>(null)
   const [catForm, setCatForm] = useState({ id: '', name_ar: '', icon: '📋', description: '', sort_order: 0, client_types: '' })
 
   // Extras
-  const [extras, setExtras] = useState<any[]>([])
+  const [extras, setExtras] = useState<ExtraRow[]>([])
   const [showExtForm, setShowExtForm] = useState(false)
   const [editExtId, setEditExtId] = useState<string | null>(null)
   const [extForm, setExtForm] = useState({ id: '', name_ar: '', icon: '📋', default_price: 0, category_only: '', sort_order: 0 })
@@ -46,11 +64,14 @@ export default function AdminCategoriesPage() {
     setLoading(false)
   }, [supabase, router])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadData() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadData])
 
   // ─── Categories CRUD ───
   const openAddCat = () => { setEditCatId(null); setCatForm({ id: '', name_ar: '', icon: '📋', description: '', sort_order: categories.length + 1, client_types: '' }); setShowCatForm(true) }
-  const openEditCat = (c: any) => {
+  const openEditCat = (c: CategoryRow) => {
     setEditCatId(c.id)
     setCatForm({ id: c.id, name_ar: c.name_ar, icon: c.icon, description: c.description ?? '', sort_order: c.sort_order, client_types: c.client_types ? c.client_types.join(',') : '' })
     setShowCatForm(true)
@@ -87,7 +108,7 @@ export default function AdminCategoriesPage() {
 
   // ─── Extras CRUD ───
   const openAddExt = () => { setEditExtId(null); setExtForm({ id: '', name_ar: '', icon: '📋', default_price: 0, category_only: '', sort_order: extras.length + 1 }); setShowExtForm(true) }
-  const openEditExt = (e: any) => {
+  const openEditExt = (e: ExtraRow) => {
     setEditExtId(e.id)
     setExtForm({ id: e.id, name_ar: e.name_ar, icon: e.icon, default_price: e.default_price, category_only: e.category_only ?? '', sort_order: e.sort_order })
     setShowExtForm(true)

@@ -4,9 +4,10 @@ import { useState } from 'react'
 import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
 import { getReviewItems, getPostStatuses } from '@/lib/review-items'
+import type { PublishRequest } from '@/types/publish-request'
 
 interface Props {
-  request: any
+  request: PublishRequest
 }
 
 /**

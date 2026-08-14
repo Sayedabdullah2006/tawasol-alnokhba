@@ -24,6 +24,19 @@ interface StudioHistoryItem {
   created_at: string
 }
 
+interface StudioApiResponse {
+  analysis?: unknown
+  tweets?: string
+  concepts?: ConceptItem[]
+  imageUrl?: string
+  error?: string
+}
+
+function createUploadPath(prefix: string, fileName: string) {
+  const ext = fileName.split('.').pop() || 'jpg'
+  return `${prefix}-${crypto.randomUUID()}.${ext}`
+}
+
 /**
  * استوديو الذكاء الاصطناعي المستقل (بلا طلب) — عديم الحالة.
  * منفصل تماماً عن استوديو الطلبات (AIStudioPanel) ومساره.
@@ -93,8 +106,7 @@ export default function StandaloneStudio() {
     if (file.size > 10 * 1024 * 1024) { showToast('الحجم يتجاوز 10MB', 'error'); return }
     setPersonUploading(i)
     try {
-      const ext = file.name.split('.').pop()
-      const path = `info-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const path = createUploadPath('info', file.name)
       const { error } = await supabase.storage.from('content-images').upload(path, file)
       if (error) throw error
       const { data } = supabase.storage.from('content-images').getPublicUrl(path)
@@ -121,7 +133,7 @@ export default function StandaloneStudio() {
   const toggleImage = (url: string) =>
     setSelectedImages(prev => (prev.includes(url) ? prev.filter(u => u !== url) : [...prev, url]))
 
-  const [analysis, setAnalysis] = useState<any>(null)
+  const [analysis, setAnalysis] = useState<unknown>(null)
   const [tweets, setTweets] = useState('')
   const [selectedTweet, setSelectedTweet] = useState('')
   const [conceptItems, setConceptItems] = useState<ConceptItem[]>([])
@@ -167,8 +179,7 @@ export default function StandaloneStudio() {
     if (file.size > 10 * 1024 * 1024) { showToast('الحجم يتجاوز 10 ميجابايت', 'error'); return }
     setUploading(true)
     try {
-      const ext = file.name.split('.').pop()
-      const path = `studio-src-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const path = createUploadPath('studio-src', file.name)
       const { error } = await supabase.storage.from('content-images').upload(path, file)
       if (error) throw error
       const { data } = supabase.storage.from('content-images').getPublicUrl(path)
@@ -182,13 +193,13 @@ export default function StandaloneStudio() {
     }
   }
 
-  const post = async (payload: any) => {
+  const post = async (payload: Record<string, unknown>): Promise<StudioApiResponse | null> => {
     const res = await fetch('/api/admin/ai-studio', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) { showToast(data.error ?? 'فشل الطلب', 'error'); return null }
-    return data
+    return data as StudioApiResponse
   }
 
   const callStep = async (step: StepKey) => {
@@ -206,17 +217,19 @@ export default function StandaloneStudio() {
       })
       if (!data) return
       if (step === 'analyze') { setAnalysis(data.analysis); showToast('تم التحليل', 'success') }
-      else if (step === 'tweets') { setTweets(data.tweets); setSelectedTweet(data.tweets); showToast('تم توليد التغريدات', 'success') }
+      else if (step === 'tweets') { setTweets(data.tweets ?? ''); setSelectedTweet(data.tweets ?? ''); showToast('تم توليد التغريدات', 'success') }
       else if (step === 'concepts') { setConceptItems(Array.isArray(data.concepts) ? data.concepts : []); showToast('تم اقتراح الاتجاهات', 'success') }
       else if (step === 'image') {
-        setBatchResults(prev => [...prev, { title: 'تصميم مفرد', imageUrl: data.imageUrl, brief: chosenConcept, preparedPrompt: chosenPreparedPrompt }])
+        if (data.imageUrl) {
+          setBatchResults(prev => [...prev, { title: 'تصميم مفرد', imageUrl: data.imageUrl!, brief: chosenConcept, preparedPrompt: chosenPreparedPrompt }])
+        }
         showToast('تم توليد التصميم', 'success')
       }
     } finally { setLoadingStep(null) }
   }
 
   // توليد تصميم واحد بقيمة تحليل صريحة (لاستخدامه في المسار التلقائي قبل تحديث الحالة)
-  const genOneWith = async (brief: string, analysisVal: any, note?: string, preparedPrompt?: string): Promise<string | null> => {
+  const genOneWith = async (brief: string, analysisVal: unknown, note?: string, preparedPrompt?: string): Promise<string | null> => {
     const data = await post({ step: 'image', title, content, sourceImages: selectedImages, extraInfo, analysis: analysisVal, chosenConcept: brief, note, hasVideo, videoOrientation, preparedPrompt })
     return data?.imageUrl ?? null
   }
@@ -241,7 +254,7 @@ export default function StandaloneStudio() {
 
       setAutoStage('② كتابة التغريدات…')
       const tRes = await post({ step: 'tweets', ...base, analysis: a })
-      if (tRes) { setTweets(tRes.tweets); setSelectedTweet(tRes.tweets) }
+      if (tRes) { setTweets(tRes.tweets ?? ''); setSelectedTweet(tRes.tweets ?? '') }
 
       setAutoStage('③ اقتراح الاتجاهات…')
       const cRes = await post({ step: 'concepts', ...base, analysis: a })
@@ -599,7 +612,7 @@ export default function StandaloneStudio() {
       <div className={card}>
         <StepHead n={1} title="تحليل الخبر" subtitle="استخراج عناصر الخبر لبناء المحتوى" done={!!analysis} />
         <Button onClick={() => callStep('analyze')} loading={loadingStep === 'analyze'} disabled={autoBusy || loadingStep !== null || !content.trim()} size="sm">حلّل الخبر</Button>
-        {analysis && <pre dir="rtl" className="bg-cream rounded-xl p-3 text-xs whitespace-pre-wrap max-h-72 overflow-y-auto border border-border">{JSON.stringify(analysis, null, 2)}</pre>}
+        {analysis != null && <pre dir="rtl" className="bg-cream rounded-xl p-3 text-xs whitespace-pre-wrap max-h-72 overflow-y-auto border border-border">{JSON.stringify(analysis, null, 2)}</pre>}
       </div>
 
       {/* 2 تغريدات */}

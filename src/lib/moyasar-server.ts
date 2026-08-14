@@ -6,14 +6,38 @@
 import { createServiceRoleClient } from '@/lib/supabase-server';
 import { buildAuthHeader, MOYASAR_API_URL, toSAR } from '@/lib/moyasar';
 import { notifyPaymentConfirmedToClient } from '@/lib/email';
+import type { MoyasarPayment, PaymentMetadata } from '@/types/moyasar';
 
-export async function refundMoyasarPayment(paymentId: string, amountHalalas?: number): Promise<{ success: boolean; data?: any; error?: string }> {
+interface ProviderData extends Record<string, unknown> {
+  id?: string;
+  refund_id?: string;
+  message?: string;
+}
+
+interface VerifiedPaymentSummary {
+  id: string;
+  status: string;
+  amount: number;
+  currency: string;
+  description?: string;
+  created_at?: string;
+  source: { type?: string; company?: string; last4: string };
+  metadata?: PaymentMetadata;
+}
+
+interface PaymentVerificationResult {
+  success: boolean;
+  reason?: string;
+  payment?: VerifiedPaymentSummary;
+}
+
+export async function refundMoyasarPayment(paymentId: string, amountHalalas?: number): Promise<{ success: boolean; data?: ProviderData; error?: string }> {
   try {
     const detailsResponse = await fetch(`${MOYASAR_API_URL}/payments/${paymentId}`, {
       headers: { Authorization: buildAuthHeader(), 'Content-Type': 'application/json' },
     })
-    const payment = await detailsResponse.json().catch(() => ({}))
-    if (!detailsResponse.ok || !['paid', 'captured'].includes(payment.status)) {
+    const payment = await detailsResponse.json().catch(() => ({})) as Partial<MoyasarPayment>
+    if (!detailsResponse.ok || !['paid', 'captured'].includes(String(payment.status ?? ''))) {
       return { success: false, error: 'عملية ميسر غير قابلة للاسترجاع في حالتها الحالية' }
     }
     const available = Number(payment.amount ?? 0) - Number(payment.refunded ?? 0)
@@ -26,7 +50,7 @@ export async function refundMoyasarPayment(paymentId: string, amountHalalas?: nu
       headers: { Authorization: buildAuthHeader(), 'Content-Type': 'application/json' },
       body: amountHalalas ? JSON.stringify({ amount: amountHalalas }) : undefined,
     })
-    const data = await response.json().catch(() => ({}))
+    const data = await response.json().catch(() => ({})) as ProviderData & { message?: string }
     if (!response.ok) return { success: false, error: data.message ?? `Moyasar refund failed (${response.status})` }
     return { success: true, data }
   } catch (error) {
@@ -40,7 +64,7 @@ export async function refundMoyasarPayment(paymentId: string, amountHalalas?: nu
  * Implements complete triple verification: status + amount + currency
  * Includes idempotency protection and proper order status updates
  */
-export async function verifyAndUpdatePayment(paymentId: string, requestId?: string): Promise<{ success: boolean; reason?: string; payment?: any }> {
+export async function verifyAndUpdatePayment(paymentId: string, requestId?: string): Promise<PaymentVerificationResult> {
   const supabase = await createServiceRoleClient();
 
   console.log(`[MOYASAR_VERIFY] 🚀 Starting verification for payment ID: ${paymentId}`);
@@ -71,7 +95,7 @@ export async function verifyAndUpdatePayment(paymentId: string, requestId?: stri
       });
 
       if (response.ok) {
-        const payment = await response.json();
+        const payment = await response.json() as MoyasarPayment;
         return {
           success: true,
           reason: 'already_processed',
@@ -106,11 +130,11 @@ export async function verifyAndUpdatePayment(paymentId: string, requestId?: stri
 
     if (!response.ok) {
       console.error(`[MOYASAR_VERIFY] ❌ Moyasar API error: ${response.status} ${response.statusText}`);
-      const errorData = await response.json().catch(() => ({}));
-      return { success: false, reason: (errorData as any).message || 'فشل في التحقق من حالة الدفع من ميسر' };
+      const errorData = await response.json().catch(() => ({})) as { message?: string };
+      return { success: false, reason: errorData.message || 'فشل في التحقق من حالة الدفع من ميسر' };
     }
 
-    const payment = await response.json();
+    const payment = await response.json() as MoyasarPayment;
     console.log(`[MOYASAR_VERIFY] 📄 Payment data received:`, {
       id: payment.id,
       status: payment.status,

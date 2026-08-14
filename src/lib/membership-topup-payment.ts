@@ -3,7 +3,19 @@ import { createServiceRoleClient } from '@/lib/supabase-server'
 import { formatMembershipTopupNumber, getMembershipTopupItem } from '@/lib/membership-topups'
 import { notifyAdminIntake, sendEmail } from '@/lib/email'
 
-async function sendTopupReceipt(topup: any) {
+interface TopupReceiptRow {
+  id: string
+  item_type: string
+  topup_number: number | string
+  quantity: number
+  total_amount: number | string
+  memberships?: {
+    client_name?: string | null
+    client_email?: string | null
+  } | null
+}
+
+async function sendTopupReceipt(topup: TopupReceiptRow) {
   const service = await createServiceRoleClient()
   const now = new Date().toISOString()
   const { data: claimed } = await service.from('membership_topups')
@@ -25,7 +37,9 @@ async function sendTopupReceipt(topup: any) {
       <p style="text-align:center"><a href="${dashboard}" style="display:inline-block;background:#14366e;color:white;padding:12px 26px;border-radius:8px;text-decoration:none;font-weight:bold">عرض الرصيد</a></p></div>
     </div></div>`
   try {
-    const sent = await sendEmail(topup.memberships?.client_email, `تم تعزيز رصيد عضويتك · ${number}`, html)
+    const clientEmail = topup.memberships?.client_email
+    if (!clientEmail) throw new Error('Membership client email is missing')
+    const sent = await sendEmail(clientEmail, `تم تعزيز رصيد عضويتك · ${number}`, html)
     if (!sent) throw new Error('Email provider did not confirm delivery')
     await notifyAdminIntake({
       subject: 'تم دفع تعزيز رصيد عضوية',

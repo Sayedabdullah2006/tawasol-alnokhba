@@ -100,7 +100,15 @@ export async function POST(request: Request) {
     const needsManualQuote = !isIndividual || (body.category ?? '') === 'Others'
 
     // ── تحقق من كود الخصم (إن وُجد) ─────────────────────────────
-    let discountRow: any = null
+    let discountRow: {
+      id: string
+      code: string
+      discount_pct: number
+      expires_at: string
+      is_active: boolean
+      max_uses: number | null
+      used_count: number
+    } | null = null
     if (body.discount_code) {
       const { data: dc } = await serviceClient
         .from('discount_codes')

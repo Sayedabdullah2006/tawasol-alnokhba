@@ -6,10 +6,18 @@ import { useRouter } from 'next/navigation'
 import ProfileForm from '@/components/dashboard/ProfileForm'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
+interface Profile {
+  id: string
+  full_name: string | null
+  phone: string | null
+  city: string | null
+  x_handle: string | null
+}
+
 export default function ProfilePage() {
   const router = useRouter()
   const supabase = createClient()
-  const [profile, setProfile] = useState<any>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -26,7 +34,7 @@ export default function ProfilePage() {
         .eq('id', user.id)
         .single()
 
-      setProfile(prof)
+      setProfile(prof as Profile | null)
       setLoading(false)
     }
     load()

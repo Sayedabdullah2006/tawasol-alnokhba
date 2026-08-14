@@ -160,6 +160,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: RequestScope }
   const [thumbnailTarget, setThumbnailTarget] = useState<AdminRequest | null>(null)
   const [savingThumbnail, setSavingThumbnail] = useState(false)
   const [reviewsByRequest, setReviewsByRequest] = useState<Record<string, RequestReview>>({})
+  const [deletingReviewCommentId, setDeletingReviewCommentId] = useState<string | null>(null)
   const [sendingReviewInvitationId, setSendingReviewInvitationId] = useState<string | null>(null)
   const [showBulkReviewConfirm, setShowBulkReviewConfirm] = useState(false)
   const [sendingBulkReviewInvitations, setSendingBulkReviewInvitations] = useState(false)
@@ -445,6 +446,32 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: RequestScope }
       showToast('خطأ في الاتصال بالخادم', 'error')
     } finally {
       setSendingReviewInvitationId(null)
+    }
+  }
+
+  const deleteReviewComment = async (requestId: string) => {
+    if (!confirm('هل تريد حذف تعليق العميل؟ سيبقى تقييم النجوم محفوظاً.')) return
+    setDeletingReviewCommentId(requestId)
+    try {
+      const response = await fetch('/api/admin/request-reviews', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.success) {
+        showToast(data.error ?? 'تعذّر حذف التعليق', 'error')
+        return
+      }
+      setReviewsByRequest(current => ({
+        ...current,
+        [requestId]: { ...(current[requestId] ?? { request_id: requestId }), comment: null },
+      }))
+      showToast('تم حذف التعليق مع الاحتفاظ بالتقييم')
+    } catch {
+      showToast('خطأ في الاتصال بالخادم', 'error')
+    } finally {
+      setDeletingReviewCommentId(null)
     }
   }
 
@@ -1252,7 +1279,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: RequestScope }
                       {membershipOnly && <span className="rounded-full bg-cyan-50 px-2.5 py-1 text-cyan-800">الرصيد: {r.membership_credit_status === 'reserved' ? 'محجوز' : r.membership_credit_status === 'consumed' ? 'مستخدم' : r.membership_credit_status === 'released' ? 'مُعاد' : 'غير مخصوم'}</span>}
                       {storeOnly && getStoreRequestMeta(r) && <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-800">{getStoreRequestMeta(r)?.product_name} · {formatNumber(Number(getStoreRequestMeta(r)?.listed_price || 0))} ر.س معلن</span>}
                     </div>
-                    {r.status === 'completed' && review?.comment && <div className="mt-3 rounded-lg border border-gold/20 bg-gold/5 px-3 py-2 text-xs leading-5 text-dark"><span className="font-black text-gold">رأي العميل: </span>{review.comment}</div>}
+                    {r.status === 'completed' && review?.comment && <div className="mt-3 flex items-start justify-between gap-3 rounded-lg border border-gold/20 bg-gold/5 px-3 py-2 text-xs leading-5 text-dark"><p className="min-w-0"><span className="font-black text-gold">رأي العميل: </span>{review.comment}</p><button type="button" onClick={() => deleteReviewComment(r.id)} disabled={deletingReviewCommentId === r.id} className="shrink-0 rounded-md px-2 py-1 font-bold text-red-600 transition hover:bg-red-50 disabled:opacity-50">{deletingReviewCommentId === r.id ? 'جارٍ الحذف...' : 'حذف التعليق'}</button></div>}
                     {r.admin_notes?.trim() && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700"><span className="font-black">ملاحظة الإدارة: </span>{r.admin_notes.trim()}</div>}
                   </div>
 

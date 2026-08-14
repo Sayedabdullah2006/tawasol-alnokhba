@@ -8,8 +8,8 @@ interface Props {
     id: string
     request_number: number
     category: string
-    title?: string
-    content?: string
+    title?: string | null
+    content?: string | null
     status: string
     created_at: string
     admin_quoted_price?: number | null

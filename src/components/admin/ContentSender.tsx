@@ -6,9 +6,10 @@ import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
 import ContentImagesUploader from '@/components/request/ContentImagesUploader'
 import ImageLightbox from '@/components/ui/ImageLightbox'
+import type { PublishRequest } from '@/types/publish-request'
 
 interface ContentSenderProps {
-  request: any
+  request: PublishRequest
   onSent: () => void
   onCancel: () => void
   initialContent?: string

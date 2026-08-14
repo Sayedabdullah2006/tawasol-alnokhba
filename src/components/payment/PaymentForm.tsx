@@ -9,6 +9,7 @@ import { useEffect, useRef } from 'react';
 import { useMoyasar } from '@/hooks/useMoyasar';
 import { getPaymentMethods } from '@/lib/moyasar';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import type { PaymentMetadata } from '@/types/moyasar';
 
 interface PaymentFormProps {
   /** Payment amount in SAR */
@@ -16,7 +17,7 @@ interface PaymentFormProps {
   /** Payment description */
   description: string;
   /** Additional metadata to include with payment */
-  metadata?: Record<string, any>;
+  metadata?: PaymentMetadata;
   /** CSS classes to apply to container */
   className?: string;
 }

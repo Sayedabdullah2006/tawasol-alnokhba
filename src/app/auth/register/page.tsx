@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
@@ -13,6 +13,7 @@ import { COUNTRIES, countryByCode, flagEmoji } from '@/lib/countries'
 
 export default function RegisterPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
   const [fullName, setFullName] = useState('')
@@ -29,11 +30,8 @@ export default function RegisterPage() {
   const captchaOn = turnstileEnabled()
 
   // وجهة العودة بعد التسجيل (مثلاً /request) — تُقرأ من ?next=
-  const [nextParam, setNextParam] = useState('')
-  useEffect(() => {
-    const n = new URLSearchParams(window.location.search).get('next')
-    if (n && n.startsWith('/') && !n.startsWith('//')) setNextParam(n)
-  }, [])
+  const requestedNext = searchParams.get('next')
+  const nextParam = requestedNext?.startsWith('/') && !requestedNext.startsWith('//') ? requestedNext : ''
   const loginHref = nextParam ? `/auth/login?next=${encodeURIComponent(nextParam)}` : '/auth/login'
 
   const handleRegister = async (e: React.FormEvent) => {

@@ -10,7 +10,7 @@ import ClientNameFixed from '@/components/ui/ClientNameFixed'
 const navLinks = [
   { href: '/', label: 'الرئيسية' },
   { href: '/inventor-store', label: 'مسار المخترع', badge: 'جديد' },
-  { href: '/request/start', label: 'تقديم طلب' },
+  { href: '/request/start', label: 'طلب نشر' },
 ]
 
 interface UserInfo {

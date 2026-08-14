@@ -206,7 +206,7 @@ Deno.serve(async (req) => {
 
     let processedCount = 0
     let sentCount = 0
-    const results: any[] = []
+    const results: ReminderResult[] = []
 
     // 2. التحقق من كل طلب وإرسال التذكيرات
     for (const request of requests) {
@@ -513,4 +513,16 @@ function createContentReminderHTML(data: ReminderData, reminderNum: number): str
       </div>
     </div>
   `
+}
+
+interface ReminderResult {
+  requestId: string
+  requestNumber: string
+  status: string
+  action: 'skipped' | 'failed' | 'sent' | 'error'
+  reason?: string
+  reminderCount?: number
+  reminderNumber?: number
+  emailSent?: boolean
+  error?: string
 }

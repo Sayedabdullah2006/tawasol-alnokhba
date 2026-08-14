@@ -5,8 +5,15 @@ import Button from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 
 type PostState = 'idle' | 'running' | 'done' | 'failed'
+type CampaignPost = { title?: string }
+type CampaignGenerationRequest = {
+  id: string
+  request_type?: string | null
+  campaign_posts?: CampaignPost[] | null
+  ai_posts?: Record<string, { designs?: unknown[] }> | null
+}
 
-export default function CampaignAutoGenerator({ request, onFinished }: { request: any; onFinished: () => void }) {
+export default function CampaignAutoGenerator({ request, onFinished }: { request: CampaignGenerationRequest; onFinished: () => void }) {
   const { showToast } = useToast()
   const posts = Array.isArray(request?.campaign_posts) ? request.campaign_posts : []
   const [running, setRunning] = useState(false)
@@ -25,7 +32,7 @@ export default function CampaignAutoGenerator({ request, onFinished }: { request
     return data
   }
 
-  const generatePost = async (post: any, postIndex: number) => {
+  const generatePost = async (_post: CampaignPost, postIndex: number) => {
     const existingDesigns = Array.isArray(request?.ai_posts?.[postIndex]?.designs)
       ? request.ai_posts[postIndex].designs
       : []
@@ -70,7 +77,7 @@ export default function CampaignAutoGenerator({ request, onFinished }: { request
   const start = async () => {
     if (!confirm(`سيجري توليد النص وثلاثة تصاميم لكل منشورات الحملة (${posts.length}) بالتتابع. هل تبدأ الآن؟`)) return
     setRunning(true)
-    setStates(Object.fromEntries(posts.map((_: any, index: number) => [index, { state: 'idle' as PostState }])))
+    setStates(Object.fromEntries(posts.map((_, index) => [index, { state: 'idle' as PostState }])))
     let completed = 0
     for (let index = 0; index < posts.length; index += 1) {
       try {
@@ -93,7 +100,7 @@ export default function CampaignAutoGenerator({ request, onFinished }: { request
         <p className="text-sm text-muted mt-1">يولد كل خبر بالتتابع: تحليل، نص مختلف، ثم 3 تصاميم. تُمرر عناوين ومضامين بقية الحملة للنموذج حتى لا تتكرر المعلومة أو زاوية الخبر.</p>
       </div>
       <div className="space-y-1.5">
-        {posts.map((post: any, index: number) => {
+        {posts.map((post, index) => {
           const entry = states[index]
           const icon = entry?.state === 'done' ? '✓' : entry?.state === 'failed' ? '!' : entry?.state === 'running' ? '…' : '•'
           const color = entry?.state === 'done' ? 'text-green' : entry?.state === 'failed' ? 'text-red-600' : entry?.state === 'running' ? 'text-blue-600' : 'text-muted'

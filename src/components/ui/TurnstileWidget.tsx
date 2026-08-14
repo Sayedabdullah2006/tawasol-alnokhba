@@ -41,7 +41,7 @@ export default function TurnstileWidget({ onVerify, onExpire }: Props) {
   useEffect(() => {
     if (!siteKey) return
     if (typeof window === 'undefined') return
-    if (window.turnstile) { setScriptReady(true); return }
+    if (window.turnstile) return
 
     if (!document.getElementById(SCRIPT_ID)) {
       window.onTurnstileLoad = () => setScriptReady(true)

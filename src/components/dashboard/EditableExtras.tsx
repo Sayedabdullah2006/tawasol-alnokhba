@@ -33,13 +33,17 @@ interface Props {
   onUpdated?: (newTotal: number, newReach: number, newSelected: string[]) => void
 }
 
+interface PricingConfig {
+  extras_prices?: Record<string, number>
+}
+
 export default function EditableExtras({
   requestId, category, basePrice, initialSelected, offered, influencer, scope, onUpdated,
 }: Props) {
   const supabase = createClient()
   const { showToast } = useToast()
   const { extras: dbExtras, loading: extrasLoading } = useExtras()
-  const [pricingConfig, setPricingConfig] = useState<any>(null)
+  const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null)
   const [selected, setSelected] = useState<string[]>(initialSelected)
   const [saving, setSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState<string[]>(initialSelected)

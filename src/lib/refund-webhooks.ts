@@ -10,6 +10,15 @@ const TIMING = {
 
 type Provider = keyof typeof TIMING
 
+interface PaymentRefundRow {
+  id: string
+  request_id: string
+  status: string
+  amount: number | string
+  provider_refund_id?: string | null
+  provider_response?: unknown
+}
+
 export async function completeProviderRefund(args: {
   provider: Exclude<Provider, 'manual'>
   providerPaymentId: string
@@ -18,17 +27,17 @@ export async function completeProviderRefund(args: {
 }): Promise<{ handled: boolean; reason: string }> {
   const service = await createServiceRoleClient()
 
-  let refund: any = null
+  let refund: PaymentRefundRow | null = null
   if (args.providerRefundId) {
     const { data } = await service.from('payment_refunds').select('*')
       .eq('provider', args.provider).eq('provider_refund_id', args.providerRefundId).maybeSingle()
-    refund = data
+    refund = data as PaymentRefundRow | null
   }
   if (!refund) {
     const { data } = await service.from('payment_refunds').select('*')
       .eq('provider', args.provider).eq('provider_payment_id', args.providerPaymentId)
       .eq('status', 'pending').order('requested_at', { ascending: false }).limit(1).maybeSingle()
-    refund = data
+    refund = data as PaymentRefundRow | null
   }
   if (!refund) return { handled: false, reason: 'no_matching_pending_refund' }
   if (refund.status === 'completed') return { handled: true, reason: 'already_completed' }

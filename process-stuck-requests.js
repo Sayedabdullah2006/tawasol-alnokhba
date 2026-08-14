@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 // سكريبت معالجة الطلبات العالقة والمتأخرة
 require('dotenv').config({ path: '.env.local' })
 const { createClient } = require('@supabase/supabase-js')

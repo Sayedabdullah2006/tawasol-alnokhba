@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useToast } from '@/components/ui/Toast'
@@ -11,7 +11,7 @@ interface CategoryRow { id: string; name_ar: string; icon: string }
 
 export default function AdminSiteContentPage() {
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const { showToast } = useToast()
 
   const [loading, setLoading] = useState(true)
@@ -56,7 +56,10 @@ export default function AdminSiteContentPage() {
     setLoading(false)
   }, [supabase, router, showToast])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [load])
 
   const save = async () => {
     setSaving(true)

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { getPublishableKey, toHalalas, getCallbackUrl, getPaymentMethods } from '@/lib/moyasar';
-import type { MoyasarConfig, MoyasarPayment } from '@/types/moyasar';
+import type { MoyasarConfig, MoyasarPayment, MoyasarPaymentFailure, PaymentMetadata } from '@/types/moyasar';
 
 interface UseMoyasarReturn {
   isLoaded: boolean;
@@ -14,7 +14,7 @@ interface UseMoyasarReturn {
   initPayment: (
     amount: number,
     description: string,
-    metadata?: Record<string, any>,
+    metadata?: PaymentMetadata,
     elementRef?: HTMLElement
   ) => Promise<void>;
 }
@@ -27,9 +27,11 @@ export function useMoyasar(): UseMoyasarReturn {
   useEffect(() => {
     // Check if Moyasar is already loaded
     if (window.Moyasar) {
-      setIsLoaded(true);
-      setIsLoading(false);
-      return;
+      const timer = window.setTimeout(() => {
+        setIsLoaded(true);
+        setIsLoading(false);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
 
     // Check if script is already being loaded
@@ -88,7 +90,7 @@ export function useMoyasar(): UseMoyasarReturn {
     async (
       amount: number,
       description: string,
-      metadata?: Record<string, any>,
+      metadata?: PaymentMetadata,
       elementRef?: HTMLElement
     ): Promise<void> => {
       if (!isLoaded || !window.Moyasar) {
@@ -97,7 +99,7 @@ export function useMoyasar(): UseMoyasarReturn {
 
       try {
         // استخدام العنصر المُمرر مباشرة أو البحث عنه
-        let element: HTMLElement | null = elementRef || document.getElementById('moyasar-form');
+        const element: HTMLElement | null = elementRef || document.getElementById('moyasar-form');
 
         if (!element) {
           console.error('Moyasar form element not found in DOM');
@@ -163,7 +165,7 @@ export function useMoyasar(): UseMoyasarReturn {
               window.location.href = `/payment/callback?id=${payment.id}&requestId=${payment.metadata?.request_id || ''}`;
             }
           },
-          on_failed: (error: any) => {
+          on_failed: (error: MoyasarPaymentFailure) => {
             console.error('[Moyasar] Payment failed:', error);
             const membershipId = paymentConfig.metadata?.membership_id ?? '';
             const topupId = paymentConfig.metadata?.topup_id ?? '';

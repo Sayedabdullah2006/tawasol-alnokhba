@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import type { PostReview } from '@/lib/review-items'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { notifyContentReadyForReview } from '@/lib/email'
 import { validateRequestId, validateContent, ValidationException, formatValidationErrors } from '@/lib/validation'
@@ -51,11 +52,11 @@ export async function POST(request: Request) {
 
     const now = new Date().toISOString()
     const images = Array.isArray(proposedImages) ? proposedImages : []
-    const reviews: Record<string, any> = existingRequest.post_reviews && typeof existingRequest.post_reviews === 'object'
+    const reviews: Record<string, PostReview> = existingRequest.post_reviews && typeof existingRequest.post_reviews === 'object'
       ? { ...existingRequest.post_reviews }
       : {}
     const previous = reviews[0]
-    const history: any[] = Array.isArray(previous?.history) ? [...previous.history] : []
+    const history: NonNullable<PostReview['history']> = Array.isArray(previous?.history) ? [...previous.history] : []
     history.push({ content: proposedContent.trim(), images, sent_at: now })
     // الطلب المنفرد يستخدم الآن نفس مراجعة المنشور الدقيقة المستخدمة في الحملات.
     reviews[0] = {
