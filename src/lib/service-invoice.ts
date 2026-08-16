@@ -9,6 +9,7 @@ import { createServiceRoleClient } from '@/lib/supabase-server'
 import { generateRequestNumber } from '@/lib/utils'
 
 const INVOICE_BUCKET = 'service-invoices'
+const INVOICE_FONT_FAMILY = 'InvoiceArabic'
 const SELLER = {
   name: 'شركة تواصل النخبة للدعاية والإعلان',
   legalType: 'شركة ذات مسؤولية محدودة',
@@ -215,11 +216,11 @@ function escapeXml(value: string) {
 }
 
 function rtlText(value: string, x: number, y: number, size = 20, weight = 400, fill = '#263a60') {
-  return `<text x="${x}" y="${y}" text-anchor="start" direction="rtl" unicode-bidi="plaintext" font-family="DejaVu Sans, Arial, sans-serif" font-size="${size}" font-weight="${weight}" fill="${fill}">${escapeXml(value)}</text>`
+  return `<text x="${x}" y="${y}" text-anchor="start" direction="rtl" unicode-bidi="plaintext" font-family="${INVOICE_FONT_FAMILY}" font-size="${size}" font-weight="${weight}" fill="${fill}">${escapeXml(value)}</text>`
 }
 
 function ltrText(value: string, x: number, y: number, size = 17, weight = 400, fill = '#263a60') {
-  return `<text x="${x}" y="${y}" text-anchor="start" direction="ltr" font-family="DejaVu Sans, Arial, sans-serif" font-size="${size}" font-weight="${weight}" fill="${fill}">${escapeXml(value)}</text>`
+  return `<text x="${x}" y="${y}" text-anchor="start" direction="ltr" font-family="${INVOICE_FONT_FAMILY}" font-size="${size}" font-weight="${weight}" fill="${fill}">${escapeXml(value)}</text>`
 }
 
 function wrapWords(value: string, maxCharacters: number, maxLines = 3) {
@@ -269,7 +270,10 @@ function formatSaudiDate(value: string) {
 }
 
 async function invoiceSvg(snapshot: ServiceInvoiceSnapshot, invoiceNumber: string) {
-  const logo = await readFile(path.join(process.cwd(), 'public', 'logo.png'))
+  const [logo, invoiceFont] = await Promise.all([
+    readFile(path.join(process.cwd(), 'public', 'logo.png')),
+    readFile(path.join(process.cwd(), 'public', 'fonts', 'NotoSansArabic-Variable.ttf')),
+  ])
   const buyerDisplayName = snapshot.buyer.organizationName ?? snapshot.buyer.name
   const buyerRepresentative = snapshot.buyer.organizationName
     ? snapshot.buyer.representativeName ?? snapshot.buyer.name
@@ -286,6 +290,14 @@ async function invoiceSvg(snapshot: ServiceInvoiceSnapshot, invoiceNumber: strin
   const paymentMethod = snapshot.payment.method || snapshot.payment.provider
 
   return Buffer.from(`<svg width="1240" height="1754" xmlns="http://www.w3.org/2000/svg">
+    <style>
+      @font-face {
+        font-family: '${INVOICE_FONT_FAMILY}';
+        src: url(data:font/ttf;base64,${invoiceFont.toString('base64')}) format('truetype');
+        font-style: normal;
+        font-weight: 100 900;
+      }
+    </style>
     <rect width="1240" height="1754" fill="#eef3fa"/>
     <rect x="38" y="38" width="1164" height="1678" rx="24" fill="#ffffff" stroke="#d7dfec" stroke-width="2"/>
     <rect x="38" y="38" width="1164" height="214" rx="24" fill="#102b5c"/>
