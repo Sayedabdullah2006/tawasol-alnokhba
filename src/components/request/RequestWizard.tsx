@@ -758,6 +758,9 @@ export default function RequestWizard() {
             بالمتابعة فإنك توافق على{' '}
             <button type="button" onClick={() => setShowTerms(true)} className="text-green font-medium underline">الشروط والأحكام وسياسة الخصوصية</button>
           </p>
+          <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-[11px] font-medium leading-5 text-red-700">
+            <strong>إقرار وإخلاء مسؤولية:</strong> بإرسال الطلب، يقر مقدم الطلب بأن جميع البيانات والمعلومات والمستندات والصور المقدمة صحيحة ودقيقة ومصرح له باستخدامها ونشرها، ويتحمل وحده كامل المسؤولية القانونية عن صحتها ومشروعيتها وعدم مخالفتها لحقوق الغير. ولا تتحمل شركة تواصل النخبة للدعاية والإعلان أو حساب «أول سعودي» أي مسؤولية قانونية أو تعويضية ناشئة عن عدم صحة أو دقة أو اكتمال البيانات المقدمة.
+          </p>
           <Button onClick={handleSubmit} loading={submitting} disabled={submitting} className="w-full" size="lg">
             {membershipMode ? 'إرسال الطلب من رصيد العضوية' : clientType === 'individual' ? 'المتابعة إلى الدفع' : 'إرسال الطلب للمراجعة'}
           </Button>
