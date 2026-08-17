@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { notifyContentApprovedToAdmin, notifyContentApprovedToClient } from '@/lib/email'
+import { notifyContentApprovedToClient } from '@/lib/email'
 
 export async function POST(request: Request) {
   try {
@@ -87,12 +87,6 @@ export async function POST(request: Request) {
 
     // Send notifications
     const requestNumber = `ATH-${String(existingRequest.request_number).padStart(4, '0')}`
-
-    // Notify admin
-    notifyContentApprovedToAdmin({
-      requestNumber,
-      clientName: existingRequest.client_name ?? 'العميل',
-    }).catch(e => console.error('Admin notification failed:', e))
 
     // Notify client
     if (existingRequest.client_email) {

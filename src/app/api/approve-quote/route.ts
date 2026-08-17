@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { calculateReach, EXTRAS_REACH_BOOST } from '@/lib/pricing-engine'
-import { notifyFreeApprovedToClient, notifyQuoteApprovedAwaitingPaymentToClient, notifyQuoteApprovedToAdmin } from '@/lib/email'
+import { notifyFreeApprovedToClient, notifyQuoteApprovedAwaitingPaymentToClient } from '@/lib/email'
 import { notifyAsync } from '@/lib/email-queue'
 
 interface OfferedExtra {
@@ -199,17 +199,6 @@ export async function POST(request: Request) {
         `quote-approved-client-${requestNumber}-${newStatus}`
       )
 
-      // Notify admin about the approval
-      await notifyAsync(
-        () => notifyQuoteApprovedToAdmin({
-          requestNumber,
-          clientName: req.client_name ?? 'العميل',
-          totalAmount: finalTotal,
-          hasExtras: valid.length > 0,
-          selectedExtras: valid
-        }),
-        `quote-approved-admin-${requestNumber}`
-      )
     }
 
     const redirectTo = newStatus === 'in_progress' ? `/dashboard/${requestId}` : `/payment/${requestId}`

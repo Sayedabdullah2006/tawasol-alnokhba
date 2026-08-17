@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto'
 import { createServiceRoleClient } from '@/lib/supabase-server'
-import { sendRequestReviewEmail } from '@/lib/email'
+import { notifyCompletedToClient, sendRequestReviewEmail } from '@/lib/email'
 
 const REVIEW_VALIDITY_DAYS = 30
 
@@ -14,6 +14,30 @@ type ReviewInvitationArgs = {
 export async function sendRequestReviewInvitation(args: ReviewInvitationArgs): Promise<boolean> {
   if (!args.clientEmail) return false
 
+  const reviewUrl = await prepareRequestReviewUrl(args)
+  if (!reviewUrl) return false
+
+  return sendRequestReviewEmail({
+    email: args.clientEmail,
+    clientName: args.clientName,
+    requestNumber: args.requestNumber,
+    reviewUrl,
+  })
+}
+
+export async function sendCompletedWithReviewInvitation(args: ReviewInvitationArgs): Promise<boolean> {
+  const reviewUrl = await prepareRequestReviewUrl(args)
+  return notifyCompletedToClient({
+    email: args.clientEmail,
+    clientName: args.clientName,
+    requestNumber: args.requestNumber,
+    reviewUrl: reviewUrl ?? undefined,
+  })
+}
+
+async function prepareRequestReviewUrl(args: ReviewInvitationArgs): Promise<string | null> {
+  if (!args.clientEmail) return null
+
   const service = await createServiceRoleClient()
   const now = new Date()
   const { data: existing, error: existingError } = await service
@@ -23,7 +47,7 @@ export async function sendRequestReviewInvitation(args: ReviewInvitationArgs): P
     .maybeSingle()
 
   if (existingError) throw existingError
-  if (existing?.submitted_at) return false
+  if (existing?.submitted_at) return null
 
   const isReusable = existing?.review_token && new Date(existing.token_expires_at) > now
   const reviewToken = isReusable ? existing.review_token : randomBytes(32).toString('hex')
@@ -43,10 +67,5 @@ export async function sendRequestReviewInvitation(args: ReviewInvitationArgs): P
 
   if (saveError) throw saveError
 
-  return sendRequestReviewEmail({
-    email: args.clientEmail,
-    clientName: args.clientName,
-    requestNumber: args.requestNumber,
-    reviewUrl: `https://nukhba.media/review/${reviewToken}`,
-  })
+  return `https://nukhba.media/review/${reviewToken}`
 }

@@ -3,13 +3,11 @@ import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supab
 import {
   notifyPaymentConfirmedToClient,
   notifyInProgressToClient,
-  notifyCompletedToClient,
   notifyRejectedToClient,
   notifyStatusUpdateToClient,
 } from '@/lib/email'
 import { REQUEST_STATUSES } from '@/lib/constants'
-import { sendRequestReviewInvitation } from '@/lib/request-reviews'
-import { generateRequestNumber } from '@/lib/utils'
+import { sendCompletedWithReviewInvitation } from '@/lib/request-reviews'
 
 // ── حماية انتقالات الحالة ──────────────────────────────────────────
 // يمنع الانتقال العشوائي بين الحالات ويحمي الحالات المالية النهائية
@@ -193,7 +191,12 @@ export async function POST(request: Request) {
             : notifyInProgressToClient(base)
           break
         case 'completed':
-          p = notifyCompletedToClient(base)
+          p = sendCompletedWithReviewInvitation({
+            requestId: updated.id,
+            requestNumber,
+            clientName: updated.client_name ?? 'عميلنا العزيز',
+            clientEmail: updated.client_email,
+          })
           break
         case 'rejected':
           p = notifyRejectedToClient({
@@ -228,14 +231,6 @@ export async function POST(request: Request) {
       }
       if (p) p.catch(e => console.error('Status email failed:', e))
 
-      if (targetStatus === 'completed') {
-        sendRequestReviewInvitation({
-          requestId: updated.id,
-          requestNumber: generateRequestNumber(updated.request_number),
-          clientName: updated.client_name ?? 'عميلنا العزيز',
-          clientEmail: updated.client_email,
-        }).catch(error => console.error('Request review invitation failed:', error))
-      }
     }
 
     if (membershipStart) {

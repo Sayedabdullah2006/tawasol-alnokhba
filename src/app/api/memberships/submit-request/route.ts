@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { generateRequestNumber } from '@/lib/utils'
-import { notifyAdminIntake, notifyRequestReceivedToClient } from '@/lib/email'
+import { notifyRequestReceivedToClient } from '@/lib/email'
 import { CATEGORIES } from '@/lib/constants'
 import { normalizeImageUrls, normalizeSupportingDocuments } from '@/lib/request-attachments'
 import {
@@ -125,20 +125,6 @@ export async function POST(request: NextRequest) {
   const requestNumber = generateRequestNumber(row.request_number)
   const category = CATEGORIES.find(item => item.id === body.category)?.nameAr ?? body.category
   const emailData = { requestNumber, clientName: body.client_name, clientEmail: body.client_email, clientPhone: body.client_phone, category, title: body.title, content: body.content, channels }
-  notifyAdminIntake({
-    subject: 'طلب نشر جديد من عضو',
-    heading: 'طلب عضو جديد يحتاج مراجعة الإدارة',
-    referenceNumber: requestNumber,
-    referenceLabel: 'رقم الطلب',
-    clientName: body.client_name,
-    clientEmail: body.client_email,
-    clientPhone: body.client_phone,
-    itemLabel: 'المحتوى',
-    itemName: body.title,
-    statusLabel: 'الرصيد محجوز والطلب بانتظار مراجعة الإدارة',
-    actionLabel: 'فتح طلبات الأعضاء',
-    actionUrl: 'https://nukhba.media/admin/member-requests',
-  }).catch(error => console.error('[MEMBERSHIP] admin email:', error))
   notifyRequestReceivedToClient({ ...emailData, requestId: row.id }).catch(error => console.error('[MEMBERSHIP] client email:', error))
   const [{ data: wallet }, { data: benefitWallets }] = await Promise.all([
     service.from('membership_credit_wallets').select('total_credits, reserved_credits, used_credits').eq('membership_id', membershipId).maybeSingle(),

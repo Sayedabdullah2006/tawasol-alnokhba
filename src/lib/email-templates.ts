@@ -444,6 +444,7 @@ export function inProgressToClient(d: {
 export function completedToClient(d: {
   requestNumber: string
   clientName: string
+  reviewUrl?: string
 }) {
   return {
     subject: `🎉 اكتمل نشر طلبك · ${d.requestNumber}`,
@@ -459,7 +460,16 @@ export function completedToClient(d: {
       <p style="margin:0 0 20px 0; font-size:13px; line-height:1.8; color:#6B7C99;">
         شكراً لاختيارك تواصل النخبة لإيصال صوتك.
       </p>
-      <p style="margin:0; text-align:center;">${button('عرض التفاصيل', `${SITE_URL}/dashboard`)}</p>
+      ${d.reviewUrl ? `
+        <div style="margin:22px 0; padding:20px; border:1px solid #E5D5A7; border-radius:12px; background:#FFFCF4; text-align:center;">
+          <div style="font-size:34px; letter-spacing:3px; color:${BRAND_GOLD};">★★★★★</div>
+          <p style="margin:8px 0 6px 0; font-size:17px; font-weight:900; color:${BRAND_NAVY};">كيف كانت تجربتك؟</p>
+          <p style="margin:0 0 16px 0; font-size:13px; line-height:1.8; color:#6B7C99;">تقييمك لا يستغرق دقيقة، ويساعدنا على تحسين الخدمة والاهتمام بالتفاصيل التي تهمك.</p>
+          ${button('تقييم التجربة', d.reviewUrl)}
+        </div>
+        <p style="margin:0 0 20px 0; font-size:14px; line-height:1.8; color:${BRAND_NAVY}; font-weight:700; text-align:center;">ونتطلع لأن نكون جزءاً من إنجازك القادم.</p>
+      ` : ''}
+      <p style="margin:0; text-align:center;">${button('عرض تفاصيل الطلب', `${SITE_URL}/dashboard`)}</p>
     `),
   }
 }

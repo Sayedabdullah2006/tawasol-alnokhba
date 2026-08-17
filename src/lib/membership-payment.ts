@@ -2,7 +2,7 @@ import { buildAuthHeader, MOYASAR_API_URL, toSAR } from '@/lib/moyasar'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { generateMembershipContractPdf, type ContractMembership } from '@/lib/membership-contract'
 import { formatMembershipNumber, getMembershipPlan } from '@/lib/memberships'
-import { notifyAdminIntake, sendEmail } from '@/lib/email'
+import { sendEmail } from '@/lib/email'
 
 function membershipEmailHtml(args: { name: string; plan: string; number: string; months: number; total: number }) {
   const dashboard = `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/membership`
@@ -25,21 +25,6 @@ export async function finishMembershipActivation(membership: ActivatedMembership
   const service = await createServiceRoleClient()
   const plan = getMembershipPlan(membership.plan_id)
   const number = formatMembershipNumber(membership.membership_number)
-  await notifyAdminIntake({
-    subject: 'تم دفع وتفعيل عضوية',
-    heading: 'اكتمل دفع عضوية جديدة وتم تفعيلها',
-    referenceNumber: number,
-    referenceLabel: 'رقم العضوية',
-    clientName: membership.client_name,
-    clientEmail: membership.client_email,
-    clientPhone: membership.client_phone,
-    itemLabel: 'العضوية',
-    itemName: `${plan?.name ?? 'عضوية تواصل النخبة'} · ${membership.duration_months} أشهر`,
-    statusLabel: 'نشطة ومدفوعة',
-    amount: Number(membership.total_amount),
-    actionLabel: 'فتح إدارة العضويات',
-    actionUrl: 'https://nukhba.media/admin/memberships',
-  })
   try {
     const pdf = await generateMembershipContractPdf(membership)
     const path = `${membership.user_id}/${membership.id}/${number}.pdf`

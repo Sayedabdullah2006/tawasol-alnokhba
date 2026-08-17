@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
-import { notifyAdminIntake, notifyRequestReceivedToClient } from '@/lib/email'
+import { notifyRequestReceivedToClient } from '@/lib/email'
 import { generateRequestNumber } from '@/lib/utils'
 import { getInventorStoreProduct } from '@/lib/inventor-store'
 import { formatInventorStoreAnswers, getInventorStoreOrderForm, validateInventorStoreAnswers } from '@/lib/inventor-store-order-forms'
@@ -68,24 +68,7 @@ export async function POST(request: Request) {
     }
     const requestNumber = generateRequestNumber(data.request_number)
     const emailData = { requestNumber, clientName, clientEmail, clientPhone, category: `مسار المخترع - ${product.name}`, title: projectTitle, content: String(answers[definition.sections[0]?.fields[1]?.key] || product.summary), channels: [], requestId: data.id }
-    await Promise.allSettled([
-      notifyAdminIntake({
-        subject: 'طلب جديد من متجر مسار المخترع',
-        heading: 'طلب خدمة جديد يحتاج مراجعة الإدارة',
-        referenceNumber: requestNumber,
-        referenceLabel: 'رقم الطلب',
-        clientName,
-        clientEmail,
-        clientPhone,
-        itemLabel: 'الخدمة',
-        itemName: product.name,
-        statusLabel: 'بانتظار مراجعة الإدارة وإرسال العرض',
-        amount: product.price,
-        actionLabel: 'فتح طلبات المتجر',
-        actionUrl: 'https://nukhba.media/admin/inventor-store-requests',
-      }),
-      notifyRequestReceivedToClient(emailData),
-    ])
+    await notifyRequestReceivedToClient(emailData)
     return NextResponse.json({ id: data.id, requestNumber })
   } catch (error) {
     console.error('Inventor store order failed:', error)

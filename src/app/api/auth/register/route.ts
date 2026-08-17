@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
-import { sendWelcomeEmail, notifyNewAccountToAdmin } from '@/lib/email'
+import { sendWelcomeEmail } from '@/lib/email'
 import { validateEmail } from '@/lib/email-validation'
 import { verifyTurnstileToken } from '@/lib/turnstile'
 
@@ -61,11 +61,8 @@ export async function POST(request: Request) {
       role: 'client',
     })
 
-    // Fire welcome + admin-notification emails. Failures never block registration.
-    await Promise.allSettled([
-      sendWelcomeEmail({ email: normalizedEmail, clientName: fullName }),
-      notifyNewAccountToAdmin({ clientName: fullName, clientEmail: normalizedEmail }),
-    ])
+    // The welcome email already CCs the administration.
+    await sendWelcomeEmail({ email: normalizedEmail, clientName: fullName })
 
     return NextResponse.json({ success: true, userId: data.user.id })
   } catch (err) {

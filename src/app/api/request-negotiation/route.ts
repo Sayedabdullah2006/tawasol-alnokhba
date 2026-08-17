@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { notifyNegotiationRequestedByClient, notifyNegotiatedQuoteToClient, notifyNegotiationRequestToClient } from '@/lib/email'
+import { notifyNegotiatedQuoteToClient, notifyNegotiationRequestToClient } from '@/lib/email'
 
 // ── سلّم الخصومات الآلي ──────────────────────────────────────────
 // الجولة 1: 5%  |  الجولة 2: 10%  |  الجولة 3: 15% (نهائي)
@@ -190,14 +190,6 @@ export async function POST(request: Request) {
         priceSource:        'admin_discount',
       }).catch(e => console.error('Auto-negotiation client email failed:', e))
     }
-
-    if (requiresAdminReview) notifyNegotiationRequestedByClient({
-      requestNumber,
-      clientName:        req.client_name ?? 'العميل',
-      negotiationReason: negotiationReason?.trim() ?? '—',
-      originalPrice,
-      proposedPrice:     clientPrice || null,
-    }).catch(e => console.error('Admin negotiation notification failed:', e))
 
     return NextResponse.json({
       success:          true,

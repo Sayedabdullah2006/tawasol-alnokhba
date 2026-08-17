@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { notifyQuoteRejectedByClient, notifyQuoteRejectionToClient } from '@/lib/email'
+import { notifyQuoteRejectionToClient } from '@/lib/email'
 import { validateRequestId, validateRejectionReason, ValidationException, formatValidationErrors } from '@/lib/validation'
 
 export async function POST(request: Request) {
@@ -62,14 +62,6 @@ export async function POST(request: Request) {
 
     // Send notifications
     const requestNumber = `ATH-${String(existingRequest.request_number).padStart(4, '0')}`
-
-    // Notify admin
-    notifyQuoteRejectedByClient({
-      requestNumber,
-      clientName: existingRequest.client_name ?? 'العميل',
-      rejectionReason: rejectionReason.trim(),
-      quotedPrice: Number(existingRequest.admin_quoted_price ?? 0)
-    }).catch(e => console.error('Admin rejection notification failed:', e))
 
     // Notify client (confirmation)
     if (existingRequest.client_email) {

@@ -129,7 +129,7 @@ export async function notifyInProgressToClient(args: {
 }
 
 export async function notifyCompletedToClient(args: {
-  email: string; requestNumber: string; clientName: string
+  email: string; requestNumber: string; clientName: string; reviewUrl?: string
 }) {
   const t = templates.completedToClient(args)
   return sendEmail(args.email, t.subject, t.html)

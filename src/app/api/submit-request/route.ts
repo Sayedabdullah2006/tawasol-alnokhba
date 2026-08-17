@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { generateRequestNumber } from '@/lib/utils'
-import { notifyNewRequestToAdmin, notifyRequestReceivedToClient, notifyQuoteApprovedAwaitingPaymentToClient } from '@/lib/email'
+import { notifyRequestReceivedToClient } from '@/lib/email'
 import { CATEGORIES, ORDERABLE_PACKAGES } from '@/lib/constants'
 import { calculateAutoQuote, calculateCampaignQuote, CAMPAIGN_DISCOUNT_PCT } from '@/lib/auto-quote'
 import { normalizeImageUrls, normalizeSupportingDocuments } from '@/lib/request-attachments'
@@ -311,17 +311,6 @@ export async function POST(request: Request) {
 
       // الأفراد: لا إيميل قبل الدفع (الأدمن يُنبَّه بعد الدفع عبر CC تأكيد الدفع). الجهات تُراجَع.
       if (!isIndividual) {
-        notifyNewRequestToAdmin({
-          requestNumber,
-          clientName:  body.client_name,
-          clientEmail: body.client_email,
-          clientPhone: body.client_phone,
-          category:    `حملة (${campaignPostsRaw.length} منشورات)`,
-          title:       `حملة: ${firstPost.title}`,
-          content:     firstPost.content,
-          channels,
-        }).catch(e => console.error('Admin campaign email failed:', e))
-
         if (body.client_email) {
           notifyRequestReceivedToClient({
             clientEmail: body.client_email,
@@ -506,17 +495,6 @@ export async function POST(request: Request) {
     // الأفراد (تسعير فوري → دفع): لا نُرسل أي إيميل قبل الدفع — لا للأدمن ولا للعميل.
     // الأدمن يُنبَّه بعد الدفع عبر نسخة (CC) من إيميل تأكيد الدفع. الجهات و«أخرى» تُراجَع يدوياً.
     if (needsManualQuote) {
-      notifyNewRequestToAdmin({
-        requestNumber,
-        clientName:  body.client_name,
-        clientEmail: body.client_email,
-        clientPhone: body.client_phone,
-        category:    catNameAr,
-        title:       body.title,
-        content:     body.content,
-        channels:    effectiveChannels,
-      }).catch(e => console.error('Admin email failed:', e))
-
       if (body.client_email) {
         notifyRequestReceivedToClient({
           clientEmail: body.client_email,

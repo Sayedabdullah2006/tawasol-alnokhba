@@ -1,7 +1,7 @@
 import { buildAuthHeader, MOYASAR_API_URL, toSAR } from '@/lib/moyasar'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { formatMembershipTopupNumber, getMembershipTopupItem } from '@/lib/membership-topups'
-import { notifyAdminIntake, sendEmail } from '@/lib/email'
+import { sendEmail } from '@/lib/email'
 
 interface TopupReceiptRow {
   id: string
@@ -41,20 +41,6 @@ async function sendTopupReceipt(topup: TopupReceiptRow) {
     if (!clientEmail) throw new Error('Membership client email is missing')
     const sent = await sendEmail(clientEmail, `تم تعزيز رصيد عضويتك · ${number}`, html)
     if (!sent) throw new Error('Email provider did not confirm delivery')
-    await notifyAdminIntake({
-      subject: 'تم دفع تعزيز رصيد عضوية',
-      heading: 'اكتمل دفع رصيد أو ميزة إضافية لعضوية',
-      referenceNumber: number,
-      referenceLabel: 'رقم العملية',
-      clientName: topup.memberships?.client_name ?? 'عميل تواصل النخبة',
-      clientEmail: topup.memberships?.client_email ?? '',
-      itemLabel: 'الإضافة',
-      itemName: `${topup.quantity} × ${item?.shortLabel ?? 'ميزة إضافية'}`,
-      statusLabel: 'مدفوعة وأضيفت إلى رصيد العضوية',
-      amount: Number(topup.total_amount),
-      actionLabel: 'فتح إدارة العضويات',
-      actionUrl: 'https://nukhba.media/admin/memberships',
-    })
   } catch (error) {
     await service.from('membership_topups').update({ receipt_sent_at: null }).eq('id', topup.id)
     console.error('[MEMBERSHIP_TOPUP] receipt email failed:', error)
