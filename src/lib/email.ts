@@ -251,6 +251,21 @@ export async function notifyMotivateUser(args: { email: string; clientName?: str
   return sendEmail(args.email, t.subject, t.html)
 }
 
+export async function notifyRequestRecoveryFirst(args: templates.RequestRecoveryEmailData) {
+  const t = templates.requestRecoveryFirst(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
+export async function notifyRequestRecoverySecond(args: templates.RequestRecoveryEmailData) {
+  const t = templates.requestRecoverySecond(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
+export async function notifyRequestRecoveryOffer(args: templates.RequestRecoveryEmailData & { code: string; expiresAt: string }) {
+  const t = templates.requestRecoveryOffer(args)
+  return sendEmail(args.email, t.subject, t.html)
+}
+
 export async function notifyPostCompletedToClient(args: {
   email: string; requestNumber: string; clientName: string; postTitle: string; postIndex: number
 }) {

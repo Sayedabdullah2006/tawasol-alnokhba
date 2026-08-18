@@ -37,6 +37,7 @@ export async function POST(request: Request) {
       .single()
 
     if (!dc) return NextResponse.json({ error: 'الكود غير صحيح' }, { status: 400 })
+    if (dc.recovery_draft_id) return NextResponse.json({ error: 'هذا العرض مرتبط بمسودة الطلب الأصلية' }, { status: 400 })
     if (!dc.is_active) return NextResponse.json({ error: 'الكود غير مفعّل' }, { status: 400 })
     if (new Date(dc.expires_at) < new Date()) return NextResponse.json({ error: 'انتهت صلاحية الكود' }, { status: 400 })
     if (dc.max_uses !== null && dc.used_count >= dc.max_uses) {
@@ -45,7 +46,10 @@ export async function POST(request: Request) {
 
     const base = Number(req.admin_quoted_price ?? 0)
     const pct = Number(dc.discount_pct)
-    const discountAmount = Math.round(base * pct / 100)
+    const discountAmount = Math.min(
+      Math.round(base * pct / 100),
+      dc.max_discount_amount == null ? Number.POSITIVE_INFINITY : Number(dc.max_discount_amount),
+    )
     const newTotal = Math.max(0, base - discountAmount)
 
     const { error } = await service

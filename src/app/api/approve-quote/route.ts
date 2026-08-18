@@ -25,6 +25,8 @@ type DiscountRow = {
   max_uses: number | null
   used_count: number
   discount_pct: number
+  max_discount_amount: number | null
+  recovery_draft_id: string | null
 }
 
 // Resolve the catalog of valid extras for a request:
@@ -120,12 +122,15 @@ export async function POST(request: Request) {
         .eq('code', discountCode.trim().toUpperCase())
         .single()
       if (
-        dc && dc.is_active &&
+        dc && !dc.recovery_draft_id && dc.is_active &&
         new Date(dc.expires_at) > new Date() &&
         (dc.max_uses === null || dc.used_count < dc.max_uses)
       ) {
         discountRow = dc
-        const discAmt = Math.round(rawTotal * Number(dc.discount_pct) / 100)
+        const discAmt = Math.min(
+          Math.round(rawTotal * Number(dc.discount_pct) / 100),
+          dc.max_discount_amount == null ? Number.POSITIVE_INFINITY : Number(dc.max_discount_amount),
+        )
         finalTotal = rawTotal - discAmt
         await serviceClient
           .from('discount_codes')

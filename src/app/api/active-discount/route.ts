@@ -15,6 +15,7 @@ export async function GET() {
       .from('discount_codes')
       .select('id, code, occasion, discount_pct, expires_at, max_uses, used_count')
       .eq('is_active', true)
+      .is('recovery_draft_id', null)
       .gt('expires_at', nowIso)
       .order('created_at', { ascending: false })
       .limit(10)

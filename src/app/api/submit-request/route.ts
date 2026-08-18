@@ -5,6 +5,7 @@ import { notifyRequestReceivedToClient } from '@/lib/email'
 import { CATEGORIES, ORDERABLE_PACKAGES } from '@/lib/constants'
 import { calculateAutoQuote, calculateCampaignQuote, CAMPAIGN_DISCOUNT_PCT } from '@/lib/auto-quote'
 import { normalizeImageUrls, normalizeSupportingDocuments } from '@/lib/request-attachments'
+import { normalizeRecoveryEmail, parseRecoveryToken, verifyLocalRecoverySecret } from '@/lib/request-recovery'
 
 // الحالات التي تُعدّ «طلباً قائماً» يمنع رفع طلب جديد (قبل الدفع/الاكتمال).
 // بعد الدفع (paid وما بعده) أو الإغلاق (مرفوض/مغلق/مكتمل) يُسمح بطلب جديد.
@@ -108,6 +109,8 @@ export async function POST(request: Request) {
       is_active: boolean
       max_uses: number | null
       used_count: number
+      max_discount_amount: number | null
+      recovery_draft_id: string | null
     } | null = null
     if (body.discount_code) {
       const { data: dc } = await serviceClient
@@ -115,16 +118,40 @@ export async function POST(request: Request) {
         .select('*')
         .eq('code', String(body.discount_code).trim().toUpperCase())
         .single()
+      let recoveryOfferValid = !dc?.recovery_draft_id
+      if (dc?.recovery_draft_id && body.recovery_token) {
+        const parsedToken = parseRecoveryToken(String(body.recovery_token))
+        if (parsedToken && parsedToken.id === dc.recovery_draft_id) {
+          const authorizedToken = parsedToken
+          const { data: recoveryDraft } = await serviceClient
+            .from('request_recovery_drafts')
+            .select('id, access_token_hash, client_email, selected_package, status, offer_code, offer_expires_at')
+            .eq('id', dc.recovery_draft_id)
+            .maybeSingle()
+          const tokenValid = !!recoveryDraft && (
+            authorizedToken.emailSigned
+            || (!!authorizedToken.localSecret && verifyLocalRecoverySecret(authorizedToken.localSecret, recoveryDraft.access_token_hash))
+          )
+          recoveryOfferValid = !!recoveryDraft
+            && tokenValid
+            && recoveryDraft.status === 'active'
+            && recoveryDraft.offer_code === dc.code
+            && !!recoveryDraft.offer_expires_at
+            && new Date(recoveryDraft.offer_expires_at) > new Date()
+            && normalizeRecoveryEmail(recoveryDraft.client_email) === normalizeRecoveryEmail(String(body.client_email ?? ''))
+            && recoveryDraft.selected_package === String(body.selected_package ?? '')
+        }
+      }
       if (
         dc && dc.is_active &&
         new Date(dc.expires_at) > new Date() &&
-        (dc.max_uses === null || dc.used_count < dc.max_uses)
+        (dc.max_uses === null || dc.used_count < dc.max_uses) &&
+        recoveryOfferValid
       ) {
         discountRow = dc
-        await serviceClient
-          .from('discount_codes')
-          .update({ used_count: dc.used_count + 1 })
-          .eq('id', dc.id)
+      }
+      if (!discountRow) {
+        return NextResponse.json({ error: 'كود الخصم غير صالح لهذا الطلب أو انتهت صلاحيته' }, { status: 400 })
       }
     }
 
@@ -209,7 +236,10 @@ export async function POST(request: Request) {
 
       // تطبيق كود الخصم على الأساس بعد الباقة
       const campaignDiscountAmt = discountRow
-        ? Math.round(campaignBaseTotal * Number(discountRow.discount_pct) / 100)
+        ? Math.min(
+            Math.round(campaignBaseTotal * Number(discountRow.discount_pct) / 100),
+            discountRow.max_discount_amount == null ? Number.POSITIVE_INFINITY : Number(discountRow.max_discount_amount),
+          )
         : 0
       const campaignFinalPrice = campaignBaseTotal - campaignDiscountAmt
 
@@ -307,6 +337,18 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'فشل حفظ الطلب' }, { status: 500 })
       }
 
+      if (discountRow) {
+        await serviceClient.from('discount_codes').update({ used_count: discountRow.used_count + 1 }).eq('id', discountRow.id)
+        if (discountRow.recovery_draft_id) {
+          await serviceClient.from('request_recovery_drafts').update({
+            status: 'recovered',
+            recovered_request_id: data.id,
+            completed_at: now,
+            updated_at: now,
+          }).eq('id', discountRow.recovery_draft_id)
+        }
+      }
+
       const requestNumber = generateRequestNumber(data.request_number)
 
       // الأفراد: لا إيميل قبل الدفع (الأدمن يُنبَّه بعد الدفع عبر CC تأكيد الدفع). الجهات تُراجَع.
@@ -392,7 +434,10 @@ export async function POST(request: Request) {
 
     // تطبيق كود الخصم على سعر الباقة النهائي
     const singleDiscountAmt = discountRow
-      ? Math.round(packagePrice * Number(discountRow.discount_pct) / 100)
+      ? Math.min(
+          Math.round(packagePrice * Number(discountRow.discount_pct) / 100),
+          discountRow.max_discount_amount == null ? Number.POSITIVE_INFINITY : Number(discountRow.max_discount_amount),
+        )
       : 0
     const singleFinalPrice = packagePrice - singleDiscountAmt
 
@@ -485,6 +530,19 @@ export async function POST(request: Request) {
     if (error) {
       console.error('Insert error:', error)
       return NextResponse.json({ error: 'فشل حفظ الطلب' }, { status: 500 })
+    }
+
+
+    if (discountRow) {
+      await serviceClient.from('discount_codes').update({ used_count: discountRow.used_count + 1 }).eq('id', discountRow.id)
+      if (discountRow.recovery_draft_id) {
+        await serviceClient.from('request_recovery_drafts').update({
+          status: 'recovered',
+          recovered_request_id: data.id,
+          completed_at: now,
+          updated_at: now,
+        }).eq('id', discountRow.recovery_draft_id)
+      }
     }
 
     const requestNumber = generateRequestNumber(data.request_number)

@@ -1578,6 +1578,75 @@ export function motivateUserToSubmit(d: { clientName?: string }) {
   }
 }
 
+export type RequestRecoveryEmailData = {
+  email: string
+  clientName: string
+  packageId: string
+  estimatedTotal: number | null
+  resumeUrl: string
+}
+
+const recoveryPackageNames: Record<string, string> = {
+  basic: 'الباقة الأساسية',
+  pro: 'باقة الاحتراف',
+  elite: 'باقة التميز',
+}
+
+function recoverySummary(d: RequestRecoveryEmailData): string {
+  const packageName = recoveryPackageNames[d.packageId] ?? 'الباقة المختارة'
+  const total = d.estimatedTotal != null
+    ? `<p style="margin:6px 0 0; color:#5A6B85; font-size:13px;">القيمة التقديرية: <strong>${Number(d.estimatedTotal).toLocaleString('ar-SA')} ر.س</strong></p>`
+    : ''
+  return `<div style="background:#F8FAFC; border-right:4px solid ${BRAND_GOLD}; border-radius:10px; padding:16px; margin:20px 0;">
+    <p style="margin:0; color:${BRAND_NAVY}; font-size:14px;">اختيارك المحفوظ: <strong>${escapeHtml(packageName)}</strong></p>${total}
+  </div>`
+}
+
+export function requestRecoveryFirst(d: RequestRecoveryEmailData) {
+  return {
+    subject: 'اختيارك محفوظ، أكمل ظهور إنجازك من حيث توقفت',
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <h2 style="margin:0 0 12px; color:${BRAND_NAVY}; font-size:21px; text-align:center;">إنجازك يستحق أن يصل بالصورة التي تليق به</h2>
+      <p style="font-size:15px; color:#5A6B85; line-height:1.9; text-align:center;">حفظنا الباقة التي اخترتها حتى لا تبدأ من جديد. أكمل بياناتك، وسيتولى فريقنا الصياغة والتصميم والنشر على حساب «أول سعودي».</p>
+      ${recoverySummary(d)}
+      <div style="text-align:center; margin:26px 0;">${button('أكمل طلبي الآن', d.resumeUrl)}</div>
+      <p style="font-size:12px; color:#8793A8; text-align:center;">سيعيدك الرابط مباشرة إلى بيانات طلبك المحفوظة.</p>
+    `),
+  }
+}
+
+export function requestRecoverySecond(d: RequestRecoveryEmailData) {
+  return {
+    subject: 'بقيت خطوة واحدة ليبدأ فريقنا تجهيز حضورك',
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <h2 style="margin:0 0 12px; color:${BRAND_NAVY}; font-size:21px; text-align:center;">لا تدع تفاصيل الطلب تؤخر وصول قصتك</h2>
+      <p style="font-size:15px; color:#5A6B85; line-height:1.9; text-align:center;">بمجرد إكمال الطلب نراجع المواد، نصوغ الخبر بصياغة صحفية، ونبني له تصميماً يبرز الإنجاز بوضوح. اختيارك ما زال محفوظاً وجاهزاً للاستكمال.</p>
+      ${recoverySummary(d)}
+      <div style="text-align:center; margin:26px 0;">${button('العودة إلى طلبي', d.resumeUrl)}</div>
+    `),
+  }
+}
+
+export function requestRecoveryOffer(d: RequestRecoveryEmailData & { code: string; expiresAt: string }) {
+  return {
+    subject: 'عرض خاص لإكمال طلبك خلال 24 ساعة',
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <h2 style="margin:0 0 12px; color:${BRAND_NAVY}; font-size:21px; text-align:center;">لنحوّل اختيارك إلى حضور فعلي</h2>
+      <p style="font-size:15px; color:#5A6B85; line-height:1.9; text-align:center;">خصصنا لك خصماً بنسبة <strong>5%</strong> بحد أقصى <strong>150 ر.س</strong> لتكمل طلبك الآن. العرض مرتبط بمسودتك ويُطبّق تلقائياً عند إرسالها.</p>
+      ${recoverySummary(d)}
+      <div style="background:${BRAND_NAVY}; color:#FFFFFF; border-radius:12px; padding:18px; text-align:center; margin:20px 0;">
+        <p style="margin:0 0 6px; font-size:12px; color:${BRAND_GOLD};">رمز العرض</p>
+        <strong dir="ltr" style="font-size:22px; letter-spacing:1px;">${escapeHtml(d.code)}</strong>
+        <p style="margin:8px 0 0; font-size:11px; color:#DCE4F2;">صالح لمدة 24 ساعة ولا يجمع مع خصم آخر</p>
+      </div>
+      <div style="text-align:center; margin:26px 0;">${button('تفعيل العرض وإكمال الطلب', d.resumeUrl)}</div>
+    `),
+  }
+}
+
 export function postCompletedToClient(d: {
   requestNumber: string; clientName: string; postTitle: string; postIndex: number
 }) {

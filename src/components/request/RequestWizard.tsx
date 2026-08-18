@@ -69,7 +69,15 @@ const DURATION_OPTIONS = [
 
 // مفتاح حفظ المسودة محلياً + مدة صلاحيتها (7 أيام)
 const DRAFT_KEY = 'tn_request_draft_v1'
+const RECOVERY_TOKEN_KEY = 'tn_request_recovery_token_v1'
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
+type RecoveryOffer = {
+  code: string
+  discountPct: number
+  maxDiscountAmount: number
+  expiresAt: string
+}
 
 type PendingQuote = Record<string, unknown> & {
   id: string
@@ -148,6 +156,7 @@ export default function RequestWizard() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const membershipId = searchParams.get('membership')
+  const resumeTokenParam = searchParams.get('resume')
   const membershipMode = !!membershipId
   const membershipPortalMode = membershipMode && pathname.startsWith('/dashboard/membership/request')
   const { showToast } = useToast()
@@ -162,6 +171,8 @@ export default function RequestWizard() {
   const [influencers, setInfluencers] = useState<Influencer[]>([])
   const [loading, setLoading] = useState(true)
   const [hydrated, setHydrated] = useState(false)
+  const [recoveryToken, setRecoveryToken] = useState<string | null>(null)
+  const [recoveryOffer, setRecoveryOffer] = useState<RecoveryOffer | null>(null)
   // طلب قائم (قبل الدفع/الاكتمال) — يمنع تقديم طلب جديد. نحمل الصف كاملاً لإتاحة التعديل/الإلغاء.
   const [pendingQuote, setPendingQuote] = useState<PendingQuote | null>(null)
   const [membershipBenefits, setMembershipBenefits] = useState<MembershipBenefitWallet[]>([])
@@ -326,6 +337,68 @@ export default function RequestWizard() {
     return () => { cancelled = true }
   }, [showToast])
 
+  // Restore a server-side draft from a signed email link. Local drafts still work as before.
+  useEffect(() => {
+    const resumeToken = resumeTokenParam
+    const storedToken = (() => {
+      try { return localStorage.getItem(RECOVERY_TOKEN_KEY) } catch { return null }
+    })()
+    const token = resumeToken || storedToken
+    if (!token || membershipMode) return
+
+    let cancelled = false
+    fetch(`/api/request-drafts?token=${encodeURIComponent(token)}`)
+      .then(async response => {
+        if (!response.ok) return null
+        return response.json() as Promise<{
+          payload?: Record<string, unknown>
+          offer?: RecoveryOffer | null
+        }>
+      })
+      .then(result => {
+        if (!result || cancelled) return
+        const d = result.payload ?? {}
+        if (typeof d.selectedInfluencer === 'string') setSelectedInfluencer(d.selectedInfluencer)
+        if (d.requestType === 'single' || d.requestType === 'campaign') setRequestType(d.requestType)
+        if (typeof d.clientType === 'string') setClientType(d.clientType as ClientType)
+        if (typeof d.category === 'string') setCategory(d.category)
+        if (typeof d.subOption === 'string') setSubOption(d.subOption)
+        if (d.competitionSelection && typeof d.competitionSelection === 'object') {
+          setCompetitionSelection(d.competitionSelection as { subcategory: string; position: string })
+        }
+        if (d.details && typeof d.details === 'object') {
+          const restored = d.details as ContentDetails
+          setDetails({
+            ...restored,
+            images: Array.isArray(restored.images) ? restored.images : [],
+            supportingDocuments: Array.isArray(restored.supportingDocuments) ? restored.supportingDocuments : [],
+          })
+        }
+        if (d.contact && typeof d.contact === 'object') setContact(d.contact as ContactData)
+        if (d.orgInfo && typeof d.orgInfo === 'object') {
+          setOrgInfo(d.orgInfo as { name: string; representative: string; license: string })
+        }
+        if (d.campaignSetup && typeof d.campaignSetup === 'object') setCampaignSetup(d.campaignSetup as CampaignSetup)
+        if (Array.isArray(d.campaignPosts)) setCampaignPosts(d.campaignPosts as CampaignPostData[])
+        if (typeof d.selectedPackage === 'string' && ORDERABLE_PACKAGES.some(pkg => pkg.id === d.selectedPackage)) {
+          setSelectedPackage(d.selectedPackage)
+        }
+        if (typeof d.basicChannel === 'string') setBasicChannel(d.basicChannel)
+        if (Array.isArray(d.selectedExtras)) setSelectedExtras(d.selectedExtras.filter((item): item is string => typeof item === 'string'))
+        setRecoveryToken(token)
+        try { localStorage.setItem(RECOVERY_TOKEN_KEY, token) } catch { /* Storage is optional. */ }
+        if (result.offer) {
+          setRecoveryOffer(result.offer)
+          setDiscountCode(result.offer.code)
+          showToast('تم تفعيل عرض استكمال الطلب على مسودتك', 'success')
+        } else if (resumeToken) {
+          showToast('تم استرجاع طلبك المحفوظ، أكمل من حيث توقفت', 'info')
+        }
+      })
+      .catch(() => undefined)
+    return () => { cancelled = true }
+  }, [membershipMode, resumeTokenParam, showToast])
+
   // ── عند اختيار الحساب: النشر تلقائياً على كل قنواته المتاحة ───
   // السعر موحّد لكل القنوات، فلا حاجة لاختيار القناة يدوياً
   // ── حفظ المسودة تلقائياً بعد أي تغيير ───────────────────────────
@@ -432,11 +505,55 @@ export default function RequestWizard() {
 
   // بيانات تواصل الضيف (الزائر غير المسجَّل) — إلزامية لإنشاء حسابه ومتابعة طلبه.
   const emailValid = /^\S+@\S+\.\S+$/.test(contact.email.trim())
+  const checkoutSubtotal = estimatedTotal != null ? estimatedTotal + extrasTotal : null
+  const recoveryDiscountAmount = recoveryOffer && checkoutSubtotal != null && discountCode === recoveryOffer.code
+    ? Math.min(Math.round(checkoutSubtotal * recoveryOffer.discountPct / 100), recoveryOffer.maxDiscountAmount)
+    : 0
+  const checkoutTotalAfterRecovery = checkoutSubtotal == null ? null : checkoutSubtotal - recoveryDiscountAmount
   const contactComplete = isLoggedIn || (
     contact.fullName.trim().length >= 3 &&
     contact.phone.trim().replace(/\D/g, '').length >= 9 &&
     emailValid
   )
+
+  // Persist only viable package selections. The debounce prevents a request on every keystroke.
+  useEffect(() => {
+    if (!hydrated || membershipMode || !selectedPackage || !emailValid || success) return
+    const timeout = window.setTimeout(async () => {
+      const payload = {
+        selectedInfluencer, requestType, clientType, category, subOption,
+        competitionSelection, details, contact, orgInfo, campaignSetup, campaignPosts,
+        selectedPackage, basicChannel, selectedExtras,
+      }
+      try {
+        const response = await fetch('/api/request-drafts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: recoveryToken,
+            clientEmail: contact.email,
+            clientName: contact.fullName,
+            clientPhone: contact.phone,
+            selectedPackage,
+            estimatedTotal: estimatedTotal != null ? estimatedTotal + extrasTotal : null,
+            payload,
+          }),
+        })
+        if (!response.ok) return
+        const result = await response.json() as { token?: string }
+        if (result.token && result.token !== recoveryToken) {
+          setRecoveryToken(result.token)
+          localStorage.setItem(RECOVERY_TOKEN_KEY, result.token)
+        }
+      } catch { /* Recovery must never interrupt checkout. */ }
+    }, 1200)
+    return () => window.clearTimeout(timeout)
+  }, [
+    hydrated, membershipMode, selectedPackage, emailValid, success, recoveryToken,
+    selectedInfluencer, requestType, clientType, category, subOption, competitionSelection,
+    details, contact, orgInfo, campaignSetup, campaignPosts, basicChannel, selectedExtras,
+    estimatedTotal, extrasTotal,
+  ])
 
   const sectionComplete = [aboutComplete, contentComplete, packagesComplete, contactComplete]
   const canSubmit = sectionComplete.every(Boolean)
@@ -482,6 +599,7 @@ export default function RequestWizard() {
           channels,
           selected_extras:  selectedExtras,
           discount_code:    discountCode.trim() || null,
+          recovery_token:   recoveryToken,
           // باقة واحدة للحملة كلها (للأفراد)
           selected_package: showPackages ? selectedPackage : null,
           basic_channel:    showPackages && selectedPackage === 'basic' ? basicChannel : null,
@@ -532,6 +650,7 @@ export default function RequestWizard() {
           channels,
           selected_extras: selectedExtras,
           discount_code: discountCode.trim() || null,
+          recovery_token: recoveryToken,
           selected_package: showPackages ? selectedPackage : null,
           basic_channel: showPackages && selectedPackage === 'basic' ? basicChannel : null,
         }
@@ -551,6 +670,14 @@ export default function RequestWizard() {
       if (!res.ok) throw new Error(data.error ?? 'حدث خطأ')
 
       try { localStorage.removeItem(DRAFT_KEY) } catch { /* تجاهل */ }
+      if (recoveryToken) {
+        fetch('/api/request-drafts', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: recoveryToken, requestId: data.id }),
+        }).catch(() => undefined)
+        try { localStorage.removeItem(RECOVERY_TOKEN_KEY) } catch { /* Storage is optional. */ }
+      }
 
       if (membershipMode) {
         setRequestNumber(data.requestNumber)
@@ -650,9 +777,8 @@ export default function RequestWizard() {
     const summaryTitle = requestType === 'campaign'
       ? `حملة من ${campaignPosts.length} منشورات`
       : details.title
-    const checkoutTotal = estimatedTotal != null ? estimatedTotal + extrasTotal : null
-    const totalLabel = membershipMode ? 'رصيد واحد' : checkoutTotal != null
-      ? `${checkoutTotal.toLocaleString('ar-SA')} ر.س`
+    const totalLabel = membershipMode ? 'رصيد واحد' : checkoutTotalAfterRecovery != null
+      ? `${checkoutTotalAfterRecovery.toLocaleString('ar-SA')} ر.س`
       : 'سيصلك عرض سعر بعد المراجعة'
     const canSelectExtras = requestType === 'single' && selectedPackage === 'basic' && estimatedTotal != null
 
@@ -730,11 +856,22 @@ export default function RequestWizard() {
 
             {!membershipMode && clientType === 'individual' && estimatedTotal != null && (
               <section className="bg-card border border-border rounded-2xl p-5">
+                {recoveryOffer && (
+                  <div className="mb-4 rounded-xl border border-green/30 bg-green/5 px-4 py-3 text-sm text-dark">
+                    <strong className="text-green">عرض الاستكمال مفعّل</strong>
+                    <span className="block mt-1">
+                      خصم {recoveryOffer.discountPct}% بحد أقصى {recoveryOffer.maxDiscountAmount.toLocaleString('ar-SA')} ر.س، ويُثبت في بيانات الطلب عند إرساله.
+                    </span>
+                  </div>
+                )}
                 <label className={fieldLabel}>كوبون الخصم</label>
                 <input
                   type="text"
                   value={discountCode}
-                  onChange={(event) => setDiscountCode(event.target.value.toUpperCase())}
+                  onChange={(event) => {
+                    setDiscountCode(event.target.value.toUpperCase())
+                    if (recoveryOffer && event.target.value.toUpperCase() !== recoveryOffer.code) setRecoveryOffer(null)
+                  }}
                   placeholder="أدخل الكود إن وجد"
                   className={selectCls}
                   autoCapitalize="characters"
@@ -1304,7 +1441,14 @@ export default function RequestWizard() {
                 <span className="text-muted">السلة: </span>
                 <span className="font-bold text-dark">{selectedPackageData.name}</span>
               </div>
-              {estimatedTotal != null && <span className="font-black text-green whitespace-nowrap">{estimatedTotal.toLocaleString('ar-SA')} ر.س</span>}
+              {checkoutTotalAfterRecovery != null && (
+                <div className="text-left">
+                  <span className="font-black text-green whitespace-nowrap">{checkoutTotalAfterRecovery.toLocaleString('ar-SA')} ر.س</span>
+                  {recoveryDiscountAmount > 0 && (
+                    <span className="block text-xs text-muted line-through">{checkoutSubtotal?.toLocaleString('ar-SA')} ر.س</span>
+                  )}
+                </div>
+              )}
             </div>
           )}
           <Button

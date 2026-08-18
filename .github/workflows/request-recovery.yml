@@ -1,0 +1,16 @@
+name: Request Recovery
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Process abandoned request drafts
+        run: |
+          curl --fail --silent --show-error --request POST \
+            --header "x-api-key: ${{ secrets.CRON_API_KEY }}" \
+            "${{ secrets.APP_BASE_URL }}/api/cron/request-recovery"
