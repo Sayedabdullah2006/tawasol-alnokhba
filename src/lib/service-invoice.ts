@@ -10,6 +10,7 @@ import { generateRequestNumber } from '@/lib/utils'
 
 const INVOICE_BUCKET = 'service-invoices'
 const INVOICE_FONT_FAMILY = 'InvoiceArabic'
+const CURRENT_INVOICE_TEMPLATE_VERSION = 2
 const SELLER = {
   name: 'شركة تواصل النخبة للدعاية والإعلان',
   legalType: 'شركة ذات مسؤولية محدودة',
@@ -70,6 +71,7 @@ type ServiceInvoiceRow = {
   snapshot: ServiceInvoiceSnapshot
   pdf_path: string | null
   email_sent_at: string | null
+  template_version: number | null
 }
 
 export type ServiceInvoiceDocument = {
@@ -223,6 +225,10 @@ function ltrText(value: string, x: number, y: number, size = 17, weight = 400, f
   return `<text x="${x}" y="${y}" text-anchor="start" direction="ltr" font-family="${INVOICE_FONT_FAMILY}" font-size="${size}" font-weight="${weight}" fill="${fill}">${escapeXml(value)}</text>`
 }
 
+function centeredText(value: string, x: number, y: number, size = 20, weight = 700, fill = '#111827') {
+  return `<text x="${x}" y="${y}" text-anchor="middle" direction="rtl" unicode-bidi="plaintext" font-family="${INVOICE_FONT_FAMILY}" font-size="${size}" font-weight="${weight}" fill="${fill}">${escapeXml(value)}</text>`
+}
+
 function wrapWords(value: string, maxCharacters: number, maxLines = 3) {
   const words = value.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean)
   const lines: string[] = []
@@ -250,12 +256,13 @@ function rtlLines(value: string, x: number, y: number, maxCharacters: number, si
     .join('')
 }
 
-function field(label: string, value: string, x: number, y: number, width: number) {
+function formalField(labelAr: string, labelEn: string, value: string, x: number, y: number, width: number, height = 76) {
   const compact = value.length > 42
   return `<g>
-    <rect x="${x}" y="${y}" width="${width}" height="76" rx="10" fill="#f7f9fd" stroke="#dce3ef"/>
-    ${rtlText(label, x + width - 16, y + 25, 14, 700, '#71809a')}
-    ${rtlLines(value, x + width - 16, y + 55, compact ? 50 : 36, compact ? 16 : 18, 24, 1, 700, '#102b5c')}
+    <rect x="${x}" y="${y}" width="${width}" height="${height}" fill="#ffffff" stroke="#1f2937" stroke-width="1.4"/>
+    ${rtlText(labelAr, x + width - 12, y + 23, 13, 700, '#344054')}
+    ${ltrText(labelEn, x + 12, y + 23, 11, 700, '#667085')}
+    ${rtlLines(value, x + width - 12, y + 53, compact ? 48 : 36, compact ? 15 : 17, 23, Math.max(1, Math.floor((height - 42) / 23)), 700, '#101828')}
   </g>`
 }
 
@@ -279,15 +286,20 @@ async function invoiceSvg(snapshot: ServiceInvoiceSnapshot, invoiceNumber: strin
     ? snapshot.buyer.representativeName ?? snapshot.buyer.name
     : snapshot.buyer.name
   const contact = [snapshot.buyer.email, snapshot.buyer.phone].filter(Boolean).join(' · ') || 'غير مسجل'
-  const sellerDetails = `${snapshot.seller.legalType} · ${snapshot.seller.unifiedNumber}`
-  const serviceTitle = `${snapshot.request.category} · ${snapshot.request.type}`
+  const serviceTitle = `${snapshot.request.category} - ${snapshot.request.type}`
   const channels = snapshot.request.channels.length ? snapshot.request.channels.join('، ') : 'حسب تفاصيل الطلب'
   const packageName = snapshot.request.packageName ?? 'خدمة مخصصة'
   const features = snapshot.request.features.length
     ? snapshot.request.features.slice(0, 7)
     : ['صياغة المحتوى', 'تصميم خاص', 'النشر وفق تفاصيل الطلب']
-  const featureLines = features.flatMap(feature => wrapWords(`• ${feature}`, 58, 2)).slice(0, 6)
+  const featureLines = features.flatMap(feature => wrapWords(`• ${feature}`, 67, 2)).slice(0, 8)
   const paymentMethod = snapshot.payment.method || snapshot.payment.provider
+  const description = [
+    snapshot.request.title,
+    `الحساب الناشر: ${snapshot.request.accountName}`,
+    `الباقة: ${packageName} - القنوات: ${channels}`,
+  ]
+  const lineColumns = [50, 165, 285, 435, 525, 885, 1140, 1190]
 
   return Buffer.from(`<svg width="1240" height="1754" xmlns="http://www.w3.org/2000/svg">
     <style>
@@ -298,61 +310,98 @@ async function invoiceSvg(snapshot: ServiceInvoiceSnapshot, invoiceNumber: strin
         font-weight: 100 900;
       }
     </style>
-    <rect width="1240" height="1754" fill="#eef3fa"/>
-    <rect x="38" y="38" width="1164" height="1678" rx="24" fill="#ffffff" stroke="#d7dfec" stroke-width="2"/>
-    <rect x="38" y="38" width="1164" height="214" rx="24" fill="#102b5c"/>
-    <rect x="1015" y="58" width="158" height="170" rx="16" fill="#ffffff"/>
-    <image href="data:image/png;base64,${logo.toString('base64')}" x="1031" y="69" width="126" height="148" preserveAspectRatio="xMidYMid meet"/>
-    ${rtlText('فاتورة خدمات مدفوعة', 980, 103, 39, 700, '#ffffff')}
-    ${rtlText(invoiceNumber, 980, 151, 24, 700, '#d4b66f')}
-    ${rtlText(`تاريخ الإصدار: ${formatSaudiDate(snapshot.payment.paidAt)}`, 980, 190, 17, 400, '#dce5f5')}
-    <rect x="72" y="116" width="130" height="54" rx="27" fill="#12805c"/>
-    ${rtlText('مدفوعة', 170, 151, 19, 700, '#ffffff')}
+    <rect width="1240" height="1754" fill="#ffffff"/>
+    <rect x="50" y="45" width="1140" height="1658" fill="#ffffff" stroke="#111827" stroke-width="2"/>
 
-    ${rtlText('بيانات مقدم الخدمة', 1158, 302, 23, 700, '#102b5c')}
-    <line x1="72" y1="319" x2="1168" y2="319" stroke="#d4b66f" stroke-width="3"/>
-    ${field('الاسم القانوني', snapshot.seller.name, 624, 342, 544)}
-    ${field('الوصف النظامي', sellerDetails, 72, 342, 528)}
-    ${field('المقر', snapshot.seller.address, 624, 430, 544)}
-    ${field('التواصل', `${snapshot.seller.email} · ${snapshot.seller.website}`, 72, 430, 528)}
+    <!-- Seller identity: formal bilingual header -->
+    <rect x="50" y="45" width="1140" height="222" fill="#ffffff" stroke="#111827" stroke-width="2"/>
+    <line x1="620" y1="45" x2="620" y2="267" stroke="#111827" stroke-width="1.4"/>
+    <image href="data:image/png;base64,${logo.toString('base64')}" x="550" y="62" width="140" height="130" preserveAspectRatio="xMidYMid meet"/>
+    ${rtlText(snapshot.seller.name, 1165, 83, 20, 800, '#102b5c')}
+    ${rtlText(`الكيان القانوني: ${snapshot.seller.legalType}`, 1165, 121, 15, 600, '#1f2937')}
+    ${rtlText(`الرقم الموحد: ${snapshot.seller.unifiedNumber}`, 1165, 155, 15, 700, '#1f2937')}
+    ${rtlText(`العنوان: ${snapshot.seller.address}`, 1165, 189, 15, 600, '#1f2937')}
+    ${rtlText(`التواصل: ${snapshot.seller.email}`, 1165, 223, 14, 500, '#475467')}
+    ${ltrText('TAWASOL ALNOKHBA ADVERTISING CO.', 75, 83, 18, 800, '#102b5c')}
+    ${ltrText('Limited Liability Company', 75, 121, 14, 600, '#1f2937')}
+    ${ltrText(`Unified No.: ${snapshot.seller.unifiedNumber}`, 75, 155, 14, 700, '#1f2937')}
+    ${ltrText('Kingdom of Saudi Arabia', 75, 189, 14, 600, '#1f2937')}
+    ${ltrText(snapshot.seller.website, 75, 223, 14, 500, '#475467')}
 
-    ${rtlText('بيانات العميل', 1158, 558, 23, 700, '#102b5c')}
-    <line x1="72" y1="575" x2="1168" y2="575" stroke="#d4b66f" stroke-width="3"/>
-    ${field(snapshot.buyer.organizationName ? 'اسم الجهة' : 'اسم العميل', buyerDisplayName, 624, 598, 544)}
-    ${field('صفة مقدم الطلب', snapshot.buyer.type, 72, 598, 528)}
-    ${field(snapshot.buyer.organizationName ? 'ممثل الجهة' : 'صاحب الطلب', buyerRepresentative, 624, 686, 544)}
-    ${field(snapshot.buyer.organizationName ? 'رقم السجل / الترخيص' : 'المدينة', snapshot.buyer.organizationName ? snapshot.buyer.registrationNumber ?? 'غير مسجل' : snapshot.buyer.city ?? 'غير مسجلة', 72, 686, 528)}
-    ${field('بيانات التواصل', contact, 624, 774, 544)}
-    ${field('مرجع الطلب', snapshot.request.number, 72, 774, 528)}
+    <rect x="50" y="279" width="1140" height="66" fill="#f5f7fa" stroke="#111827" stroke-width="2"/>
+    ${centeredText('فاتورة / INVOICE', 620, 321, 27, 800, '#102b5c')}
 
-    <rect x="72" y="892" width="1096" height="405" rx="17" fill="#f7f9fd" stroke="#d7dfec"/>
-    ${rtlText('تفاصيل الخدمة', 1138, 938, 24, 700, '#102b5c')}
-    ${rtlText(serviceTitle, 1138, 979, 21, 700, '#263a60')}
-    ${rtlLines(snapshot.request.title, 1138, 1015, 78, 17, 27, 2, 400, '#52627d')}
-    ${rtlText(`الحساب الناشر: ${snapshot.request.accountName}`, 1138, 1085, 18, 700, '#12805c')}
-    ${rtlText(`الباقة: ${packageName} · عدد المنشورات: ${snapshot.request.postCount}`, 1138, 1123, 18, 700, '#263a60')}
-    ${rtlText(`قنوات النشر: ${channels}`, 1138, 1161, 17, 400, '#52627d')}
-    ${rtlText('مميزات الباقة والخدمة', 1138, 1204, 17, 700, '#102b5c')}
-    ${featureLines.map((line, index) => rtlText(line, index % 2 === 0 ? 1138 : 590, 1227 + Math.floor(index / 2) * 27, 14, 400, '#52627d')).join('')}
+    <!-- Invoice metadata -->
+    ${formalField('رقم الفاتورة', 'Invoice Number', invoiceNumber, 810, 357, 380, 82)}
+    ${formalField('تاريخ الإصدار', 'Issue Date', formatSaudiDate(snapshot.payment.paidAt), 430, 357, 380, 82)}
+    ${formalField('حالة الدفع', 'Payment Status', `مدفوعة - ${paymentMethod}`, 50, 357, 380, 82)}
 
-    ${rtlText('ملخص المبلغ والدفع', 1158, 1350, 23, 700, '#102b5c')}
-    <line x1="72" y1="1367" x2="1168" y2="1367" stroke="#d4b66f" stroke-width="3"/>
-    <rect x="72" y="1390" width="1096" height="184" rx="15" fill="#ffffff" stroke="#d7dfec"/>
-    ${rtlText('قيمة الخدمة قبل الخصم', 1138, 1430, 17, 400, '#52627d')}
-    ${rtlText(`${formatMoney(snapshot.pricing.subtotal)} ر.س`, 450, 1430, 18, 700, '#263a60')}
-    ${snapshot.pricing.discount > 0 ? `${rtlText('الخصم', 1138, 1467, 17, 400, '#52627d')}${rtlText(`- ${formatMoney(snapshot.pricing.discount)} ر.س`, 450, 1467, 18, 700, '#b42318')}` : ''}
-    ${rtlText('ضريبة القيمة المضافة', 1138, 1504, 17, 400, '#52627d')}
-    ${rtlText('غير مطبقة', 450, 1504, 18, 700, '#52627d')}
-    <line x1="92" y1="1524" x2="1148" y2="1524" stroke="#d7dfec"/>
-    ${rtlText('الإجمالي المدفوع', 1138, 1555, 20, 700, '#102b5c')}
-    ${rtlText(`${formatMoney(snapshot.pricing.total)} ر.س`, 450, 1555, 25, 700, '#12805c')}
+    <!-- Buyer data -->
+    <rect x="50" y="451" width="1140" height="45" fill="#102b5c" stroke="#111827" stroke-width="2"/>
+    ${rtlText('بيانات العميل', 1165, 481, 18, 800, '#ffffff')}
+    ${ltrText('CUSTOMER INFORMATION', 75, 481, 13, 700, '#ffffff')}
+    ${formalField(snapshot.buyer.organizationName ? 'اسم الجهة' : 'اسم العميل', 'Customer', buyerDisplayName, 620, 496, 570, 82)}
+    ${formalField('نوع العميل', 'Customer Type', snapshot.buyer.type, 50, 496, 570, 82)}
+    ${formalField(snapshot.buyer.organizationName ? 'ممثل الجهة' : 'صاحب الطلب', 'Representative', buyerRepresentative, 620, 578, 570, 82)}
+    ${formalField(snapshot.buyer.organizationName ? 'السجل / الترخيص' : 'المدينة', snapshot.buyer.organizationName ? 'Registration No.' : 'City', snapshot.buyer.organizationName ? snapshot.buyer.registrationNumber ?? 'غير مسجل' : snapshot.buyer.city ?? 'غير مسجلة', 50, 578, 570, 82)}
+    ${formalField('بيانات التواصل', 'Contact', contact, 620, 660, 570, 82)}
+    ${formalField('مرجع الطلب', 'Request Reference', snapshot.request.number, 50, 660, 570, 82)}
 
-    ${rtlText(`وسيلة الدفع: ${paymentMethod}`, 1138, 1618, 15, 400, '#52627d')}
-    ${snapshot.payment.reference ? ltrText(`Reference: ${snapshot.payment.reference}`, 72, 1618, 14, 400, '#52627d') : ''}
-    <rect x="72" y="1642" width="1096" height="45" rx="10" fill="#fff8e8"/>
-    ${rtlText('شركة تواصل النخبة غير مسجلة حالياً في ضريبة القيمة المضافة؛ لذلك لا تتضمن هذه الفاتورة ضريبة قيمة مضافة.', 1140, 1671, 14, 700, '#765812')}
-    ${rtlText('فاتورة إلكترونية مرتبطة بسجل الدفع والطلب في nukhba.media', 1138, 1708, 13, 400, '#71809a')}
-    ${ltrText('TAWASOL ALNOKHBA · 1 / 1', 72, 1708, 13, 400, '#71809a')}
+    <!-- Service line table -->
+    <rect x="50" y="760" width="1140" height="45" fill="#102b5c" stroke="#111827" stroke-width="2"/>
+    ${rtlText('تفاصيل الخدمة', 1165, 790, 18, 800, '#ffffff')}
+    ${ltrText('SERVICE DETAILS', 75, 790, 13, 700, '#ffffff')}
+    <rect x="50" y="805" width="1140" height="72" fill="#f2f4f7" stroke="#111827" stroke-width="1.5"/>
+    ${lineColumns.slice(1, -1).map(x => `<line x1="${x}" y1="805" x2="${x}" y2="1115" stroke="#111827" stroke-width="1.2"/>`).join('')}
+    ${centeredText('الإجمالي', 108, 842, 14, 700)}
+    ${centeredText('الخصم', 225, 842, 14, 700)}
+    ${centeredText('سعر الوحدة', 360, 842, 14, 700)}
+    ${centeredText('الكمية', 480, 842, 14, 700)}
+    ${centeredText('البيان', 705, 842, 14, 700)}
+    ${centeredText('اسم الخدمة', 1012, 842, 14, 700)}
+    ${centeredText('م', 1165, 842, 14, 700)}
+    <line x1="50" y1="877" x2="1190" y2="877" stroke="#111827" stroke-width="1.2"/>
+    <rect x="50" y="877" width="1140" height="238" fill="#ffffff" stroke="#111827" stroke-width="1.5"/>
+    ${lineColumns.slice(1, -1).map(x => `<line x1="${x}" y1="877" x2="${x}" y2="1115" stroke="#111827" stroke-width="1.2"/>`).join('')}
+    ${centeredText(formatMoney(snapshot.pricing.total), 108, 925, 15, 700, '#102b5c')}
+    ${centeredText(formatMoney(snapshot.pricing.discount), 225, 925, 14, 600)}
+    ${centeredText(formatMoney(snapshot.pricing.subtotal), 360, 925, 14, 600)}
+    ${centeredText(String(snapshot.request.postCount), 480, 925, 15, 700)}
+    ${rtlLines(description.join(' | '), 860, 918, 43, 13, 24, 6, 500, '#344054')}
+    ${rtlLines(serviceTitle, 1125, 918, 23, 15, 26, 4, 700, '#101828')}
+    ${centeredText('1', 1165, 925, 15, 700)}
+
+    <!-- Included deliverables -->
+    <rect x="50" y="1132" width="1140" height="185" fill="#ffffff" stroke="#111827" stroke-width="1.5"/>
+    <rect x="50" y="1132" width="1140" height="42" fill="#f2f4f7" stroke="#111827" stroke-width="1.2"/>
+    ${rtlText('المخرجات والمزايا المشمولة', 1165, 1160, 16, 800, '#102b5c')}
+    ${ltrText('INCLUDED DELIVERABLES', 75, 1160, 12, 700, '#475467')}
+    ${featureLines.map((line, index) => rtlText(line, index % 2 === 0 ? 1160 : 610, 1204 + Math.floor(index / 2) * 28, 14, 500, '#344054')).join('')}
+
+    <!-- Totals -->
+    <rect x="50" y="1334" width="1140" height="211" fill="#ffffff" stroke="#111827" stroke-width="1.8"/>
+    <line x1="620" y1="1334" x2="620" y2="1545" stroke="#111827" stroke-width="1.2"/>
+    ${rtlText('ملخص المبلغ', 1165, 1365, 17, 800, '#102b5c')}
+    ${rtlText('المبلغ قبل الخصم', 1165, 1402, 14, 600, '#344054')}
+    ${rtlText(`${formatMoney(snapshot.pricing.subtotal)} ر.س`, 790, 1402, 15, 700, '#101828')}
+    ${rtlText('الخصم', 1165, 1438, 14, 600, '#344054')}
+    ${rtlText(`${formatMoney(snapshot.pricing.discount)} ر.س`, 790, 1438, 15, 700, '#b42318')}
+    ${rtlText('ضريبة القيمة المضافة', 1165, 1474, 14, 600, '#344054')}
+    ${rtlText('غير مطبقة', 790, 1474, 15, 700, '#344054')}
+    <line x1="640" y1="1490" x2="1170" y2="1490" stroke="#111827" stroke-width="1.2"/>
+    ${rtlText('الإجمالي المدفوع', 1165, 1524, 17, 800, '#102b5c')}
+    ${rtlText(`${formatMoney(snapshot.pricing.total)} ر.س`, 790, 1524, 20, 800, '#12805c')}
+    ${rtlText('بيانات السداد', 595, 1365, 17, 800, '#102b5c')}
+    ${rtlText(`وسيلة الدفع: ${paymentMethod}`, 595, 1404, 14, 600, '#344054')}
+    ${rtlText(`تاريخ السداد: ${formatSaudiDate(snapshot.payment.paidAt)}`, 595, 1442, 14, 600, '#344054')}
+    ${snapshot.payment.reference ? `${rtlText('مرجع العملية', 595, 1480, 14, 600, '#344054')}${ltrText(snapshot.payment.reference, 75, 1515, 13, 600, '#101828')}` : ''}
+
+    <!-- Legal VAT treatment -->
+    <rect x="50" y="1562" width="1140" height="91" fill="#fff8e6" stroke="#b79239" stroke-width="1.5"/>
+    ${rtlText('بيان المعاملة الضريبية', 1165, 1591, 15, 800, '#765812')}
+    ${rtlLines('شركة تواصل النخبة غير مسجلة حالياً في ضريبة القيمة المضافة؛ لذلك لم تُحصّل أو تُضف ضريبة قيمة مضافة إلى هذه الفاتورة.', 1165, 1622, 102, 13, 23, 2, 600, '#765812')}
+    ${rtlText('فاتورة إلكترونية مرتبطة بسجل الدفع والطلب في nukhba.media', 1165, 1682, 12, 500, '#667085')}
+    ${ltrText('TAWASOL ALNOKHBA  |  1 / 1', 75, 1682, 12, 600, '#667085')}
   </svg>`)
 }
 
@@ -387,7 +436,11 @@ async function persistPdf(invoice: ServiceInvoiceRow, pdf: Buffer) {
   if (uploadError) throw uploadError
   const { error: updateError } = await service
     .from('service_invoices')
-    .update({ pdf_path: pdfPath, updated_at: new Date().toISOString() })
+    .update({
+      pdf_path: pdfPath,
+      template_version: CURRENT_INVOICE_TEMPLATE_VERSION,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', invoice.id)
   if (updateError) throw updateError
   return pdfPath
@@ -436,6 +489,7 @@ export async function ensureServiceInvoice(requestId: string, overrides: Payment
       payment_reference: snapshot.payment.reference,
       paid_at: snapshot.payment.paidAt,
       snapshot,
+      template_version: CURRENT_INVOICE_TEMPLATE_VERSION,
     }
     const { data: inserted, error: insertError } = await service
       .from('service_invoices')
@@ -449,7 +503,8 @@ export async function ensureServiceInvoice(requestId: string, overrides: Payment
   }
 
   if (!invoice) throw new Error('invoice_creation_failed')
-  let pdf = invoice.pdf_path ? await downloadStoredPdf(invoice.pdf_path) : null
+  const currentTemplate = Number(invoice.template_version ?? 1) >= CURRENT_INVOICE_TEMPLATE_VERSION
+  let pdf = currentTemplate && invoice.pdf_path ? await downloadStoredPdf(invoice.pdf_path) : null
   if (!pdf) {
     pdf = await generateServiceInvoicePdf(invoice.snapshot, invoice.invoice_number)
     await persistPdf(invoice, pdf)
