@@ -140,6 +140,22 @@ export interface Package {
   badge?: string
 }
 
+export const SPONSORED_CAMPAIGN_MIN_POST_PRICE = 900
+
+export function packageHasSponsoredCampaign(pkg: Package, postPrice: number | null | undefined) {
+  return Boolean(
+    pkg.sponsoredCampaignBudget
+    && postPrice != null
+    && Number.isFinite(postPrice)
+    && postPrice > SPONSORED_CAMPAIGN_MIN_POST_PRICE,
+  )
+}
+
+export function getPackageFeaturesForPostPrice(pkg: Package, postPrice: number | null | undefined) {
+  if (packageHasSponsoredCampaign(pkg, postPrice)) return pkg.features
+  return pkg.features.filter(feature => !feature.includes('حملة إعلانية مموّلة'))
+}
+
 export const PACKAGES: Package[] = [
   {
     id: 'basic',

@@ -20,6 +20,12 @@ interface DiscountCode {
 }
 
 const emptyForm = { code: '', occasion: '', discount_pct: '', expires_at: '', max_uses: '' }
+const emptyRenewForm = { expires_at: '', max_uses: '' }
+
+function toDateTimeLocal(value: Date) {
+  const offset = value.getTimezoneOffset() * 60_000
+  return new Date(value.getTime() - offset).toISOString().slice(0, 16)
+}
 
 export default function AdminDiscountsPage() {
   const router = useRouter()
@@ -29,6 +35,9 @@ export default function AdminDiscountsPage() {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [renewingFor, setRenewingFor] = useState<string | null>(null)
+  const [renewForm, setRenewForm] = useState(emptyRenewForm)
+  const [renewing, setRenewing] = useState(false)
 
   // حالة الإرسال بالبريد
   const [sendingFor, setSendingFor]     = useState<string | null>(null)   // id الكود الذي يُرسل
@@ -110,6 +119,56 @@ export default function AdminDiscountsPage() {
     } else {
       showToast('فشل التحديث', 'error')
     }
+  }
+
+  const openRenewPanel = (discount: DiscountCode) => {
+    const currentExpiry = new Date(discount.expires_at)
+    const defaultExpiry = currentExpiry.getTime() > Date.now()
+      ? currentExpiry
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    const defaultMaxUses = discount.max_uses === null
+      ? ''
+      : String(Math.max(discount.max_uses, discount.used_count + 1))
+
+    setRenewingFor(discount.id)
+    setRenewForm({
+      expires_at: toDateTimeLocal(defaultExpiry),
+      max_uses: defaultMaxUses,
+    })
+  }
+
+  const handleRenew = async (discount: DiscountCode) => {
+    if (!renewForm.expires_at || new Date(renewForm.expires_at).getTime() <= Date.now()) {
+      showToast('اختر تاريخ انتهاء جديداً في المستقبل', 'error')
+      return
+    }
+    const maxUses = renewForm.max_uses ? Number(renewForm.max_uses) : null
+    if (maxUses !== null && maxUses <= discount.used_count) {
+      showToast(`يجب أن يكون الحد الجديد أكبر من ${discount.used_count}`, 'error')
+      return
+    }
+
+    setRenewing(true)
+    const res = await fetch('/api/admin/discounts', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: discount.id,
+        is_active: true,
+        expires_at: renewForm.expires_at,
+        max_uses: maxUses,
+      }),
+    })
+    const json = await res.json()
+    if (res.ok) {
+      setCodes(prev => prev.map(code => code.id === discount.id ? json.data : code))
+      setRenewingFor(null)
+      setRenewForm(emptyRenewForm)
+      showToast('تم تمديد الكود وإعادة تفعيله')
+    } else {
+      showToast(json.error ?? 'فشل تمديد الكود', 'error')
+    }
+    setRenewing(false)
   }
 
   const handleDelete = async (id: string) => {
@@ -262,6 +321,7 @@ export default function AdminDiscountsPage() {
             const exhausted = dc.max_uses !== null && dc.used_count >= dc.max_uses
             const isValid   = dc.is_active && !expired && !exhausted
             const isSending = sendingFor === dc.id
+            const isRenewing = renewingFor === dc.id
 
             return (
               <div key={dc.id} className={`bg-card rounded-2xl border transition-opacity ${isValid ? 'border-border' : 'border-border opacity-60'}`}>
@@ -316,7 +376,23 @@ export default function AdminDiscountsPage() {
                         </button>
                       )}
                       <button
-                        onClick={() => handleToggle(dc.id, !dc.is_active)}
+                        onClick={() => isRenewing ? setRenewingFor(null) : openRenewPanel(dc)}
+                        className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
+                          isRenewing
+                            ? 'border-blue-300 bg-blue-50 text-blue-700'
+                            : 'border-blue-200 text-blue-700 hover:bg-blue-50'
+                        }`}
+                      >
+                        {isRenewing ? 'إلغاء التمديد' : expired || exhausted ? 'إعادة تفعيل' : 'تمديد الصلاحية'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (!dc.is_active && (expired || exhausted)) {
+                            openRenewPanel(dc)
+                            return
+                          }
+                          handleToggle(dc.id, !dc.is_active)
+                        }}
                         className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
                           dc.is_active
                             ? 'border-amber-300 text-amber-700 hover:bg-amber-50'
@@ -334,6 +410,42 @@ export default function AdminDiscountsPage() {
                     </div>
                   </div>
                 </div>
+
+                {isRenewing && (
+                  <div className="border-t border-border bg-slate-50/70 p-4 md:p-5">
+                    <div className="mb-4">
+                      <p className="text-sm font-bold text-dark">تمديد أو إعادة تفعيل الكود</p>
+                      <p className="mt-1 text-xs text-muted">سيبقى سجل الاستخدام السابق ({dc.used_count}) محفوظاً ولن يُصفّر.</p>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-dark">تاريخ الانتهاء الجديد *</label>
+                        <input
+                          type="datetime-local"
+                          value={renewForm.expires_at}
+                          min={toDateTimeLocal(new Date())}
+                          onChange={event => setRenewForm(current => ({ ...current, expires_at: event.target.value }))}
+                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-dark">الحد الجديد للاستخدام</label>
+                        <input
+                          type="number"
+                          value={renewForm.max_uses}
+                          min={dc.used_count + 1}
+                          onChange={event => setRenewForm(current => ({ ...current, max_uses: event.target.value }))}
+                          placeholder="اتركه فارغاً لاستخدام بلا حد"
+                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-4 flex justify-end gap-2">
+                      <Button variant="ghost" onClick={() => setRenewingFor(null)}>إلغاء</Button>
+                      <Button loading={renewing} onClick={() => handleRenew(dc)}>حفظ وإعادة التفعيل</Button>
+                    </div>
+                  </div>
+                )}
 
                 {/* ── لوحة الإرسال ── */}
                 {isSending && (

@@ -20,7 +20,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Button from '@/components/ui/Button'
 import RequestManageActions from '@/components/dashboard/RequestManageActions'
 import { getStatusLabel } from '@/lib/status-labels'
-import { COMPETITION_SUBCATEGORIES, getCompetitionPositions, ORDERABLE_PACKAGES, CATEGORY_CONDITIONS, type RequestStatus } from '@/lib/constants'
+import { COMPETITION_SUBCATEGORIES, getCompetitionPositions, getPackageFeaturesForPostPrice, ORDERABLE_PACKAGES, CATEGORY_CONDITIONS, type RequestStatus } from '@/lib/constants'
 import { AQ_EXTRAS_PRICES, calculateAutoQuote } from '@/lib/auto-quote'
 import MembershipTeaser from '@/components/memberships/MembershipTeaser'
 import MembershipBenefitPicker, { type MembershipBenefitWallet } from '@/components/memberships/MembershipBenefitPicker'
@@ -835,7 +835,12 @@ export default function RequestWizard() {
                   {estimatedTotal != null && <span className="text-green font-black whitespace-nowrap">{totalLabel}</span>}
                 </div>
                 <ul className="space-y-2">
-                  {selectedPackageData.features.map((feature) => (
+                  {getPackageFeaturesForPostPrice(
+                    selectedPackageData,
+                    estimatedTotal == null
+                      ? null
+                      : estimatedTotal / (requestType === 'campaign' ? Math.max(campaignPosts.length, 1) : 1),
+                  ).map((feature) => (
                     <li key={feature} className="flex items-start gap-2 text-sm text-dark">
                       <span className="text-green">✓</span>
                       <span>{feature}</span>
@@ -1313,6 +1318,10 @@ export default function RequestWizard() {
                     pkgPrice = Math.round(basicDynamicPrice * pkg.priceMultiplier)
                   }
                   const priceLabel = pkgPrice != null ? `${pkgPrice} ر.س` : 'حسب نوع الخبر'
+                  const postPrice = pkgPrice == null
+                    ? null
+                    : pkgPrice / (requestType === 'campaign' ? Math.max(campaignPosts.length, 1) : 1)
+                  const visibleFeatures = getPackageFeaturesForPostPrice(pkg, postPrice)
                   return (
                     <button
                       type="button"
@@ -1350,7 +1359,7 @@ export default function RequestWizard() {
                         </span>
                       )}
                       <ul className="space-y-1.5 mt-auto">
-                        {pkg.features.map((f, i) => {
+                        {visibleFeatures.map((f, i) => {
                           const isSponsored = f.includes('مموّل')
                           return (
                             <li

@@ -50,13 +50,51 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   if (!await verifyAdmin()) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
-  const { id, is_active } = await request.json()
+  const { id, is_active, expires_at, max_uses } = await request.json()
   if (!id) return NextResponse.json({ error: 'المعرّف مطلوب' }, { status: 400 })
 
+  const updates: Record<string, boolean | string | number | null> = {}
+  if (typeof is_active === 'boolean') updates.is_active = is_active
+  if (expires_at !== undefined) {
+    const expiry = new Date(expires_at)
+    if (Number.isNaN(expiry.getTime())) {
+      return NextResponse.json({ error: 'تاريخ الانتهاء غير صالح' }, { status: 400 })
+    }
+    if (expiry.getTime() <= Date.now()) {
+      return NextResponse.json({ error: 'يجب أن يكون تاريخ الانتهاء الجديد في المستقبل' }, { status: 400 })
+    }
+    updates.expires_at = expiry.toISOString()
+  }
+  if (max_uses !== undefined) {
+    if (max_uses !== null && (!Number.isInteger(Number(max_uses)) || Number(max_uses) < 1)) {
+      return NextResponse.json({ error: 'حد الاستخدام غير صالح' }, { status: 400 })
+    }
+    updates.max_uses = max_uses === null ? null : Number(max_uses)
+  }
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'لا توجد تعديلات للحفظ' }, { status: 400 })
+  }
+
   const sc = await createServiceRoleClient()
-  const { error } = await sc.from('discount_codes').update({ is_active }).eq('id', id)
+  const { data: current, error: currentError } = await sc
+    .from('discount_codes')
+    .select('used_count')
+    .eq('id', id)
+    .maybeSingle()
+  if (currentError) return NextResponse.json({ error: 'فشل التحقق من الكود' }, { status: 500 })
+  if (!current) return NextResponse.json({ error: 'الكود غير موجود' }, { status: 404 })
+  if (typeof updates.max_uses === 'number' && updates.max_uses <= current.used_count) {
+    return NextResponse.json({ error: `يجب أن يكون حد الاستخدام أكبر من مرات الاستخدام الحالية (${current.used_count})` }, { status: 400 })
+  }
+
+  const { data, error } = await sc
+    .from('discount_codes')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
   if (error) return NextResponse.json({ error: 'فشل التحديث' }, { status: 500 })
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, data })
 }
 
 export async function DELETE(request: Request) {

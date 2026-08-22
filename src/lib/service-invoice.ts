@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { PDFDocument } from 'pdf-lib'
 import sharp from 'sharp'
-import { CATEGORIES, EXTRAS, PACKAGES } from '@/lib/constants'
+import { CATEGORIES, EXTRAS, getPackageFeaturesForPostPrice, PACKAGES } from '@/lib/constants'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { generateRequestNumber } from '@/lib/utils'
 
@@ -146,9 +146,15 @@ function createSnapshot(request: JsonObject, overrides: PaymentInvoiceOverrides)
   const extraFeatures = selectedExtras
     .map(id => EXTRAS.find(item => item.id === id)?.nameAr)
     .filter((item): item is string => Boolean(item))
-  const features = Array.from(new Set([...(selectedPackage?.features ?? []), ...extraFeatures]))
-  const subOption = parseSubOption(request.sub_option)
   const total = numberValue(request.final_total ?? request.admin_quoted_price)
+  const campaignPostCount = Array.isArray(request.campaign_posts) && request.campaign_posts.length > 0
+    ? request.campaign_posts.length
+    : 1
+  const packageFeatures = selectedPackage
+    ? getPackageFeaturesForPostPrice(selectedPackage, total / campaignPostCount)
+    : []
+  const features = Array.from(new Set([...packageFeatures, ...extraFeatures]))
+  const subOption = parseSubOption(request.sub_option)
   const explicitDiscount = Math.max(
     0,
     numberValue(request.discount_amount),

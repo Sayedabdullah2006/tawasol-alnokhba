@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { generateRequestNumber } from '@/lib/utils'
 import { notifyRequestReceivedToClient } from '@/lib/email'
-import { CATEGORIES, ORDERABLE_PACKAGES } from '@/lib/constants'
+import { CATEGORIES, ORDERABLE_PACKAGES, packageHasSponsoredCampaign } from '@/lib/constants'
 import { calculateAutoQuote, calculateCampaignQuote, CAMPAIGN_DISCOUNT_PCT } from '@/lib/auto-quote'
 import { normalizeImageUrls, normalizeSupportingDocuments } from '@/lib/request-attachments'
 import { normalizeRecoveryEmail, parseRecoveryToken, verifyLocalRecoverySecret } from '@/lib/request-recovery'
@@ -313,7 +313,7 @@ export async function POST(request: Request) {
                 approved_at:        now,
                 auto_quoted_at:     now,
                 auto_quote_note:    campaignPkg
-                  ? `حملة ${campaignPostsRaw.length} منشورات — باقة: ${campaignPkg.name} — خصم ${CAMPAIGN_DISCOUNT_PCT}%${campaignPkg.sponsoredCampaignBudget ? ' — حملة ممولة' : ''}`
+                  ? `حملة ${campaignPostsRaw.length} منشورات — باقة: ${campaignPkg.name} — خصم ${CAMPAIGN_DISCOUNT_PCT}%${packageHasSponsoredCampaign(campaignPkg, campaignFinalPrice / campaignPostsRaw.length) ? ' — حملة ممولة' : ''}`
                   : `حملة ${campaignPostsRaw.length} منشورات — خصم ${CAMPAIGN_DISCOUNT_PCT}%`,
               }
             : {
@@ -508,7 +508,7 @@ export async function POST(request: Request) {
               auto_quote_tier:    selectedPackage,
               auto_quoted_at:     now,
               auto_quote_note:    pkg
-                ? `باقة: ${pkg.name} — فئة: ${body.category}${pkg.sponsoredCampaignBudget ? ' — حملة ممولة' : ''}`
+                ? `باقة: ${pkg.name} — فئة: ${body.category}${packageHasSponsoredCampaign(pkg, singleFinalPrice) ? ' — حملة ممولة' : ''}`
                 : `تسعير تلقائي — فئة: ${body.category}، إضافات: ${selectedExtras.length}`,
             }
           : {
