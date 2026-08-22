@@ -3,14 +3,14 @@ import 'server-only'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { PDFDocument } from 'pdf-lib'
-import sharp from 'sharp'
+import { Resvg } from '@resvg/resvg-js'
 import { CATEGORIES, EXTRAS, getPackageFeaturesForPostPrice, PACKAGES } from '@/lib/constants'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { generateRequestNumber } from '@/lib/utils'
 
 const INVOICE_BUCKET = 'service-invoices'
-const INVOICE_FONT_FAMILY = 'InvoiceArabic'
-const CURRENT_INVOICE_TEMPLATE_VERSION = 2
+const INVOICE_FONT_FAMILY = 'Noto Sans Arabic'
+const CURRENT_INVOICE_TEMPLATE_VERSION = 3
 const SELLER = {
   name: 'شركة تواصل النخبة للدعاية والإعلان',
   legalType: 'شركة ذات مسؤولية محدودة',
@@ -224,7 +224,7 @@ function escapeXml(value: string) {
 }
 
 function rtlText(value: string, x: number, y: number, size = 20, weight = 400, fill = '#263a60') {
-  return `<text x="${x}" y="${y}" text-anchor="start" direction="rtl" unicode-bidi="plaintext" font-family="${INVOICE_FONT_FAMILY}" font-size="${size}" font-weight="${weight}" fill="${fill}">${escapeXml(value)}</text>`
+  return `<text x="${x}" y="${y}" text-anchor="end" direction="rtl" unicode-bidi="plaintext" font-family="${INVOICE_FONT_FAMILY}" font-size="${size}" font-weight="${weight}" fill="${fill}">${escapeXml(value)}</text>`
 }
 
 function ltrText(value: string, x: number, y: number, size = 17, weight = 400, fill = '#263a60') {
@@ -283,10 +283,7 @@ function formatSaudiDate(value: string) {
 }
 
 async function invoiceSvg(snapshot: ServiceInvoiceSnapshot, invoiceNumber: string) {
-  const [logo, invoiceFont] = await Promise.all([
-    readFile(path.join(process.cwd(), 'public', 'logo.png')),
-    readFile(path.join(process.cwd(), 'public', 'fonts', 'NotoSansArabic-Variable.ttf')),
-  ])
+  const logo = await readFile(path.join(process.cwd(), 'public', 'logo.png'))
   const buyerDisplayName = snapshot.buyer.organizationName ?? snapshot.buyer.name
   const buyerRepresentative = snapshot.buyer.organizationName
     ? snapshot.buyer.representativeName ?? snapshot.buyer.name
@@ -308,14 +305,6 @@ async function invoiceSvg(snapshot: ServiceInvoiceSnapshot, invoiceNumber: strin
   const lineColumns = [50, 165, 285, 435, 525, 885, 1140, 1190]
 
   return Buffer.from(`<svg width="1240" height="1754" xmlns="http://www.w3.org/2000/svg">
-    <style>
-      @font-face {
-        font-family: '${INVOICE_FONT_FAMILY}';
-        src: url(data:font/ttf;base64,${invoiceFont.toString('base64')}) format('truetype');
-        font-style: normal;
-        font-weight: 100 900;
-      }
-    </style>
     <rect width="1240" height="1754" fill="#ffffff"/>
     <rect x="50" y="45" width="1140" height="1658" fill="#ffffff" stroke="#111827" stroke-width="2"/>
 
@@ -413,7 +402,19 @@ async function invoiceSvg(snapshot: ServiceInvoiceSnapshot, invoiceNumber: strin
 
 export async function generateServiceInvoicePdf(snapshot: ServiceInvoiceSnapshot, invoiceNumber: string) {
   const svg = await invoiceSvg(snapshot, invoiceNumber)
-  const png = await sharp(svg).png().toBuffer()
+  const fontPath = path.join(process.cwd(), 'public', 'fonts', 'NotoSansArabic-Variable.ttf')
+  const renderer = new Resvg(svg, {
+    background: '#ffffff',
+    languages: ['ar'],
+    textRendering: 2,
+    font: {
+      fontFiles: [fontPath],
+      loadSystemFonts: false,
+      defaultFontFamily: INVOICE_FONT_FAMILY,
+      sansSerifFamily: INVOICE_FONT_FAMILY,
+    },
+  })
+  const png = Buffer.from(renderer.render().asPng())
   const pdf = await PDFDocument.create()
   const image = await pdf.embedPng(png)
   const page = pdf.addPage([595.28, 841.89])
