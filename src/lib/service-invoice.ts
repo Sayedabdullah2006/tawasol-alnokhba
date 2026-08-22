@@ -10,7 +10,7 @@ import { generateRequestNumber } from '@/lib/utils'
 
 const INVOICE_BUCKET = 'service-invoices'
 const INVOICE_FONT_FAMILY = 'Noto Sans Arabic'
-const CURRENT_INVOICE_TEMPLATE_VERSION = 3
+const CURRENT_INVOICE_TEMPLATE_VERSION = 4
 const SELLER = {
   name: 'شركة تواصل النخبة للدعاية والإعلان',
   legalType: 'شركة ذات مسؤولية محدودة',
@@ -391,12 +391,8 @@ async function invoiceSvg(snapshot: ServiceInvoiceSnapshot, invoiceNumber: strin
     ${rtlText(`تاريخ السداد: ${formatSaudiDate(snapshot.payment.paidAt)}`, 595, 1442, 14, 600, '#344054')}
     ${snapshot.payment.reference ? `${rtlText('مرجع العملية', 595, 1480, 14, 600, '#344054')}${ltrText(snapshot.payment.reference, 75, 1515, 13, 600, '#101828')}` : ''}
 
-    <!-- Legal VAT treatment -->
-    <rect x="50" y="1562" width="1140" height="91" fill="#fff8e6" stroke="#b79239" stroke-width="1.5"/>
-    ${rtlText('بيان المعاملة الضريبية', 1165, 1591, 15, 800, '#765812')}
-    ${rtlLines('شركة تواصل النخبة غير مسجلة حالياً في ضريبة القيمة المضافة؛ لذلك لم تُحصّل أو تُضف ضريبة قيمة مضافة إلى هذه الفاتورة.', 1165, 1622, 102, 13, 23, 2, 600, '#765812')}
-    ${rtlText('فاتورة إلكترونية مرتبطة بسجل الدفع والطلب في nukhba.media', 1165, 1682, 12, 500, '#667085')}
-    ${ltrText('TAWASOL ALNOKHBA  |  1 / 1', 75, 1682, 12, 600, '#667085')}
+    ${rtlText('فاتورة إلكترونية مرتبطة بسجل الدفع والطلب في nukhba.media', 1165, 1610, 12, 500, '#667085')}
+    ${ltrText('TAWASOL ALNOKHBA  |  1 / 1', 75, 1610, 12, 600, '#667085')}
   </svg>`)
 }
 
