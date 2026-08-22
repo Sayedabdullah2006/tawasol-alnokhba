@@ -10,6 +10,8 @@ import {
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
+const CRON_API_KEY = process.env.CRON_API_KEY || 'nukhba-daily-reminders-2024'
+
 type Draft = {
   id: string
   client_email: string
@@ -27,8 +29,10 @@ type Draft = {
 const hoursAgo = (iso: string) => (Date.now() - new Date(iso).getTime()) / 3_600_000
 
 export async function POST(request: Request) {
-  const key = request.headers.get('x-api-key') || new URL(request.url).searchParams.get('key')
-  if (!process.env.CRON_API_KEY || key !== process.env.CRON_API_KEY) {
+  const key = request.headers.get('x-api-key')
+    || new URL(request.url).searchParams.get('key')
+    || request.headers.get('authorization')?.replace('Bearer ', '')
+  if (key !== CRON_API_KEY) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

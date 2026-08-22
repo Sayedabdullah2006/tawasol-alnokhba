@@ -49,6 +49,27 @@ const EXCLUDED_SECTIONS = new Set([
   'قناة أول سعودى قريبا', 'جائزة أول سعودى قريبا', 'دورات تدريبية',
 ])
 
+function sampleArchivePages(postCount: number): number[] {
+  const totalPages = Math.max(1, Math.ceil(postCount / FIRST1_ARCHIVE_PER_PAGE))
+  if (totalPages <= FIRST1_ARCHIVE_PAGES) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1)
+  }
+  const pages = new Set<number>()
+  while (pages.size < FIRST1_ARCHIVE_PAGES) {
+    pages.add(1 + Math.floor(Math.random() * totalPages))
+  }
+  return [...pages]
+}
+
+function riyadhDate() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Riyadh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+}
+
 const SUBJECT_STOP_WORDS = new Set([
   'السعودي', 'السعودية', 'بالمملكة', 'المملكة', 'المملكه', 'سعودي', 'سعوديه', 'اول', 'اولي', 'اولى',
   'يحقق', 'تحقق', 'يحققون', 'تفوز', 'يفوز', 'فاز', 'تفوق', 'نجاح', 'انجاز', 'انجازات', 'جائزة', 'جايزه', 'جوائز',
@@ -108,10 +129,26 @@ async function handle(request: NextRequest) {
 export async function runBatch(
   { count, force, sourceParam }: { count: number; force: boolean; sourceParam: string | null },
 ): Promise<NextResponse> {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = riyadhDate()
+  const automaticRun = !force && !sourceParam
+  const sc = await createServiceRoleClient()
 
   try {
-    const sc = await createServiceRoleClient()
+    if (automaticRun) {
+      const { data: claimed, error: claimError } = await sc.rpc('claim_daily_social_run', {
+        p_run_date: today,
+        p_requested_count: count,
+      })
+      if (claimError) throw new Error(`تعذّر حجز تشغيل النشرة اليومية: ${claimError.message}`)
+      if (!claimed) {
+        return NextResponse.json({
+          success: true,
+          skipped: true,
+          date: today,
+          reason: 'daily_batch_already_claimed',
+        })
+      }
+    }
 
     // ── 0) توليد الكرون اليومي غير مشروط بعدد ما وُلّد يدوياً اليوم. ──
     // زر «توليد يدوي» منفصل تماماً ولا يُقلّل حصة الكرون: يُولَّد العدد المطلوب
@@ -148,7 +185,9 @@ export async function runBatch(
     if (manhomTarget > count) manhomTarget = count
     const achTarget = count - manhomTarget
 
+    type Candidate = { post: NewsPost; key: string }
     const selected: SelectedItem[] = []
+    const achievementPool: Candidate[] = []
     const sourceDiagnostics = {
       first1: { fetched: 0, unseen: 0 },
       xArchive: { fetched: 0, unseen: 0, selected: 0 },
@@ -158,9 +197,6 @@ export async function runBatch(
 
     // ── 2) اختيار «الإنجازات»: تجميع من first1saudi + مصادر RSS ثم اختيار بتنويع المصدر ──
     if (achTarget > 0 && sourceParam !== 'manhom') {
-      type Cand = { post: NewsPost; key: string }
-      const pool: Cand[] = []
-
       // first1saudi: أقسام مختلفة
       try {
         const sections = (await fetchCategories()).filter(
@@ -171,8 +207,8 @@ export async function runBatch(
           .slice(0, FIRST1_ARCHIVE_SECTIONS)
         const archivePages = await Promise.all(
           archiveSections.flatMap(section =>
-            Array.from({ length: FIRST1_ARCHIVE_PAGES }, (_, index) =>
-              fetchPostsByCategory(section.id, FIRST1_ARCHIVE_PER_PAGE, index + 1)
+            sampleArchivePages(section.count).map(page =>
+              fetchPostsByCategory(section.id, FIRST1_ARCHIVE_PER_PAGE, page)
                 .then(posts => ({ section, posts })),
             ),
           ),
@@ -184,7 +220,7 @@ export async function runBatch(
             if (!isSocialNewsEligible(p.title, p.content)) continue
             sourceDiagnostics.first1.unseen++
             p.categoryNames = [section.name]
-            pool.push({ post: p, key: 'first1saudi' })
+            achievementPool.push({ post: p, key: 'first1saudi' })
           }
         }
       } catch { /* الموقع قد يتعذّر — نكمل من RSS */ }
@@ -196,7 +232,7 @@ export async function runBatch(
         for (const post of archivedPosts) {
           if (usedXArchiveUrls.has(post.url) || !isSocialNewsEligible(post.title, post.content)) continue
           sourceDiagnostics.xArchive.unseen++
-          pool.push({ post, key: 'first1saudi-x-archive' })
+          achievementPool.push({ post, key: 'first1saudi-x-archive' })
         }
       } catch { /* لا نوقف الخطة اليومية إن لم يكتمل الاستيراد بعد. */ }
 
@@ -205,7 +241,7 @@ export async function runBatch(
         try {
           const used = usedByKey.get(src.key) ?? new Set<number>()
           const items = await fetchRssCandidates(src)
-          for (const p of items) { if (!used.has(p.id)) pool.push({ post: p, key: src.key }) }
+          for (const p of items) { if (!used.has(p.id)) achievementPool.push({ post: p, key: src.key }) }
         } catch { /* تجاهل مصدراً متعذّراً */ }
       }
 
@@ -213,7 +249,7 @@ export async function runBatch(
       try {
         const used = usedByKey.get('saudipedia') ?? new Set<number>()
         const items = await fetchSaudipediaCandidates()
-        for (const p of items) { if (!used.has(p.id)) pool.push({ post: p, key: 'saudipedia' }) }
+        for (const p of items) { if (!used.has(p.id)) achievementPool.push({ post: p, key: 'saudipedia' }) }
       } catch { /* تجاهل مصدراً متعذّراً */ }
 
       // سيدتي: صفحات وسم قصص/إنجازات السعوديات (رائدات/المرأة السعودية)
@@ -221,14 +257,14 @@ export async function runBatch(
         try {
           const used = usedByKey.get(src.key) ?? new Set<number>()
           const items = await fetchSayidatyCandidates(src)
-          for (const p of items) { if (!used.has(p.id)) pool.push({ post: p, key: src.key }) }
+          for (const p of items) { if (!used.has(p.id)) achievementPool.push({ post: p, key: src.key }) }
         } catch { /* تجاهل مصدراً متعذّراً */ }
       }
 
-      pool.sort(() => Math.random() - 0.5)
+      achievementPool.sort(() => Math.random() - 0.5)
       // Once archive material exists, reserve one eligible historical First1Saudi post for
       // the daily mix. Archive posts remain suggested only; they are never auto-scheduled.
-      for (const c of pool) {
+      for (const c of achievementPool) {
         if (c.key !== 'first1saudi-x-archive' || achCount() >= achTarget) continue
         const fingerprint = subjectFingerprint(c.post.title)
         if (isRepeatedSubject(fingerprint, usedSubjectFingerprints)) continue
@@ -243,7 +279,7 @@ export async function runBatch(
       // تمريرة أولى: مصدر مختلف لكل عنصر (تنويع)؛ ثم تمريرة ثانية للتعبئة.
       for (const preferDiverse of [true, false]) {
         const pickedKeys = new Set(selected.filter(s => s.source !== 'manhom').map(s => s.source))
-        for (const c of pool) {
+        for (const c of achievementPool) {
           if (achCount() >= achTarget) break
           if (selected.some(s => s.post.id === c.post.id && s.source === c.key)) continue
           if (preferDiverse && pickedKeys.has(c.key)) continue
@@ -279,13 +315,39 @@ export async function runBatch(
       }
     }
 
-    if (selected.length === 0) {
+    // If a preferred source is temporarily unavailable, fill the batch from other
+    // eligible achievement sources instead of sending a short or empty digest.
+    if (selected.length < count) {
+      for (const candidate of achievementPool) {
+        if (selected.length >= count) break
+        if (selected.some(item => item.post.id === candidate.post.id && item.source === candidate.key)) continue
+        const fingerprint = subjectFingerprint(candidate.post.title)
+        if (isRepeatedSubject(fingerprint, usedSubjectFingerprints)) continue
+        const image = candidate.post.imageUrl ?? await resolveImageUrl(candidate.post)
+        if (!image) continue
+        candidate.post.imageUrl = image
+        selected.push({ post: candidate.post, source: candidate.key })
+        usedSubjectFingerprints.push(fingerprint)
+      }
+    }
+
+    if (selected.length < count) {
       console.warn('[daily-social] No eligible candidates', {
         ...sourceDiagnostics,
-        selected: 0,
+        selected: selected.length,
+        requested: count,
       })
+      if (automaticRun) {
+        await sc.from('daily_social_runs').update({
+          status: 'failed',
+          generated_count: 0,
+          error: `Only ${selected.length} of ${count} eligible candidates were found`,
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }).eq('run_date', today)
+      }
       return NextResponse.json(
-        { success: false, error: 'لا توجد عناصر صالحة من المصادر' },
+        { success: false, error: `لم يكتمل العدد المطلوب: وُجد ${selected.length} من أصل ${count} أخبار صالحة` },
         { status: 502 },
       )
     }
@@ -317,9 +379,18 @@ export async function runBatch(
       else errors.push({ title: post.title, error: r.reason instanceof Error ? r.reason.message : 'خطأ غير معروف' })
     })
 
-    if (results.length === 0) {
+    if (results.length !== count) {
+      if (automaticRun) {
+        await sc.from('daily_social_runs').update({
+          status: 'failed',
+          generated_count: results.length,
+          error: `Only ${results.length} of ${count} designs were generated`,
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }).eq('run_date', today)
+      }
       return NextResponse.json(
-        { success: false, error: 'فشل توليد كل التصاميم', errors },
+        { success: false, error: `اكتمل ${results.length} من أصل ${count} تصاميم فقط، ولم يُرسل البريد`, errors },
         { status: 500 },
       )
     }
@@ -344,7 +415,8 @@ export async function runBatch(
       status: 'suggested',
       email_sent: false,
     }))
-    const { data: inserted } = await sc.from('social_schedule').insert(rows).select('id')
+    const { data: inserted, error: insertError } = await sc.from('social_schedule').insert(rows).select('id')
+    if (insertError) throw new Error(`تعذّر حفظ دفعة النشرة: ${insertError.message}`)
     const insertedIds = (inserted ?? []).map(r => r.id)
 
     // تسجيل تصاميم اليوم في السجلّ الموحّد (مرشّحي نشرة «النخبة في ٧»)
@@ -368,16 +440,35 @@ export async function runBatch(
       await sc.from('social_schedule').update({ email_sent: true }).in('id', insertedIds)
     }
 
+    if (automaticRun) {
+      await sc.from('daily_social_runs').update({
+        status: 'completed',
+        generated_count: results.length,
+        email_sent: emailOk,
+        completed_at: new Date().toISOString(),
+        error: emailOk ? null : 'Digest email delivery failed',
+        updated_at: new Date().toISOString(),
+      }).eq('run_date', today)
+    }
+
     return NextResponse.json({
-      success: true,
+      success: emailOk,
       date: today,
       generated: results.length,
       requested: count,
       emailSent: emailOk,
       failures: errors,
       posts: results.map(r => ({ title: r.post.title, url: r.post.url, design: r.designUrl })),
-    })
+    }, { status: emailOk ? 200 : 502 })
   } catch (err) {
+    if (automaticRun) {
+      await sc.from('daily_social_runs').update({
+        status: 'failed',
+        error: err instanceof Error ? err.message.slice(0, 1000) : 'Unknown daily-social error',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }).eq('run_date', today)
+    }
     return NextResponse.json(
       { success: false, error: err instanceof Error ? err.message : 'خطأ غير معروف' },
       { status: 500 },

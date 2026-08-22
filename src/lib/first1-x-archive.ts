@@ -186,6 +186,8 @@ export async function getFirst1XArchiveCandidates(excludedUrls: Set<string>, lim
   const { data, error } = await service
     .from('first1_x_archive_posts')
     .select('x_post_id,post_url,post_text,created_at_x,image_url')
+    .gte('created_at_x', `${ARCHIVE_START}T00:00:00Z`)
+    .lt('created_at_x', '2026-01-01T00:00:00Z')
     .not('image_url', 'is', null)
     .order('created_at_x', { ascending: false })
     .limit(Math.max(limit * 4, 80))
@@ -213,9 +215,17 @@ export async function getFirst1XArchiveCandidates(excludedUrls: Set<string>, lim
 
 export async function getFirst1XArchiveStatus() {
   const service = await createServiceRoleClient()
-  const [{ data: state }, { count }] = await Promise.all([
+  const [{ data: state }, { count }, { count: analyticsOnlyPosts }] = await Promise.all([
     service.from('first1_x_archive_import_state').select('next_start_date,last_window_start,last_window_end,completed,last_error,updated_at').eq('source', ARCHIVE_SOURCE).maybeSingle(),
-    service.from('first1_x_archive_posts').select('*', { count: 'exact', head: true }),
+    service.from('first1_x_archive_posts').select('*', { count: 'exact', head: true })
+      .gte('created_at_x', `${ARCHIVE_START}T00:00:00Z`)
+      .lt('created_at_x', '2026-01-01T00:00:00Z'),
+    service.from('first1_x_archive_posts').select('*', { count: 'exact', head: true })
+      .gte('created_at_x', '2026-01-01T00:00:00Z'),
   ])
-  return { state: state ?? { next_start_date: ARCHIVE_START, completed: false }, importedPosts: count ?? 0 }
+  return {
+    state: state ?? { next_start_date: ARCHIVE_START, completed: false },
+    importedPosts: count ?? 0,
+    analyticsOnlyPosts: analyticsOnlyPosts ?? 0,
+  }
 }

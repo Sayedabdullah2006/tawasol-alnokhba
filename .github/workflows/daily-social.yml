@@ -19,7 +19,7 @@ jobs:
           echo "🚀 Generating daily social plan..."
 
           response=$(curl -s -X POST \
-            "${{ secrets.APP_BASE_URL }}/api/cron/daily-social" \
+            "${{ secrets.APP_BASE_URL }}/api/cron/daily-social?count=5" \
             -H "x-api-key: ${{ secrets.CRON_API_KEY }}" \
             -H "Content-Type: application/json" \
             --max-time 290)
