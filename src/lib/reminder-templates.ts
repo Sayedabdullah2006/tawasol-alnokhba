@@ -187,6 +187,7 @@ export const quotedDiscountTemplate = {
     originalPrice: number,
     newPrice: number,
     discountPct: number,
+    options?: { paymentUrl?: string },
   ) => `
     <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f8f9fa; padding: 20px;">
       <div style="background: white; border-radius: 12px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
@@ -219,13 +220,15 @@ export const quotedDiscountTemplate = {
         </div>
 
         <p style="font-size: 14px; color: #555; line-height: 1.7; text-align: center;">
-          فرصة محدودة — راجع العرض المحدّث واعتمده الآن من لوحة التحكم.
+          ${options?.paymentUrl
+            ? 'تم تطبيق الخصم على طلبك المعتمد. يمكنك الآن استكمال الدفع مباشرةً بالسعر الجديد.'
+            : 'فرصة محدودة — راجع العرض المحدّث واعتمده الآن من لوحة التحكم.'}
         </p>
 
         <div style="text-align: center; margin: 26px 0;">
-          <a href="${process.env.NEXT_PUBLIC_SITE_URL}/dashboard"
+          <a href="${options?.paymentUrl ?? `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard`}"
             style="background: #c2410c; color: white; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 15px;">
-            مراجعة العرض المحدّث
+            ${options?.paymentUrl ? 'استكمال الدفع بالسعر الجديد' : 'مراجعة العرض المحدّث'}
           </a>
         </div>
 

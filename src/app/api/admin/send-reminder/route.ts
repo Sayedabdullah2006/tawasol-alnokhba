@@ -9,6 +9,8 @@ import { sendEmailWithRetry } from '@/lib/email-queue';
 import { generateRequestNumber } from '@/lib/utils';
 import { reminderTemplates, quotedDiscountTemplate } from '@/lib/reminder-templates';
 
+const DISCOUNT_ELIGIBLE_STATUSES = new Set(['quoted', 'approved'])
+
 export async function POST(request: NextRequest) {
   try {
     const { requestId, reminderType, discountPct } = await request.json() as {
@@ -64,9 +66,9 @@ export async function POST(request: NextRequest) {
 
     const requestNumber = generateRequestNumber(requestData.request_number);
 
-    if (applyDiscount && requestData.status !== 'quoted') {
+    if (applyDiscount && !DISCOUNT_ELIGIBLE_STATUSES.has(requestData.status)) {
       return NextResponse.json(
-        { error: 'الخصم متاح فقط للطلبات بحالة "بانتظار موافقة العميل"' },
+        { error: 'الخصم متاح فقط للطلبات بانتظار موافقة العميل أو بانتظار الدفع' },
         { status: 400 }
       );
     }
@@ -77,7 +79,7 @@ export async function POST(request: NextRequest) {
     let discountOriginalPrice: number | null = null
 
     if (applyDiscount) {
-      const originalPrice = Number(requestData.admin_quoted_price ?? requestData.final_total ?? 0)
+      const originalPrice = Number(requestData.final_total ?? requestData.admin_quoted_price ?? 0)
       if (originalPrice <= 0) {
         return NextResponse.json(
           { error: 'لا يوجد سعر لهذا العرض ليتم تطبيق الخصم عليه' },
@@ -93,6 +95,11 @@ export async function POST(request: NextRequest) {
         originalPrice,
         newPrice,
         discountPct!,
+        requestData.status === 'approved'
+          ? {
+              paymentUrl: `${(process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://nukhba.media').replace(/\/$/, '')}/payment/${requestId}`,
+            }
+          : undefined,
       )
     } else {
       const templateType = reminderType || requestData.status;

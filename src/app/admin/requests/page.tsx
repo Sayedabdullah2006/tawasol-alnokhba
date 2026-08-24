@@ -17,6 +17,7 @@ import { INVENTOR_STORE_PRODUCTS } from '@/lib/inventor-store'
 
 const REQUESTS_PER_PAGE = 10
 const REFUND_QUICK_ACTION = '__refund__'
+const DISCOUNT_REMINDER_STATUSES = new Set(['quoted', 'approved'])
 
 const QUICK_STATUS_TRANSITIONS: Record<string, string[]> = {
   pending: ['rejected', 'suspended'],
@@ -938,7 +939,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: RequestScope }
   const handleConfirmSingleReminder = async () => {
     if (!reminderTarget) return
     const request = reminderTarget
-    const willApplyDiscount = singleApplyDiscount && request.status === 'quoted'
+    const willApplyDiscount = singleApplyDiscount && DISCOUNT_REMINDER_STATUSES.has(request.status)
     if (willApplyDiscount && (singleDiscountPct <= 0 || singleDiscountPct >= 100)) {
       showToast('نسبة الخصم يجب أن تكون بين 1 و 99', 'error')
       return
@@ -1811,7 +1812,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: RequestScope }
               )}
             </div>
 
-            {reminderTarget.status === 'quoted' ? (
+            {DISCOUNT_REMINDER_STATUSES.has(reminderTarget.status) ? (
               <>
                 <label className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all mb-3 ${
                   singleApplyDiscount ? 'bg-orange-50 border-orange-400' : 'bg-white border-border hover:border-orange-300'
@@ -1843,13 +1844,13 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: RequestScope }
                       onChange={e => setSingleDiscountPct(parseFloat(e.target.value) || 0)}
                       className="w-full px-3 py-2 rounded-lg border border-orange-300 bg-white text-sm"
                     />
-                    {(reminderTarget.admin_quoted_price ?? reminderTarget.final_total ?? 0) > 0 && singleDiscountPct > 0 && singleDiscountPct < 100 && (
+                    {(reminderTarget.final_total ?? reminderTarget.admin_quoted_price ?? 0) > 0 && singleDiscountPct > 0 && singleDiscountPct < 100 && (
                       <p className="text-xs text-orange-700 mt-2 leading-relaxed">
                         السعر بعد الخصم:{' '}
                         <strong>
                           {formatNumber(
                             Math.round(
-                              (reminderTarget.admin_quoted_price ?? reminderTarget.final_total ?? 0) *
+                              (reminderTarget.final_total ?? reminderTarget.admin_quoted_price ?? 0) *
                                 (1 - singleDiscountPct / 100) * 100
                             ) / 100
                           )}{' '}
@@ -1858,7 +1859,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: RequestScope }
                         {' '}(توفير{' '}
                         {formatNumber(
                           Math.round(
-                            (reminderTarget.admin_quoted_price ?? reminderTarget.final_total ?? 0) *
+                            (reminderTarget.final_total ?? reminderTarget.admin_quoted_price ?? 0) *
                               (singleDiscountPct / 100) * 100
                           ) / 100
                         )}
@@ -1870,7 +1871,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: RequestScope }
               </>
             ) : (
               <p className="text-xs text-muted text-center bg-blue-50 border border-blue-200 rounded-xl py-2 px-3 mb-4">
-                💡 خيار الخصم متاح فقط للطلبات بحالة «بانتظار موافقة العميل»
+                💡 خيار الخصم متاح للطلبات بانتظار موافقة العميل أو بانتظار الدفع
               </p>
             )}
 
@@ -1886,11 +1887,11 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: RequestScope }
               <Button
                 onClick={handleConfirmSingleReminder}
                 loading={sendingReminderId === reminderTarget.id}
-                className={singleApplyDiscount && reminderTarget.status === 'quoted'
+                className={singleApplyDiscount && DISCOUNT_REMINDER_STATUSES.has(reminderTarget.status)
                   ? 'flex-1 bg-orange-600 hover:bg-orange-700'
                   : 'flex-1'}
               >
-                {singleApplyDiscount && reminderTarget.status === 'quoted'
+                {singleApplyDiscount && DISCOUNT_REMINDER_STATUSES.has(reminderTarget.status)
                   ? `إرسال + خصم ${singleDiscountPct}%`
                   : 'إرسال الآن'}
               </Button>
