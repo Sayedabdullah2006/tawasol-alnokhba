@@ -24,8 +24,8 @@ export const OPENAI_MODEL = 'gpt-5.5'
 export const FACE_LOCK =
   'REFERENCE PHOTO RULE: treat each attached photo as an intact documentary photograph. ' +
   'Keep any person, clothing, pose, and scene from the supplied photograph unchanged; do not redraw, restyle, replace, or synthesize a person. ' +
-  'Build the editorial layout around the photo using its natural crop and negative space. ' +
-  'بالعربية: استخدم الصورة المرجعية كما هي كلقطة وثائقية حقيقية، ولا تعِد رسم الشخص أو تغيّر ملامحه أو ملابسه أو وضعيته؛ ابنِ التصميم حولها.'
+  'Build the editorial layout around the photo using its natural crop and negative space. Keep text and graphics away from the face, hands, and important clothing. ' +
+  'بالعربية: استخدم الصورة المرجعية كما هي كلقطة وثائقية حقيقية، ولا تعِد رسم الشخص أو تغيّر ملامحه أو ملابسه أو وضعيته؛ ابنِ التصميم حولها، ولا تحشر الصورة بين النصوص أو تضع النص فوق الوجه أو الجسد.'
 
 /**
  * توجيه تخطيط الفيديو — يُلحق فقط عند تفعيل "الخبر يتضمّن فيديو" في الاستوديو.
@@ -69,19 +69,19 @@ export interface Concept {
 
 const REQUIRED_STUDIO_CONCEPTS: Array<Required<Omit<Concept, 'imagePrompt'>>> = [
   {
-    title: 'بطل تحريري سينمائي',
-    mood: 'فخر وطاقة بصرية مركزة',
-    brief: 'لقطة بطولية للصورة المرجعية مع قصّ جريء وإضاءة تحريرية عميقة، عنوان عربي مختصر وكتلة حقائق واضحة ضمن تكوين عمودي ديناميكي.',
+    title: 'صورة خبرية كاملة',
+    mood: 'مصداقية ووضوح وهدوء',
+    brief: 'استخدام الصورة الحقيقية كلقطة خبرية محورية واضحة دون إعادة رسمها، مع عنوان عربي مختصر في مساحة سالبة طبيعية وشريط معلومات رشيق بعيد عن الوجه والجسد.',
   },
   {
-    title: 'خريطة إنجاز معلوماتية',
-    mood: 'دقة وحداثة ووضوح',
-    brief: 'تحويل الخبر إلى إنفوجرافيك عربي من اليمين إلى اليسار: الصورة عنصر حي داخل شبكة معلوماتية، مع 3 حقائق قصيرة وأيقونات وخطوط تنظيمية أنيقة.',
+    title: 'غلاف تحريري بسيط',
+    mood: 'أناقة معاصرة وحضور إنساني',
+    brief: 'الصورة الحقيقية داخل قص مستطيل نظيف يناسب زاويتها الأصلية، مع مساحة لونية واحدة وعنوان قوي وحقيقتين قصيرتين فقط ضمن تسلسل عربي من اليمين إلى اليسار.',
   },
   {
-    title: 'كولاج مجلة معاصر',
-    mood: 'إلهام وحركة وعمق',
-    brief: 'تكوين تحريري غير متماثل بطبقات وقصّات مائلة ومسار حركة بصري؛ تظهر الصورة ضمن قصة بصرية حديثة مع عنوان قوي وحقائق محدودة.',
+    title: 'صفحة مجلة موثوقة',
+    mood: 'احتراف وثقة ومساحة تنفس',
+    brief: 'تخطيط مجلة هادئ يضع الصورة الحقيقية كاملة أو شبه كاملة في منطقة مستقلة، ويوازنها بكتلة عنوان ومساحة بيضاء محسوبة وفواصل دقيقة بلا كولاج أو مؤثرات صناعية.',
   },
 ]
 
@@ -136,19 +136,14 @@ export async function prepareConceptImagePrompts(
  * لضمان تنوّع بصري واضح بدل نمط واحد متكرّر، مع الحفاظ على ثوابت هوية First1Saudi.
  */
 export const POSTER_STYLES: string[] = [
-  'سينمائي درامي: قصّ بطولي كبير للصورة مع تدرّج معتم وإضاءة جانبية، نص مكثّف أسفل، أجواء فخمة عميقة.',
-  'مينمال تحريري: مساحات تيل/بيضاء هادئة واسعة، تايبوغرافي ضخم، عناصر قليلة أنيقة — فخامة بالبساطة.',
-  'إنفوجرافيك بطاقات: الحقائق كبطاقات جانبية بأيقونات خطّية ذهبية وفواصل، تخطيط منظّم معلوماتي.',
-  'تايبوغرافي عملاق: الاسم/سطر الإنجاز بخط ضخم جداً يملأ التصميم كعنصر بصري رئيسي، الصورة ثانوية متكاملة.',
-  'مجلة/كولاج عصري: تقسيمات قطرية وطبقات وقصاصات بإيقاع بصري ديناميكي بأسلوب أغلفة المجلات.',
-  'هندسي مجرّد: أشكال هندسية وأقواس ودوائر ذهبية/خضراء كزخرفة خلفية منظّمة حول الصورة.',
-  'بورتريه فخم كلاسيكي: إطار راقٍ للصورة، تناظر ووقار، لمسات ذهبية كلاسيكية وهيبة.',
-  'سبوتلايت دراماتيكي: خلفية داكنة جداً وبقعة ضوء على الشخص، تباين عالٍ وتركيز كامل على البطل.',
-  'غلاف مجلة سعودي جريء: قصّ غير متماثل، عنوان ضخم كغلاف افتتاحي، طبقات صغيرة للحقائق حول الصورة.',
-  'انقسام شاشة بطولي: نصف للصورة بقصّة قوية ونصف للإنجاز بتايبوغرافي معماري ومساحات سالبة واضحة.',
-  'نحت بيانات بصري: تحويل الرقم/الإنجاز إلى كتلة بصرية كبيرة أو مسار ذهبي يلتف حول الصورة.',
-  'مسار حركة وطاقة: خطوط اتجاه وطبقات شفافة تعطي إحساس تقدم/سباق/صعود بدون زخرفة عشوائية.',
-  'إطار معماري فاخر: شبكة أعمدة وأقواس حديثة تحتضن الصورة والنص مثل واجهة مؤسسة أو جائزة عالمية.',
+  'صورة خبرية كاملة: الصورة الحقيقية هي البطل، بقص طبيعي أو ملء كامل، وعنوان قصير في مساحة سالبة واضحة بعيداً عن الشخص.',
+  'مينمال تحريري: مساحة لونية هادئة، صورة حقيقية مستقلة، تايبوغرافي قوي، وفواصل دقيقة مع أقل عدد ممكن من العناصر.',
+  'إنفوجرافيك رشيق: الصورة الحقيقية في إطار واضح وبجوارها حقيقتان أو ثلاث فقط بأرقام وخطوط تنظيمية بسيطة دون بطاقات كثيرة.',
+  'غلاف مجلة موثوق: لقطة حقيقية كبيرة وعنوان افتتاحي موجز وهوامش دقيقة، من دون كولاج أو قصاصات حول الوجه والجسد.',
+  'تقسيم تحريري نظيف: منطقة مستقلة للصورة ومنطقة مستقلة للنص، بتوازن غير متماثل محسوب ومساحة تنفس كافية.',
+  'بورتريه وثائقي راقٍ: الحفاظ على اللقطة والملامح والإضاءة الأصلية، مع إطار بسيط واسم وسطر إنجاز واحد فقط.',
+  'بطاقة بيانات هادئة: صورة حقيقية واضحة مع رقم محوري واحد وحقيقتين، بلا أيقونات عشوائية أو مؤثرات مستقبلية.',
+  'تايبوغرافي وصورة: عنوان عربي قوي لا يتقاطع مع الشخص، والصورة بحجم مريح داخل قص يناسب زاويتها الأصلية.',
 ]
 
 /** يخلط أنماط التصميم ويعيدها (لتوزيع نمط مختلف على كل منشور في الدفعة). */
@@ -299,13 +294,14 @@ export function buildCompactImagePrompt(args: {
 
   return [
     'Create a premium 4:5 Arabic editorial social-media poster for First1Saudi.',
-    'Use each supplied reference image as an intact documentary photograph. Do not redraw, replace, alter, or synthesize people, clothing, faces, or poses. Build the composition around the real photographs.',
-    `Creative direction: ${direction || 'A distinctive, modern Arabic editorial infographic with a strong visual hierarchy.'}`,
+    'Use each supplied reference image as an intact documentary photograph. Do not redraw, replace, alter, beautify, or synthesize people, clothing, faces, hands, or poses. Build the composition around the real photographs and keep them visibly photographic.',
+    `Creative direction: ${direction || 'A restrained modern Arabic editorial layout with one real focal photograph and a clear hierarchy.'}`,
     label ? `Small context label: "${label}".` : '',
     `FINAL PRINT-READY ARABIC COPY ONLY: ${displayContent || 'A concise Arabic headline and up to three verified factual callouts.'}`,
     'Render the quoted Arabic as finished news copy: direct, human, clear, and declarative. Never print internal narration or meta-language such as "الخبر الحالي", "يذكر الخبر", "يتحدث عن", "هذا المحتوى", "يوضح الخبر", "الصورة المرفقة", or any equivalent description of the source.',
-    'Use strict right-to-left Arabic hierarchy, one concise headline, and no more than three short callouts. Do not copy a long caption, invent facts, or add photo descriptions.',
+    'Use strict right-to-left Arabic hierarchy, one concise headline, and no more than three short callouts. Keep all copy in a dedicated readable zone away from faces, hands, and important clothing. Do not squeeze the photograph between text blocks. Do not copy a long caption, invent facts, or add photo descriptions.',
     'Use deep teal, Saudi green, turquoise, restrained gold, and white. Keep the artwork full-bleed, with no white logo panel or empty logo frame.',
+    'Keep the composition simple and credible: one focal image, one headline, restrained rules and colour fields. Avoid fantasy glow, floating particles, energy trails, plastic skin, excessive cutouts, decorative science motifs, fake architecture, and busy AI-style effects.',
     'Add a compact footer with equal, recognizable icons for X, Instagram, LinkedIn, Facebook, and TikTok followed by @First1Saudi. Do not draw a brand logo; it is overlaid after generation.',
     args.templateDirective ?? '',
     args.hasVideo ? videoLayoutFor(args.videoOrientation) : '',

@@ -14,6 +14,8 @@ interface OpenAIImageOptions {
   retries?: number
   allowSafetyFallback?: boolean
   safetyFallbackPrompt?: string
+  /** Disable only for non-design utility transforms such as faithful colorization. */
+  applyEditorialBaseline?: boolean
 }
 
 interface OpenAIImageResponse {
@@ -25,6 +27,31 @@ interface OpenAIImageResponse {
 const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-2'
 const OPENAI_IMAGE_QUALITY = (process.env.OPENAI_IMAGE_QUALITY || 'medium') as OpenAIImageOptions['quality']
 const OA_AGENT = new https.Agent({ keepAlive: false })
+
+const PROFESSIONAL_EDITORIAL_BASELINE_MARKER = '=== PROFESSIONAL EDITORIAL AUTHENTICITY BASELINE ==='
+
+/**
+ * Shared art-direction baseline for every image-generation surface.
+ * Route-specific prompts still control the subject, identity, format, and campaign details.
+ */
+export const PROFESSIONAL_EDITORIAL_DESIGN_BASELINE = [
+  PROFESSIONAL_EDITORIAL_BASELINE_MARKER,
+  'Create a restrained, human-designed editorial composition. The result must look art-directed by a professional designer, not like obvious AI artwork.',
+  'REAL PHOTOGRAPH FIRST: when reference photographs are supplied, they are the source of truth. Keep each photograph recognizably real and documentary. Preserve the exact face, expression, skin texture, body, pose, hands, clothing, accessories, and culturally important details. Do not redraw, beautify, reconstruct, stylize, or replace the person.',
+  'Choose the layout from the photograph itself: respect its orientation, camera angle, crop, subject position, lighting, and usable negative space. Prefer an intact photo, a clean rectangular crop, or a simple full-bleed crop. Never squeeze a portrait between text blocks, weave text through the body, or place copy over the face, hands, or important clothing.',
+  'For multiple reference photos, use a clean editorial grid or clearly separated frames. Never blend bodies or faces together, invent missing anatomy, or turn the people into one synthetic scene.',
+  'Use one focal image and one clear reading path. Keep the headline concise and limit supporting facts to what the route explicitly supplies. Use spacing, scale, alignment, thin rules, and restrained colour fields instead of decorative clutter.',
+  'Avoid the stereotypical AI look: no plastic skin, synthetic glamour portrait, fantasy lighting, neon glow, floating particles, luminous energy trails, excessive gold, fake depth, impossible architecture, invented crowds, decorative molecular or circuit overlays, random icons, busy collage fragments, or effects crossing the subject unless the route explicitly requires one for the factual story.',
+  'If no real photograph is supplied, do not invent a photorealistic person merely as decoration. Prefer authentic objects, restrained abstract editorial forms, typography, verified places, or data-led graphics. Generate people only when the route explicitly requires them.',
+  'Keep Arabic typography correctly connected, right-to-left, readable, and outside the photographic subject. The final design should feel calm, credible, contemporary, and easy on the eye.',
+  'These rules refine the visual treatment only. Preserve every route-specific instruction about facts, logos, footer, dimensions, event identity, video space, and exact text.',
+].join('\n')
+
+export function withProfessionalEditorialBaseline(promptText: string): string {
+  const prompt = promptText.trim()
+  if (prompt.includes(PROFESSIONAL_EDITORIAL_BASELINE_MARKER)) return prompt
+  return `${PROFESSIONAL_EDITORIAL_DESIGN_BASELINE}\n\n=== ROUTE-SPECIFIC CREATIVE BRIEF ===\n${prompt}`
+}
 
 function imageSizeFor(opts: OpenAIImageOptions): string {
   if (opts.size) return opts.size
@@ -248,7 +275,7 @@ async function createImageViaImageApi(
 
   const commonFields: Record<string, string> = {
     model: OPENAI_IMAGE_MODEL,
-    prompt: promptText,
+    prompt: opts.applyEditorialBaseline === false ? promptText : withProfessionalEditorialBaseline(promptText),
     size: imageSizeFor(opts),
     quality: opts.quality ?? OPENAI_IMAGE_QUALITY ?? 'medium',
   }

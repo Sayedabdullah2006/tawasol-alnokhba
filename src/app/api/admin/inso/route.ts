@@ -267,7 +267,7 @@ export async function POST(request: Request) {
         await failGenerationJob(generationJobId, new Error('ولّد أو اكتب نص المنشور أولاً'))
         return NextResponse.json({ error: 'ولّد أو اكتب نص المنشور أولاً' }, { status: 400 })
       }
-      const directions = ['منظور علمي تحريري جريء', 'لقطة إنسانية دولية دافئة', 'تكوين بصري مستقبلي مستلهم من العلوم النووية السلمية']
+      const directions = ['صفحة علمية تحريرية موثوقة', 'لقطة إنسانية دولية دافئة', 'إنفوجرافيك علمي هادئ مستلهم من العلوم النووية السلمية']
       const optionIndex = Number.isInteger(body.optionIndex) ? Number(body.optionIndex) : 0
       if (optionIndex < 0 || optionIndex >= directions.length) {
         await failGenerationJob(generationJobId, new Error('خيار التصميم غير صالح'))

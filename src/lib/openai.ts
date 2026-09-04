@@ -208,9 +208,12 @@ export const SYS_CONCEPTS = `أنت مدير فني لحساب "First1Saudi". ا
 
 ⚠️ الاتجاهات ليست قوالب ثابتة — يجب أن تُشتق فعلياً من تحليل هذا الخبر تحديداً ومن الصورة المرفقة (إن وُجدت): نوع الموضوع (شخص/حيوان/منتج/مشهد)، تكوين الصورة وزاويتها وإضاءتها ومزاجها، وطبيعة الإنجاز. اجعل كل اتجاه مناسباً لهذه الصورة وهذا الخبر بالذات، لا وصفاً عاماً.
 
-نوّع الاتجاهات تنويعاً حقيقياً حسب نوع الخبر وصورته من **مكتبة واسعة من عائلات التصميم** (سينمائي هيرو، إنفوجرافيك معلوماتي، مينمال تحريري، سُلّم جوائز/بوديوم، علمي‑تقني، مجلة/كولاج، تايبوغرافي عملاق، بوستر سينمائي درامي، خط زمني، بطاقة بيانات، اقتباس بارز، شبكة/Grid، هندسي مجرّد، ضوئي راقٍ، طبقات عمق، بورتريه فخم كلاسيكي، أقواس/دوائر ديناميكية، تباين دراماتيكي…) **ولست محصوراً بهذه القائمة — ابتكر عائلة جديدة إن كانت أنسب للصورة والخبر**.
-اجعل الاتجاهات الثلاثة مختلفة فعلياً على محاور: أرشيتايب التخطيط، معالجة الصورة (ملء كامل/إطار/قصّ بطولي/تدرّج)، كثافة النص (مكثّف↔مينمال)، تركيز اللون **داخل لوحة الهوية المقفلة** (تيل غالب/ذهبي غالب/أبيض نظيف)، ومقياس التايبوغرافي — لا أن تختلف بالاسم فقط.
-قاعدة إبداعية إلزامية: الاتجاه التقليدي مرفوض. كل اتجاه يجب أن يحتوي "آلية بصرية" واضحة ومميزة: قصّ غير متوقع، عمق طبقي، عدم تماثل محسوب، كتلة تايبوغرافية بطولية، مسار حركة، إطار معماري، كولاج تحريري، أو نظام معلومات مبتكر. تجنّب تكرار قالب الشريط السفلي/البطاقات الآمنة إلا إذا كان الخبر نفسه يفرض ذلك.
+المبدأ الفني الجديد: «البساطة الموجّهة بالصورة». الصورة الحقيقية هي العنصر الأهم، وليست خامة لإعادة الرسم أو التجميل الاصطناعي. اقرأ اتجاه اللقطة وزاويتها ومكان الشخص والمساحة السالبة، ثم اختر قالباً يحيط بها باحتراف. لا تحشر الصورة بين النصوص، ولا تجعل النص يمر فوق الوجه أو اليدين أو الملابس المهمة.
+
+نوّع الاتجاهات ضمن عائلات تحريرية هادئة وموثوقة: صورة خبرية كاملة، غلاف مجلة بسيط، تقسيم صورة/نص نظيف، بورتريه وثائقي، إنفوجرافيك رشيق، أو بطاقة بيانات محدودة. يمكن الابتكار في المحاذاة والنسب والقص والمساحة، لا في إضافة مؤثرات كثيرة.
+اجعل الاتجاهات الثلاثة مختلفة فعلياً في موضع الصورة ونسبة حضورها وتوزيع النص، مع الحفاظ على عنصر تركيز واحد وتسلسل قراءة واضح. النص قليل: عنوان واحد وحقيقتان أو ثلاث فقط.
+
+ممنوع اقتراح مظهر الذكاء الاصطناعي الشائع: لا إضاءة خيالية، لا وهج نيون، لا جسيمات أو مسارات طاقة، لا كولاج قصاصات حول الشخص، لا مبانٍ مختلقة، لا دوائر/جزيئات/شبكات تقنية للزينة، لا بشرة بلاستيكية، ولا إعادة تكوين للشخص أو وضعيته. إذا لم توجد صورة حقيقية، استخدم رموزاً أو أشياء أو بيانات أو أشكالاً تحريرية هادئة بدلاً من اختلاق شخصية فوتوغرافية.
 
 أخرج JSON فقط بهذا الشكل (3 عناصر بالضبط):
 {
@@ -225,7 +228,7 @@ export const SYS_CONCEPTS = `أنت مدير فني لحساب "First1Saudi". ا
 
 ثوابت تلتزم بها كل الاتجاهات (تُذكر في brief ضمناً، ولا تتغيّر):
 - هوية First1Saudi: تيل عميق #0A2D35–#0D3D47، أخضر سعودي #2D8B3F–#3A9B4F، ذهبي #FFD700، تيل-سماوي #1A8B9F، أبيض.
-- الصورة الحقيقية للموضوع محورية (شخص/حيوان/منتج/مشهد).
+- الصورة الحقيقية للموضوع محورية وتبقى لقطة فوتوغرافية موثوقة بلا إعادة رسم أو تغيير للملامح والوضعية.
 - فوتر منحني فيه أيقونات سوشال + معرّف @First1Saudi.
 - كل منشور قائم على إنجاز/قيمة للقارئ، لا نص أدبي فقط.
 
@@ -236,10 +239,12 @@ export const SYS_CONCEPTS = `أنت مدير فني لحساب "First1Saudi". ا
  * التي تركّب شعاراتها برمجياً بعد التوليد، مع الحفاظ على تذييل اجتماعي موحّد.
  */
 export const STUDIO_EDITORIAL_DESIGN_RULES = `
-Build a campaign-grade Arabic editorial poster, not a conservative text overlay.
-Make the supplied reference the source of truth when one exists: preserve real people, clothing, and culturally important details while allowing smart cropping, reframing, background extension, editorial lighting, depth, and graphic layers.
-Use one distinctive visual mechanism that makes the selected direction visible: split-screen hero crop, magazine grid, cinematic spotlight, cutout collage, typographic monument, data sculpture, diagonal editorial bands, architectural frame, motion trail, or a layered depth system.
-Avoid generic stock-template composition and the safe default of a bottom text strip. Create a memorable first read with strong asymmetry, a clear hierarchy, and intentional negative space.
+Build a campaign-grade Arabic editorial poster whose sophistication comes from restraint, proportion, and typography rather than effects.
+Make the supplied reference the source of truth when one exists: keep real people, faces, hands, clothing, pose, and culturally important details visibly photographic and unchanged. Choose the layout from the photo's natural orientation, crop, subject position, and negative space.
+Give the photograph one clear, comfortable zone. Prefer a full-bleed documentary crop, a clean rectangular crop, or a simple image/text split. Never squeeze a person between copy, cut the body into decorative fragments, weave text through the subject, or place words over the face, hands, or important clothing.
+Use one focal image, one concise headline, and no more than three compact facts. Create distinction through scale, alignment, spacing, thin rules, and restrained colour fields.
+Avoid the obvious AI aesthetic: plastic skin, synthetic glamour lighting, neon glow, floating particles, energy trails, excessive gold, fake depth, impossible architecture, invented crowds, decorative science overlays, random icons, and busy collage fragments.
+When no real photo exists, prefer authentic objects, verified places, typography, or data-led editorial graphics instead of inventing a photorealistic person for decoration.
 Arabic typography: GE Dinar One Heavy. Alternatives: Lomar or Din Next Arabic Heavy. Use sharp, weighty Arabic type with correct connected RTL shaping; never use Cairo or rounded soft lettering.
 Treat descriptive source-image notes as internal direction only. Do not render captions about the image or its source as visible text.
 Every design must include a compact, clean social footer for First1Saudi: the official icons for X, Instagram, LinkedIn, Facebook, and TikTok, followed by the exact handle "@First1Saudi". Keep all five icons visible, equal in size, and visually balanced; never omit Facebook.
@@ -249,9 +254,9 @@ Every design must include a compact, clean social footer for First1Saudi: the of
 export const SYS_IMAGE = `أنت مهندس برومبتات تصميم لحساب "First1Saudi".
 حوّل (الخبر + الاتجاه المعتمد + بيانات JSON المُحلَّلة) إلى برومبت **تحرير صورة** واحد بالإنجليزية، مع إبقاء كل النصوص المعروضة بالعربية حرفياً.
 
-‼️ هذه مهمة تصميم بوستر تحريري باستخدام الصورة المرجعية، وليست مجرد إضافة شريط نص فوق صورة. الصورة المرفقة مصدر الهوية الحقيقي — حافظ على الشخص/الأشخاص قابلين للتعرف بوضوح، لكن اسمح بتكوين إبداعي كامل: قصّ ذكي، إعادة تأطير، امتداد خلفية، عمق، إضاءة تحريرية، طبقات جرافيك، وتايبوغرافي قوي.
+‼️ هذه مهمة تصميم بوستر تحريري باستخدام الصورة المرجعية. الصورة المرفقة مصدر الهوية الحقيقي وتبقى فوتوغرافية كما هي؛ اختر التكوين من زاوية الصورة وقصّها ومساحتها السالبة، ولا تعِد رسم الشخص أو تجميله أو تغيير وضعيته.
 
-⭐ المبدأ: ترتيب وأسلوب العناصر يتبع «الاتجاه المعتمد» (الخطوة 3). ثوابت الهوية مقفلة، لكن التكوين البصري ليس مقفلاً: المطلوب نتيجة تبدو كغلاف/حملة احترافية لا كصورة أصلية عليها ملصق.
+⭐ المبدأ: «بساطة موجّهة بالصورة». الإبداع يأتي من النسب والمساحة والمحاذاة والتايبوغرافي، لا من المؤثرات أو ازدحام العناصر. المطلوب نتيجة تبدو كغلاف تحريري احترافي وموثوق.
 
 اكتب المخرجات بالقالب الإنجليزي المُقسَّم أدناه، مستبدلاً القيم بين [...] بمعطيات هذا الخبر، وحاذفاً ما لا ينطبق. لا تشرح ولا تضف مقدمة — أخرج البرومبت فقط.
 
@@ -271,14 +276,14 @@ OUTPUT SIZE: EXACTLY 1080×1350 pixels — portrait 4:5 aspect ratio. Compose th
 === 🔒 PRESERVE REAL IDENTITY — DO NOT SUBSTITUTE PEOPLE ===
 The provided photo is the source of truth for identity. Preserve the person/people so they remain clearly recognizable: same identity, face structure, expression, age, skin tone, hair/veil, and key clothing cues.
 Do not invent a different person, do not swap faces, do not make the subject look like a generic AI portrait, and do not remove culturally important clothing/veil.
-You MAY crop, reframe, scale, mask the background, extend the background, add editorial lighting, depth layers, duotone treatment, and integrate the subject into a strong poster composition as long as identity remains faithful.
+You MAY crop, reframe, and scale the intact photograph conservatively. Do not mask around the body, reconstruct the background near the person, relight the face, apply duotone to skin, or add effects across the subject.
 (INTERNAL EDITING NOTE — DO NOT RENDER AS TEXT): the photographed people are [وصف موجز من photo_notes]. This is guidance for you only; never draw this description, the people's descriptive names, or any "صورة لـ…" caption anywhere on the design.
 Only allowed photo edit: clone out foreign logos (e.g. واس/SPA) from the background.
 
 === 🎨 LAYOUT — MAKE THE CHOSEN DIRECTION VISIBLE ===
-Build a distinctive composition from the chosen direction. Use one clear visual mechanism, such as: split-screen hero crop, magazine cover grid, cinematic spotlight, cutout collage, typographic monument, data sculpture, diagonal editorial bands, architectural frame, motion trail, or layered depth system.
-Avoid the safe default of a bottom text strip. Do not use the same footer-heavy template unless the chosen direction explicitly asks for it. Let the poster have a memorable first read, strong asymmetry, clean hierarchy, and a fresh arrangement of image, title, facts, and negative space.
-If the chosen direction is weak or generic, upgrade it into a campaign-grade editorial layout while preserving the facts and brand palette.
+Build a distinctive but restrained composition from the chosen direction. Use a full-bleed documentary image, a clean image/text split, a magazine page, a quiet data layout, or a simple framed portrait chosen to suit the real photograph.
+Keep the photograph in one coherent visual zone and all copy in another readable zone. Never place copy over the face, hands, or important clothing, and never squeeze the subject between text blocks.
+Let the poster have one memorable focal point, a clean hierarchy, and intentional breathing room. If the direction is busy, simplify it rather than adding more layers.
 
 === 🔒 BRAND IDENTITY — FIRST1SAUDI (مقفل) ===
 Deep teal #0A2D35 – #0D3D47 · Saudi green #2D8B3F – #3A9B4F
@@ -318,37 +323,27 @@ Render all Arabic text crisp, correctly shaped and connected (RTL), exactly as q
 ✗ ‼️ أي عبارة تعريفية/وصفية للمحتوى أو الشخص مثل: «يُعرّف بـ» / «يعرف المحتوى بـ» / «هو عبارة عن» / «نبذة عن» / «يتحدث عن» / «هذا المحتوى» — اعرض مضمون الخبر وصياغة الإنجاز مباشرةً فقط.
 ✗ the phrase "أول سعودية" unless it appears in the source
 
-FINAL REMINDER: Create a campaign-grade editorial poster. Preserve the real identity faithfully, but use bold composition, framing, depth, and typography. Output the result as a 1080×1350 (4:5) portrait image.`
+FINAL REMINDER: Create a calm, campaign-grade editorial poster that feels professionally art-directed rather than AI-generated. Preserve the real photograph faithfully and use proportion, spacing, framing, and typography with restraint. Output the result as a 1080×1350 (4:5) portrait image.`
 
 // ─── تنويع اتجاهات التصميم ─────────────────────────────────────────
 // مكتبة عائلات الاتجاه — أوسع من الأمثلة المضمّنة في البرومبت، ويُمرَّر منها
 // مجموعة عشوائية في كل تشغيل لضمان تنويع حقيقي بين مرّة وأخرى.
 export const CONCEPT_STYLE_FAMILIES: string[] = [
-  'سينمائي هيرو',
-  'إنفوجرافيك معلوماتي',
+  'صورة خبرية كاملة',
+  'تقسيم صورة ونص نظيف',
   'مينمال تحريري',
-  'سُلّم جوائز (بوديوم)',
-  'علمي‑تقني',
-  'مجلة/كولاج',
-  'تايبوغرافي عملاق',
-  'بوستر سينمائي درامي',
+  'غلاف مجلة موثوق',
+  'بورتريه وثائقي راقٍ',
+  'إنفوجرافيك رشيق',
+  'تايبوغرافي وصورة',
   'خط زمني (Timeline)',
-  'بطاقة بيانات (Stat Card)',
+  'بطاقة بيانات هادئة (Stat Card)',
   'اقتباس بارز',
-  'شبكة/Grid',
-  'هندسي مجرّد',
-  'ضوئي راقٍ (Glow)',
-  'طبقات عمق (Depth)',
-  'بورتريه فخم كلاسيكي',
-  'أقواس/دوائر ديناميكية',
-  'تباين دراماتيكي (Spotlight)',
-  'غلاف مجلة سعودي جريء (Magazine Cover)',
-  'انقسام شاشة بطولي (Split-screen Hero)',
-  'نحت بيانات/أرقام (Data Sculpture)',
-  'معمارية شبكة فاخرة (Architectural Grid)',
-  'مسار حركة/طاقة (Motion Trail)',
-  'كولاج قصاصات تحريرية (Cutout Collage)',
-  'إضاءة افتتاحية فخمة (Luxury Editorial)',
+  'شبكة صور وثائقية (Documentary Grid)',
+  'ملف إنجاز تحريري',
+  'رقم محوري وصورة حقيقية',
+  'صفحة تقرير بصري',
+  'عنوان افتتاحي مع لقطة كاملة',
 ]
 
 // يبني كتلة توجيهات تُلحَق برسالة خطوة الاتجاهات: مجموعة عشوائية من العائلات،
@@ -359,8 +354,9 @@ export function buildConceptDirectives(opts?: { exclude?: string[]; poolSize?: n
   const exclude = (opts?.exclude ?? []).map(s => String(s).trim()).filter(Boolean)
   const lines = [
     `عائلات الاتجاه المتاحة لهذا التشغيل — اختر منها 3 عائلات مختلفة تماماً، أو ابتكر عائلة جديدة أنسب للصورة والخبر: ${pool.join(' · ')}.`,
-    `يجب أن تختلف الاتجاهات الثلاثة على محاور: أرشيتايب التخطيط، معالجة الصورة (ملء/إطار/قصّ بطولي/تدرّج)، كثافة النص (مكثّف↔مينمال)، تركيز اللون داخل لوحة الهوية المقفلة (تيل/ذهبي/أبيض)، ومقياس التايبوغرافي — لا بالاسم فقط. مع الحفاظ التام على ثوابت الهوية والصورة الحقيقية والفوتر.`,
-    `ممنوع الاتجاه الآمن المتكرر: لا تجعل كل المقترحات شريطا سفليا أو بطاقة معلومات عادية. اجعل كل brief يذكر آلية بصرية جريئة واحدة على الأقل وطريقة تنفيذها بوضوح داخل مقاس 4:5.`,
+    `يجب أن تختلف الاتجاهات الثلاثة في موضع الصورة ونسبة حضورها وتوزيع النص ومقياس التايبوغرافي، لا بالاسم فقط. اختر المعالجة من زاوية الصورة ومساحتها السالبة، مع الحفاظ التام على الصورة الحقيقية والفوتر.`,
+    `اجعل كل brief يحدد منطقة واضحة ومريحة للصورة ومنطقة مستقلة للنص، مع عنوان واحد وحقيقتين أو ثلاث. الإبداع مطلوب في النسب والمحاذاة والمساحة، لا في المؤثرات أو الكولاج حول الشخص.`,
+    `ممنوع: إعادة رسم الشخص، تجميل الوجه، تغيير الوضعية أو الملابس، حشر الصورة بين الكلام، النص فوق الوجه أو الجسد، الوهج والنيون والجسيمات ومسارات الطاقة والمباني المختلقة والزخارف التقنية العشوائية.`,
   ]
   if (exclude.length) {
     lines.push(`تجنّب تكرار هذه الاتجاهات المقترحة سابقاً لنفس الخبر، وقدّم بدائل مختلفة عنها: ${exclude.join(' · ')}.`)

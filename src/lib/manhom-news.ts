@@ -33,7 +33,11 @@ export async function ensureColorImage(personId: number, bwUrl: string): Promise
   if (existing?.image_url_color) return existing.image_url_color
 
   try {
-    const { b64, mimeType } = await generateImageWithOpenAI(COLORIZE_PROMPT, [bwUrl], { aspectRatio: '1:1', allowSafetyFallback: false })
+    const { b64, mimeType } = await generateImageWithOpenAI(COLORIZE_PROMPT, [bwUrl], {
+      aspectRatio: '1:1',
+      allowSafetyFallback: false,
+      applyEditorialBaseline: false,
+    })
     const buf = Buffer.from(b64, 'base64')
     const ext = mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg' : 'png'
     const path = `manhom-color-${personId}-${Date.now()}.${ext}`
