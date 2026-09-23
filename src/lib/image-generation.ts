@@ -52,6 +52,9 @@ export function withProfessionalEditorialBaseline(promptText: string): string {
   if (prompt.includes(PROFESSIONAL_EDITORIAL_BASELINE_MARKER)) return prompt
   return `${PROFESSIONAL_EDITORIAL_DESIGN_BASELINE}\n\n=== ROUTE-SPECIFIC CREATIVE BRIEF ===\n${prompt}`
 }
+// Shared print boundary for studio, requests, newsletters, and campaign imagery.
+// Directional metadata belongs to the prompt, never to the artwork itself.
+const PRINT_BOUNDARY = '\n\nFINAL ARTWORK TEXT RULE: Render only text explicitly designated as visible copy. Never render field names, analysis labels, prompt instructions, source-image descriptions, layout notes, or explanatory metadata. Do not introduce headings to explain quoted copy.'
 
 function imageSizeFor(opts: OpenAIImageOptions): string {
   if (opts.size) return opts.size
@@ -275,7 +278,7 @@ async function createImageViaImageApi(
 
   const commonFields: Record<string, string> = {
     model: OPENAI_IMAGE_MODEL,
-    prompt: opts.applyEditorialBaseline === false ? promptText : withProfessionalEditorialBaseline(promptText),
+    prompt: `${opts.applyEditorialBaseline === false ? promptText : withProfessionalEditorialBaseline(promptText)}${PRINT_BOUNDARY}`,
     size: imageSizeFor(opts),
     quality: opts.quality ?? OPENAI_IMAGE_QUALITY ?? 'medium',
   }

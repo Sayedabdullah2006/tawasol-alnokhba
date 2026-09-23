@@ -9,6 +9,7 @@ import { compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
 import { completeGenerationJob, failGenerationJob, startGenerationJob, throwIfGenerationCancelled } from '@/lib/generation-jobs'
 import { selectEditorialTemplate } from '@/lib/editorial-template-selector'
 import { normalizeImageUrls, normalizeSupportingDocuments } from '@/lib/request-attachments'
+import { greetingCopyFromNewsText } from '@/lib/studio-print-copy'
 
 export const dynamic = 'force-dynamic'
 // Image generation can be slow — give it room.
@@ -252,6 +253,10 @@ export async function POST(req: Request) {
         // Fallback: store the raw text if the model didn't return clean JSON.
         analysis = { raw }
       }
+      const posterCopy = greetingCopyFromNewsText(newsText)
+      if (posterCopy && analysis && typeof analysis === 'object') {
+        analysis = { ...analysis, poster_copy: posterCopy }
+      }
 
       await saveStep({ analysis, sourceImage: primarySource })
 
@@ -371,6 +376,7 @@ export async function POST(req: Request) {
       const designPrompt = buildCompactImagePrompt({
         analysis: priorAnalysis,
         chosenConcept: String(chosenConcept ?? ''),
+        sourceText: newsText,
         note,
         templateDirective,
       })
@@ -385,7 +391,7 @@ export async function POST(req: Request) {
       // المقاس النهائي يُضبط بـ sharp إلى 1080×1350 لاحقاً.
       const { b64 } = await generateImageWithOpenAI(designPrompt, referenceImages, {
         quality: 'high',
-        safetyFallbackPrompt: buildStudioSafetyFallbackPrompt({ analysis: priorAnalysis, chosenConcept: String(chosenConcept ?? '') }),
+        safetyFallbackPrompt: buildStudioSafetyFallbackPrompt({ analysis: priorAnalysis, chosenConcept: String(chosenConcept ?? ''), sourceText: newsText }),
       })
 
       // 3) ضبط المقاس إلى 1080×1350 بالضبط، ثم تركيب لوقو أول سعودي أسفل اليمين (إن وُجد).

@@ -14,6 +14,7 @@ import { generateImageWithOpenAI, generateImageFromPartsWithOpenAI } from './ima
 import { compositeLogoBottomRight, resizeToPoster } from './logo-overlay'
 import { createServiceRoleClient } from './supabase-server'
 import { selectEditorialTemplate } from './editorial-template-selector'
+import { buildGreetingPosterPrompt, greetingCopyFromNewsText, type StudioGreetingCopy } from './studio-print-copy'
 
 export const OPENAI_MODEL = 'gpt-5.5'
 
@@ -173,7 +174,13 @@ export async function analyzeNews(
     messages: [{ role: 'system', content: SYS_ANALYZE }, { role: 'user', content: userContent }],
   })
   const raw = completion.choices[0]?.message?.content ?? '{}'
-  try { return JSON.parse(raw) } catch { return { raw } }
+  const posterCopy = greetingCopyFromNewsText(args.newsText)
+  try {
+    const analysis = JSON.parse(raw)
+    return posterCopy && analysis && typeof analysis === 'object'
+      ? { ...analysis, poster_copy: posterCopy }
+      : analysis
+  } catch { return { raw, ...(posterCopy ? { poster_copy: posterCopy } : {}) } }
 }
 
 /** الخطوة 2 — توليد 3 تغريدات (نص مرقّم). `extra` تعليمات إضافية اختيارية. */
@@ -236,7 +243,7 @@ export function conceptToString(c: Concept | undefined): string {
 }
 
 /** Keeps a moderation retry faithful to the selected studio direction instead of using a generic poster. */
-export function buildStudioSafetyFallbackPrompt(args: { analysis: unknown; chosenConcept: string; hasVideo?: boolean; videoOrientation?: VideoOrientation }): string {
+export function buildStudioSafetyFallbackPrompt(args: { analysis: unknown; chosenConcept: string; sourceText?: string; hasVideo?: boolean; videoOrientation?: VideoOrientation }): string {
   return buildCompactImagePrompt(args)
 }
 
@@ -254,6 +261,8 @@ function textList(value: unknown, limit: number, maxLength: number): string[] {
 function finalPrintCopy(value: unknown, maxLength: number): string {
   const source = textValue(value, maxLength)
   if (!source) return ''
+  if (/^(?:المناسبة|التهنئة\s*موجّهة\s*إلى|النص\s*الختامي|الشعار\s*الرسمي\s*المطلوب\s*إبرازه|التصميم\s*مخصّص|وصف\s*الصورة)\s*[:：]/i.test(source)) return ''
+  if (/^(?:التصميم\s*مخصّص|الصورة\s*المرفقة|يظهر\s*التصميم|تظهر\s*الصورة)/i.test(source)) return ''
   return source
     .replace(/^(?:الخبر\s*(?:الحالي|المذكور)?\s*)?(?:يذكر|يتحدث\s*عن|يتناول|يركز\s*على|يستعرض|يشير\s*إلى|يوضح|يسلط\s*الضوء\s*على)\s*[:،-]?\s*/i, '')
     .replace(/^(?:هذا\s*(?:الخبر|المحتوى)|المحتوى)\s*(?:يتحدث\s*عن|يتناول|يستعرض|يركز\s*على)\s*[:،-]?\s*/i, '')
@@ -268,6 +277,7 @@ function finalPrintCopy(value: unknown, maxLength: number): string {
 export function buildCompactImagePrompt(args: {
   analysis: unknown
   chosenConcept: string
+  sourceText?: string
   note?: string
   extra?: string
   hasVideo?: boolean
@@ -277,6 +287,17 @@ export function buildCompactImagePrompt(args: {
   const record = args.analysis && typeof args.analysis === 'object'
     ? args.analysis as Record<string, unknown>
     : {}
+  const posterCopy = args.sourceText
+    ? greetingCopyFromNewsText(args.sourceText) ?? undefined
+    : record.poster_copy as StudioGreetingCopy | undefined
+  if (posterCopy?.kind === 'greeting' && posterCopy.message) {
+    return buildGreetingPosterPrompt(posterCopy, {
+      direction: textValue(args.chosenConcept, 1100),
+      note: textValue(args.note, 500),
+      templateDirective: args.templateDirective,
+      videoDirective: args.hasVideo ? videoLayoutFor(args.videoOrientation) : undefined,
+    })
+  }
   const name = finalPrintCopy(record.name, 160)
   const achievement = finalPrintCopy(record.achievement_core, 360)
   const label = finalPrintCopy(record.context_label, 120)
@@ -286,19 +307,15 @@ export function buildCompactImagePrompt(args: {
   const direction = textValue(args.chosenConcept, 1100)
   const note = textValue(args.note, 500)
   const extra = textValue(args.extra, 500)
-  const displayContent = [
-    name ? `NAME: "${name}"` : '',
-    achievement ? `HEADLINE: "${achievement}"` : '',
-    ...facts.map(fact => `FACT: "${fact}"`),
-  ].filter(Boolean).join(' | ')
+  const displayContent = [name, achievement, ...facts].filter(Boolean).map(value => `"${value}"`).join('\n')
 
   return [
     'Create a premium 4:5 Arabic editorial social-media poster for First1Saudi.',
     'Use each supplied reference image as an intact documentary photograph. Do not redraw, replace, alter, beautify, or synthesize people, clothing, faces, hands, or poses. Build the composition around the real photographs and keep them visibly photographic.',
     `Creative direction: ${direction || 'A restrained modern Arabic editorial layout with one real focal photograph and a clear hierarchy.'}`,
-    label ? `Small context label: "${label}".` : '',
-    `FINAL PRINT-READY ARABIC COPY ONLY: ${displayContent || 'A concise Arabic headline and up to three verified factual callouts.'}`,
-    'Render the quoted Arabic as finished news copy: direct, human, clear, and declarative. Never print internal narration or meta-language such as "الخبر الحالي", "يذكر الخبر", "يتحدث عن", "هذا المحتوى", "يوضح الخبر", "الصورة المرفقة", or any equivalent description of the source.',
+    label ? `Internal visual context only: ${label}` : '',
+    `Only the following quoted lines may be printed on the artwork:\n${displayContent || 'Create a concise Arabic headline from the verified source.'}`,
+    'Set the quoted Arabic as finished news copy: direct, human, clear, and declarative. Never print field labels, analysis summaries, source-image descriptions, or explanatory metadata.',
     'Use strict right-to-left Arabic hierarchy, one concise headline, and no more than three short callouts. Keep all copy in a dedicated readable zone away from faces, hands, and important clothing. Do not squeeze the photograph between text blocks. Do not copy a long caption, invent facts, or add photo descriptions.',
     'Use deep teal, Saudi green, turquoise, restrained gold, and white. Keep the artwork full-bleed, with no white logo panel or empty logo frame.',
     'Keep the composition simple and credible: one focal image, one headline, restrained rules and colour fields. Avoid fantasy glow, floating particles, energy trails, plastic skin, excessive cutouts, decorative science motifs, fake architecture, and busy AI-style effects.',
@@ -314,7 +331,7 @@ export function buildCompactImagePrompt(args: {
 /** الخطوة 4 — توليد التصميم عبر OpenAI Images + تركيب اللوقو + الرفع إلى التخزين. */
 export async function generateDesign(
   openai: OpenAI,
-  args: { analysis: unknown; chosenConcept: string; sourceImages: string[]; note?: string; extra?: string; hasVideo?: boolean; videoOrientation?: VideoOrientation; preparedPrompt?: string },
+  args: { analysis: unknown; chosenConcept: string; sourceImages: string[]; sourceText?: string; note?: string; extra?: string; hasVideo?: boolean; videoOrientation?: VideoOrientation; preparedPrompt?: string },
 ): Promise<{ imageUrl: string; prompt: string }> {
   const { analysis, chosenConcept, sourceImages, note, extra, hasVideo, videoOrientation, preparedPrompt } = args
 
@@ -330,7 +347,7 @@ export async function generateDesign(
   // تحرير حساسة على الصورة المرجعية. نستخلص فقط الحقائق والاتجاه الآمن الحالي.
   void openai
   void preparedPrompt
-  const designPrompt = buildCompactImagePrompt({ analysis, chosenConcept, note, extra, hasVideo, videoOrientation, templateDirective })
+  const designPrompt = buildCompactImagePrompt({ analysis, chosenConcept, sourceText: args.sourceText, note, extra, hasVideo, videoOrientation, templateDirective })
 
   // قفل الصورة: يُحاط به موجّه الصورة من الطرفين حتى يبني النموذج القالب حول اللقطة الحقيقية.
   // عند وجود فيديو: نُلحق توجيه تخطيط الفيديو في النهاية (أولوية قصوى).
@@ -339,7 +356,7 @@ export async function generateDesign(
     : `${FACE_LOCK}\n\n${designPrompt}\n\n${FACE_LOCK}`
   const { b64 } = await generateImageWithOpenAI(imagePrompt, sourceImages, {
     quality: 'high',
-    safetyFallbackPrompt: buildStudioSafetyFallbackPrompt({ analysis, chosenConcept, hasVideo, videoOrientation }),
+    safetyFallbackPrompt: buildStudioSafetyFallbackPrompt({ analysis, chosenConcept, sourceText: args.sourceText, hasVideo, videoOrientation }),
   })
   const rawImage = Buffer.from(b64, 'base64')
   const posterBase = await resizeToPoster(rawImage)
@@ -567,6 +584,7 @@ export async function runStudioPipeline(input: {
     analysis,
     chosenConcept,
     sourceImages,
+    sourceText: newsText,
     note: input.note,
     extra: [EVERGREEN_NOTE, styleNote].filter(Boolean).join('\n\n'),
     preparedPrompt: concepts[0]?.imagePrompt,

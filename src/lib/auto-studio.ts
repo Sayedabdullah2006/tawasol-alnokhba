@@ -125,7 +125,7 @@ export async function autoRunRequestStudio(requestId: string): Promise<void> {
       const brief = concepts[i].brief ?? concepts[i].title ?? ''
       try {
         const { imageUrl, prompt } = await generateDesign(openai, {
-          analysis, chosenConcept: brief, sourceImages, extra: styles[i % styles.length], preparedPrompt: concepts[i].imagePrompt,
+          analysis, chosenConcept: brief, sourceImages, sourceText: newsText, extra: styles[i % styles.length], preparedPrompt: concepts[i].imagePrompt,
         })
         designs.push({ title: concepts[i].title ?? `اتجاه ${i + 1}`, imageUrl, brief })
         lastPrompt = prompt
