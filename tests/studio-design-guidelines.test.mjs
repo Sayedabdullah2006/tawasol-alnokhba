@@ -69,7 +69,7 @@ test('new fidelity and emblem exclusions reach news, greeting and video prompts'
     assert.match(prompt, /NEVER add medals, trophies or any objects to the people/)
     assert.match(prompt, /never remove or change existing objects on them/)
     assert.match(prompt, /crossed swords and palm tree \/ السيفين والنخلة/)
-    assert.match(prompt, /without geometric patterns, glow, ornamental dividers or texture/)
+    assert.match(prompt, /Do not draw either pocket as a visible box or card/)
     assert.match(prompt, /generate the entire design WITHOUT text/)
   }
 })
@@ -80,4 +80,16 @@ test('competition badges stay separate from unchanged centered photo cutouts', (
   assert.match(prompt, /side by side in the center as the visual heart/)
   assert.match(prompt, /Do not generate a design before its news type is clear/)
   assert.match(prompt, /Arabic news copy appears ONLY in the header plaque/)
+})
+
+test('top label follows the story instead of a fixed achievement phrase', () => {
+  for (const header_label of ['تتويج عالمي', 'ابتكار سعودي', 'جائزة دولية']) {
+    const prompt = buildCompactImagePrompt({ analysis: { header_label, headline: 'المركز الأول' }, chosenConcept: '' })
+    assert.match(prompt, new RegExp(`STORY-SPECIFIC HEADER: "${header_label}"`))
+    assert.doesNotMatch(prompt, /HEADER PLAQUE: "إنجاز سعودي"/)
+  }
+  const old = buildCompactImagePrompt({ analysis: { context_label: 'بطولة العالم' }, chosenConcept: '' })
+  assert.match(old, /STORY-SPECIFIC HEADER: "بطولة العالم"/)
+  const empty = buildCompactImagePrompt({ analysis: {}, chosenConcept: '' })
+  assert.doesNotMatch(empty, /STORY-SPECIFIC HEADER:/)
 })

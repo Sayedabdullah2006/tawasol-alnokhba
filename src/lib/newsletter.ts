@@ -1,3 +1,4 @@
+import { compositeStudioSocialFooter } from './studio-social-footer'
 /**
  * نشرة «النخبة في ٧» الأسبوعية.
  * المرشّحون: السجلّ الموحّد generated_designs (يومية + مستقل + طلبات) مرتّبين بالأحدث.
@@ -368,7 +369,7 @@ export async function generateNewsletterPoster(opts?: {
   const { b64 } = await generateImageWithOpenAI(prompt, refs, { aspectRatio: '9:16', allowSafetyFallback: false })
   const raw = Buffer.from(b64, 'base64')
   const poster = await sharp(raw).resize(NL_WIDTH, NL_HEIGHT, { fit: 'cover', position: 'top' }).png().toBuffer()
-  const withLogo = await compositeBrandLogo(poster)
+  const withLogo = await compositeBrandLogo(await compositeStudioSocialFooter(poster, 0))
 
   // النص المرافق التشويقي (يُولَّد قبل النشر)
   const caption = await generateCaption(window, items)

@@ -68,7 +68,7 @@ export function buildCompactImagePrompt(args: {
   const achievement = finalPrintCopy(record.headline, 160) || finalPrintCopy(record.achievement_core, 360)
   const subtitle = finalPrintCopy(record.subtitle, 220)
   const subtitleEn = textValue(record.subtitle_en, 180)
-  const label = finalPrintCopy(record.context_label, 120)
+  const label = finalPrintCopy(record.header_label, 120) || finalPrintCopy(record.context_label, 120)
   const labels = textList(record.info_labels, 4, 120)
   const facts = (labels.length ? labels : [...textList(record.key_facts, 4, 220), ...textList(record.awards, 1, 220)])
     .map(fact => finalPrintCopy(fact, 220))
@@ -77,7 +77,7 @@ export function buildCompactImagePrompt(args: {
   const note = textValue(args.note, 500)
   const extra = textValue(args.extra, 500)
   const displayContent = [
-    'HEADER PLAQUE: "إنجاز سعودي"',
+    label ? `STORY-SPECIFIC HEADER: "${label}"` : '',
     name ? `NAMES BOX (full names, exactly once): "${name}"` : '',
     achievement ? `HEADLINE (legacy long copy: shorten to 2–5 words without changing facts): "${achievement}"` : '',
     subtitle ? `ARABIC SUBTITLE: "${subtitle}"` : '',
@@ -93,7 +93,7 @@ export function buildCompactImagePrompt(args: {
     `News category: ${textValue(record.news_type, 80) || 'Classify from the verified achievement below; do not assume a competition.'}`,
     'Use each supplied reference image as an intact documentary photograph. Do not redraw, replace, alter, or synthesize people, clothing, faces, or poses. Build the composition around the real photographs.',
     `Creative direction: ${direction || 'Classic Celebration with the established achievement hierarchy.'}`,
-    label ? `Internal visual context only: ${label}` : '',
+    'Choose a story-specific top label only from the approved copy below. If none is supplied, omit the label instead of printing the same generic إنجاز سعودي on every design.',
     `Visible copy and placements (shorten only legacy long headline/facts as instructed, never full names):\n${displayContent || 'Create a concise Arabic headline from the verified source.'}`,
     'Set the quoted Arabic as finished news copy: direct, human, clear, and declarative. Never print field labels, analysis summaries, source-image descriptions, or explanatory metadata.',
     'Use strict RTL hierarchy, a 2–5-word headline and up to four verified 1–3-word info labels; details belong in the subtitle. Do not invent missing facts.',

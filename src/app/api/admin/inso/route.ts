@@ -1,3 +1,4 @@
+import { compositeStudioSocialFooter } from '@/lib/studio-social-footer'
 import { NextResponse } from 'next/server'
 import { STUDIO_DESIGN_DIRECTIONS } from '@/lib/studio-design-guidelines'
 import { readFile } from 'fs/promises'
@@ -93,7 +94,7 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
       : '',
     'Turn the facts into an original visual infographic hierarchy: use a concise Arabic headline only when it can be rendered accurately, then 2 to 4 short factual callouts, numbers, icons, data marks, or a small timeline. Never use long paragraphs, never repeat the full post caption, and never make the design look like a screenshot of a social post.',
     args.exactText?.trim() ? `Add this exact Arabic phrase in a small, readable line: "${args.exactText.trim()}". Copy every character exactly as supplied with correct connected RTL shaping. Do not invent, shorten, translate, spell-correct, or alter it.` : '',
-    'Reserve a 300×220-pixel lower-right pocket for original First1Saudi and Mawhiba digital overlays, including the full area below them. No text, people, numbers, icons or video in or beneath this pocket. Use only the plain emerald base background behind it, without texture, patterns, glow, decoration, panel or frame. Leave bottom-center empty for later digital social handles; never AI-render them.',
+    'Reserve a 300×220-pixel lower-right pocket for original First1Saudi and Mawhiba digital overlays, including the full area below them. No text, people, numbers, icons or video in or beneath this pocket. Continue the surrounding background seamlessly; never draw a separate colored rectangle, rounded card, frame or panel for this pocket. The full-width curved social footer is added digitally. Leave bottom-center empty for later digital social handles; never AI-render them.',
     args.note?.trim() ? `Additional creative direction: ${args.note.trim()}` : '',
   ].filter(Boolean).join('\n\n')
   const safetyFallbackPrompt = [
@@ -113,7 +114,7 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
     'Avoid flags, weapons, radiation-danger symbols, danger imagery, explosions, political messaging, military content, invented buildings, and invented claims.',
   ].filter(Boolean).join('\n\n')
   const { b64 } = await generateImageWithOpenAI(prompt, args.sourceImages ?? [], { quality: 'high', safetyFallbackPrompt })
-  const poster = await resizeToPoster(Buffer.from(b64, 'base64'))
+  const poster = await compositeStudioSocialFooter(await resizeToPoster(Buffer.from(b64, 'base64')))
   const response = await fetch(brand.first1saudi_logo_url)
   if (!response.ok) throw new Error('تعذّر تحميل شعار أول سعودي من إعدادات الهوية')
   const logos: Array<{ input: Buffer; widthRatio: number }> = [

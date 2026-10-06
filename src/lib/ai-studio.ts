@@ -1,3 +1,4 @@
+import { compositeStudioSocialFooter } from './studio-social-footer'
 /**
  * استوديو الذكاء الاصطناعي — طبقة منطق قابلة لإعادة الاستخدام (headless).
  *
@@ -239,7 +240,7 @@ export async function generateDesign(
     safetyFallbackPrompt: buildStudioSafetyFallbackPrompt({ analysis, chosenConcept, sourceText: args.sourceText, hasVideo, videoOrientation }),
   })
   const rawImage = Buffer.from(b64, 'base64')
-  const posterBase = await resizeToPoster(rawImage)
+  const posterBase = await compositeStudioSocialFooter(await resizeToPoster(rawImage))
   const { buffer: finalImage, mimeType } = logoUrl
     ? await compositeLogoBottomRight(posterBase, logoUrl)
     : { buffer: posterBase, mimeType: 'image/png' }
@@ -371,7 +372,7 @@ export async function generateInfographic(
   ].join('\n\n')
   const { b64 } = await generateImageFromPartsWithOpenAI(imagePrompt, refs, { safetyFallbackPrompt })
   const rawImage = Buffer.from(b64, 'base64')
-  const posterBase = await resizeToPoster(rawImage)
+  const posterBase = await compositeStudioSocialFooter(await resizeToPoster(rawImage))
   const { buffer: finalImage, mimeType } = logoUrl
     ? await compositeLogoBottomRight(posterBase, logoUrl)
     : { buffer: posterBase, mimeType: 'image/png' }

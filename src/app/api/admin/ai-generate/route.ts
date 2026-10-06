@@ -1,3 +1,4 @@
+import { compositeStudioSocialFooter } from '@/lib/studio-social-footer'
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
@@ -393,7 +394,7 @@ export async function POST(req: Request) {
 
       // 3) ضبط المقاس إلى 1080×1350 بالضبط، ثم تركيب لوقو أول سعودي أسفل اليمين (إن وُجد).
       const rawImage = Buffer.from(b64, 'base64')
-      const posterBase = await resizeToPoster(rawImage)
+      const posterBase = await compositeStudioSocialFooter(await resizeToPoster(rawImage))
       const { buffer: finalImage, mimeType: finalMime } = logoUrl
         ? await compositeLogoBottomRight(posterBase, logoUrl)
         : { buffer: posterBase, mimeType: 'image/png' }
