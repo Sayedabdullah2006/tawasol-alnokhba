@@ -215,7 +215,7 @@ export const SYS_TWEETS = `أنت كاتب محتوى مبدع لحساب "First
 أخرج 3 تغريدات مرقّمة فقط.`
 
 /** الخطوة الثالثة - مولد مفاهيم التصميم */
-export const SYS_CONCEPTS = `You are the art director for First1Saudi. Classify the supplied news before proposing EXACTLY three directions in this order: Classic Celebration (الاحتفالي الكلاسيكي), Dramatic (الدرامي الحماسي), Minimal Premium (الأنيق المختصر). Adapt every direction to this specific news and its supplied photos; distinguish lighting, hero scale, typography and negative space within the established hierarchy. Regeneration varies execution within these three directions, never replaces them with unrelated families.
+export const SYS_CONCEPTS = `You are the art director for First1Saudi. Classify the supplied news before proposing EXACTLY three directions in this order: Classic Celebration (الاحتفالي الكلاسيكي), Dramatic (الدرامي الحماسي), Minimal Premium (الأنيق المختصر). Adapt every direction to this specific news and its supplied photos; distinguish background brightness and lighting as well as hero scale, typography and negative space: Classic medium/light emerald, Dramatic dark emerald, Minimal clearly light ivory/warm-white/pale emerald. Never generate all three with dark backgrounds. Regeneration varies execution within these three directions, never replaces them with unrelated families.
 ${STUDIO_BRAND_RULES}
 ${STUDIO_NEWS_LAYOUT_RULES}
 ${STUDIO_LOGO_RESERVATION}
@@ -239,7 +239,7 @@ export function buildConceptDirectives(opts?: { exclude?: string[]; poolSize?: n
   const exclude = (opts?.exclude ?? []).map(s => String(s).trim()).filter(Boolean)
   return [
     `قدّم ثلاثة اتجاهات بهذا الترتيب: ${CONCEPT_STYLE_FAMILIES.join(' · ')}. كيّفها حسب تصنيف الخبر وصوره، مع هوية الأخضر الزمردي والذهبي والتسلسل المعتمد.`,
-    'التنويع في الإضاءة وحجم الصورة والتايبوغرافي والمساحات السالبة؛ لا تغيّر الأسماء أو الوجوه أو الوضعيات، ولا تولّد شعارات؛ ولّد التذييل المنحني والأيقونات الخمس كاملة مع @First1Saudi، ولا تضع كلاماً تحت الشعار.',
+    'تنويع الخلفيات إلزامي: الكلاسيكي زمردي متوسط أو فاتح، الدرامي زمردي داكن، والأنيق عاجي أو أبيض دافئ أو أخضر باهت فاتح بوضوح؛ لا تجعل الاتجاهات الثلاثة داكنة. نوّع الإضاءة وحجم الصورة والتايبوغرافي والمساحات السالبة؛ لا تغيّر الأسماء أو الوجوه أو الوضعيات، ولا تولّد شعارات؛ ولّد التذييل المنحني والأيقونات الخمس كاملة مع @First1Saudi، ولا تضع كلاماً تحت الشعار.',
     exclude.length ? `غيّر المعالجة البصرية السابقة داخل الاتجاهات الثلاثة نفسها؛ المرجع السابق: ${exclude.join(' · ')}.` : '',
   ].filter(Boolean).join('\n')
 }

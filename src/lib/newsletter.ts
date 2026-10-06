@@ -240,7 +240,7 @@ function buildNewsletterPrompt(window: WeeklyWindow, items: NewsletterItem[], di
     `اكتب نصوص العناوين والنبذ العربية حرفياً بين علامتي اقتباس كما هي:`,
     list,
     ``,
-    `🔒 BRAND IDENTITY (FIRST1SAUDI): Deep emerald #0A3A2A · luxurious gold #D4AF37 · white only for supporting text.`,
+    `🔒 BRAND IDENTITY (FIRST1SAUDI): Deep emerald #0A3A2A · luxurious gold #D4AF37 · light ivory, warm-white or pale-emerald dominant backgrounds are allowed when appropriate to the direction; keep emerald/gold accents.`,
     `FOOTER: ولّد تذييلاً زمردياً بعرض التصميم بمنحنى أخضر وحافة ذهبية، وفي الوسط أيقونات X وInstagram وLinkedIn وFacebook وTikTok الخمس كاملة ومتساوية، ثم "@First1Saudi" باللون الأبيض؛ الشعار فقط يضاف برمجياً، وممنوع توليد الروابط. لا تضع نصاً داخل مساحة الشعار أعلى اليسار أو تحته ضمن الشريط العلوي، ولا تولّد شعاراً أو علامة مائية.`,
     `قواعد: نصوص عربية حادّة متّصلة صحيحة الاتجاه (RTL) وحرفية. كل نبذة جملة مكتملة المعنى. لا تختلق نصاً. لا نِسب مئوية. لا إيموجي. لا نقاط «...». لا منشن (@) ولا أسماء أقسام في التصميم.`,
   ].join('\n')

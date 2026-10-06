@@ -104,3 +104,15 @@ test('AI generates the curved social footer while only original logos are digita
   assert.match(prompt, /NO separate rectangle, rounded card/)
   assert.doesNotMatch(prompt, /NEVER generate.*social-media icons|footer is added digitally|social icons and @First1Saudi are composited digitally/)
 })
+
+test('three directions require visibly different background brightness', () => {
+  const prompt = buildCompactImagePrompt({ analysis: { headline: 'ابتكار سعودي' }, chosenConcept: 'الأنيق المختصر' })
+  assert.match(prompt, /BACKGROUND VARIETY IS MANDATORY/)
+  assert.match(prompt, /clearly LIGHT ivory, warm-white or very pale-emerald dominant background/)
+  assert.match(prompt, /Do not output all three on dark backgrounds/)
+  assert.match(prompt, /deep emerald on light surfaces/)
+  assert.doesNotMatch(prompt, /white only for names|white may only be a small supporting detail/)
+  assert.match(STUDIO_DESIGN_DIRECTIONS[0].brief, /زمردي متوسط أو أخضر فاتح/)
+  assert.match(STUDIO_DESIGN_DIRECTIONS[1].brief, /خلفية زمردية داكنة/)
+  assert.match(STUDIO_DESIGN_DIRECTIONS[2].brief, /خلفية فاتحة سائدة/)
+})

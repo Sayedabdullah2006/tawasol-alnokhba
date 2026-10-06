@@ -77,7 +77,7 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
   const prompt = [
     'Create an editorial 4:5 social media poster for the International Nuclear Science Olympiad 2026 in Jeddah.',
     STUDIO_EDITORIAL_DESIGN_RULES,
-    'Arabic-first premium scientific event design. Deep emerald #0A3A2A and luxurious gold #D4AF37; white may only be a small supporting detail, never a dominant field. Show science, global exchange, youth talent, and peaceful nuclear science through elegant visual metaphors; never show weapons, explosions, radiation danger signs, or fake logos.',
+    'Arabic-first premium scientific event design. Deep emerald #0A3A2A and luxurious gold #D4AF37; the Minimal direction MUST allow a dominant light ivory, warm-white or pale-emerald background, Classic uses medium/light emerald, and only Dramatic requires a dark emerald background. Show science, global exchange, youth talent, and peaceful nuclear science through elegant visual metaphors; never show weapons, explosions, radiation danger signs, or fake logos.',
     REAL_ARCHITECTURE_RULE,
     `Event moment: ${item.title}. ${item.brief}`,
     `Source post facts to interpret visually: ${postText}. Do not copy or paste this caption into the design.`,
