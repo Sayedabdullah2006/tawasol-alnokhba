@@ -12,6 +12,7 @@
     "@resvg/resvg-js": "^2.6.2",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.3",
+    "cheerio": "1.2.0",
     "dotenv": "^17.4.2",
     "next": "16.2.4",
     "openai": "^4.77.0",

@@ -10,6 +10,7 @@ import { StepHead } from '@/components/admin/StudioStep'
 import ScheduleSuggestions from '@/components/admin/ScheduleSuggestions'
 import ImageEditSchedule from '@/components/admin/ImageEditSchedule'
 import { SECTION_NAMES } from '@/lib/showcase-sections'
+import LinkedNewsStudio from '@/components/admin/LinkedNewsStudio'
 
 type StepKey = 'analyze' | 'tweets' | 'concepts' | 'image'
 interface ConceptItem { title?: string; mood?: string; brief?: string; imagePrompt?: string }
@@ -53,6 +54,7 @@ export default function StandaloneStudio() {
   const [hasVideo, setHasVideo] = useState(false)
   const [videoOrientation, setVideoOrientation] = useState<'landscape' | 'portrait'>('landscape')
   const [uploading, setUploading] = useState(false)
+  const [linkBusy, setLinkBusy] = useState(false)
   // تضمين تصميم مميّز في «مجلة المبدعين»
   const [magazineCategory, setMagazineCategory] = useState('')
   const [featuredCover, setFeaturedCover] = useState<string | null>(null)
@@ -89,6 +91,7 @@ export default function StandaloneStudio() {
   }
 
   const selectMode = (nextMode: 'news' | 'info' | 'upload' | 'history') => {
+    if (linkBusy) { showToast('انتظر اكتمال دفعة الأخبار أو أوقفها قبل تغيير التبويب'); return }
     setMode(nextMode)
     if (nextMode === 'history') void loadHistory()
   }
@@ -542,7 +545,22 @@ export default function StandaloneStudio() {
         </div>
       )}
 
+      <div hidden={mode !== 'news'}>
+      <LinkedNewsStudio disabled={autoBusy || batchLoading || loadingStep !== null || bulkBusy || regenIndex !== null || editIndex !== null} onBusy={setLinkBusy} onOpen={story => {
+        setTitle(story.title); setContent(story.content)
+        setImages(story.images); setSelectedImages(story.selectedImages)
+        setExtraInfo(`رابط المصدر: ${story.sourceUrl}`)
+        setHasVideo(false); setAnalysis(story.analysis ?? null)
+        setTweets(story.tweets ?? ''); setSelectedTweet(story.tweets ?? '')
+        setConceptItems(story.concepts ?? []); setBatchResults(story.designs)
+        setChosenConcept(''); setChosenPreparedPrompt('')
+        setNoteByIndex({}); setBulkNote(''); setMagazineCategory('')
+        setPublishedCover(null); setScheduledCover(null)
+        showToast('تم فتح الخبر ونتائجه في المحرر')
+      }} />
+      </div>
       {mode === 'news' && (<>
+      <fieldset disabled={linkBusy} className="space-y-4 min-w-0">
       {/* الخبر */}
       <div className={card}>
         <h3 className="font-bold text-dark">📝 الخبر</h3>
@@ -717,6 +735,7 @@ export default function StandaloneStudio() {
           </div>
         )}
       </div>
+      </fieldset>
       </>)}
 
       {/* نافذة معاينة/تعديل قبل النشر عبر القنوات */}
