@@ -1,4 +1,3 @@
-import { compositeStudioSocialFooter } from './studio-social-footer'
 /**
  * نشرة «النخبة في ٧» الأسبوعية.
  * المرشّحون: السجلّ الموحّد generated_designs (يومية + مستقل + طلبات) مرتّبين بالأحدث.
@@ -242,7 +241,7 @@ function buildNewsletterPrompt(window: WeeklyWindow, items: NewsletterItem[], di
     list,
     ``,
     `🔒 BRAND IDENTITY (FIRST1SAUDI): Deep emerald #0A3A2A · luxurious gold #D4AF37 · white only for supporting text.`,
-    `FOOTER: اترك أسفل الوسط نظيفاً لحسابات التواصل التي تضاف رقمياً لاحقاً؛ ممنوع توليد أيقونات سوشال أو حسابات أو روابط. لا تضع نصاً داخل مساحة الشعار أعلى اليسار أو تحته ضمن الشريط العلوي، ولا تولّد شعاراً أو علامة مائية.`,
+    `FOOTER: ولّد تذييلاً زمردياً بعرض التصميم بمنحنى أخضر وحافة ذهبية، وفي الوسط أيقونات X وInstagram وLinkedIn وFacebook وTikTok الخمس كاملة ومتساوية، ثم "@First1Saudi" باللون الأبيض؛ الشعار فقط يضاف برمجياً، وممنوع توليد الروابط. لا تضع نصاً داخل مساحة الشعار أعلى اليسار أو تحته ضمن الشريط العلوي، ولا تولّد شعاراً أو علامة مائية.`,
     `قواعد: نصوص عربية حادّة متّصلة صحيحة الاتجاه (RTL) وحرفية. كل نبذة جملة مكتملة المعنى. لا تختلق نصاً. لا نِسب مئوية. لا إيموجي. لا نقاط «...». لا منشن (@) ولا أسماء أقسام في التصميم.`,
   ].join('\n')
 }
@@ -369,7 +368,7 @@ export async function generateNewsletterPoster(opts?: {
   const { b64 } = await generateImageWithOpenAI(prompt, refs, { aspectRatio: '9:16', allowSafetyFallback: false })
   const raw = Buffer.from(b64, 'base64')
   const poster = await sharp(raw).resize(NL_WIDTH, NL_HEIGHT, { fit: 'cover', position: 'top' }).png().toBuffer()
-  const withLogo = await compositeBrandLogo(await compositeStudioSocialFooter(poster, 0))
+  const withLogo = await compositeBrandLogo(poster)
 
   // النص المرافق التشويقي (يُولَّد قبل النشر)
   const caption = await generateCaption(window, items)

@@ -1,4 +1,3 @@
-import { compositeStudioSocialFooter } from '@/lib/studio-social-footer'
 import { NextResponse } from 'next/server'
 import { STUDIO_DESIGN_DIRECTIONS } from '@/lib/studio-design-guidelines'
 import { readFile } from 'fs/promises'
@@ -94,7 +93,7 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
       : '',
     'Turn the facts into an original visual infographic hierarchy: use a concise Arabic headline only when it can be rendered accurately, then 2 to 4 short factual callouts, numbers, icons, data marks, or a small timeline. Never use long paragraphs, never repeat the full post caption, and never make the design look like a screenshot of a social post.',
     args.exactText?.trim() ? `Add this exact Arabic phrase in a small, readable line: "${args.exactText.trim()}". Copy every character exactly as supplied with correct connected RTL shaping. Do not invent, shorten, translate, spell-correct, or alter it.` : '',
-    'Reserve a 300×220-pixel lower-right pocket for original First1Saudi and Mawhiba digital overlays, including the full area below them. No text, people, numbers, icons or video in or beneath this pocket. Continue the surrounding background seamlessly; never draw a separate colored rectangle, rounded card, frame or panel for this pocket. The full-width curved social footer is added digitally. Leave bottom-center empty for later digital social handles; never AI-render them.',
+    'Reserve a 300×220-pixel lower-right pocket for original First1Saudi and Mawhiba digital overlays, including the full area below them. No text, people, numbers, icons or video in or beneath this pocket. Continue the surrounding background seamlessly; never draw a separate colored rectangle, rounded card, frame or panel for this pocket. Generate the full-width curved emerald footer with a gold-edged swoosh, all five equal white social icons (X, Instagram, LinkedIn, Facebook, TikTok) and the exact handle "@First1Saudi" in the left/center area; only the original logos are overlaid digitally. Generate the social icons and "@First1Saudi" in the footer left/center, away from the logo area.',
     args.note?.trim() ? `Additional creative direction: ${args.note.trim()}` : '',
   ].filter(Boolean).join('\n\n')
   const safetyFallbackPrompt = [
@@ -108,13 +107,13 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
       ? 'Use every supplied reference image as an intact documentary photograph. Integrate the photos creatively without redrawing, replacing, or restyling people.'
       : 'Use only authentic Jeddah context or abstract scientific elements. Omit any architecture whose authenticity is uncertain.',
     'Use one concise Arabic headline and 2 to 4 short factual callouts in strict right-to-left hierarchy. Do not copy the whole caption.',
-    'Reserve the same 300×220-pixel lower-right digital-logo pocket, with no text in or underneath it; leave bottom-center empty for digital handles.',
+    'Reserve the same 300×220-pixel lower-right digital-logo pocket, with no text in or underneath it; generate the curved footer, all five social icons and exact "@First1Saudi" at bottom left/center.',
     args.exactText?.trim() ? `Add this exact Arabic phrase exactly as written: "${args.exactText.trim()}".` : '',
     args.note?.trim() ? `Additional creative direction: ${args.note.trim()}` : '',
     'Avoid flags, weapons, radiation-danger symbols, danger imagery, explosions, political messaging, military content, invented buildings, and invented claims.',
   ].filter(Boolean).join('\n\n')
   const { b64 } = await generateImageWithOpenAI(prompt, args.sourceImages ?? [], { quality: 'high', safetyFallbackPrompt })
-  const poster = await compositeStudioSocialFooter(await resizeToPoster(Buffer.from(b64, 'base64')))
+  const poster = await resizeToPoster(Buffer.from(b64, 'base64'))
   const response = await fetch(brand.first1saudi_logo_url)
   if (!response.ok) throw new Error('تعذّر تحميل شعار أول سعودي من إعدادات الهوية')
   const logos: Array<{ input: Buffer; widthRatio: number }> = [

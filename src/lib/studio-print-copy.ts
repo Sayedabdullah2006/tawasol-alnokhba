@@ -41,7 +41,7 @@ export function buildGreetingPosterPrompt(copy: StudioGreetingCopy, options: {
     'Greeting layout exception: do not add an achievement plaque, news headline, names box or fact row; use only the approved greeting copy below.',
     'Preserve all pictured people, faces, clothing and their order. Keep the Arabic greeting large and readable in clear space away from faces.',
     options.direction ? `Use this direction for visual arrangement only; its words must not appear on the artwork: ${options.direction}` : '',
-    'The following quoted Arabic is the complete visible greeting copy. Render it verbatim as finished celebratory text, without headings, field names, explanations, callouts, icons describing the occasion, or facts extracted from the analysis:',
+    'The following quoted Arabic is the complete visible greeting copy; the mandatory social footer and exact "@First1Saudi" are additional required elements. Render it verbatim as finished celebratory text, without headings, field names, explanations, callouts, icons describing the occasion, or facts extracted from the analysis:',
     `"${copy.message}"`,
     copy.closing ? `"${copy.closing}"` : '',
     copy.slogan ? `Render the approved national-day slogan as text only, never generate its official logo: "${copy.slogan}" prominently; do not render it as a hashtag or a descriptive label.` : '',
@@ -50,6 +50,6 @@ export function buildGreetingPosterPrompt(copy: StudioGreetingCopy, options: {
     options.templateDirective ?? '',
     options.videoDirective ?? '',
     options.note ? `Apply this visual editing note without printing its words: ${options.note}` : '',
-    'Do not print analysis keys, source descriptions, design instructions, or any additional Arabic copy.',
+    'Do not print analysis keys, source descriptions, design instructions, or any additional Arabic copy. Always generate the mandatory curved social footer with the five social icons and exact "@First1Saudi".',
   ].filter(Boolean).join('\n\n')
 }

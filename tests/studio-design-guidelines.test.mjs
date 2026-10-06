@@ -20,7 +20,7 @@ test('patent copy uses full names, four facts and protected digital-logo space',
   assert.match(prompt, /#0A3A2A/)
   assert.match(prompt, /#D4AF37/)
   assert.match(prompt, /never for patents, appointments/)
-  assert.match(prompt, /NEVER generate brand\/event logos, social-media icons, handles/)
+  assert.match(prompt, /NEVER generate brand\/event logos, URLs or watermarks/)
   assert.match(prompt, /area below it through the bottom edge with NO text/)
   assert.match(prompt, /even if an old concept or optional template asks otherwise/)
   assert.match(prompt, /SINGLE SMALL ENGLISH SUBTITLE: "Artificial intelligence innovation"/)
@@ -69,8 +69,8 @@ test('new fidelity and emblem exclusions reach news, greeting and video prompts'
     assert.match(prompt, /NEVER add medals, trophies or any objects to the people/)
     assert.match(prompt, /never remove or change existing objects on them/)
     assert.match(prompt, /crossed swords and palm tree \/ السيفين والنخلة/)
-    assert.match(prompt, /Do not draw either pocket as a visible box or card/)
-    assert.match(prompt, /generate the entire design WITHOUT text/)
+    assert.match(prompt, /Do not draw this area as a visible box or card/)
+    assert.match(prompt, /generate the design WITHOUT Arabic story text/)
   }
 })
 
@@ -92,4 +92,15 @@ test('top label follows the story instead of a fixed achievement phrase', () => 
   assert.match(old, /STORY-SPECIFIC HEADER: "بطولة العالم"/)
   const empty = buildCompactImagePrompt({ analysis: {}, chosenConcept: '' })
   assert.doesNotMatch(empty, /STORY-SPECIFIC HEADER:/)
+})
+
+test('AI generates the curved social footer while only original logos are digital', () => {
+  const prompt = buildCompactImagePrompt({ analysis: { header_label: 'ابتكار سعودي' }, chosenConcept: '' })
+  assert.match(prompt, /MANDATORY GENERATED FOOTER/)
+  assert.match(prompt, /X, Instagram, LinkedIn, Facebook, TikTok/)
+  assert.match(prompt, /exact bold white account text "@First1Saudi"/)
+  assert.match(prompt, /Never omit any icon, the handle or the curve/)
+  assert.match(prompt, /ONLY original logos are composited digitally/)
+  assert.match(prompt, /NO separate rectangle, rounded card/)
+  assert.doesNotMatch(prompt, /NEVER generate.*social-media icons|footer is added digitally|social icons and @First1Saudi are composited digitally/)
 })

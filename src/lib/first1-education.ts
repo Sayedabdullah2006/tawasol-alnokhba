@@ -1,4 +1,3 @@
-import { compositeStudioSocialFooter } from './studio-social-footer'
 import { STUDIO_BRAND_RULES, STUDIO_LOGO_RESERVATION } from './studio-design-guidelines'
 import { OPENAI_MODEL } from '@/lib/ai-studio'
 import { generateImageWithOpenAI } from '@/lib/image-generation'
@@ -253,7 +252,7 @@ export async function generateEducationInfographic(content: GeneratedEducation, 
     STUDIO_LOGO_RESERVATION,
   ].filter(Boolean).join('\n\n')
   const { b64 } = await generateImageWithOpenAI(prompt, options.referenceImageUrls ?? [], { aspectRatio: '4:5', safetyFallbackPrompt })
-  const poster = await compositeStudioSocialFooter(await resizeToPoster(Buffer.from(b64, 'base64')))
+  const poster = await resizeToPoster(Buffer.from(b64, 'base64'))
   const { buffer } = await compositeLogoBottomRight(poster, brand.first1saudi_logo_url, { widthRatio: 0.1 })
   const path = `${filePrefix}-${Date.now()}-${Math.random().toString(36).slice(2)}.png`
   const { error } = await service.storage.from('content-images').upload(path, buffer, { contentType: 'image/png' })

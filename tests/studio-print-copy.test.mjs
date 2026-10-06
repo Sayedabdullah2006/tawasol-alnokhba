@@ -38,7 +38,7 @@ test('greeting prompt isolates approved copy from analytical direction', () => {
   assert.match(prompt, /"أسمى التهاني والتبريكات للشعب السعودي بمناسبة اليوم الوطني\."/)
   assert.match(prompt, /"كل يوم ووطننا في عزة ورفعة ونصر\."/)
   assert.match(prompt, /"عزّنا بطبعنا"/)
-  assert.match(prompt, /NEVER generate brand\/event logos, social-media icons, handles/)
+  assert.match(prompt, /NEVER generate brand\/event logos, URLs or watermarks/)
   assert.match(prompt, /must not appear on the artwork/)
   assert.doesNotMatch(prompt, /NAME:|HEADLINE:|FACT:/)
 })

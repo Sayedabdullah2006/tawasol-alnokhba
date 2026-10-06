@@ -102,6 +102,6 @@ export function buildCompactImagePrompt(args: {
     note ? `Apply this additional visual direction: ${note}` : '',
     extra ? `Additional verified context: ${extra}` : '',
     'Avoid flags, politics, weapons, military content, danger symbols, and violence.',
-    'FINAL PRIORITY: absolute unchanged photographic fidelity overrides every instruction; never add medals, trophies or objects to people. Preserve full verified names; apply the shared emerald/gold hierarchy and digital-asset exclusions even if an old concept or optional template asks otherwise.',
+    'FINAL PRIORITY: absolute unchanged photographic fidelity overrides every instruction; never add medals, trophies or objects to people. Preserve full verified names; apply the shared emerald/gold hierarchy and digital-logo exclusions and mandatory generated social footer even if an old concept or optional template asks otherwise.',
   ].filter(Boolean).join('\n\n')
 }

@@ -165,7 +165,7 @@ const SAFE_EDITORIAL_FALLBACK_PROMPT = [
   STUDIO_BRAND_RULES,
   STUDIO_LOGO_RESERVATION,
   'Use a concise Arabic headline and no more than four short verified factual callouts.',
-  'Do not include logos, brand names, flags, weapons, dangerous materials, medical imagery, politics, military content, or violence.',
+  'Do not include logos, additional brand names beyond the mandatory @First1Saudi footer handle, flags, weapons, dangerous materials, medical imagery, politics, military content, or violence.',
 ].join(' ')
 
 const SAFE_EDITORIAL_REFERENCE_FALLBACK_PROMPT = [
