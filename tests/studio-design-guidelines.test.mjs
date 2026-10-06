@@ -11,12 +11,12 @@ test('patent copy uses full names, four facts and protected digital-logo space',
     analysis: {
       news_type: 'patent-innovation', name, headline: 'براءة اختراع تقنية',
       subtitle: 'ابتكار في الذكاء الاصطناعي', subtitle_en: 'Artificial intelligence innovation',
-      info_labels: ['الذكاء الاصطناعي', 'مكتب البراءات', 'جامعة سعودية', 'تحسين الكفاءة'],
+      info_phrases: ['سُجل في مكتب البراءات', 'طورته جامعة سعودية', 'يسهم في تحسين الكفاءة', 'نتيجة بحث تقني موثق'],
     },
     chosenConcept: 'اتجاه قديم: ألوان بيضاء وتيل وفوتر سوشال',
   })
   assert.equal(prompt.split(`"${name}"`).length - 1, 1)
-  assert.equal((prompt.match(/INFO LABEL \(/g) ?? []).length, 4)
+  assert.equal((prompt.match(/INFO PHRASE \(/g) ?? []).length, 4)
   assert.match(prompt, /#0A3A2A/)
   assert.match(prompt, /#D4AF37/)
   assert.match(prompt, /never for patents, appointments/)
@@ -28,7 +28,7 @@ test('patent copy uses full names, four facts and protected digital-logo space',
 
 test('old analysis remains usable without inventing missing facts', () => {
   const prompt = buildCompactImagePrompt({ analysis: { name: 'سارة عبدالله', achievement_core: 'فازت بجائزة علمية دولية', key_facts: ['جائزة علمية'] }, chosenConcept: '' })
-  assert.equal((prompt.match(/INFO LABEL \(/g) ?? []).length, 1)
+  assert.equal((prompt.match(/INFO PHRASE \(/g) ?? []).length, 1)
   assert.match(prompt, /Classify from the verified achievement/)
   assert.match(prompt, /never fill gaps by inventing facts/)
 })
@@ -44,7 +44,7 @@ test('greeting bypasses news plaque and facts while keeping brand/logo rules', (
     analysis: { name: 'لا يُطبع', key_facts: ['لا تُطبع'], poster_copy: { kind: 'greeting', message: 'نهنئ الشعب السعودي بمناسبة اليوم الوطني.' } },
     chosenConcept: 'الأنيق المختصر',
   })
-  assert.doesNotMatch(prompt, /HEADER PLAQUE:|NAMES BOX|INFO LABEL/)
+  assert.doesNotMatch(prompt, /PRIMARY NAME|CONNECTED ACHIEVEMENT|INFO PHRASE/)
   assert.match(prompt, /"نهنئ الشعب السعودي بمناسبة اليوم الوطني\."/)
   assert.match(prompt, /never add a slogan or any words underneath it/)
 })
@@ -77,21 +77,21 @@ test('new fidelity and emblem exclusions reach news, greeting and video prompts'
 test('competition badges stay separate from unchanged centered photo cutouts', () => {
   const prompt = buildCompactImagePrompt({ analysis: { news_type: 'competition win', headline: 'المركز الأول' }, chosenConcept: 'الدرامي الحماسي' })
   assert.match(prompt, /outside the reference photos and never attached to a person/)
-  assert.match(prompt, /side by side in the center as the visual heart/)
+  assert.match(prompt, /never interrupt the name\/sentence pair/)
   assert.match(prompt, /Do not generate a design before its news type is clear/)
-  assert.match(prompt, /Arabic news copy appears ONLY in the header plaque/)
+  assert.match(prompt, /Arabic copy is limited to the primary name/)
 })
 
 test('top label follows the story instead of a fixed achievement phrase', () => {
   for (const header_label of ['تتويج عالمي', 'ابتكار سعودي', 'جائزة دولية']) {
     const prompt = buildCompactImagePrompt({ analysis: { header_label, headline: 'المركز الأول' }, chosenConcept: '' })
-    assert.match(prompt, new RegExp(`STORY-SPECIFIC HEADER: "${header_label}"`))
+    assert.match(prompt, new RegExp(`STORY-SPECIFIC HEADER .*"${header_label}"`))
     assert.doesNotMatch(prompt, /HEADER PLAQUE: "إنجاز سعودي"/)
   }
   const old = buildCompactImagePrompt({ analysis: { context_label: 'بطولة العالم' }, chosenConcept: '' })
-  assert.match(old, /STORY-SPECIFIC HEADER: "بطولة العالم"/)
+  assert.match(old, /STORY-SPECIFIC HEADER .*"بطولة العالم"/)
   const empty = buildCompactImagePrompt({ analysis: {}, chosenConcept: '' })
-  assert.doesNotMatch(empty, /STORY-SPECIFIC HEADER:/)
+  assert.doesNotMatch(empty, /STORY-SPECIFIC HEADER \(/)
 })
 
 test('AI generates the curved social footer while only original logos are digital', () => {
@@ -115,4 +115,31 @@ test('three directions require visibly different background brightness', () => {
   assert.match(STUDIO_DESIGN_DIRECTIONS[0].brief, /زمردي متوسط أو أخضر فاتح/)
   assert.match(STUDIO_DESIGN_DIRECTIONS[1].brief, /خلفية زمردية داكنة/)
   assert.match(STUDIO_DESIGN_DIRECTIONS[2].brief, /خلفية فاتحة سائدة/)
+})
+
+test('name is dominant and its grammatical achievement follows before secondary context', () => {
+  const prompt = buildCompactImagePrompt({ analysis: {
+    name: 'د. بشرى عبدالله الحجيلي', achievement_sentence: 'تحصل على الدكتوراه بتقدير ممتاز مرتفع',
+    headline: 'ريادة حضرية سعودية', header_label: 'إنجاز أكاديمي',
+    info_phrases: ['بحث في إعادة تأهيل الأحياء', 'دراسة تطبيقية على ينبع البحر'],
+  }, chosenConcept: '' })
+  const name = prompt.indexOf('PRIMARY NAME (')
+  const sentence = prompt.indexOf('CONNECTED ACHIEVEMENT (')
+  const context = prompt.indexOf('STORY-SPECIFIC HEADER (')
+  assert.ok(name >= 0 && name < sentence && sentence < context)
+  assert.ok(prompt.includes('"تحصل على الدكتوراه بتقدير ممتاز مرتفع"'))
+  assert.doesNotMatch(prompt.slice(prompt.indexOf('Visible copy and placements')), /"ريادة حضرية سعودية"|NAMES BOX|1–3-word info labels/)
+  assert.match(prompt, /INFO PHRASE .*"بحث في إعادة تأهيل الأحياء"/)
+})
+
+test('repeated information is removed from subtitle and icon copy', () => {
+  const prompt = buildCompactImagePrompt({ analysis: {
+    name: 'سارة عبدالله', achievement_sentence: 'تحصل على الدكتوراه بتقدير ممتاز مرتفع',
+    subtitle: 'بتقدير ممتاز مرتفع',
+    info_phrases: ['بتقدير ممتاز مرتفع', 'بحث في إعادة تأهيل الأحياء', 'بَحْث في إعادة تأهيل الأحياء', 'دراسة تطبيقية على ينبع البحر'],
+  }, chosenConcept: '' })
+  assert.doesNotMatch(prompt, /ARABIC SUBTITLE:/)
+  assert.equal((prompt.match(/INFO PHRASE \(/g) ?? []).length, 2)
+  assert.match(prompt, /GLOBAL FACT UNIQUENESS/)
+  assert.match(prompt, /do not repeat facts even in different wording/)
 })

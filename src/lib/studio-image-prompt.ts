@@ -23,6 +23,22 @@ function textList(value: unknown, limit: number, maxLength: number): string[] {
     : []
 }
 
+/** Compare display copy without changing its original Arabic spelling. */
+function copyKey(value: string): string {
+  return value.normalize('NFKC').replace(/[\u064B-\u065F\u0670\u0640]/g, '').replace(/[أإآ]/g, 'ا')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ').trim().toLowerCase()
+}
+
+/** Remove exact repeated copy and facts already stated verbatim in a larger block. */
+function uniqueCopy(seen: string[], candidate: string): string {
+  const key = copyKey(candidate)
+  if (!key) return ''
+  const contained = key.split(' ').length >= 2 && key.length >= 12
+  if (seen.some(previous => previous === key || (contained && ` ${previous} `.includes(` ${key} `)))) return ''
+  seen.push(key)
+  return candidate
+}
+
 /** يستبعد لغة التحليل الداخلية كي لا تُطبع على التصميم كأنها جزء من الخبر. */
 function finalPrintCopy(value: unknown, maxLength: number): string {
   const source = textValue(value, maxLength)
@@ -65,24 +81,26 @@ export function buildCompactImagePrompt(args: {
     })
   }
   const name = finalPrintCopy(record.name, Number.MAX_SAFE_INTEGER)
-  const achievement = finalPrintCopy(record.headline, 160) || finalPrintCopy(record.achievement_core, 360)
-  const subtitle = finalPrintCopy(record.subtitle, 220)
+  const achievement = finalPrintCopy(record.achievement_sentence, 360) || finalPrintCopy(record.achievement_core, 360) || finalPrintCopy(record.headline, 160)
+  const seen = [name, achievement].filter(Boolean).map(copyKey)
+  const subtitle = uniqueCopy(seen, finalPrintCopy(record.subtitle, 220))
   const subtitleEn = textValue(record.subtitle_en, 180)
-  const label = finalPrintCopy(record.header_label, 120) || finalPrintCopy(record.context_label, 120)
-  const labels = textList(record.info_labels, 4, 120)
-  const facts = (labels.length ? labels : [...textList(record.key_facts, 4, 220), ...textList(record.awards, 1, 220)])
-    .map(fact => finalPrintCopy(fact, 220))
+  const label = uniqueCopy(seen, finalPrintCopy(record.header_label, 120) || finalPrintCopy(record.context_label, 120))
+  const phrases = textList(record.info_phrases, 4, 220)
+  const legacyFacts = [...textList(record.key_facts, 4, 220), ...textList(record.awards, 1, 220)]
+  const facts = (phrases.length ? phrases : legacyFacts.length ? legacyFacts : textList(record.info_labels, 4, 220))
+    .map(fact => uniqueCopy(seen, finalPrintCopy(fact, 220)))
     .filter(Boolean)
   const direction = textValue(args.chosenConcept, 1100)
   const note = textValue(args.note, 500)
   const extra = textValue(args.extra, 500)
   const displayContent = [
-    label ? `STORY-SPECIFIC HEADER: "${label}"` : '',
-    name ? `NAMES BOX (full names, exactly once): "${name}"` : '',
-    achievement ? `HEADLINE (legacy long copy: shorten to 2–5 words without changing facts): "${achievement}"` : '',
+    name ? `PRIMARY NAME (largest text, full name exactly once, first in reading order): "${name}"` : '',
+    achievement ? `CONNECTED ACHIEVEMENT (immediately below the name; adapt legacy copy into a factual grammatical continuation without repeating the name): "${achievement}"` : '',
+    label ? `STORY-SPECIFIC HEADER (secondary context only, never larger than or before the primary name): "${label}"` : '',
     subtitle ? `ARABIC SUBTITLE: "${subtitle}"` : '',
     subtitleEn ? `SINGLE SMALL ENGLISH SUBTITLE: "${subtitleEn}"` : '',
-    ...facts.slice(0, 4).map(fact => `INFO LABEL (legacy long facts: shorten to 1–3 words faithfully): "${fact}"`),
+    ...facts.slice(0, 4).map(fact => `INFO PHRASE (under its topic icon; a meaningful achievement detail, not a bare word; expand legacy labels only from verified context): "${fact}"`),
   ].filter(Boolean).join('\n')
 
   return [
@@ -94,14 +112,14 @@ export function buildCompactImagePrompt(args: {
     'Use each supplied reference image as an intact documentary photograph. Do not redraw, replace, alter, or synthesize people, clothing, faces, or poses. Build the composition around the real photographs.',
     `Creative direction: ${direction || 'Classic Celebration with the established achievement hierarchy.'}`,
     'Choose a story-specific top label only from the approved copy below. If none is supplied, omit the label instead of printing the same generic إنجاز سعودي on every design.',
-    `Visible copy and placements (shorten only legacy long headline/facts as instructed, never full names):\n${displayContent || 'Create a concise Arabic headline from the verified source.'}`,
+    `Visible copy and placements (name first, then its connected achievement sentence; turn legacy fact labels into meaningful phrases without inventing relationships, never shorten full names):\n${displayContent || 'Create a concise Arabic headline from the verified source.'}`,
     'Set the quoted Arabic as finished news copy: direct, human, clear, and declarative. Never print field labels, analysis summaries, source-image descriptions, or explanatory metadata.',
-    'Use strict RTL hierarchy, a 2–5-word headline and up to four verified 1–3-word info labels; details belong in the subtitle. Do not invent missing facts.',
+    'Use strict RTL hierarchy: the full name is the dominant headline, its factual achievement sentence follows immediately, then up to four meaningful fact phrases under their icons. Prefer concise 3–7-word phrases over isolated keywords. Each fact must add new information not stated in the achievement sentence, context, tag or another icon; do not repeat facts even in different wording. Omit redundant blocks instead of filling space. Do not invent missing facts or relationships.',
     args.templateDirective ?? '',
     args.hasVideo ? videoLayoutFor(args.videoOrientation) : '',
     note ? `Apply this additional visual direction: ${note}` : '',
     extra ? `Additional verified context: ${extra}` : '',
     'Avoid flags, politics, weapons, military content, danger symbols, and violence.',
-    'FINAL PRIORITY: absolute unchanged photographic fidelity overrides every instruction; never add medals, trophies or objects to people. Preserve full verified names; apply the shared emerald/gold hierarchy and digital-logo exclusions and mandatory generated social footer even if an old concept or optional template asks otherwise.',
+    'FINAL PRIORITY: absolute unchanged photographic fidelity overrides every instruction; never add medals, trophies or objects to people. Preserve full verified names; apply the shared name-first reading order and emerald/gold hierarchy and digital-logo exclusions and mandatory generated social footer even if an old concept or optional template asks otherwise.',
   ].filter(Boolean).join('\n\n')
 }
