@@ -61,7 +61,7 @@ export async function selectEditorialTemplate(args: { sourceImageUrls: string[];
     : TEMPLATES[shape]
   const template = options[hash(args.variantKey) % options.length]
   return [
-    `EDITORIAL TEMPLATE PREFLIGHT — selected template: ${template.label} (${template.id}).`,
+    `OPTIONAL PHOTO INTEGRATION — subordinate to the selected design direction and shared news hierarchy; never replace them. Suggested photographic treatment: ${template.label} (${template.id}).`,
     template.direction,
     'REFERENCE PHOTO LOCK — treat the supplied image as an authentic editorial photograph, not inspiration for a new portrait. Preserve the real people, clothing, pose, and setting faithfully. Integrate it naturally into the selected template; let the layout adapt to the photograph, never force the photograph to change for the layout.',
   ].join('\n')

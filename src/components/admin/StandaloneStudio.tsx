@@ -239,7 +239,6 @@ export default function StandaloneStudio() {
   // يمرّر التحليل محلياً (لا ينتظر تحديث الحالة) لتسلسل موثوق.
   const autoRun = async () => {
     if (!content.trim()) { showToast('أدخل نص الخبر أولاً', 'error'); return }
-    if (!selectedImages.length) { showToast('ارفع صورة المصدر أولاً', 'error'); return }
     setAutoBusy(true)
     setBatchResults([]); setNoteByIndex({})
     setTweets(''); setConceptItems([])
@@ -281,7 +280,6 @@ export default function StandaloneStudio() {
 
   const designAll = async () => {
     if (!conceptItems.length) return
-    if (!selectedImages.length) { showToast('ارفع صورة المصدر أولاً', 'error'); return }
     setBatchLoading(true); setBatchResults([]); setNoteByIndex({})
     try {
       const results: DesignResult[] = []
@@ -600,12 +598,12 @@ export default function StandaloneStudio() {
             <h4 className="font-bold text-dark">⚡ توليد تلقائي لكل الخطوات</h4>
             <p className="text-[11px] text-muted mt-0.5">تحليل ← تغريدات ← اتجاهات ← تصميم الاتجاهات الثلاثة، دفعة واحدة.</p>
           </div>
-          <Button onClick={autoRun} loading={autoBusy} disabled={autoBusy || loadingStep !== null || batchLoading || !content.trim() || !selectedImages.length} size="sm">
+          <Button onClick={autoRun} loading={autoBusy} disabled={autoBusy || loadingStep !== null || batchLoading || !content.trim()} size="sm">
             ⚡ ابدأ التوليد التلقائي
           </Button>
         </div>
         {autoBusy && <div className="flex items-center gap-2 text-sm text-green-700"><LoadingSpinner size="sm" /><span>{autoStage || 'جارٍ التوليد…'}</span></div>}
-        {!content.trim() && <p className="text-[11px] text-amber-600">أدخل نص الخبر وارفع صورة المصدر لتفعيل التوليد التلقائي.</p>}
+        {!content.trim() && <p className="text-[11px] text-amber-600">أدخل نص الخبر لتفعيل التوليد التلقائي. الصورة اختيارية؛ بدونها يُستخدم رسم رمزي بلا وجوه مولّدة.</p>}
       </div>
 
       {/* 1 تحليل */}
@@ -659,12 +657,12 @@ export default function StandaloneStudio() {
       {/* 4 تصاميم */}
       <div className={card}>
         <StepHead n={4} title="التصاميم" subtitle="صمّم الاتجاهات أو الاتجاه المعتمد" done={batchResults.length > 0} />
-        <Button onClick={designAll} loading={batchLoading} disabled={autoBusy || batchLoading || loadingStep !== null || !analysis || !selectedImages.length || conceptItems.length === 0} size="sm">🎨 صمّم الاتجاهات الثلاثة</Button>
+        <Button onClick={designAll} loading={batchLoading} disabled={autoBusy || batchLoading || loadingStep !== null || !analysis || conceptItems.length === 0} size="sm">🎨 صمّم الاتجاهات الثلاثة</Button>
         {batchLoading && <div className="flex items-center gap-2 text-sm text-muted"><LoadingSpinner size="sm" /><span>{batchProgress || 'جارٍ التوليد…'}</span></div>}
         {autoBusy && autoStage.includes('توليد التصميم') && <div className="mt-3 flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 p-3 text-sm font-bold text-teal-900"><LoadingSpinner size="sm" /><span>{autoStage}</span></div>}
         <div className="border-t border-border pt-3">
           <p className="text-xs text-muted mb-2">أو صمّم الاتجاه المعتمد (تصميم واحد):</p>
-          <Button onClick={() => callStep('image')} loading={loadingStep === 'image'} disabled={autoBusy || loadingStep !== null || batchLoading || !analysis || !selectedImages.length || !chosenConcept.trim()} variant="outline" size="sm">صمّم الصورة (مفرد)</Button>
+          <Button onClick={() => callStep('image')} loading={loadingStep === 'image'} disabled={autoBusy || loadingStep !== null || batchLoading || !analysis || !chosenConcept.trim()} variant="outline" size="sm">صمّم الصورة (مفرد)</Button>
         </div>
 
         {batchResults.length > 0 && (

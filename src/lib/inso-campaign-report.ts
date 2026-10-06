@@ -1,3 +1,4 @@
+import { STUDIO_BRAND_RULES } from './studio-design-guidelines'
 import { PDFDocument } from 'pdf-lib'
 import { readFile } from 'fs/promises'
 import path from 'path'
@@ -23,10 +24,11 @@ interface ReportSlide {
 function reportRules() {
   return [
     'Create one polished horizontal 16:9 campaign-report slide as a finished bitmap image, never a web page or a document.',
-    'Brand: First1Saudi. Premium Saudi editorial design in deep teal, turquoise, restrained gold, and clean white details. Strong Arabic-first RTL hierarchy, elegant infographic composition, generous spacing, high-end presentation quality.',
+    STUDIO_BRAND_RULES,
+    'Report layout exception: keep the horizontal presentation hierarchy of the supplied slide title and content; do not add the news-poster plaque or force a 4:5 layout.',
     'Render every Arabic phrase quoted below accurately, connected, crisp and readable. Do not translate, paraphrase, omit, invent, or replace any quoted Arabic text or numeric fact.',
-    'Add a subtle bottom footer containing the five social icons X, Instagram, LinkedIn, Facebook, TikTok and the exact handle @First1Saudi. Do not render any brand logo; original First1Saudi and Mawhiba logos will be composited after generation.',
-    'Keep a compact lower-right logo-safe area with a continuous textured background, never a white panel or an empty box.',
+    'Leave bottom-center empty for later digital social handles. Original First1Saudi and Mawhiba logos are composited after generation; never generate logos, social icons, handles or URLs.',
+    'On the 1600×900 report slide reserve the lower-right 450×220-pixel pocket including the area underneath the digital logos. No text, labels, numbers, icons or people inside or below it; keep a continuous emerald background, never a white panel or empty box.',
   ].join('\n')
 }
 

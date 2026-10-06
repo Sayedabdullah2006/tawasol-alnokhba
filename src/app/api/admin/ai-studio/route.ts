@@ -98,7 +98,6 @@ export async function POST(req: Request) {
     if (step === 'image') {
       if (!analysis) { await failGenerationJob(jobId, new Error('حلّل الخبر أولاً')); return NextResponse.json({ error: 'حلّل الخبر أولاً' }, { status: 400 }) }
       if (!chosenConcept) { await failGenerationJob(jobId, new Error('اختر اتجاه التصميم أولاً')); return NextResponse.json({ error: 'اختر اتجاه التصميم أولاً' }, { status: 400 }) }
-      if (!sourceImages.length) { await failGenerationJob(jobId, new Error('ارفع صورة المصدر أولاً')); return NextResponse.json({ error: 'ارفع صورة المصدر أولاً' }, { status: 400 }) }
 
       const { imageUrl, prompt } = await generateDesign(openai, { analysis, chosenConcept, sourceImages, sourceText: newsText, note, hasVideo, videoOrientation: body.videoOrientation, preparedPrompt: typeof preparedPrompt === 'string' ? preparedPrompt : undefined })
       // تسجيل التصميم في السجلّ الموحّد (مرشّحي نشرة «النخبة في ٧»)

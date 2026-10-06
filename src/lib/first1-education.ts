@@ -1,3 +1,4 @@
+import { STUDIO_BRAND_RULES, STUDIO_LOGO_RESERVATION } from './studio-design-guidelines'
 import { OPENAI_MODEL } from '@/lib/ai-studio'
 import { generateImageWithOpenAI } from '@/lib/image-generation'
 import { compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
@@ -230,15 +231,15 @@ export async function generateEducationInfographic(content: GeneratedEducation, 
 
   const prompt = [
     'Create one premium 4:5 Arabic social infographic for First1Saudi, 1080x1350.',
-    'Make it an original, elegant editorial information design for Saudi innovators and inventors. Use deep teal, Saudi green accents, warm gold details, and generous but balanced visual hierarchy. Full bleed artwork, no white logo panel, no huge empty spaces, no copied social-post screenshot.',
+    STUDIO_BRAND_RULES,
+    STUDIO_LOGO_RESERVATION,
     `Headline: ${content.infographicTitle}`,
     `Use exactly these three compact Arabic callouts, each visually distinct with a simple icon or data mark: ${content.infographicPoints.map((point, index) => `${index + 1}. ${point}`).join(' | ')}`,
     'STRICT RIGHT-TO-LEFT ARABIC LAYOUT: every Arabic text block must be right-aligned and read from right to left. For the three callouts, place number 1 on the FAR RIGHT, number 2 in the center, and number 3 on the LEFT. The visual journey must flow right-to-left; never put 1 on the left or arrange the numbered steps left-to-right. Use correctly connected Arabic letterforms and clear RTL hierarchy.',
     `Visual direction: ${content.visualDirection}.`,
     options.visualInstructions ?? 'Use symbolic innovation visuals such as a patent document, magnifier, prototype, blueprint, light path, or idea-to-market journey. Do not use people, flags, official seals, fake logos, sources, URLs, citations, or long paragraphs.',
-    'When the concept calls for Saudi achievers or people, portray a balanced group of at least three diverse Saudi achievers rather than a lone hero. They must feel like a collective of innovators, researchers, or students; do not make any person an identifiable real-world likeness. The only exception is a national-occasion instruction that explicitly supplies official portrait references.',
-    'Add a compact, elegant social footer with the recognizable icons for X, Instagram, LinkedIn, Facebook, and TikTok followed by the exact handle @First1Saudi. Keep the footer small and readable.',
-    'Do not draw any brand logo. The original First1Saudi logo will be overlaid directly within the artwork at the extreme lower-right. Keep only a compact text-free pocket there, about 150 by 100 pixels, while the same artwork, texture, and colour continue behind it. Never create a frame, box, panel, banner, border, blank area, or separate footer for the logo.',
+    'If no portrait references are supplied, use symbolic illustrations of innovation and collaboration; never generate fake people or faces.',
+
   ].join('\n\n')
   const safetyFallbackPrompt = [
     'Create one premium 4:5 Arabic social infographic for First1Saudi.',
@@ -247,7 +248,8 @@ export async function generateEducationInfographic(content: GeneratedEducation, 
     'Strict RTL: callout 1 on the far right, 2 in the centre, and 3 on the left. Use clearly connected Arabic letterforms.',
     `Visual direction: ${content.visualDirection}.`,
     options.referenceImageUrls?.length ? 'Preserve every supplied reference person faithfully and integrate them into the infographic, rather than making a plain portrait.' : '',
-    'Use a compact footer with X, Instagram, LinkedIn, Facebook, and TikTok icons followed by @First1Saudi. Do not draw the First1Saudi logo; it is overlaid after generation. Full-bleed artwork, no white panel, no logo frame, no unsupported claims, flags, weapons, political or military imagery.',
+    STUDIO_BRAND_RULES,
+    STUDIO_LOGO_RESERVATION,
   ].filter(Boolean).join('\n\n')
   const { b64 } = await generateImageWithOpenAI(prompt, options.referenceImageUrls ?? [], { aspectRatio: '4:5', safetyFallbackPrompt })
   const poster = await resizeToPoster(Buffer.from(b64, 'base64'))

@@ -503,12 +503,8 @@ export default function AIStudioPanel({
 
   // ⚡ التوليد التلقائي: ينفّذ الخطوات تباعاً (تحليل → تغريدات → اتجاهات → تصميم كل الاتجاهات)
   const autoRunAll = async () => {
-    if (autoRunning || loadingStep || batchLoading) return;
-    if (!selectedImages.length) {
-      showToast("اختر صورة المصدر أولاً", "error");
-      return;
-    }
-    setAutoRunning(true);
+    if (autoRunning || loadingStep || batchLoading) return
+    setAutoRunning(true)
     try {
       // 1) تحليل الخبر
       setAutoStage("١/٤ — تحليل الخبر…");
@@ -571,13 +567,9 @@ export default function AIStudioPanel({
 
   // يولّد تصميماً لكل اتجاه من الاتجاهات الثلاثة ثم يعرضها للاختيار
   const designAll = async () => {
-    if (!conceptItems.length) return;
-    if (!selectedImages.length) {
-      showToast("اختر صورة المصدر أولاً", "error");
-      return;
-    }
-    setBatchLoading(true);
-    const roundId = beginDesignRound();
+    if (!conceptItems.length) return
+    setBatchLoading(true)
+      const roundId = beginDesignRound()
     try {
       const results: DesignResult[] = [];
       for (let i = 0; i < conceptItems.length; i++) {
@@ -773,8 +765,7 @@ export default function AIStudioPanel({
         <h4 className="font-bold text-dark">اختيار صور المصدر</h4>
         {contentImages.length === 0 ? (
           <p className="text-sm text-muted">
-            لا توجد صورة مرفقة بالخبر. ارفع صورة المصدر أدناه، أو حلّل الخبر
-            بدونها.
+            الصورة المرجعية اختيارية. بدونها سيُستخدم رسم رمزي للمجال بلا وجوه مولّدة.
           </p>
         ) : (
           <>
@@ -856,12 +847,7 @@ export default function AIStudioPanel({
           <Button
             onClick={autoRunAll}
             loading={autoRunning}
-            disabled={
-              autoRunning ||
-              loadingStep !== null ||
-              batchLoading ||
-              !selectedImages.length
-            }
+            disabled={autoRunning || loadingStep !== null || batchLoading}
             size="sm"
           >
             ⚡ توليد تلقائي
@@ -874,9 +860,7 @@ export default function AIStudioPanel({
           </div>
         )}
         {!selectedImages.length && (
-          <p className="text-[11px] text-amber-600">
-            اختر صورة المصدر أولاً لتفعيل التوليد التلقائي.
-          </p>
+          <p className="text-[11px] text-amber-600">بدون صورة مرجعية سيُستخدم رسم رمزي للمجال، ولن تُولّد وجوه أشخاص.</p>
         )}
       </div>
 
@@ -1059,13 +1043,7 @@ export default function AIStudioPanel({
           <Button
             onClick={designAll}
             loading={batchLoading}
-            disabled={
-              batchLoading ||
-              loadingStep !== null ||
-              !analysis ||
-              !selectedImages.length ||
-              conceptItems.length === 0
-            }
+            disabled={batchLoading || loadingStep !== null || !analysis || conceptItems.length === 0}
             size="sm"
           >
             🎨 صمّم الاتجاهات الثلاثة
@@ -1313,11 +1291,7 @@ export default function AIStudioPanel({
             onClick={() => callStep("image")}
             loading={loadingStep === "image"}
             disabled={
-              loadingStep !== null ||
-              batchLoading ||
-              !analysis ||
-              !selectedImages.length ||
-              !chosenConcept.trim()
+              loadingStep !== null || batchLoading || !analysis || !chosenConcept.trim()
             }
             variant="outline"
             size="sm"

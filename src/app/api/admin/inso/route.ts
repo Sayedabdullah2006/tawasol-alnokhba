@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { STUDIO_DESIGN_DIRECTIONS } from '@/lib/studio-design-guidelines'
 import { readFile } from 'fs/promises'
 import path from 'path'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
@@ -23,7 +24,7 @@ export const maxDuration = 300
 
 type Action = 'generate-copy' | 'generate-design-options' | 'generate-design-option' | 'select-design-option' | 'edit-design-option' | 'save' | 'add' | 'add-saved' | 'rewrite-saved' | 'delete-saved' | 'mark-published' | 'mark-scheduled' | 'cancel-scheduled'
 
-const REAL_ARCHITECTURE_RULE = 'STRICT REAL-WORLD ARCHITECTURE RULE: never invent, redesign, exaggerate, or combine buildings, towers, skylines, landmarks, venues, or cityscapes. Do not use futuristic, imaginary, AI-looking, or generic foreign architecture. If a reference image contains a building, preserve it faithfully without changing its shape, height, facade, or surroundings. If no reference image is supplied, either use a clearly recognizable real Jeddah landmark only (Jeddah Corniche, King Fahd Fountain, Al-Balad heritage buildings, or an authentic Jeddah skyline) or omit buildings entirely and use science, people, sea, light, and abstract editorial elements instead. When accuracy is uncertain, omit the building rather than invent one.'
+const REAL_ARCHITECTURE_RULE = 'STRICT REAL-WORLD ARCHITECTURE RULE: never invent, redesign, exaggerate, or combine buildings, towers, skylines, landmarks, venues, or cityscapes. Do not use futuristic, imaginary, AI-looking, or generic foreign architecture. If a reference image contains a building, preserve it faithfully without changing its shape, height, facade, or surroundings. If no reference image is supplied, either use a clearly recognizable real Jeddah landmark only (Jeddah Corniche, King Fahd Fountain, Al-Balad heritage buildings, or an authentic Jeddah skyline) or omit buildings entirely and use science, sea, light, and abstract editorial elements instead. When accuracy is uncertain, omit the building rather than invent one.'
 
 async function requireAdmin() {
   const supabase = await createServerSupabaseClient()
@@ -76,7 +77,7 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
   const prompt = [
     'Create an editorial 4:5 social media poster for the International Nuclear Science Olympiad 2026 in Jeddah.',
     STUDIO_EDITORIAL_DESIGN_RULES,
-    'Arabic-first premium scientific event design. Deep teal, bright turquoise and restrained gold accents; white may only be a small supporting detail, never a dominant field. Show science, global exchange, youth talent, and peaceful nuclear science through elegant visual metaphors; never show weapons, explosions, radiation danger signs, or fake logos.',
+    'Arabic-first premium scientific event design. Deep emerald #0A3A2A and luxurious gold #D4AF37; white may only be a small supporting detail, never a dominant field. Show science, global exchange, youth talent, and peaceful nuclear science through elegant visual metaphors; never show weapons, explosions, radiation danger signs, or fake logos.',
     REAL_ARCHITECTURE_RULE,
     `Event moment: ${item.title}. ${item.brief}`,
     `Source post facts to interpret visually: ${postText}. Do not copy or paste this caption into the design.`,
@@ -84,15 +85,15 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
     templateDirective,
     args.sourceImages?.length
       ? `Use all ${args.sourceImages.length} supplied reference images as intact documentary photographs in one creative composition. Do not redraw, restyle, replace, or synthesize people; retain each photo's real pose, clothing, and scene while designing the surrounding layout creatively.`
-      : 'No reference image was supplied. Make Jeddah unmistakable and authentic through the Red Sea waterfront, people, event details, science, or a real verified landmark only. Never use a generic foreign city, invented tower, fictional venue, or imaginary cityscape.',
+      : 'No reference image was supplied. Use symbolic science visuals without generated people or faces. Make Jeddah unmistakable and authentic through the Red Sea waterfront, event details, science, or a real verified landmark only. Never use a generic foreign city, invented tower, fictional venue, or imaginary cityscape.',
     args.hasVideo
       ? args.videoOrientation === 'portrait'
-        ? 'This is a cover for a vertical 9:16 event video. On the 1080×1350 canvas reserve one large, empty 9:16 video window aligned to the right, around 56% of the canvas width and 85% of its height. It must be the dominant element, with a slim gold outline and subtle play icon only. Keep the window empty: no people, photos, words, numbers, or icons inside it. Build a clear Arabic RTL information column on the left, with all content and reference imagery arranged around the portrait video window. Never turn it into a horizontal frame.'
-        : 'This is a cover for a horizontal 16:9 event video. On the 1080×1350 canvas reserve one large, empty 16:9 video window spanning almost the full width across the upper half. It must be the dominant element, with a slim gold outline and subtle play icon only. Keep the window empty: no people, photos, words, numbers, or icons inside it. Arrange the Arabic RTL title, facts, and reference imagery below or around it. Never turn it into a vertical frame.'
+        ? 'This is a cover for a vertical 9:16 event video. On the 1080×1350 canvas reserve one large, empty 9:16 video window aligned to the right, around 56% of the canvas width and 80% of its height, ending above the bottom 220-pixel logo pocket. It must be the dominant element, with a slim gold outline and a subtle play icon on the outer border only. Keep the window empty: no people, photos, words, numbers, or icons inside it. Build a clear Arabic RTL information column on the left, with all content and reference imagery arranged around the portrait video window. Never turn it into a horizontal frame.'
+        : 'This is a cover for a horizontal 16:9 event video. On the 1080×1350 canvas reserve one large, empty 16:9 video window spanning almost the full width across the upper half. It must be the dominant element, with a slim gold outline and a subtle play icon on the outer border only. Keep the window empty: no people, photos, words, numbers, or icons inside it. Arrange the Arabic RTL title, facts, and reference imagery below or around it. Never turn it into a vertical frame.'
       : '',
     'Turn the facts into an original visual infographic hierarchy: use a concise Arabic headline only when it can be rendered accurately, then 2 to 4 short factual callouts, numbers, icons, data marks, or a small timeline. Never use long paragraphs, never repeat the full post caption, and never make the design look like a screenshot of a social post.',
     args.exactText?.trim() ? `Add this exact Arabic phrase in a small, readable line: "${args.exactText.trim()}". Copy every character exactly as supplied with correct connected RTL shaping. Do not invent, shorten, translate, spell-correct, or alter it.` : '',
-    'Do not render event logos, brand logos, or hashtags. Add a compact social footer for First1Saudi with the official icons for X, Instagram, LinkedIn, Facebook, and TikTok, followed by the exact handle "@First1Saudi". All five icons are mandatory, equal in size, and must remain fully visible. Keep the artwork full-bleed to every edge. The original First1Saudi and Mawhiba lockups will be overlaid directly within the artwork at the extreme lower-right, approximately 300 by 130 pixels on the 1080 by 1350 canvas. Keep only text, people, numbers, and icons out of that small pocket while the exact same teal artwork and texture continue behind it. Never create a frame, box, panel, banner, border, blank area, or separate footer for the logos. The rest of the canvas must remain visually rich and balanced.',
+    'Reserve a 300×220-pixel lower-right pocket for original First1Saudi and Mawhiba digital overlays, including the full area below them. No text, people, numbers, icons or video in or beneath this pocket. Continue the emerald background texture behind it without a panel or frame. Leave bottom-center empty for later digital social handles; never AI-render them.',
     args.note?.trim() ? `Additional creative direction: ${args.note.trim()}` : '',
   ].filter(Boolean).join('\n\n')
   const safetyFallbackPrompt = [
@@ -106,7 +107,7 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
       ? 'Use every supplied reference image as an intact documentary photograph. Integrate the photos creatively without redrawing, replacing, or restyling people.'
       : 'Use only authentic Jeddah context or abstract scientific elements. Omit any architecture whose authenticity is uncertain.',
     'Use one concise Arabic headline and 2 to 4 short factual callouts in strict right-to-left hierarchy. Do not copy the whole caption.',
-    'Add a compact First1Saudi social footer with X, Instagram, LinkedIn, Facebook, and TikTok icons and the exact handle @First1Saudi. Do not draw logos or hashtags; they are overlaid after generation. Full-bleed artwork only, with no white panel or logo frame.',
+    'Reserve the same 300×220-pixel lower-right digital-logo pocket, with no text in or underneath it; leave bottom-center empty for digital handles.',
     args.exactText?.trim() ? `Add this exact Arabic phrase exactly as written: "${args.exactText.trim()}".` : '',
     args.note?.trim() ? `Additional creative direction: ${args.note.trim()}` : '',
     'Avoid flags, weapons, radiation-danger symbols, danger imagery, explosions, political messaging, military content, invented buildings, and invented claims.',
@@ -267,7 +268,7 @@ export async function POST(request: Request) {
         await failGenerationJob(generationJobId, new Error('ولّد أو اكتب نص المنشور أولاً'))
         return NextResponse.json({ error: 'ولّد أو اكتب نص المنشور أولاً' }, { status: 400 })
       }
-      const directions = ['صفحة علمية تحريرية موثوقة', 'لقطة إنسانية دولية دافئة', 'إنفوجرافيك علمي هادئ مستلهم من العلوم النووية السلمية']
+      const directions = STUDIO_DESIGN_DIRECTIONS.map(direction => `${direction.title}: ${direction.brief}`)
       const optionIndex = Number.isInteger(body.optionIndex) ? Number(body.optionIndex) : 0
       if (optionIndex < 0 || optionIndex >= directions.length) {
         await failGenerationJob(generationJobId, new Error('خيار التصميم غير صالح'))

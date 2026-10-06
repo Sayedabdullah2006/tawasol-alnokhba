@@ -1,3 +1,4 @@
+import { STUDIO_BRAND_RULES, STUDIO_LOGO_RESERVATION } from './studio-design-guidelines'
 import https from 'https'
 import sharp from 'sharp'
 
@@ -36,15 +37,9 @@ const PROFESSIONAL_EDITORIAL_BASELINE_MARKER = '=== PROFESSIONAL EDITORIAL AUTHE
  */
 export const PROFESSIONAL_EDITORIAL_DESIGN_BASELINE = [
   PROFESSIONAL_EDITORIAL_BASELINE_MARKER,
-  'Create a restrained, human-designed editorial composition. The result must look art-directed by a professional designer, not like obvious AI artwork.',
-  'REAL PHOTOGRAPH FIRST: when reference photographs are supplied, they are the source of truth. Keep each photograph recognizably real and documentary. Preserve the exact face, expression, skin texture, body, pose, hands, clothing, accessories, and culturally important details. Do not redraw, beautify, reconstruct, stylize, or replace the person.',
-  'Choose the layout from the photograph itself: respect its orientation, camera angle, crop, subject position, lighting, and usable negative space. Prefer an intact photo, a clean rectangular crop, or a simple full-bleed crop. Never squeeze a portrait between text blocks, weave text through the body, or place copy over the face, hands, or important clothing.',
-  'For multiple reference photos, use a clean editorial grid or clearly separated frames. Never blend bodies or faces together, invent missing anatomy, or turn the people into one synthetic scene.',
-  'Use one focal image and one clear reading path. Keep the headline concise and limit supporting facts to what the route explicitly supplies. Use spacing, scale, alignment, thin rules, and restrained colour fields instead of decorative clutter.',
-  'Avoid the stereotypical AI look: no plastic skin, synthetic glamour portrait, fantasy lighting, neon glow, floating particles, luminous energy trails, excessive gold, fake depth, impossible architecture, invented crowds, decorative molecular or circuit overlays, random icons, busy collage fragments, or effects crossing the subject unless the route explicitly requires one for the factual story.',
-  'If no real photograph is supplied, do not invent a photorealistic person merely as decoration. Prefer authentic objects, restrained abstract editorial forms, typography, verified places, or data-led graphics. Generate people only when the route explicitly requires them.',
-  'Keep Arabic typography correctly connected, right-to-left, readable, and outside the photographic subject. The final design should feel calm, credible, contemporary, and easy on the eye.',
-  'These rules refine the visual treatment only. Preserve every route-specific instruction about facts, logos, footer, dimensions, event identity, video space, and exact text.',
+  STUDIO_BRAND_RULES,
+  'Use the route-specific dimensions and content structure. Keep copy outside faces, hands and important clothing; never blend bodies or invent anatomy. Apply cinematic lighting and gold effects only around the untouched reference photograph.',
+  'For reports and newsletters, use the route-specific logo position and reserved pocket; do not relocate their digitally composited originals. Preserve all route-specific exact copy, image/name pairing, and video-space requirements.',
 ].join('\n')
 
 export function withProfessionalEditorialBaseline(promptText: string): string {
@@ -166,15 +161,19 @@ function isModerationBlocked(err: unknown): boolean {
 
 const SAFE_EDITORIAL_FALLBACK_PROMPT = [
   'Create a polished vertical 4:5 editorial social-media graphic about learning, scientific curiosity, global collaboration, and achievement.',
-  'Use only abstract geometric science motifs, elegant light trails, a deep teal and turquoise palette with restrained gold accents, and a rich full-bleed composition.',
-  'Use a concise Arabic headline and no more than two short factual callouts. Add a compact footer with the recognizable icons for X, Instagram, LinkedIn, Facebook, and TikTok, followed by the exact handle @First1Saudi.',
+  'Use only abstract geometric science motifs, elegant light trails, deep emerald #0A3A2A and luxurious gold #D4AF37, and a rich full-bleed composition.',
+  STUDIO_BRAND_RULES,
+  STUDIO_LOGO_RESERVATION,
+  'Use a concise Arabic headline and no more than four short verified factual callouts.',
   'Do not include logos, brand names, flags, weapons, dangerous materials, medical imagery, politics, military content, or violence.',
 ].join(' ')
 
 const SAFE_EDITORIAL_REFERENCE_FALLBACK_PROMPT = [
   'Create a polished vertical 4:5 editorial social-media graphic about learning, innovation, and achievement.',
   'Keep the supplied image as one intact documentary photograph. Do not redraw or transform people; place the editorial typography and graphics only around the photo.',
-  'Use a refined deep teal, turquoise, and restrained gold editorial treatment. Use very little Arabic text and a compact social footer with X, Instagram, LinkedIn, Facebook, and TikTok plus @First1Saudi.',
+  STUDIO_BRAND_RULES,
+  STUDIO_LOGO_RESERVATION,
+  'Use a concise Arabic headline and no more than four short verified factual callouts.',
   'Keep the artwork full-bleed and neutral, with no logos, flags, weapons, danger symbols, politics, military content, or violence.',
 ].join(' ')
 

@@ -1,3 +1,5 @@
+import { STUDIO_BRAND_RULES, STUDIO_LOGO_RESERVATION } from './studio-design-guidelines'
+
 /** Text approved for display on a congratulatory poster, separate from analysis metadata. */
 export interface StudioGreetingCopy {
   kind: 'greeting'
@@ -36,13 +38,15 @@ export function buildGreetingPosterPrompt(copy: StudioGreetingCopy, options: {
 }): string {
   return [
     'Create a premium 4:5 Arabic congratulatory poster for First1Saudi using the supplied reference image as the visual source.',
+    'Greeting layout exception: do not add an achievement plaque, news headline, names box or fact row; use only the approved greeting copy below.',
     'Preserve all pictured people, faces, clothing and their order. Keep the Arabic greeting large and readable in clear space away from faces.',
     options.direction ? `Use this direction for visual arrangement only; its words must not appear on the artwork: ${options.direction}` : '',
     'The following quoted Arabic is the complete visible greeting copy. Render it verbatim as finished celebratory text, without headings, field names, explanations, callouts, icons describing the occasion, or facts extracted from the analysis:',
     `"${copy.message}"`,
     copy.closing ? `"${copy.closing}"` : '',
-    copy.slogan ? `Place the official national-day slogan/logo "${copy.slogan}" prominently; do not render it as a hashtag or a descriptive label.` : '',
-    'Use deep teal, Saudi green, restrained gold, and white. Add a compact footer with equal recognizable icons for X, Instagram, LinkedIn, Facebook, and TikTok followed by @First1Saudi. Leave the lower right clear for the original First1Saudi logo, which is added after generation.',
+    copy.slogan ? `Render the approved national-day slogan as text only, never generate its official logo: "${copy.slogan}" prominently; do not render it as a hashtag or a descriptive label.` : '',
+    STUDIO_BRAND_RULES,
+    STUDIO_LOGO_RESERVATION,
     options.templateDirective ?? '',
     options.videoDirective ?? '',
     options.note ? `Apply this visual editing note without printing its words: ${options.note}` : '',

@@ -351,9 +351,6 @@ export async function POST(req: Request) {
       if (!chosenConcept) {
         return failure('اختر اتجاه التصميم أولاً')
       }
-      if (!sourceImages.length) {
-        return failure('اختر صورة المصدر أولاً')
-      }
 
       // Fetch the brand logo URL (if configured) so we can reference it in the prompt.
       const { data: brand } = await service

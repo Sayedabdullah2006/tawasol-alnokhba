@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { buildGreetingPosterPrompt, greetingCopyFromNewsText } from '../src/lib/studio-print-copy.ts'
+import './register-ts-imports.mjs'
+const { buildGreetingPosterPrompt, greetingCopyFromNewsText } = await import('../src/lib/studio-print-copy.ts')
 
 test('congratulatory copy preserves the user message and excludes design instructions', () => {
   const copy = greetingCopyFromNewsText(`العنوان: اليوم الوطني السعودي ٩٦
@@ -37,7 +38,7 @@ test('greeting prompt isolates approved copy from analytical direction', () => {
   assert.match(prompt, /"أسمى التهاني والتبريكات للشعب السعودي بمناسبة اليوم الوطني\."/)
   assert.match(prompt, /"كل يوم ووطننا في عزة ورفعة ونصر\."/)
   assert.match(prompt, /"عزّنا بطبعنا"/)
-  assert.match(prompt, /@First1Saudi/)
+  assert.match(prompt, /NEVER generate brand\/event logos, social-media icons, handles/)
   assert.match(prompt, /must not appear on the artwork/)
   assert.doesNotMatch(prompt, /NAME:|HEADLINE:|FACT:/)
 })

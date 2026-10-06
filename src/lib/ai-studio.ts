@@ -8,13 +8,16 @@
  * نفس البرومبتات (SYS_*) ونفس النماذج — لا يوجد سلوك مختلف عن الواجهة.
  */
 import OpenAI from 'openai'
+import { STUDIO_BRAND_RULES, STUDIO_LOGO_RESERVATION, STUDIO_DESIGN_DIRECTIONS } from './studio-design-guidelines'
 import sharp from 'sharp'
 import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, buildConceptDirectives, buildTweetDirectives } from './openai'
 import { generateImageWithOpenAI, generateImageFromPartsWithOpenAI } from './image-generation'
 import { compositeLogoBottomRight, resizeToPoster } from './logo-overlay'
 import { createServiceRoleClient } from './supabase-server'
 import { selectEditorialTemplate } from './editorial-template-selector'
-import { buildGreetingPosterPrompt, greetingCopyFromNewsText, type StudioGreetingCopy } from './studio-print-copy'
+import { greetingCopyFromNewsText } from './studio-print-copy'
+import { buildCompactImagePrompt, videoLayoutFor, type VideoOrientation } from './studio-image-prompt'
+export { buildCompactImagePrompt, videoLayoutFor, type VideoOrientation } from './studio-image-prompt'
 
 export const OPENAI_MODEL = 'gpt-5.5'
 
@@ -27,21 +30,6 @@ export const FACE_LOCK =
   'Keep any person, clothing, pose, and scene from the supplied photograph unchanged; do not redraw, restyle, replace, or synthesize a person. ' +
   'Build the editorial layout around the photo using its natural crop and negative space. Keep text and graphics away from the face, hands, and important clothing. ' +
   'بالعربية: استخدم الصورة المرجعية كما هي كلقطة وثائقية حقيقية، ولا تعِد رسم الشخص أو تغيّر ملامحه أو ملابسه أو وضعيته؛ ابنِ التصميم حولها، ولا تحشر الصورة بين النصوص أو تضع النص فوق الوجه أو الجسد.'
-
-/**
- * توجيه تخطيط الفيديو — يُلحق فقط عند تفعيل "الخبر يتضمّن فيديو" في الاستوديو.
- * يُعيد هيكلة التصميم: مساحة فيديو أفقية كبيرة فارغة + صورة الشخص في إطار احترافي.
- */
-export type VideoOrientation = 'landscape' | 'portrait'
-
-export function videoLayoutFor(orientation: VideoOrientation = 'landscape'): string {
-  if (orientation === 'portrait') {
-    return '=== VIDEO LAYOUT OVERRIDE — PORTRAIT 9:16 (highest priority) ===\n' +
-      'This post contains a vertical video. On the 1080×1350 portrait canvas, reserve one large empty 9:16 video window, approximately 56% of canvas width and 85% of its height, aligned to the right side. Keep this video window visibly dominant with a slim gold outline, subtle play icon, and a continuous integrated background; it must be empty inside with no person, image, words, numbers, or icons. Arrange the Arabic headline, factual callouts, and any reference photo in a clear vertical information column on the left, without covering the video window. Do not convert the 9:16 window into a horizontal frame or place a video inside it.'
-  }
-  return '=== VIDEO LAYOUT OVERRIDE — LANDSCAPE 16:9 (highest priority) ===\n' +
-    'This post contains a horizontal video. On the 1080×1350 portrait canvas, reserve one large empty 16:9 video window spanning almost the full width across the upper half. Keep it visibly dominant with a slim gold outline, subtle play icon, and a continuous integrated background; it must be empty inside with no person, image, words, numbers, or icons. Place the Arabic headline, factual callouts, and any reference photo below or around the video window without covering it. Do not convert the 16:9 window into a vertical frame or place a video inside it.'
-}
 
 /**
  * توجيه "الصياغة الدائمة" — يُحقَن في الأتمتة (إعادة نشر الأرشيف) فقط.
@@ -68,23 +56,7 @@ export interface Concept {
   imagePrompt?: string
 }
 
-const REQUIRED_STUDIO_CONCEPTS: Array<Required<Omit<Concept, 'imagePrompt'>>> = [
-  {
-    title: 'صورة خبرية كاملة',
-    mood: 'مصداقية ووضوح وهدوء',
-    brief: 'استخدام الصورة الحقيقية كلقطة خبرية محورية واضحة دون إعادة رسمها، مع عنوان عربي مختصر في مساحة سالبة طبيعية وشريط معلومات رشيق بعيد عن الوجه والجسد.',
-  },
-  {
-    title: 'غلاف تحريري بسيط',
-    mood: 'أناقة معاصرة وحضور إنساني',
-    brief: 'الصورة الحقيقية داخل قص مستطيل نظيف يناسب زاويتها الأصلية، مع مساحة لونية واحدة وعنوان قوي وحقيقتين قصيرتين فقط ضمن تسلسل عربي من اليمين إلى اليسار.',
-  },
-  {
-    title: 'صفحة مجلة موثوقة',
-    mood: 'احتراف وثقة ومساحة تنفس',
-    brief: 'تخطيط مجلة هادئ يضع الصورة الحقيقية كاملة أو شبه كاملة في منطقة مستقلة، ويوازنها بكتلة عنوان ومساحة بيضاء محسوبة وفواصل دقيقة بلا كولاج أو مؤثرات صناعية.',
-  },
-]
+const REQUIRED_STUDIO_CONCEPTS: Array<Required<Omit<Concept, 'imagePrompt'>>> = STUDIO_DESIGN_DIRECTIONS
 
 function requireThreeConcepts(value: unknown): Concept[] {
   const supplied: Concept[] = Array.isArray(value)
@@ -125,7 +97,7 @@ export async function prepareConceptImagePrompts(
   void args.sourceImageCount
   void args.hasVideo
   void args.videoOrientation
-  return args.concepts.map(concept => ({
+  return requireThreeConcepts(args.concepts).map(concept => ({
     title: concept.title,
     mood: concept.mood,
     brief: concept.brief,
@@ -136,16 +108,7 @@ export async function prepareConceptImagePrompts(
  * أنماط تصميم متمايزة — تُوزَّع على منشورات الدفعة اليومية (نمط مختلف لكل منشور)
  * لضمان تنوّع بصري واضح بدل نمط واحد متكرّر، مع الحفاظ على ثوابت هوية First1Saudi.
  */
-export const POSTER_STYLES: string[] = [
-  'صورة خبرية كاملة: الصورة الحقيقية هي البطل، بقص طبيعي أو ملء كامل، وعنوان قصير في مساحة سالبة واضحة بعيداً عن الشخص.',
-  'مينمال تحريري: مساحة لونية هادئة، صورة حقيقية مستقلة، تايبوغرافي قوي، وفواصل دقيقة مع أقل عدد ممكن من العناصر.',
-  'إنفوجرافيك رشيق: الصورة الحقيقية في إطار واضح وبجوارها حقيقتان أو ثلاث فقط بأرقام وخطوط تنظيمية بسيطة دون بطاقات كثيرة.',
-  'غلاف مجلة موثوق: لقطة حقيقية كبيرة وعنوان افتتاحي موجز وهوامش دقيقة، من دون كولاج أو قصاصات حول الوجه والجسد.',
-  'تقسيم تحريري نظيف: منطقة مستقلة للصورة ومنطقة مستقلة للنص، بتوازن غير متماثل محسوب ومساحة تنفس كافية.',
-  'بورتريه وثائقي راقٍ: الحفاظ على اللقطة والملامح والإضاءة الأصلية، مع إطار بسيط واسم وسطر إنجاز واحد فقط.',
-  'بطاقة بيانات هادئة: صورة حقيقية واضحة مع رقم محوري واحد وحقيقتين، بلا أيقونات عشوائية أو مؤثرات مستقبلية.',
-  'تايبوغرافي وصورة: عنوان عربي قوي لا يتقاطع مع الشخص، والصورة بحجم مريح داخل قص يناسب زاويتها الأصلية.',
-]
+export const POSTER_STYLES: string[] = STUDIO_DESIGN_DIRECTIONS.map(direction => `${direction.title}: ${direction.brief}`)
 
 /** يخلط أنماط التصميم ويعيدها (لتوزيع نمط مختلف على كل منشور في الدفعة). */
 export function shuffledPosterStyles(): string[] {
@@ -247,86 +210,6 @@ export function buildStudioSafetyFallbackPrompt(args: { analysis: unknown; chose
   return buildCompactImagePrompt(args)
 }
 
-function textValue(value: unknown, maxLength: number): string {
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, maxLength) : ''
-}
-
-function textList(value: unknown, limit: number, maxLength: number): string[] {
-  return Array.isArray(value)
-    ? value.map(item => textValue(item, maxLength)).filter(Boolean).slice(0, limit)
-    : []
-}
-
-/** يستبعد لغة التحليل الداخلية كي لا تُطبع على التصميم كأنها جزء من الخبر. */
-function finalPrintCopy(value: unknown, maxLength: number): string {
-  const source = textValue(value, maxLength)
-  if (!source) return ''
-  if (/^(?:المناسبة|التهنئة\s*موجّهة\s*إلى|النص\s*الختامي|الشعار\s*الرسمي\s*المطلوب\s*إبرازه|التصميم\s*مخصّص|وصف\s*الصورة)\s*[:：]/i.test(source)) return ''
-  if (/^(?:التصميم\s*مخصّص|الصورة\s*المرفقة|يظهر\s*التصميم|تظهر\s*الصورة)/i.test(source)) return ''
-  return source
-    .replace(/^(?:الخبر\s*(?:الحالي|المذكور)?\s*)?(?:يذكر|يتحدث\s*عن|يتناول|يركز\s*على|يستعرض|يشير\s*إلى|يوضح|يسلط\s*الضوء\s*على)\s*[:،-]?\s*/i, '')
-    .replace(/^(?:هذا\s*(?:الخبر|المحتوى)|المحتوى)\s*(?:يتحدث\s*عن|يتناول|يستعرض|يركز\s*على)\s*[:،-]?\s*/i, '')
-    .replace(/^(?:في\s*الخبر\s*(?:الحالي|المذكور))\s*[:،-]?\s*/i, '')
-    .trim()
-}
-
-/**
- * موجّه صورة قصير يُنشأ لحظة التوليد؛ لا يعيد إدخال برومبتات تاريخية مطوّلة
- * قد تطلب تعديل وجه أو هوية الشخص فتتوقف عند فحص أمان الصور.
- */
-export function buildCompactImagePrompt(args: {
-  analysis: unknown
-  chosenConcept: string
-  sourceText?: string
-  note?: string
-  extra?: string
-  hasVideo?: boolean
-  videoOrientation?: VideoOrientation
-  templateDirective?: string
-}): string {
-  const record = args.analysis && typeof args.analysis === 'object'
-    ? args.analysis as Record<string, unknown>
-    : {}
-  const posterCopy = args.sourceText
-    ? greetingCopyFromNewsText(args.sourceText) ?? undefined
-    : record.poster_copy as StudioGreetingCopy | undefined
-  if (posterCopy?.kind === 'greeting' && posterCopy.message) {
-    return buildGreetingPosterPrompt(posterCopy, {
-      direction: textValue(args.chosenConcept, 1100),
-      note: textValue(args.note, 500),
-      templateDirective: args.templateDirective,
-      videoDirective: args.hasVideo ? videoLayoutFor(args.videoOrientation) : undefined,
-    })
-  }
-  const name = finalPrintCopy(record.name, 160)
-  const achievement = finalPrintCopy(record.achievement_core, 360)
-  const label = finalPrintCopy(record.context_label, 120)
-  const facts = [...textList(record.key_facts, 3, 220), ...textList(record.awards, 1, 220)]
-    .map(fact => finalPrintCopy(fact, 220))
-    .filter(Boolean)
-  const direction = textValue(args.chosenConcept, 1100)
-  const note = textValue(args.note, 500)
-  const extra = textValue(args.extra, 500)
-  const displayContent = [name, achievement, ...facts].filter(Boolean).map(value => `"${value}"`).join('\n')
-
-  return [
-    'Create a premium 4:5 Arabic editorial social-media poster for First1Saudi.',
-    'Use each supplied reference image as an intact documentary photograph. Do not redraw, replace, alter, beautify, or synthesize people, clothing, faces, hands, or poses. Build the composition around the real photographs and keep them visibly photographic.',
-    `Creative direction: ${direction || 'A restrained modern Arabic editorial layout with one real focal photograph and a clear hierarchy.'}`,
-    label ? `Internal visual context only: ${label}` : '',
-    `Only the following quoted lines may be printed on the artwork:\n${displayContent || 'Create a concise Arabic headline from the verified source.'}`,
-    'Set the quoted Arabic as finished news copy: direct, human, clear, and declarative. Never print field labels, analysis summaries, source-image descriptions, or explanatory metadata.',
-    'Use strict right-to-left Arabic hierarchy, one concise headline, and no more than three short callouts. Keep all copy in a dedicated readable zone away from faces, hands, and important clothing. Do not squeeze the photograph between text blocks. Do not copy a long caption, invent facts, or add photo descriptions.',
-    'Use deep teal, Saudi green, turquoise, restrained gold, and white. Keep the artwork full-bleed, with no white logo panel or empty logo frame.',
-    'Keep the composition simple and credible: one focal image, one headline, restrained rules and colour fields. Avoid fantasy glow, floating particles, energy trails, plastic skin, excessive cutouts, decorative science motifs, fake architecture, and busy AI-style effects.',
-    'Add a compact footer with equal, recognizable icons for X, Instagram, LinkedIn, Facebook, and TikTok followed by @First1Saudi. Do not draw a brand logo; it is overlaid after generation.',
-    args.templateDirective ?? '',
-    args.hasVideo ? videoLayoutFor(args.videoOrientation) : '',
-    note ? `Apply this additional visual direction: ${note}` : '',
-    extra ? `Additional verified context: ${extra}` : '',
-    'Avoid flags, politics, weapons, military content, danger symbols, and violence.',
-  ].filter(Boolean).join('\n\n')
-}
 
 /** الخطوة 4 — توليد التصميم عبر OpenAI Images + تركيب اللوقو + الرفع إلى التخزين. */
 export async function generateDesign(
@@ -399,7 +282,7 @@ export async function editDesign(args: { designImageUrl: string; note: string; e
       ? `The ${referenceImageUrls.length} additional attached image(s) are the mandatory replacement visual source(s). Replace or integrate the requested photo content from them while preserving every depicted person's exact facial identity, features, skin tone, body proportions, clothing, accessories, and appearance. Never alter, beautify, restyle, or invent their face, body, or clothes. Keep the purple Mawhiba calligraphy logo and every white letter within it completely intact; do not crop, erase, translate, or regenerate any part of either campaign logo. `
       : '') +
     'Only modify what the requested change requires — but DO make that change; do not return the image unchanged.\n' +
-    'Render Arabic text crisp and correctly shaped (RTL). Output the edited design as a portrait 1080×1350 (4:5) ultra-HD image.'
+    'Do not add any new words inside or underneath the original logo area. Preserve the existing logo as supplied. Render Arabic text crisp and correctly shaped (RTL). Output the edited design as a portrait 1080×1350 (4:5) ultra-HD image.'
 
   const { b64 } = await generateImageWithOpenAI(prompt, [designImageUrl, ...referenceImageUrls], { allowSafetyFallback: false })
   const posterBase = await resizeToPoster(Buffer.from(b64, 'base64'))
@@ -412,9 +295,9 @@ export async function editDesign(args: { designImageUrl: string; note: string; e
 export interface InfographicPerson { imageUrl: string; name: string; blurb: string }
 
 export const INFOGRAPHIC_DIRECTIONS = [
-  'شبكة بطاقات أنيقة بحواف ناعمة وظلال خفيفة',
-  'أعمدة عمودية متناسقة بفواصل ذهبية',
-  'تصميم دائري/مموّج عصري بعمق وتدرّجات',
+  'الاحتفالي الكلاسيكي: بطاقات أشخاص متوازنة بإطارات ذهبية وأسماء كاملة وخلفية زمردية مرتبطة بالمجال',
+  'الدرامي الحماسي: بطاقات صور حقيقية بحضور أكبر وإضاءة ذهبية سينمائية دون تغيير الوجوه أو ترتيب الأشخاص',
+  'الأنيق المختصر: شبكة أشخاص هادئة بمساحات سالبة وتايبوغرافي راقٍ وزخارف قليلة',
 ]
 
 /** يضيف رقماً دائرياً على زاوية صورة الشخص — مرساة ربط بصرية موثوقة للنموذج. */
@@ -468,7 +351,8 @@ export async function generateInfographic(
     `الأشخاص:`,
     peopleList,
     ``,
-    `الهوية: تيل عميق #0A2D35–#0D3D47 · أخضر سعودي #2D8B3F–#3A9B4F · ذهبي #FFD700 · أبيض. فوتر إلزامي فيه أيقونات X وInstagram وLinkedIn وFacebook وTikTok كاملة وبالحجم نفسه، ثم "@First1Saudi".`,
+    STUDIO_BRAND_RULES,
+    STUDIO_LOGO_RESERVATION,
     `‼️ لا ترسم أي مربّع أبيض أو إطار فارغ للشعار في الزوايا — الشعار يُضاف برمجياً فوق التصميم، فاجعل الخلفية ممتدّة بلا فراغات بيضاء.`,
     `OUTPUT: عمودي 1080×1350، ultra-HD، نصوص عربية حادّة صحيحة الاتجاه (RTL)، بلا اختلاق نص ولا إيموجي.`,
     extraInfo && extraInfo.trim() ? `\nمعلومات إضافية تُراعى: ${extraInfo.trim()}` : '',
@@ -478,10 +362,12 @@ export async function generateInfographic(
   const safetyFallbackPrompt = [
     'Create a premium 4:5 Arabic editorial infographic for First1Saudi about an accomplished Saudi figure or group.',
     `Headline: ${title.slice(0, 220)}.`,
-    `Use these verified concise facts as callouts: ${people.slice(0, 4).map(person => `${person.name}: ${person.blurb}`).join(' | ')}`,
+    `Use these verified concise facts as callouts: ${people.map(person => `${person.name}: ${person.blurb}`).join(' | ')}`,
     `Creative direction: ${direction.slice(0, 1800)}.`,
     'Preserve every supplied reference person exactly in face, identity, body, clothing, apparent age, and hairstyle. Integrate them into the composition rather than producing a plain portrait.',
-    'Use strict RTL Arabic hierarchy. Add a compact footer with X, Instagram, LinkedIn, Facebook, and TikTok icons followed by @First1Saudi. Do not draw a logo; it is overlaid after generation.',
+    'Use strict RTL Arabic hierarchy.',
+    STUDIO_BRAND_RULES,
+    STUDIO_LOGO_RESERVATION,
     'Full-bleed artwork only, no white panel, no frame, no invented claims, flags, weapons, political or military imagery.',
   ].join('\n\n')
   const { b64 } = await generateImageFromPartsWithOpenAI(imagePrompt, refs, { safetyFallbackPrompt })
@@ -560,7 +446,6 @@ export async function runStudioPipeline(input: {
   note?: string
   styleDirective?: string // نمط تصميم إلزامي لهذا المنشور (لتنويع الدفعة)
 }): Promise<StudioResult> {
-  if (!input.sourceImages?.length) throw new Error('لا توجد صورة مصدر للخبر')
   const openai = getOpenAI()
   const newsText = buildNewsText(input)
 
@@ -578,7 +463,7 @@ export async function runStudioPipeline(input: {
   // نمط إلزامي لهذا المنشور (إن مُرِّر) — يضمن تمايزاً بصرياً واضحاً بين منشورات الدفعة.
   const styleNote = input.styleDirective
     ? `‼️ نمط التصميم الإلزامي لهذا المنشور: ${input.styleDirective}\n` +
-      `اجعل التخطيط والمعالجة البصرية متمايزة بوضوح بهذا النمط تحديداً، مع الحفاظ التام على ثوابت الهوية (الألوان/الفوتر/التايبوغرافي) والصورة الحقيقية.`
+      `اجعل التخطيط والمعالجة البصرية متمايزة بوضوح بهذا النمط تحديداً، مع الحفاظ على التسلسل المعتمد والهوية ومساحات الأصول الرقمية والصورة الحقيقية.`
     : ''
   const { imageUrl, prompt } = await generateDesign(openai, {
     analysis,
