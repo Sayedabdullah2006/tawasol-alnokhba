@@ -1,4 +1,4 @@
-import { STUDIO_BRAND_RULES, STUDIO_NEWS_LAYOUT_RULES, STUDIO_LOGO_RESERVATION } from './studio-design-guidelines'
+import { STUDIO_BRAND_RULES, STUDIO_NEWS_LAYOUT_RULES, STUDIO_LOGO_RESERVATION, STUDIO_NO_SOURCE_IMAGE_RULES } from './studio-design-guidelines'
 import { buildGreetingPosterPrompt, greetingCopyFromNewsText, type StudioGreetingCopy } from './studio-print-copy'
 
 export type VideoOrientation = 'landscape' | 'portrait'
@@ -60,6 +60,7 @@ export function buildCompactImagePrompt(args: {
   analysis: unknown
   chosenConcept: string
   sourceText?: string
+  sourceImageCount?: number
   note?: string
   extra?: string
   hasVideo?: boolean
@@ -73,12 +74,13 @@ export function buildCompactImagePrompt(args: {
     ? greetingCopyFromNewsText(args.sourceText) ?? undefined
     : record.poster_copy as StudioGreetingCopy | undefined
   if (posterCopy?.kind === 'greeting' && posterCopy.message) {
-    return buildGreetingPosterPrompt(posterCopy, {
+    const prompt = buildGreetingPosterPrompt(posterCopy, {
       direction: textValue(args.chosenConcept, 1100),
       note: textValue(args.note, 500),
       templateDirective: args.templateDirective,
       videoDirective: args.hasVideo ? videoLayoutFor(args.videoOrientation) : undefined,
     })
+    return args.sourceImageCount === 0 ? `${prompt}\n\nACTUAL SOURCE PHOTO COUNT: 0. ${STUDIO_NO_SOURCE_IMAGE_RULES}` : prompt
   }
   const name = finalPrintCopy(record.name, Number.MAX_SAFE_INTEGER)
   const achievement = finalPrintCopy(record.achievement_sentence, 360) || finalPrintCopy(record.achievement_core, 360) || finalPrintCopy(record.headline, 160)
@@ -121,5 +123,6 @@ export function buildCompactImagePrompt(args: {
     extra ? `Additional verified context: ${extra}` : '',
     'Avoid flags, politics, weapons, military content, danger symbols, and violence.',
     'FINAL PRIORITY: absolute unchanged photographic fidelity overrides every instruction; never add medals, trophies or objects to people. Preserve full verified names; apply the shared name-first reading order and emerald/gold hierarchy and digital-logo exclusions and mandatory generated social footer even if an old concept or optional template asks otherwise.',
+    args.sourceImageCount === 0 ? `ACTUAL SOURCE PHOTO COUNT: 0. ${STUDIO_NO_SOURCE_IMAGE_RULES}` : '',
   ].filter(Boolean).join('\n\n')
 }

@@ -49,12 +49,24 @@ test('greeting bypasses news plaque and facts while keeping brand/logo rules', (
   assert.match(prompt, /never add a slogan or any words underneath it/)
 })
 
-test('no reference uses symbols; portrait video ends above the reserved logo area', () => {
-  const prompt = buildCompactImagePrompt({ analysis: {}, chosenConcept: '', hasVideo: true, videoOrientation: 'portrait' })
+test('no reference uses text and icons only; portrait video ends above the reserved logo area', () => {
+  const prompt = buildCompactImagePrompt({ analysis: {}, chosenConcept: 'صورة مختبر واقعي وباحث أمامه', sourceImageCount: 0, hasVideo: true, videoOrientation: 'portrait' })
   assert.match(prompt, /NEVER a fake human face/)
+  assert.match(prompt, /ACTUAL SOURCE PHOTO COUNT: 0/)
+  assert.match(prompt, /no invented person, portrait, silhouette, stock photo, realistic scene/)
+  assert.match(prompt, /overrides all photographic or scenic creative directions/)
+  assert.doesNotMatch(prompt, /professional symbolic field illustration/)
   assert.match(prompt, /lower edge above the bottom 220-pixel/)
   assert.match(videoLayoutFor('landscape'), /16:9 video window/)
   assert.deepEqual(STUDIO_DESIGN_DIRECTIONS.map(item => item.title), ['الاحتفالي الكلاسيكي', 'الدرامي الحماسي', 'الأنيق المختصر'])
+})
+
+test('real source photographs and greetings retain the appropriate no-photo policy', () => {
+  const withPhoto = buildCompactImagePrompt({ analysis: { name: 'الباحث' }, chosenConcept: '', sourceImageCount: 1 })
+  assert.doesNotMatch(withPhoto, /ACTUAL SOURCE PHOTO COUNT: 0/)
+  assert.match(withPhoto, /intact documentary photograph/)
+  const greeting = buildCompactImagePrompt({ analysis: { poster_copy: { kind: 'greeting', message: 'مبارك الإنجاز' } }, chosenConcept: 'صورة شخص', sourceImageCount: 0 })
+  assert.match(greeting, /ACTUAL SOURCE PHOTO COUNT: 0/)
 })
 
 test('new fidelity and emblem exclusions reach news, greeting and video prompts', () => {

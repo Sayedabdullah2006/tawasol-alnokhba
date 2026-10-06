@@ -80,3 +80,19 @@ test('stops at a request boundary while retaining the just completed analysis', 
   assert.equal(result.analysis.name, 'الأول')
   assert.equal(result.designs.length, 0)
 })
+
+test('tweets-only stops before designs; later generation reuses the same news tweets and uploaded image', async () => {
+  const input = { ...story('الأول'), selectedImages: ['https://example.com/uploaded-photo.jpg'] }
+  const requests = []
+  const request = async payload => { requests.push(payload); return reply(payload) }
+  const tweetsOnly = await runStoryPipeline(input, request, () => {}, () => false, 'tweets')
+  assert.deepEqual(requests.map(p => p.step), ['analyze', 'tweets'])
+  assert.equal(tweetsOnly.tweets, 'نص الأول')
+  assert.equal(tweetsOnly.designs.length, 0)
+  requests.length = 0
+  const full = await runStoryPipeline(tweetsOnly, request, () => {}, () => false)
+  assert.deepEqual(requests.map(p => p.step), ['concepts', 'image', 'image', 'image'])
+  assert.equal(full.tweets, tweetsOnly.tweets)
+  assert.equal(full.designs.length, 3)
+  for (const payload of requests) assert.deepEqual(payload.sourceImages, input.selectedImages)
+})

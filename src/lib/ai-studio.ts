@@ -169,7 +169,7 @@ export async function generateConcepts(
   // توجيهات التنويع: مجموعة عشوائية من عائلات الاتجاه + محاور التنويع + استبعاد السابق
   const directives = buildConceptDirectives({ exclude: args.excludeTitles })
   const conceptContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
-    { type: 'text', text: `${JSON.stringify(args.analysis)}\n\n${args.newsText}\n\n${directives}` },
+    { type: 'text', text: `${JSON.stringify(args.analysis)}\n\n${args.newsText}\n\n${directives}\n\nActual source photo count: ${args.sourceImages.length}. ${args.sourceImages.length ? 'Build around only the supplied unmodified photographs.' : 'No source photo exists: directions must use typography, small fact icons and abstract decoration only; do not invent a portrait, replacement hero or scene.'}` },
   ]
   for (const img of args.sourceImages) conceptContent.push({ type: 'image_url', image_url: { url: img } })
   const completion = await chatComplete(openai, {
@@ -203,7 +203,7 @@ export function conceptToString(c: Concept | undefined): string {
 }
 
 /** Keeps a moderation retry faithful to the selected studio direction instead of using a generic poster. */
-export function buildStudioSafetyFallbackPrompt(args: { analysis: unknown; chosenConcept: string; sourceText?: string; hasVideo?: boolean; videoOrientation?: VideoOrientation }): string {
+export function buildStudioSafetyFallbackPrompt(args: { analysis: unknown; chosenConcept: string; sourceText?: string; sourceImageCount?: number; hasVideo?: boolean; videoOrientation?: VideoOrientation }): string {
   return buildCompactImagePrompt(args)
 }
 
@@ -227,7 +227,7 @@ export async function generateDesign(
   // تحرير حساسة على الصورة المرجعية. نستخلص فقط الحقائق والاتجاه الآمن الحالي.
   void openai
   void preparedPrompt
-  const designPrompt = buildCompactImagePrompt({ analysis, chosenConcept, sourceText: args.sourceText, note, extra, hasVideo, videoOrientation, templateDirective })
+  const designPrompt = buildCompactImagePrompt({ analysis, chosenConcept, sourceText: args.sourceText, sourceImageCount: sourceImages.length, note, extra, hasVideo, videoOrientation, templateDirective })
 
   // قفل الصورة: يُحاط به موجّه الصورة من الطرفين حتى يبني النموذج القالب حول اللقطة الحقيقية.
   // عند وجود فيديو: نُلحق توجيه تخطيط الفيديو في النهاية (أولوية قصوى).
@@ -236,7 +236,7 @@ export async function generateDesign(
     : `${FACE_LOCK}\n\n${designPrompt}\n\n${FACE_LOCK}`
   const { b64 } = await generateImageWithOpenAI(imagePrompt, sourceImages, {
     quality: 'high',
-    safetyFallbackPrompt: buildStudioSafetyFallbackPrompt({ analysis, chosenConcept, sourceText: args.sourceText, hasVideo, videoOrientation }),
+    safetyFallbackPrompt: buildStudioSafetyFallbackPrompt({ analysis, chosenConcept, sourceText: args.sourceText, sourceImageCount: sourceImages.length, hasVideo, videoOrientation }),
   })
   const rawImage = Buffer.from(b64, 'base64')
   const posterBase = await resizeToPoster(rawImage)

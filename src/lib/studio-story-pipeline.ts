@@ -12,6 +12,7 @@ export async function runStoryPipeline(
   request: (payload: Record<string, unknown>) => Promise<StoryResponse>,
   update: (story: LinkStory) => void,
   stopped: () => boolean,
+  target: 'tweets' | 'designs' = 'designs',
 ): Promise<LinkStory> {
   let current: LinkStory = { ...story, error: undefined }
   const base = { title: story.title, content: story.content, sourceImages: story.selectedImages, extraInfo: `رابط المصدر: ${story.sourceUrl}`, hasVideo: false }
@@ -31,6 +32,10 @@ export async function runStoryPipeline(
       const data = await request({ ...base, step: 'tweets', analysis: current.analysis })
       if (!data.tweets) throw new Error('لم تصل نصوص الخبر')
       current = { ...current, tweets: data.tweets }; update(current)
+    }
+    if (target === 'tweets') {
+      current = { ...current, status: current.designs.length === 3 ? 'مكتمل' : 'التغريدات جاهزة' }; update(current)
+      return current
     }
     if (!current.concepts?.length) {
       if (!stage('جارٍ توليد الاتجاهات')) return current
