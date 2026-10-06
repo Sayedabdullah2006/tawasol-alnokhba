@@ -28,7 +28,7 @@ function reportRules() {
     'Report layout exception: keep the horizontal presentation hierarchy of the supplied slide title and content; do not add the news-poster plaque or force a 4:5 layout.',
     'Render every Arabic phrase quoted below accurately, connected, crisp and readable. Do not translate, paraphrase, omit, invent, or replace any quoted Arabic text or numeric fact.',
     'Leave bottom-center empty for later digital social handles. Original First1Saudi and Mawhiba logos are composited after generation; never generate logos, social icons, handles or URLs.',
-    'On the 1600×900 report slide reserve the lower-right 450×220-pixel pocket including the area underneath the digital logos. No text, labels, numbers, icons or people inside or below it; keep a continuous emerald background, never a white panel or empty box.',
+    'On the 1600×900 report slide reserve the lower-right 450×220-pixel pocket including the area underneath the digital logos. No text, labels, numbers, icons or people inside or below it; keep only the plain emerald base color, without texture, patterns, glow, decoration, white panel or empty box.',
   ].join('\n')
 }
 

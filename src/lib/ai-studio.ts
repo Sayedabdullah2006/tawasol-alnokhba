@@ -8,7 +8,7 @@
  * نفس البرومبتات (SYS_*) ونفس النماذج — لا يوجد سلوك مختلف عن الواجهة.
  */
 import OpenAI from 'openai'
-import { STUDIO_BRAND_RULES, STUDIO_LOGO_RESERVATION, STUDIO_DESIGN_DIRECTIONS } from './studio-design-guidelines'
+import { STUDIO_BRAND_RULES, STUDIO_LOGO_RESERVATION, STUDIO_DESIGN_DIRECTIONS, STUDIO_PHOTO_FIDELITY_RULES, STUDIO_EXCLUDED_EMBLEM_RULE } from './studio-design-guidelines'
 import sharp from 'sharp'
 import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, buildConceptDirectives, buildTweetDirectives } from './openai'
 import { generateImageWithOpenAI, generateImageFromPartsWithOpenAI } from './image-generation'
@@ -25,11 +25,8 @@ export const OPENAI_MODEL = 'gpt-5.5'
  * قفل الصورة المرجعية — تعليمة تحفظ اللقطة الأصلية داخل التكوين التحريري.
  * مكتوبة بالعربية والإنجليزية كي يتكيّف القالب مع الصورة بدلاً من إعادة رسمها.
  */
-export const FACE_LOCK =
-  'REFERENCE PHOTO RULE: treat each attached photo as an intact documentary photograph. ' +
-  'Keep any person, clothing, pose, and scene from the supplied photograph unchanged; do not redraw, restyle, replace, or synthesize a person. ' +
-  'Build the editorial layout around the photo using its natural crop and negative space. Keep text and graphics away from the face, hands, and important clothing. ' +
-  'بالعربية: استخدم الصورة المرجعية كما هي كلقطة وثائقية حقيقية، ولا تعِد رسم الشخص أو تغيّر ملامحه أو ملابسه أو وضعيته؛ ابنِ التصميم حولها، ولا تحشر الصورة بين النصوص أو تضع النص فوق الوجه أو الجسد.'
+export const FACE_LOCK = STUDIO_PHOTO_FIDELITY_RULES +
+  ' بالعربية: ضع الصور كقصاصات فوتوغرافية غير معدّلة، ولا تغيّر الوجوه أو التعابير أو الملابس أو الوضعيات، ولا تضف ميداليات أو كؤوساً أو أي عناصر إلى الأشخاص؛ الإبداع في الخلفية والتخطيط حول الصور فقط.'
 
 /**
  * توجيه "الصياغة الدائمة" — يُحقَن في الأتمتة (إعادة نشر الأرشيف) فقط.
@@ -269,6 +266,8 @@ export async function editDesign(args: { designImageUrl: string; note: string; e
 
   const prompt =
     'EDIT the attached social-media design image (this is an image-editing task, not generation).\n' +
+    STUDIO_PHOTO_FIDELITY_RULES + '\n' +
+    STUDIO_EXCLUDED_EMBLEM_RULE + '\n' +
     '‼️ APPLY THIS CHANGE NOW — it MUST be clearly and visibly applied to the image: ' + note.trim() + '\n' +
     'بالعربية — نفّذ هذا التعديل على الصورة المرفقة فوراً بحيث يظهر واضحاً: ' + note.trim() + '\n\n' +
     (exactText.trim() ? `EXACT NEW TEXT — Add this exact Arabic phrase in a small, readable line without changing any existing text: "${exactText.trim()}". Copy every character exactly as supplied, with correct connected RTL Arabic shaping. Do not invent, shorten, translate, spell-correct, or alter it.\n` : '') +

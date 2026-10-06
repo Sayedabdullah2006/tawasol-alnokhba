@@ -93,7 +93,7 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
       : '',
     'Turn the facts into an original visual infographic hierarchy: use a concise Arabic headline only when it can be rendered accurately, then 2 to 4 short factual callouts, numbers, icons, data marks, or a small timeline. Never use long paragraphs, never repeat the full post caption, and never make the design look like a screenshot of a social post.',
     args.exactText?.trim() ? `Add this exact Arabic phrase in a small, readable line: "${args.exactText.trim()}". Copy every character exactly as supplied with correct connected RTL shaping. Do not invent, shorten, translate, spell-correct, or alter it.` : '',
-    'Reserve a 300×220-pixel lower-right pocket for original First1Saudi and Mawhiba digital overlays, including the full area below them. No text, people, numbers, icons or video in or beneath this pocket. Continue the emerald background texture behind it without a panel or frame. Leave bottom-center empty for later digital social handles; never AI-render them.',
+    'Reserve a 300×220-pixel lower-right pocket for original First1Saudi and Mawhiba digital overlays, including the full area below them. No text, people, numbers, icons or video in or beneath this pocket. Use only the plain emerald base background behind it, without texture, patterns, glow, decoration, panel or frame. Leave bottom-center empty for later digital social handles; never AI-render them.',
     args.note?.trim() ? `Additional creative direction: ${args.note.trim()}` : '',
   ].filter(Boolean).join('\n\n')
   const safetyFallbackPrompt = [

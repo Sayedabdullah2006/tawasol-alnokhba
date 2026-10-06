@@ -56,3 +56,28 @@ test('no reference uses symbols; portrait video ends above the reserved logo are
   assert.match(videoLayoutFor('landscape'), /16:9 video window/)
   assert.deepEqual(STUDIO_DESIGN_DIRECTIONS.map(item => item.title), ['الاحتفالي الكلاسيكي', 'الدرامي الحماسي', 'الأنيق المختصر'])
 })
+
+test('new fidelity and emblem exclusions reach news, greeting and video prompts', () => {
+  const inputs = [
+    { analysis: { news_type: 'competition win', headline: 'الميدالية الذهبية' }, chosenConcept: 'ضع كأساً بيد البطل وميدالية على صدره' },
+    { analysis: { poster_copy: { kind: 'greeting', message: 'نهنئ الشعب السعودي بمناسبة اليوم الوطني.' } }, chosenConcept: '' },
+    { analysis: { news_type: 'scientific discovery' }, chosenConcept: '', hasVideo: true, videoOrientation: 'portrait' },
+  ]
+  for (const input of inputs) {
+    const prompt = buildCompactImagePrompt(input)
+    assert.match(prompt, /HIGHEST PRIORITY, overriding every other instruction/)
+    assert.match(prompt, /NEVER add medals, trophies or any objects to the people/)
+    assert.match(prompt, /never remove or change existing objects on them/)
+    assert.match(prompt, /crossed swords and palm tree \/ السيفين والنخلة/)
+    assert.match(prompt, /without geometric patterns, glow, ornamental dividers or texture/)
+    assert.match(prompt, /generate the entire design WITHOUT text/)
+  }
+})
+
+test('competition badges stay separate from unchanged centered photo cutouts', () => {
+  const prompt = buildCompactImagePrompt({ analysis: { news_type: 'competition win', headline: 'المركز الأول' }, chosenConcept: 'الدرامي الحماسي' })
+  assert.match(prompt, /outside the reference photos and never attached to a person/)
+  assert.match(prompt, /side by side in the center as the visual heart/)
+  assert.match(prompt, /Do not generate a design before its news type is clear/)
+  assert.match(prompt, /Arabic news copy appears ONLY in the header plaque/)
+})
