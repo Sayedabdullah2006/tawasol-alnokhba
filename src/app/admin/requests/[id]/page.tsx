@@ -216,6 +216,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
   const [aiPostIndex, setAiPostIndex] = useState<number | null>(null)
   const [respondingToNegotiation, setRespondingToNegotiation] = useState(false)
   const [discountPercentage, setDiscountPercentage] = useState('')
+  const [negotiatedPrice, setNegotiatedPrice] = useState('')
   const [negotiationNotes, setNegotiationNotes] = useState('')
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showPaymentConfirm, setShowPaymentConfirm] = useState(false)
@@ -396,6 +397,34 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
       showToast(data.error ?? 'فشل إرسال العرض المعدل', 'error')
     }
     setSaving(false)
+  }
+
+  const handleSetNegotiatedPrice = async () => {
+    if (!request) return
+    const price = Number(negotiatedPrice)
+    if (!negotiatedPrice.trim() || !Number.isFinite(price) || price < 0 || price > 1000000) {
+      showToast('يرجى إدخال سعر صالح بين 0 و1,000,000 ريال', 'error')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/send-negotiated-quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: request.id, newPrice: price, customPrice: true, adminNotes: negotiationNotes.trim() || null }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        showToast(data.error ?? 'فشل إرسال السعر المحدد', 'error')
+        return
+      }
+      showToast('تم إرسال العرض بالسعر المحدد للعميل')
+      router.push('/admin/requests')
+    } catch {
+      showToast('خطأ في الاتصال بالخادم', 'error')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleDeleteRequest = async () => {
@@ -960,7 +989,7 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                   <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-4">
                     <div className="flex items-center justify-between">
                       <h4 className="font-bold text-orange-700">🤝 الرد على طلب التفاوض</h4>
-                      <Button variant="ghost" size="sm" onClick={() => { setRespondingToNegotiation(false); setDiscountPercentage(''); setNegotiationNotes('') }} className="text-orange-600 hover:bg-orange-100">إلغاء</Button>
+                      <Button variant="ghost" size="sm" onClick={() => { setRespondingToNegotiation(false); setDiscountPercentage(''); setNegotiatedPrice(''); setNegotiationNotes('') }} className="text-orange-600 hover:bg-orange-100">إلغاء</Button>
                     </div>
                     <div className="bg-white rounded-lg p-3 space-y-1 text-sm">
                       <div><span className="font-medium text-orange-700">رسالة العميل: </span><span className="text-orange-600">{request.negotiation_reason}</span></div>
@@ -994,6 +1023,23 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                             </p>
                           )}
                           <Button onClick={handleApplyDiscount} loading={saving} disabled={!discountPercentage.trim()} className="w-full bg-blue-600 hover:bg-blue-700">تطبيق الخصم وإرسال العرض</Button>
+                        </div>
+                      </div>
+                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                        <h5 className="font-bold text-purple-700 mb-2">تحديد سعر جديد</h5>
+                        <p className="text-sm text-purple-600 mb-3">أدخل السعر الذي تريد عرضه على العميل مباشرة.</p>
+                        <div className="space-y-3">
+                          <label htmlFor="negotiated-price" className="block text-sm font-medium text-purple-700">السعر المحدد (ر.س)</label>
+                          <input
+                            id="negotiated-price"
+                            type="number"
+                            value={negotiatedPrice}
+                            onChange={e => setNegotiatedPrice(e.target.value)}
+                            min="0" max="1000000" step="0.01"
+                            className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm"
+                            placeholder="مثلاً: 2500"
+                          />
+                          <Button onClick={handleSetNegotiatedPrice} loading={saving} disabled={!negotiatedPrice.trim()} className="w-full bg-purple-600 hover:bg-purple-700">إرسال العرض بالسعر المحدد</Button>
                         </div>
                       </div>
                       <div className="bg-red-50 border border-red-200 rounded-lg p-4">

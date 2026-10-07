@@ -21,7 +21,14 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { requestId, newPrice, discountPercentage, adminNotes, acceptClientPrice, rejectNegotiation } = body
+    const { requestId, newPrice, discountPercentage, adminNotes, acceptClientPrice, rejectNegotiation, customPrice } = body
+
+    if (customPrice !== undefined && typeof customPrice !== 'boolean') {
+      return NextResponse.json({ error: 'خيار السعر المحدد غير صالح' }, { status: 400 })
+    }
+    if (customPrice && (acceptClientPrice || rejectNegotiation || discountPercentage !== undefined)) {
+      return NextResponse.json({ error: 'اختر إجراء واحداً للرد على التفاوض' }, { status: 400 })
+    }
 
     // Validate input data
     try {
@@ -93,23 +100,21 @@ export async function POST(request: Request) {
 
     const clientProposedPrice = Number(existingRequest.client_proposed_price ?? 0)
 
-    let finalPrice = newPrice
-    let actualDiscountPercentage = 0
-    let priceSource = 'admin_discount' // 'admin_discount' or 'client_accepted'
+    let finalPrice = validatePrice(newPrice)
+    // The existing nullable source distinguishes a direct price from discount/acceptance.
+    let priceSource: string | null = customPrice ? null : 'admin_discount'
 
     if (acceptClientPrice && clientProposedPrice > 0) {
       // Admin accepted the client's proposed price
       finalPrice = clientProposedPrice
       priceSource = 'client_accepted'
-      actualDiscountPercentage = originalPrice > 0
-        ? Math.round(((originalPrice - clientProposedPrice) / originalPrice) * 100)
-        : 0
-    } else {
-      // Admin set their own price (with discount percentage)
-      actualDiscountPercentage = originalPrice > 0
-        ? Math.round(((originalPrice - newPrice) / originalPrice) * 100)
-        : 0
     }
+
+    // A higher accepted price is not a discount. Keep the agreed price intact
+    // while respecting the database's 0–100 discount constraint.
+    const actualDiscountPercentage = !customPrice && originalPrice > 0
+      ? Math.max(0, Math.round(((originalPrice - finalPrice) / originalPrice) * 100))
+      : 0
 
     // Update request with negotiated price
     const { error } = await supabase
@@ -146,7 +151,7 @@ export async function POST(request: Request) {
         newPrice: finalPrice,
         discountPercentage: actualDiscountPercentage,
         adminMessage: adminNotes ?? '',
-        priceSource
+        priceSource: priceSource ?? 'admin_price'
       }).catch(e => console.error('Negotiated quote email failed:', e))
     }
 

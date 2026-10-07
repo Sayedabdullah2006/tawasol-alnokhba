@@ -1275,7 +1275,8 @@ export function negotiatedQuoteToClient(d: {
   email: string; requestNumber: string; clientName: string; originalPrice: number; newPrice: number; discountPercentage: number; adminMessage: string; priceSource?: string
 }) {
   const isClientAccepted = d.priceSource === 'client_accepted'
-  const title = isClientAccepted ? 'تم قبول عرضك المقترح' : 'عرض معدل بخصم خاص'
+  const isCustomPrice = d.priceSource === 'admin_price'
+  const title = isClientAccepted ? 'تم قبول عرضك المقترح' : isCustomPrice ? 'عرض معدل بسعر جديد' : 'عرض معدل بخصم خاص'
   const emoji = isClientAccepted ? '✅' : '🎯'
 
   return {
@@ -1291,7 +1292,9 @@ export function negotiatedQuoteToClient(d: {
       <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
         ${isClientAccepted
           ? 'تم مراجعة طلبك للتفاوض، ويسعدنا أن نقبل السعر الذي اقترحته.'
-          : 'تم مراجعة طلبك للتفاوض، ويسعدنا أن نقدم لك عرضاً معدلاً بخصم خاص.'}
+          : isCustomPrice
+            ? 'تم مراجعة طلبك للتفاوض، ويسعدنا أن نقدم لك عرضاً معدلاً بالسعر الموضح أدناه.'
+            : 'تم مراجعة طلبك للتفاوض، ويسعدنا أن نقدم لك عرضاً معدلاً بخصم خاص.'}
       </p>
 
       <div style="background:#E8F5E8; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid #059669;">
@@ -1310,7 +1313,7 @@ export function negotiatedQuoteToClient(d: {
             <td style="padding:8px 0; color:#059669; font-size:20px; font-weight:bold; text-align:left;">${d.newPrice} ر.س</td>
           </tr>
         </table>
-        ${d.discountPercentage > 0 ? `
+        ${!isCustomPrice && d.discountPercentage > 0 ? `
           <div style="background:#059669; color:#FFFFFF; padding:8px 12px; border-radius:8px; text-align:center; font-weight:bold;">
             ${isClientAccepted ? 'وفرت' : 'خصم خاص'} ${d.discountPercentage}% 🏷️
           </div>
