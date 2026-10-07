@@ -2,7 +2,7 @@ export interface LinkConcept { title?: string; brief?: string; imagePrompt?: str
 export interface LinkDesign { title: string; imageUrl: string; brief: string; preparedPrompt?: string; conceptIndex: number }
 export interface LinkStory {
   id: string; title: string; content: string; images: string[]; selectedImages: string[]; sourceUrl: string
-  selected: boolean; analysis?: unknown; tweets?: string; concepts?: LinkConcept[]; designs: LinkDesign[]; status?: string; error?: string
+  selected: boolean; analysis?: unknown; tweets?: string; selectedTweet?: string; selectedDesignUrl?: string; concepts?: LinkConcept[]; designs: LinkDesign[]; status?: string; error?: string
 }
 export interface StoryResponse { analysis?: unknown; tweets?: string; concepts?: LinkConcept[]; imageUrl?: string }
 

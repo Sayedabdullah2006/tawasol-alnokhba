@@ -5,8 +5,12 @@ import Button from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { runStoryPipeline, type LinkStory, type StoryResponse } from '@/lib/studio-story-pipeline'
 import { createClient } from '@/lib/supabase'
+import { splitSuggestedTweets, storyScheduleSelection, type ScheduledStoryPost, type StoryScheduleSelection } from '@/lib/studio-story-schedule'
 
-export default function LinkedNewsStudio({ onOpen, onBusy, disabled = false }: { onOpen: (story: LinkStory) => void; onBusy: (busy: boolean) => void; disabled?: boolean }) {
+export default function LinkedNewsStudio({ onOpen, onBusy, onSchedule, scheduledPosts, disabled = false }: {
+  onOpen: (story: LinkStory) => void; onBusy: (busy: boolean) => void; disabled?: boolean
+  onSchedule: (selection: StoryScheduleSelection) => void; scheduledPosts: Record<string, ScheduledStoryPost>
+}) {
   const { showToast } = useToast()
   const [url, setUrl] = useState('')
   const [importing, setImporting] = useState(false)
@@ -29,7 +33,7 @@ export default function LinkedNewsStudio({ onOpen, onBusy, disabled = false }: {
     } catch (error) { showToast(error instanceof Error ? error.message : 'تعذّر استيراد الرابط', 'error') }
     finally { setImporting(false); onBusy(false) }
   }
-  const patch = (id: string, value: Partial<LinkStory>, reset = false) => setStories(previous => previous.map(story => story.id === id ? { ...story, ...(reset ? { analysis: undefined, tweets: undefined, concepts: undefined, designs: [], error: undefined, status: 'جاهز' } : {}), ...value } : story))
+  const patch = (id: string, value: Partial<LinkStory>, reset = false) => setStories(previous => previous.map(story => story.id === id ? { ...story, ...(reset ? { analysis: undefined, tweets: undefined, selectedTweet: undefined, selectedDesignUrl: undefined, concepts: undefined, designs: [], error: undefined, status: 'جاهز' } : {}), ...value } : story))
   const uploadImage = async (story: LinkStory, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
@@ -104,14 +108,27 @@ export default function LinkedNewsStudio({ onOpen, onBusy, disabled = false }: {
         </button>)}</div>}
         {story.tweets && <div className="bg-cream rounded-xl p-3 space-y-2">
           <div className="flex items-center justify-between gap-2"><h4 className="text-sm font-bold text-green">التغريدات المقترحة لهذا الخبر</h4><Button variant="outline" size="sm" onClick={() => copyTweets(story.tweets!)}>نسخ التغريدات</Button></div>
-          <textarea aria-label={`التغريدات المقترحة لخبر ${index + 1}`} readOnly value={story.tweets} className="w-full min-h-48 rounded-lg p-2 text-sm leading-relaxed bg-white border border-border" />
+          {splitSuggestedTweets(story.tweets).map((tweet, tweetIndex) => <label key={tweetIndex} className={`block rounded-lg p-3 bg-white border cursor-pointer ${story.selectedTweet === tweet ? 'border-green ring-1 ring-green/30' : 'border-border'}`}>
+            <span className="flex items-center gap-2 text-xs font-bold text-green"><input type="radio" name={`tweet-${story.id}`} checked={story.selectedTweet === tweet} disabled={busy} onChange={() => patch(story.id, { selectedTweet: tweet })} />اختيار التغريدة {tweetIndex + 1}</span>
+            <span className="block mt-2 text-sm leading-relaxed whitespace-pre-wrap">{tweet}</span>
+          </label>)}
+          <label className="block text-xs font-bold text-dark">التغريدة المختارة للجدولة (يمكن تعديلها):
+            <textarea aria-label={`التغريدة المختارة لخبر ${index + 1}`} disabled={busy} value={story.selectedTweet ?? ''} onChange={e => patch(story.id, { selectedTweet: e.target.value })} placeholder="اختر تغريدة من الأعلى أو اكتب نص المنشور..." className="w-full min-h-28 mt-1 rounded-lg p-2 text-sm leading-relaxed bg-white border border-border" />
+          </label>
         </div>}
         {story.error && <p role="alert" className="text-xs text-red-600">{story.error} — يمكنك استكمال هذا الخبر؛ تُحفظ الخطوات المكتملة.</p>}
         {story.concepts && <p className="text-xs text-muted">الاتجاهات: {story.concepts.map(c => c.title).join(' · ')}</p>}
-        {story.designs.length > 0 && <div className="grid grid-cols-3 gap-2">{story.designs.map(design => <a key={design.conceptIndex} href={design.imageUrl} target="_blank" rel="noopener noreferrer" className="space-y-1">
+        {story.designs.length > 0 && <div className="grid grid-cols-3 gap-2">{story.designs.map(design => <div key={design.conceptIndex} className={`space-y-2 rounded-xl border-2 p-2 ${story.selectedDesignUrl === design.imageUrl ? 'border-green' : 'border-border'}`}>
+          <a href={design.imageUrl} target="_blank" rel="noopener noreferrer">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={design.imageUrl} alt={design.title} className="w-full rounded-lg aspect-[4/5] object-cover" /><p className="text-xs text-muted">{design.title}</p>
-        </a>)}</div>}
+          <img src={design.imageUrl} alt={design.title} className="w-full rounded-lg aspect-[4/5] object-cover" /></a><p className="text-xs text-muted">{design.title}</p>
+          <label className="flex items-center gap-1 text-xs font-bold text-green cursor-pointer"><input type="radio" name={`design-${story.id}`} checked={story.selectedDesignUrl === design.imageUrl} disabled={busy} onChange={() => patch(story.id, { selectedDesignUrl: design.imageUrl })} />اختيار التصميم</label>
+        </div>)}</div>}
+        {story.designs.length > 0 && <Button size="sm" disabled={busy || !story.selectedDesignUrl || !story.selectedTweet?.trim()} onClick={() => {
+          try { onSchedule(storyScheduleSelection(story)) }
+          catch (error) { showToast(error instanceof Error ? error.message : 'اختر التصميم والتغريدة', 'error') }
+        }}>🗓️ جدولة التصميم والتغريدة المختارين</Button>}
+        {scheduledPosts[story.id] && <p role="status" className="text-xs text-green">✅ تمت جدولة منشور هذا الخبر في {scheduledPosts[story.id].when.replace('T', ' — ')} بتوقيت السعودية.</p>}
       </article>)}
     </>}
   </section>

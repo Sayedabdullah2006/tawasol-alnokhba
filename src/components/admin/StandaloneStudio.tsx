@@ -11,6 +11,7 @@ import ScheduleSuggestions from '@/components/admin/ScheduleSuggestions'
 import ImageEditSchedule from '@/components/admin/ImageEditSchedule'
 import { SECTION_NAMES } from '@/lib/showcase-sections'
 import LinkedNewsStudio from '@/components/admin/LinkedNewsStudio'
+import { splitSuggestedTweets, type ScheduledStoryPost } from '@/lib/studio-story-schedule'
 
 type StepKey = 'analyze' | 'tweets' | 'concepts' | 'image'
 interface ConceptItem { title?: string; mood?: string; brief?: string; imagePrompt?: string }
@@ -163,6 +164,9 @@ export default function StandaloneStudio() {
   const [scheduleCover, setScheduleCover] = useState<string | null>(null)
   const [scheduleText, setScheduleText] = useState('')
   const [scheduleWhen, setScheduleWhen] = useState('')
+  const [scheduleStoryId, setScheduleStoryId] = useState<string | null>(null)
+  const [scheduleStoryTitle, setScheduleStoryTitle] = useState('')
+  const [scheduledLinkPosts, setScheduledLinkPosts] = useState<Record<string, ScheduledStoryPost>>({})
   const [schedulingCover, setSchedulingCover] = useState<string | null>(null)
   const [scheduledCover, setScheduledCover] = useState<string | null>(null)
 
@@ -399,22 +403,26 @@ export default function StandaloneStudio() {
   }
 
   // جدولة المنشور (Post-Pulse) بموعد محدّد بتوقيت السعودية لكل القنوات
-  const openSchedule = (cover: string) => { setScheduleText(selectedTweet || ''); setScheduleWhen(''); setScheduleCover(cover) }
+  const openSchedule = (cover: string) => { setScheduleStoryId(null); setScheduleStoryTitle(''); setScheduleText(selectedTweet || ''); setScheduleWhen(''); setScheduleCover(cover) }
   const confirmSchedule = async () => {
     const cover = scheduleCover
     if (!cover) return
     if (!scheduleText.trim()) { showToast('اكتب نص المنشور أولاً', 'error'); return }
     if (!scheduleWhen) { showToast('حدّد تاريخ ووقت الجدولة', 'error'); return }
+    const scheduledText = scheduleText
+    const scheduledLocal = scheduleWhen
+    const storyId = scheduleStoryId
     setSchedulingCover(cover)
     try {
       const res = await fetch('/api/postpulse/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: scheduleText, imageUrl: cover, scheduledLocal: scheduleWhen }),
+        body: JSON.stringify({ content: scheduledText, imageUrl: cover, scheduledLocal }),
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) { showToast(d.error ?? 'فشل الجدولة', 'error'); return }
       setScheduledCover(cover)
+      if (storyId) setScheduledLinkPosts(previous => ({ ...previous, [storyId]: { imageUrl: cover, text: scheduledText, when: scheduledLocal } }))
       setScheduleCover(null)
       const n = Array.isArray(d.accountIds) ? d.accountIds.length : 0
       showToast(`تمت الجدولة في ${n} قناة بتوقيت السعودية 🗓️`, 'success')
@@ -546,12 +554,15 @@ export default function StandaloneStudio() {
       )}
 
       <div hidden={mode !== 'news'}>
-      <LinkedNewsStudio disabled={autoBusy || batchLoading || loadingStep !== null || bulkBusy || regenIndex !== null || editIndex !== null} onBusy={setLinkBusy} onOpen={story => {
+      <LinkedNewsStudio disabled={autoBusy || batchLoading || loadingStep !== null || bulkBusy || regenIndex !== null || editIndex !== null || uploading || schedulingCover !== null} onBusy={setLinkBusy} scheduledPosts={scheduledLinkPosts} onSchedule={selection => {
+        setScheduleStoryId(selection.storyId); setScheduleStoryTitle(selection.title)
+        setScheduleText(selection.text); setScheduleCover(selection.imageUrl); setScheduleWhen('')
+      }} onOpen={story => {
         setTitle(story.title); setContent(story.content)
         setImages(story.images); setSelectedImages(story.selectedImages)
         setExtraInfo(`رابط المصدر: ${story.sourceUrl}`)
         setHasVideo(false); setAnalysis(story.analysis ?? null)
-        setTweets(story.tweets ?? ''); setSelectedTweet(story.tweets ?? '')
+        setTweets(story.tweets ?? ''); setSelectedTweet(story.selectedTweet || splitSuggestedTweets(story.tweets ?? '')[0] || '')
         setConceptItems(story.concepts ?? []); setBatchResults(story.designs)
         setChosenConcept(''); setChosenPreparedPrompt('')
         setNoteByIndex({}); setBulkNote(''); setMagazineCategory('')
@@ -773,6 +784,7 @@ export default function StandaloneStudio() {
           <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-border">
               <h3 className="font-black text-dark text-base">🗓️ جدولة المنشور</h3>
+              {scheduleStoryTitle && <p className="text-sm font-bold text-green mt-1">{scheduleStoryTitle}</p>}
               <p className="text-xs text-muted mt-0.5">يُنشر النص مع التصميم في كل القنوات المربوطة في الموعد المحدّد (توقيت السعودية).</p>
             </div>
             <div className="px-5 py-4 overflow-y-auto space-y-3">
@@ -783,11 +795,11 @@ export default function StandaloneStudio() {
                 <input type="datetime-local" value={scheduleWhen} onChange={e => setScheduleWhen(e.target.value)}
                   disabled={!!schedulingCover}
                   className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm mb-2" />
-                <ScheduleSuggestions value={scheduleWhen} onPick={setScheduleWhen} />
+                <ScheduleSuggestions value={scheduleWhen} onPick={value => { if (!schedulingCover) setScheduleWhen(value) }} />
               </div>
               <div>
                 <label className="block text-xs font-bold text-dark mb-1">نص المنشور (عدّله قبل الجدولة):</label>
-                <textarea value={scheduleText} onChange={e => setScheduleText(e.target.value)}
+                <textarea value={scheduleText} onChange={e => setScheduleText(e.target.value)} disabled={!!schedulingCover}
                   className="w-full px-3 py-2 rounded-xl border border-border bg-white text-sm min-h-[140px] resize-y"
                   placeholder="اكتب نص المنشور..." />
                 <p className="text-[11px] text-muted mt-1">{scheduleText.length} حرف</p>
