@@ -1,6 +1,7 @@
 import { STUDIO_BRAND_RULES, STUDIO_LOGO_RESERVATION } from './studio-design-guidelines'
 import https from 'https'
 import sharp from 'sharp'
+import { designImageProvider, generateImageWithGemini } from './gemini-image-generation'
 
 export interface RefImage {
   mimeType: string
@@ -344,5 +345,8 @@ export async function generateImageFromPartsWithOpenAI(
   refs: RefImage[],
   opts: OpenAIImageOptions = {},
 ): Promise<{ b64: string; mimeType: string }> {
+  if (opts.applyEditorialBaseline !== false && designImageProvider() === 'gemini') {
+    return generateImageWithGemini(`${withProfessionalEditorialBaseline(promptText)}${PRINT_BOUNDARY}`, refs, opts)
+  }
   return createImageViaImageApi(promptText, refs, opts)
 }
