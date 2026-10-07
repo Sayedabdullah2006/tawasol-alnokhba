@@ -22,7 +22,8 @@ test('sends source parts in order and preserves dimensions without web search', 
   const refs = [image, { mimeType: 'image/jpeg', data: 'c2Vjb25k' }]
   const payload = buildGeminiImagePayload('نص معتمد', refs, { aspectRatio: '16:9' })
   assert.deepEqual(payload.contents[0].parts.slice(1).map(p => p.inlineData), refs)
-  assert.deepEqual(payload.generationConfig.responseFormat.image, { aspectRatio: '16:9', imageSize: '2K' })
+  assert.deepEqual(payload.generationConfig.imageConfig, { aspectRatio: '16:9', imageSize: '2K' })
+  assert.equal(payload.generationConfig.responseFormat, undefined)
   assert.equal(payload.tools, undefined)
   assert.equal(geminiImageAspectRatio({ size: '1080x1350' }), '4:5')
   assert.equal(geminiImageAspectRatio({ size: '1088x1920' }), '9:16')
@@ -38,7 +39,7 @@ test('shared entry routes to Nano Banana 2.1 with all editorial protections', as
   configure(t, { DESIGN_IMAGE_PROVIDER: 'gemini', GEMINI_API_KEY: 'test-key', GEMINI_IMAGE_MODEL: undefined, GEMINI_IMAGE_SIZE: undefined })
   let body
   t.mock.method(globalThis, 'fetch', async (url, opts) => {
-    assert.equal(url, 'https://generativelanguage.googleapis.com/v1/models/gemini-nano-banana-2.1:generateContent')
+    assert.equal(url, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-nano-banana-2.1:generateContent')
     assert.equal(opts.headers['x-goog-api-key'], 'test-key')
     body = JSON.parse(opts.body)
     return Response.json(result)
@@ -57,6 +58,10 @@ test('bad key fails once without exposing provider debug or silently switching',
 test('utility transforms keep their original provider', async t => {
   configure(t, { DESIGN_IMAGE_PROVIDER: 'gemini', GEMINI_API_KEY: 'test-key', OPENAI_API_KEY: undefined })
   await assert.rejects(generateImageFromPartsWithOpenAI('utility', [], { applyEditorialBaseline: false }), /OPENAI_API_KEY/)
+})
+test('API validation failures retain the reason while redacting credentials and image data', async t => {
+  configure(t, { GEMINI_API_KEY: 'test-secret' })
+  await assert.rejects(generateImageWithGemini('خبر', [], { retries: 0 }, async () => Response.json({ error: { message: `Invalid generationConfig: test-secret ${'A'.repeat(100)}` } }, { status: 400 })), error => error.message.includes('Invalid generationConfig') && !error.message.includes('test-secret') && !error.message.includes('A'.repeat(100)))
 })
 test('retries transient failure then accepts final image', async t => {
   configure(t, { GEMINI_API_KEY: 'test-key' })

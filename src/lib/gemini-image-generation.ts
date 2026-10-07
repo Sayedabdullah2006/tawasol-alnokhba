@@ -34,7 +34,7 @@ export function buildGeminiImagePayload(prompt: string, refs: GeminiReferenceIma
   if (!['1K', '2K', '4K'].includes(resolution)) throw new Error('GEMINI_IMAGE_SIZE يجب أن يكون 1K أو 2K أو 4K')
   return {
     contents: [{ role: 'user', parts: [{ text: prompt }, ...refs.map(ref => ({ inlineData: { mimeType: ref.mimeType, data: ref.data } }))] }],
-    generationConfig: { responseModalities: ['TEXT', 'IMAGE'], responseFormat: { image: { aspectRatio: geminiImageAspectRatio(opts), imageSize: resolution } } },
+    generationConfig: { responseModalities: ['TEXT', 'IMAGE'], imageConfig: { aspectRatio: geminiImageAspectRatio(opts), imageSize: resolution } },
   }
 }
 
@@ -67,17 +67,20 @@ export async function generateImageWithGemini(
   const retries = opts.retries ?? 2
   for (let attempt = 0; ; attempt++) {
     try {
-      const response = await fetcher(`https://generativelanguage.googleapis.com/v1/models/${model}:generateContent`, {
+      const response = await fetcher(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
         body, signal: AbortSignal.timeout(opts.timeoutMs ?? 180_000),
       })
       if (!response.ok) {
-        // Avoid echoing provider request details or credentials into client errors/logs.
-        await response.body?.cancel()
+        // Keep the useful API validation reason, excluding keys and embedded image data.
+        const details = await response.json().catch(() => ({})) as { error?: { message?: unknown } }
+        const reason = typeof details.error?.message === 'string'
+          ? details.error.message.replaceAll(apiKey, '[redacted]').replace(/AIza[\w-]+/g, '[redacted]').replace(/[A-Za-z0-9+/_=-]{80,}/g, '[image data]').slice(0, 480)
+          : ''
         const error = new Error(response.status === 401 || response.status === 403
           ? 'تعذّر الوصول إلى Gemini؛ تحقق من صلاحية المفتاح والوصول إلى النموذج'
           : response.status === 404 ? `نموذج Gemini غير متاح لهذا المفتاح: ${model}`
-          : `تعذّر توليد الصورة بواسطة Gemini (HTTP ${response.status})`) as Error & { status?: number }
+          : `تعذّر توليد الصورة بواسطة Gemini (HTTP ${response.status})${reason ? `: ${reason}` : ''}`) as Error & { status?: number }
         error.status = response.status
         throw error
       }
