@@ -5,6 +5,15 @@ import './register-ts-imports.mjs'
 const { buildCompactImagePrompt, videoLayoutFor } = await import('../src/lib/studio-image-prompt.ts')
 const { STUDIO_DESIGN_DIRECTIONS } = await import('../src/lib/studio-design-guidelines.ts')
 
+test('selected photos must appear as visual content despite a conflicting old direction', () => {
+  const prompt = buildCompactImagePrompt({ analysis: { name: 'باحثة سعودية', headline: 'تحقق إنجازاً موثقاً' }, chosenConcept: 'Old text-only composition', sourceImageCount: 1 })
+  assert.match(prompt, /ACTUAL SOURCE PHOTO COUNT: 1/)
+  assert.match(prompt, /PHOTO INCLUSION IS MANDATORY/)
+  assert.match(prompt, /include the intact photograph instead of omitting it/)
+  assert.ok(prompt.lastIndexOf('PHOTO INCLUSION IS MANDATORY') > prompt.indexOf('Old text-only composition'))
+  assert.doesNotMatch(prompt, /ACTUAL SOURCE PHOTO COUNT: 0/)
+})
+
 test('patent copy uses full names, four facts and protected digital-logo space', () => {
   const name = 'الدكتور عبدالعزيز بن محمد بن عبدالله آل سعود'
   const prompt = buildCompactImagePrompt({

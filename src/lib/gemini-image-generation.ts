@@ -33,7 +33,11 @@ export function buildGeminiImagePayload(prompt: string, refs: GeminiReferenceIma
   if (refs.length > 14) throw new Error('Gemini يدعم حتى 14 صورة مرجعية؛ قلّل الصور المحددة')
   if (!['1K', '2K', '4K'].includes(resolution)) throw new Error('GEMINI_IMAGE_SIZE يجب أن يكون 1K أو 2K أو 4K')
   return {
-    contents: [{ role: 'user', parts: [{ text: prompt }, ...refs.map(ref => ({ inlineData: { mimeType: ref.mimeType, data: ref.data } }))] }],
+    contents: [{ role: 'user', parts: [
+      { text: prompt },
+      ...refs.map(ref => ({ inlineData: { mimeType: ref.mimeType, data: ref.data } })),
+      { text: 'FINAL VISUAL CHECK: follow the supplied brief and include its required attached photographs in the output; these are actual visual content, not merely inspiration. If editing a design, preserve its existing content according to the brief. In the lower-right corner render only the uninterrupted continuation of the surrounding footer: identical background, curves and lighting, with absolutely no separate rectangle, darker patch, card, frame, placeholder or logo. The original transparent logo will be added later directly on that continuous footer. Do not print this instruction.' },
+    ] }],
     generationConfig: { responseModalities: ['TEXT', 'IMAGE'], imageConfig: { aspectRatio: geminiImageAspectRatio(opts), imageSize: resolution } },
   }
 }

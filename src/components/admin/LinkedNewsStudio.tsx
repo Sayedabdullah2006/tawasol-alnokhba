@@ -28,8 +28,8 @@ export default function LinkedNewsStudio({ onOpen, onBusy, onSchedule, scheduled
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'تعذّر استيراد الرابط')
       if (!Array.isArray(data.stories) || !data.stories.length) throw new Error('لم تُستخرج أخبار من الصفحة')
-      setStories(data.stories.map((story: { title: string; content: string; images: string[]; sourceUrl: string }) => ({ ...story, id: crypto.randomUUID(), selected: true, selectedImages: [], designs: [], status: 'جاهز' })))
-      showToast(`تم استخراج ${data.stories.length} خبر؛ راجع النصوص واختر صور كل خبر`, 'success')
+      setStories(data.stories.map((story: { title: string; content: string; images: string[]; sourceUrl: string }) => ({ ...story, id: crypto.randomUUID(), selected: true, selectedImages: story.images.slice(0, 1), designs: [], status: 'جاهز' })))
+      showToast(`تم استخراج ${data.stories.length} خبر واختيار أول صورة لكل خبر؛ راجعها قبل التوليد`, 'success')
     } catch (error) { showToast(error instanceof Error ? error.message : 'تعذّر استيراد الرابط', 'error') }
     finally { setImporting(false); onBusy(false) }
   }
@@ -57,11 +57,12 @@ export default function LinkedNewsStudio({ onOpen, onBusy, onSchedule, scheduled
     try { await navigator.clipboard.writeText(text); showToast('تم نسخ التغريدات', 'success') }
     catch { showToast('تعذّر النسخ التلقائي؛ يمكنك تحديد النص ونسخه', 'error') }
   }
-  const run = async (target: 'tweets' | 'designs' = 'designs') => {
+  const run = async (target: 'tweets' | 'designs' = 'designs', storyId?: string, regenerate = false) => {
     stop.current = false; setStopping(false); setRunning(true); onBusy(true)
     try {
-      for (const story of stories.filter(s => s.selected)) {
+      for (const input of stories.filter(s => storyId ? s.id === storyId : s.selected)) {
         if (stop.current) break
+        const story: LinkStory = regenerate ? { ...input, concepts: undefined, designs: [], selectedDesignUrl: undefined, error: undefined } : input
         await runStoryPipeline(story, async payload => {
           const response = await fetch('/api/admin/ai-studio', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
           const data = await response.json()
@@ -82,7 +83,7 @@ export default function LinkedNewsStudio({ onOpen, onBusy, onSchedule, scheduled
       <Button onClick={importLink} loading={importing} disabled={busy || !url.trim()} size="sm">استيراد وفصل الأخبار</Button>
     </div>
     {stories.length > 0 && <>
-      <p className="text-xs text-muted">{stories.length} خبر مستخرج — {stories.filter(s => s.selected).length} محدد. اختر صور كل خبر أو ارفع صورته قبل التوليد. بدون صورة يُصمّم بالنص والأيقونات والزخارف فقط، دون صورة مخترعة. تعديل النص أو الصور يبدأ توليداً جديداً لهذا الخبر.</p>
+      <p className="text-xs text-muted">{stories.length} خبر مستخرج — {stories.filter(s => s.selected).length} محدد. أول صورة مستوردة لكل خبر محددة تلقائياً للاستخدام؛ يمكنك تغييرها أو إلغاء اختيارها أو رفع صورة أخرى قبل التوليد. بدون صورة يُصمّم بالنص والأيقونات والزخارف فقط، دون صورة مخترعة. تعديل النص أو الصور يبدأ توليداً جديداً لهذا الخبر.</p>
       <div className="flex gap-2 flex-wrap">
         <Button onClick={() => run('tweets')} variant="outline" disabled={busy || !stories.some(s => s.selected && s.content.trim())} size="sm">توليد التغريدات فقط</Button>
         <Button onClick={() => run('designs')} disabled={busy || !stories.some(s => s.selected && s.content.trim())} size="sm">توليد / استكمال التغريدات والتصاميم</Button>
@@ -118,6 +119,7 @@ export default function LinkedNewsStudio({ onOpen, onBusy, onSchedule, scheduled
         </div>}
         {story.error && <p role="alert" className="text-xs text-red-600">{story.error} — يمكنك استكمال هذا الخبر؛ تُحفظ الخطوات المكتملة.</p>}
         {story.concepts && <p className="text-xs text-muted">الاتجاهات: {story.concepts.map(c => c.title).join(' · ')}</p>}
+        {story.designs.length > 0 && <Button variant="outline" size="sm" disabled={busy} onClick={() => run('designs', story.id, true)}>إعادة توليد تصاميم هذا الخبر</Button>}
         {story.designs.length > 0 && <div className="grid grid-cols-3 gap-2">{story.designs.map(design => <div key={design.conceptIndex} className={`space-y-2 rounded-xl border-2 p-2 ${story.selectedDesignUrl === design.imageUrl ? 'border-green' : 'border-border'}`}>
           <a href={design.imageUrl} target="_blank" rel="noopener noreferrer">
           {/* eslint-disable-next-line @next/next/no-img-element */}

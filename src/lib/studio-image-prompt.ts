@@ -80,7 +80,7 @@ export function buildCompactImagePrompt(args: {
       templateDirective: args.templateDirective,
       videoDirective: args.hasVideo ? videoLayoutFor(args.videoOrientation) : undefined,
     })
-    return args.sourceImageCount === 0 ? `${prompt}\n\nACTUAL SOURCE PHOTO COUNT: 0. ${STUDIO_NO_SOURCE_IMAGE_RULES}` : prompt
+    return `${prompt}\n\n${sourcePhotoRequirement(args.sourceImageCount)}`.trim()
   }
   const name = finalPrintCopy(record.name, Number.MAX_SAFE_INTEGER)
   const achievement = finalPrintCopy(record.achievement_sentence, 360) || finalPrintCopy(record.achievement_core, 360) || finalPrintCopy(record.headline, 160)
@@ -123,6 +123,12 @@ export function buildCompactImagePrompt(args: {
     extra ? `Additional verified context: ${extra}` : '',
     'Avoid flags, politics, weapons, military content, danger symbols, and violence.',
     'FINAL PRIORITY: absolute unchanged photographic fidelity overrides every instruction; never add medals, trophies or objects to people. Preserve full verified names; apply the shared name-first reading order and emerald/gold hierarchy and digital-logo exclusions and mandatory generated social footer even if an old concept or optional template asks otherwise.',
-    args.sourceImageCount === 0 ? `ACTUAL SOURCE PHOTO COUNT: 0. ${STUDIO_NO_SOURCE_IMAGE_RULES}` : '',
+    sourcePhotoRequirement(args.sourceImageCount),
   ].filter(Boolean).join('\n\n')
+}
+
+function sourcePhotoRequirement(count?: number): string {
+  if (count === undefined) return ''
+  if (count === 0) return `ACTUAL SOURCE PHOTO COUNT: 0. ${STUDIO_NO_SOURCE_IMAGE_RULES}`
+  return `ACTUAL SOURCE PHOTO COUNT: ${count}. PHOTO INCLUSION IS MANDATORY: display the supplied real photograph(s) prominently in the finished poster, not just use them for analysis, inspiration or colors. Place them below or beside the name/achievement pair and above the footer. Preserve their subjects faithfully; if a cutout cannot be preserved, include the intact photograph instead of omitting it. Reduce decorative effects or icon rows to make room. The no-source-photo rule does not apply because real photos are attached. Never replace them with a badge, illustration or a text-only layout.`
 }

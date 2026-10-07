@@ -21,7 +21,9 @@ test('provider is explicit and reversible', () => {
 test('sends source parts in order and preserves dimensions without web search', () => {
   const refs = [image, { mimeType: 'image/jpeg', data: 'c2Vjb25k' }]
   const payload = buildGeminiImagePayload('نص معتمد', refs, { aspectRatio: '16:9' })
-  assert.deepEqual(payload.contents[0].parts.slice(1).map(p => p.inlineData), refs)
+  assert.deepEqual(payload.contents[0].parts.filter(p => p.inlineData).map(p => p.inlineData), refs)
+  assert.match(payload.contents[0].parts.at(-1).text, /include its required attached photographs/)
+  assert.match(payload.contents[0].parts.at(-1).text, /no separate rectangle, darker patch/)
   assert.deepEqual(payload.generationConfig.imageConfig, { aspectRatio: '16:9', imageSize: '2K' })
   assert.equal(payload.generationConfig.responseFormat, undefined)
   assert.equal(payload.tools, undefined)
