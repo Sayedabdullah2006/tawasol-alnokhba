@@ -5,7 +5,7 @@ Production tests MUST be silent. Never disable the global notification worker.
 1. The signed-in manager starts a silent run under Workforce → Notifications → Test mode.
 2. Staff explicitly join using its employee link. Confirm the amber test indicator before creating anything.
 3. API clients must use `quietWorkforceTestHeaders(runId)` on every workforce request, authenticated as the real authorized participant. Never mint admin sessions or change passwords.
-4. Test mode covers tasks (including their attachments, submissions, decisions and reminders) and general administrative requests. Requests that change money, attendance or leave are rejected in this mode; use isolated/rolled-back tests for them.
+4. Test mode covers tasks (including their attachments, submissions, decisions and reminders), general administrative requests, and all eight employee journeys at `/api/workforce/journeys`. HR items and notification preferences have their own immutable run scope. Test preferences never affect real delivery. Payroll, attendance and leave mutations outside these journeys remain blocked; use isolated/rolled-back tests for those.
 5. Existing real records cannot be relabelled as tests. A test marker is immutable and survives run expiry/end, so background reminders stay silent.
 6. Runs expire after two hours. Expired/ended browser sessions fail closed for creation until explicitly left. Manager finish closes the run; staff leave clears only their own browser mode.
 7. Remove only the recorded test IDs and their Storage objects. Clear test rows before deleting their run (FK protects retained fixtures).
@@ -24,3 +24,10 @@ that splits statements into separate transactions. This is domain verification,
 not a claim that these mutations are supported by the live browser test mode.
 Read employee pages/APIs as each real account; test real credentials by normal
 sign-in, never by resetting passwords or invoking password email/reauth flows.
+
+`supabase/tests/workforce_employee_journeys.sql` verifies the eight new journeys,
+both employees, permissions, scoped silence and independently applied inbox/email
+preferences. It is a single rolled-back transaction; normal delivery controls
+are never committed. For live quiet fixtures, remove only run-scoped policy
+receipts, HR events, child appeals before parents, scoped preferences, command
+receipts referencing those fixture IDs, and finally the ended run.

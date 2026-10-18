@@ -9,8 +9,13 @@ export default function EmployeeNavigation() {
   if (pathname === "/employee/unavailable") return null;
   const modules = [
     ...employeeModules.filter((m) => m.key === "profile"),
-    ...employeeModules.filter((m) => !["profile", "finance", "knowledge", "notifications"].includes(m.key)),
-    ...employeeModules.filter((m) => ["knowledge", "notifications"].includes(m.key)),
+    ...employeeModules.filter(
+      (m) =>
+        !["profile", "finance", "knowledge", "notifications"].includes(m.key),
+    ),
+    ...employeeModules.filter((m) =>
+      ["knowledge", "notifications"].includes(m.key),
+    ),
   ];
   return (
     <nav
@@ -41,6 +46,12 @@ export default function EmployeeNavigation() {
             (s) => pathname === s.path || pathname.startsWith(s.path + "/"),
           );
           const style = `flex min-h-12 items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-colors ${active ? "bg-dark text-white" : "text-dark hover:bg-slate-100"}`;
+          if (module.key === "profile") {
+            const advances = employeeModules
+              .find((m) => m.key === "finance")
+              ?.screens.find((s) => s.path === "/employee/finance/advances");
+            if (advances) screens.push(advances);
+          }
           return screens.length === 1 ? (
             <li key={module.key}>
               <Link
@@ -56,8 +67,12 @@ export default function EmployeeNavigation() {
             <li
               key={module.key}
               className="lg:relative"
-              onPointerEnter={(event) => { if(event.pointerType === "mouse") setOpen(module.key); }}
-              onPointerLeave={(event) => { if(event.pointerType === "mouse") setOpen(null); }}
+              onPointerEnter={(event) => {
+                if (event.pointerType === "mouse") setOpen(module.key);
+              }}
+              onPointerLeave={(event) => {
+                if (event.pointerType === "mouse") setOpen(null);
+              }}
               onBlur={(event) => {
                 if (!event.currentTarget.contains(event.relatedTarget))
                   setOpen(null);
@@ -69,7 +84,18 @@ export default function EmployeeNavigation() {
                 aria-expanded={open === module.key}
                 aria-controls={`employee-menu-${module.key}`}
                 onClick={() => setOpen(open === module.key ? null : module.key)}
-                onKeyDown={(event) => { if(event.key === "ArrowDown") { event.preventDefault(); setOpen(module.key); requestAnimationFrame(() => document.getElementById(`employee-menu-${module.key}`)?.querySelector("a")?.focus()); } }}
+                onKeyDown={(event) => {
+                  if (event.key === "ArrowDown") {
+                    event.preventDefault();
+                    setOpen(module.key);
+                    requestAnimationFrame(() =>
+                      document
+                        .getElementById(`employee-menu-${module.key}`)
+                        ?.querySelector("a")
+                        ?.focus(),
+                    );
+                  }
+                }}
               >
                 {module.title}
                 <span

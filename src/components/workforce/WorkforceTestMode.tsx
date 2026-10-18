@@ -85,7 +85,7 @@ export default function WorkforceTestMode({
           <>
             <p className="font-bold">
               {run.active
-                ? "المهام والطلبات الإدارية الجديدة · دون إشعارات أو بريد"
+                ? "المهام والطلبات وشؤون الفريق · دون إشعارات أو بريد"
                 : "انتهت الجولة · إنشاء بيانات الاختبار متوقف"}
             </p>
             <p className="text-xs text-muted">

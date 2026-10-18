@@ -38,6 +38,14 @@ const screen = (
     !!live ||
     [
       "work/projects",
+      "performance/goals",
+      "performance/reviews",
+      "finance/advances",
+      "requests/performance-review",
+      "profile/assets",
+      "profile/onboarding",
+      "profile/policies",
+      "notifications/preferences",
       "work/calendar",
       "work/time",
       "work/deliveries",

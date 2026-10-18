@@ -1,4 +1,6 @@
 import AttendanceHub from "@/components/workforce/AttendanceHub";
+import EmployeeJourneys from "@/components/workforce/EmployeeJourneys";
+import { journeySections, type JourneyKind } from "@/lib/workforce/journeys";
 import EmployeeWorkPages from "@/components/workforce/EmployeeWorkPages";
 import { REQUEST_KINDS } from "@/lib/workforce/requests";
 import RequestCenter from "@/components/workforce/RequestCenter";
@@ -22,7 +24,19 @@ export default async function Page({
   const { section } = await params;
   const path = `/employee/${section.join("/")}`;
   const { employee } = await employeePageActor();
-  if(section[0] === "work" && section.length === 2 && ["projects","calendar","time","deliveries","archive"].includes(section[1])) return <EmployeeWorkPages key={path} section={section[1]}/>;
+  const journey = Object.entries(journeySections).find(
+    ([, s]) => `/employee/${s.employee}` === path,
+  );
+  if (journey)
+    return <EmployeeJourneys key={path} section={journey[0] as JourneyKind} />;
+  if (
+    section[0] === "work" &&
+    section.length === 2 &&
+    ["projects", "calendar", "time", "deliveries", "archive"].includes(
+      section[1],
+    )
+  )
+    return <EmployeeWorkPages key={path} section={section[1]} />;
   if (path === "/employee/documents") redirect("/employee/profile/documents");
   if (path === "/employee/payment-details")
     redirect("/employee/finance/payment-details");
