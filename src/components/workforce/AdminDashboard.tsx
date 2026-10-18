@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import Button from "@/components/ui/Button";
 import {
@@ -114,18 +113,6 @@ export default function AdminDashboard({ userId }: { userId: string }) {
           <h1 className="mt-2 text-3xl font-black">الفريق والمهام</h1>
         </div>
         <nav aria-label="إدارة الفريق" className="flex flex-wrap gap-3">
-          <Link
-            href="/admin/workforce/employees"
-            className="rounded-xl border border-border bg-white px-4 py-3 text-sm font-bold"
-          >
-            الموظفات
-          </Link>
-          <Link
-            href="/admin/workforce/notifications"
-            className="rounded-xl border border-border bg-white px-4 py-3 text-sm font-bold"
-          >
-            الإشعارات
-          </Link>
           <Button variant="outline" onClick={changed}>
             تحديث
           </Button>

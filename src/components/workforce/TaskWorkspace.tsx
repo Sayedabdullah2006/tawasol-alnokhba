@@ -224,9 +224,11 @@ export default function TaskWorkspace({
             </Button>
           ))}
         </div>
-        <span className="text-xs text-muted" role="status">
-          {loading ? "جارٍ التحديث…" : `${count} مهمة`}
-        </span>
+        {(loading || !embedded) && (
+          <span className="text-xs text-muted" role="status">
+            {loading ? "جارٍ التحديث…" : `${count} مهمة`}
+          </span>
+        )}
       </div>
       <details className="rounded-2xl border border-border bg-white p-4">
         <summary className="cursor-pointer text-sm font-bold">
