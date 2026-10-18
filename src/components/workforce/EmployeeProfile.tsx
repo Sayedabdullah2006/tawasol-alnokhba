@@ -214,9 +214,7 @@ export default function EmployeeProfile({
       <div className="rounded-2xl bg-dark p-6 text-white md:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="mb-2 text-sm text-white/70">
-              {admin ? "ملف الموظف" : `بوابة الموظف / ${sectionLabel}`}
-            </p>
+
             <h1 className="break-words text-3xl font-black">
               {admin || section === "profile"
                 ? employee.full_name
@@ -490,7 +488,7 @@ export default function EmployeeProfile({
                 <div>
                   <dt className="text-muted">البنك</dt>
                   <dd className="mt-1">
-                    {data.bank?.bank_name || "لم يُحدد بعد"}
+                    {data.bank?.bank_name || "—"}
                   </dd>
                 </div>
                 <div>

@@ -77,7 +77,7 @@ function Terms({ value }: { value: CompensationVersion }) {
                 </p>
                 <p>أساس الحساب: {COMMISSION_BASES[item.basis]}</p>
                 <p className="whitespace-pre-wrap break-words text-muted">
-                  {item.conditions || "لم تسجل شروط إضافية."}
+                  {item.conditions || "—"}
                 </p>
               </li>
             ))}
@@ -263,7 +263,7 @@ export default function CompensationPanel({
               </div>
             ) : (
               <p className="rounded-xl bg-slate-50 p-4 text-sm text-muted">
-                لم تسجل إعدادات راتب سارية بعد. لا يعني ذلك أن الراتب صفر.
+                قيد الإعداد
               </p>
             )}
             {data.latest && data.latest.effective_from > data.companyDate && (

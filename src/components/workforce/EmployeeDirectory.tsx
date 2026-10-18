@@ -130,9 +130,7 @@ export default function EmployeeDirectory({ userId }: { userId: string }) {
       {confirmation}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="mb-2 text-sm font-bold text-muted">
-            تواصل النخبة / فريق العمل
-          </p>
+
           <h1 className="text-3xl font-black text-dark">إدارة الموظفين</h1>
         </div>
         <Button
@@ -273,7 +271,7 @@ export default function EmployeeDirectory({ userId }: { userId: string }) {
                       {employee.full_name}
                     </h3>
                     <p className="mt-1 text-sm text-muted">
-                      {employee.job_title || "لم يحدد المسمى"} ·{" "}
+                      {employee.job_title || "—"} ·{" "}
                       {data.departments.find(
                         (d) => d.id === employee.department_id,
                       )?.name || "دون قسم"}

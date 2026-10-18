@@ -306,7 +306,7 @@ export default function TaskAttachments({
               onChange={(e) => setPurpose(e.target.value)}
             >
               <option value="delivery">
-                ملفات نتيجة العمل — تحدد للتسليم تلقائيًا
+                مرفقات التسليم
               </option>
               <option value="task">ملفات مرجعية للمهمة</option>
             </select>
@@ -353,8 +353,7 @@ export default function TaskAttachments({
       {onSelected && canUpload && (
         <div className="space-y-2">
           <p className="text-sm font-bold">
-            المحدد للتسليم التالي: {selected.length} من 20. الملفات المرجعية لا
-            ترتبط بالتسليم إلا عند تحديدها.
+            مرفقات التسليم: {selected.length} / 20
           </p>
           {selected.length > 0 && (
             <Button
