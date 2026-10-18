@@ -88,10 +88,7 @@ export default function TaskHistory({
     setError("");
   };
   return (
-    <Panel
-      title="سجل المهمة والتسليمات"
-      description="يمكن للطرفين الرجوع إلى محاولات التسليم وقراراتها السابقة."
-    >
+    <Panel title="سجل المهمة والتسليمات">
       <div className="space-y-4">
         <div className="flex flex-wrap gap-2">
           <Button

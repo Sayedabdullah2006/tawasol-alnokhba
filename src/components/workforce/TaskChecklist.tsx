@@ -64,10 +64,7 @@ export default function TaskChecklist({
     });
   const required = items.filter((item) => item.required);
   return (
-    <Panel
-      title="قائمة التحقق"
-      description="المدير يحدد بنود التكليف، والمنفذ يسجل إنجازها. البنود المطلوبة تمنع التسليم حتى تكتمل."
-    >
+    <Panel title="قائمة التحقق">
       {confirmation}
       {unsaved}
       <div className="space-y-4">

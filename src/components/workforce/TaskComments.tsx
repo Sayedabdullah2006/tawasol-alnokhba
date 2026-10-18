@@ -242,10 +242,7 @@ export default function TaskComments({
     }
   };
   return (
-    <Panel
-      title="التعليقات والنقاش"
-      description="النقاش متاح للمدير ومنفذي المهمة، ويظهر لمن لديهم حق الاطلاع عليها. التعليق لا يغير شروط التكليف أو قرار الاعتماد."
-    >
+    <Panel title="التعليقات والنقاش">
       {confirmation}
       {unsaved}
       <div className="space-y-5">

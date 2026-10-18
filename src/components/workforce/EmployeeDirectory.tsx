@@ -130,7 +130,6 @@ export default function EmployeeDirectory({ userId }: { userId: string }) {
       {confirmation}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-
           <h1 className="text-3xl font-black text-dark">إدارة الموظفين</h1>
         </div>
         <Button
@@ -179,12 +178,7 @@ export default function EmployeeDirectory({ userId }: { userId: string }) {
           إعادة المحاولة
         </Button>
       )}
-      <Panel
-        title="دليل الفريق"
-        description={
-          data ? `${data.count} موظف حسب التصفية الحالية` : "جارٍ تحميل الفريق"
-        }
-      >
+      <Panel title="دليل الفريق">
         <div className="mb-4 flex max-w-xs items-center gap-3">
           <label htmlFor="team-sort" className="shrink-0 text-sm font-bold">
             ترتيب حسب

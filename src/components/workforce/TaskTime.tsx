@@ -217,10 +217,7 @@ export default function TaskTime({
       setEditing(null);
   };
   return (
-    <Panel
-      title="الوقت الفعلي"
-      description="تسجيل اختياري لفترات العمل المنجزة بتوقيت الرياض. الوقت ليس حضورًا أو عملًا إضافيًا معتمدًا، ولا ينتج عنه راتب أو حسم تلقائي."
-    >
+    <Panel title="الوقت الفعلي">
       {unsaved}
       {confirmation}
       <Notice message={error} error />

@@ -84,10 +84,7 @@ export default function TaskMembers({
     }
   };
   return (
-    <Panel
-      title="المسؤول والمشاركون"
-      description="المشارك ينفذ العمل ويسلم النتيجة، والمتابع يقرأ دون تعديل. إدارة الوصول والاعتماد للمدير."
-    >
+    <Panel title="المسؤول والمشاركون">
       {confirmation}
       {unsaved}
       <Notice message={error} error />

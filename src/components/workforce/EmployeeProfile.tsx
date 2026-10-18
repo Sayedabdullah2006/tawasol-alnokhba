@@ -214,7 +214,6 @@ export default function EmployeeProfile({
       <div className="rounded-2xl bg-dark p-6 text-white md:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-
             <h1 className="break-words text-3xl font-black">
               {admin || section === "profile"
                 ? employee.full_name
@@ -273,11 +272,6 @@ export default function EmployeeProfile({
           {(admin || section === "profile") && (
             <Panel
               title={admin ? "البيانات الوظيفية والتواصل" : "بيانات التواصل"}
-              description={
-                admin
-                  ? "حدّث بيانات الموظف مع الحفاظ على سجله السابق."
-                  : "يمكنك تعديل الهاتف والمدينة. تغيير الاسم أو بيانات البنك يتطلب اعتماد مدير النظام."
-              }
             >
               <form
                 className="space-y-5"
@@ -324,10 +318,7 @@ export default function EmployeeProfile({
             />
           )}
           {(admin || section === "documents") && (
-            <Panel
-              title="المستندات"
-              description="ملفات خاصة بالموظف. الملفات الإدارية غير المشتركة لا تظهر في بوابته."
-            >
+            <Panel title="المستندات">
               <div className="space-y-3">
                 {data.documents.length ? (
                   data.documents.map((document) => (
@@ -480,16 +471,11 @@ export default function EmployeeProfile({
         </div>
         <div className="space-y-6">
           {(admin || section === "payment-details") && (
-            <Panel
-              title="بيانات الصرف"
-              description="تُستخدم لإعداد المستحقات. تعديلها يحتاج موافقة موثقة."
-            >
+            <Panel title="بيانات الصرف">
               <dl className="space-y-4 text-sm">
                 <div>
                   <dt className="text-muted">البنك</dt>
-                  <dd className="mt-1">
-                    {data.bank?.bank_name || "—"}
-                  </dd>
+                  <dd className="mt-1">{data.bank?.bank_name || "—"}</dd>
                 </div>
                 <div>
                   <dt className="text-muted">الآيبان</dt>
@@ -632,10 +618,7 @@ export default function EmployeeProfile({
       </div>
       {admin && (
         <>
-          <Panel
-            title="ملاحظات إدارية خاصة"
-            description="لا تظهر هذه الملاحظات للموظف أو في بياناته العامة."
-          >
+          <Panel title="ملاحظات إدارية خاصة">
             <form
               onSubmit={(event) => {
                 event.preventDefault();

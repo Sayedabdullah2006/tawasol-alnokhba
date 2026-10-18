@@ -181,7 +181,7 @@ export default function TaskAttachments({
         }
         change();
       }
-      setMessage("تم رفع الملفات. راجع المرفقات المحددة للتسليم قبل إرساله.");
+      setMessage("تم رفع المرفقات");
       if (input.current) input.current.value = "";
     } catch (e) {
       setError((e as Error).message);
@@ -305,9 +305,7 @@ export default function TaskAttachments({
               disabled={busy || disabled}
               onChange={(e) => setPurpose(e.target.value)}
             >
-              <option value="delivery">
-                مرفقات التسليم
-              </option>
+              <option value="delivery">مرفقات التسليم</option>
               <option value="task">ملفات مرجعية للمهمة</option>
             </select>
           </Field>
@@ -383,8 +381,9 @@ export default function TaskAttachments({
                 <div className="min-w-0">
                   <p className="break-all font-bold">{file.title}</p>
                   <p className="break-all text-muted">
-                    {file.filename} · {(file.size_bytes / 1024).toFixed(1)}{" "}
-                    كيلوبايت · {workDate(file.created_at)}
+                    {file.title !== file.filename ? `${file.filename} · ` : ""}
+                    {(file.size_bytes / 1024).toFixed(1)} كيلوبايت ·{" "}
+                    {workDate(file.created_at)}
                   </p>
                   <p>
                     {file.purpose === "delivery" ? "نتيجة عمل" : "مرجع للمهمة"}
@@ -468,11 +467,6 @@ export default function TaskAttachments({
       {content}
     </div>
   ) : (
-    <Panel
-      title="مرفقات المهمة والتسليم"
-      description="تظهر مرفقات المهمة لمن يستطيع قراءة المهمة. كل محاولة تسليم تحتفظ بالملفات التي حددت لها، وتبقى متاحة عند طلب التعديل أو الاعتماد."
-    >
-      {content}
-    </Panel>
+    <Panel title="مرفقات المهمة والتسليم">{content}</Panel>
   );
 }

@@ -226,14 +226,7 @@ export default function CompensationPanel({
   const update = (patch: Partial<CompensationInput>) =>
     setForm((value) => (value ? { ...value, ...patch } : value));
   return (
-    <Panel
-      title="الراتب والبدلات والعمولات"
-      description={
-        admin
-          ? "حدد البنود المتفق عليها وتاريخ سريانها. كل تعديل ينشئ نسخة جديدة ولا يغير كشوفًا أو عمليات مالية سابقة."
-          : "إعدادات مستحقاتك الوظيفية كما سجلها مدير النظام، مع تفاصيل البدلات وبنود العمولة."
-      }
-    >
+    <Panel title="الراتب والبدلات والعمولات">
       {confirmation}
       <div className="space-y-5">
         <Notice message={error} error />

@@ -79,9 +79,11 @@ export default function ProfileApprovals() {
         requests.map((request) => (
           <Panel
             key={request.id}
-            title={request.wf_employees.full_name}
-            description={`${FIELD_LABELS[request.field]} · ${formatDate(request.created_at)}`}
+            title={`${request.wf_employees.full_name} · ${FIELD_LABELS[request.field]}`}
           >
+            <time className="text-xs text-muted">
+              {formatDate(request.created_at)}
+            </time>
             <p className="break-all text-lg font-bold">
               {request.proposed_value}
             </p>
