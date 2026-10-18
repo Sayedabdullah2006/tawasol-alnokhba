@@ -80,7 +80,8 @@ export default function Header() {
     router.refresh()
   }
 
-  const dashboardLink = user?.role === 'admin' ? '/admin' : '/dashboard'
+  const dashboardLink = user?.role === 'admin' ? '/admin' : user?.role === 'employee' ? '/employee' : '/dashboard'
+  const visibleNavLinks = user?.role === 'employee' ? [{ href: '/employee', label: 'بوابة الموظف', badge: undefined }] : navLinks
 
   return (
     <>
@@ -100,7 +101,7 @@ export default function Header() {
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-2 md:flex">
-          {navLinks.map(l => (
+          {visibleNavLinks.map(l => (
             <Link key={l.href} href={l.href} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-dark/80 transition-colors hover:bg-white/60 hover:text-green">
               <span>{l.label}</span>
               {l.badge && <span className="rounded-full bg-gold/15 px-1.5 py-0.5 text-[9px] font-black text-dark">{l.badge}</span>}
@@ -129,7 +130,7 @@ export default function Header() {
                   <div className="px-4 py-3 border-b border-border">
                     <ClientNameFixed name={user.fullName} className="font-bold text-dark text-sm" />
                     <p className="text-xs text-muted">
-                      {user.role === 'admin' ? 'مدير المنصة' : 'عميل'}
+                      {user.role === 'admin' ? 'مدير المنصة' : user.role === 'employee' ? 'موظف' : 'عميل'}
                     </p>
                   </div>
 
@@ -138,10 +139,10 @@ export default function Header() {
                     onClick={() => setDropdownOpen(false)}
                     className="flex items-center gap-2 px-4 py-3 text-sm text-dark hover:bg-cream transition-colors"
                   >
-                    {user.role === 'admin' ? '🛡️ لوحة الإدارة' : '📋 طلباتي'}
+                    {user.role === 'admin' ? '🛡️ لوحة الإدارة' : user.role === 'employee' ? 'بوابة الموظف' : '📋 طلباتي'}
                   </Link>
 
-                  {user.role !== 'admin' && (
+                  {user.role === 'client' && (
                     <Link
                       href="/dashboard/membership"
                       onClick={() => setDropdownOpen(false)}
@@ -162,7 +163,7 @@ export default function Header() {
                   )}
 
                   <Link
-                    href="/dashboard/profile"
+                    href={user.role === 'employee' ? '/employee' : '/dashboard/profile'}
                     onClick={() => setDropdownOpen(false)}
                     className="flex items-center gap-2 px-4 py-3 text-sm text-dark hover:bg-cream transition-colors"
                   >
@@ -220,7 +221,7 @@ export default function Header() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <ClientNameFixed name={user.fullName} className="font-bold text-dark" maxLength={20} />
-                  <p className="text-xs text-muted">{user.role === 'admin' ? 'مدير المنصة' : 'عميل'}</p>
+                  <p className="text-xs text-muted">{user.role === 'admin' ? 'مدير المنصة' : user.role === 'employee' ? 'موظف' : 'عميل'}</p>
                 </div>
               </div>
             )}
@@ -234,7 +235,7 @@ export default function Header() {
                   className="flex items-center gap-3 px-4 py-4 text-dark hover:bg-cream transition-colors border-b border-border"
                 >
                   <span className="text-xl">{user.role === 'admin' ? '🛡️' : '📋'}</span>
-                  <span className="font-medium">{user.role === 'admin' ? 'لوحة الإدارة' : 'طلباتي'}</span>
+                  <span className="font-medium">{user.role === 'admin' ? 'لوحة الإدارة' : user.role === 'employee' ? 'بوابة الموظف' : 'طلباتي'}</span>
                 </Link>
                 {user.role === 'admin' && (
                   <Link
@@ -246,7 +247,7 @@ export default function Header() {
                     <span className="font-medium">لوحة العميل</span>
                   </Link>
                 )}
-                {user.role !== 'admin' && (
+                {user.role === 'client' && (
                   <Link
                     href="/dashboard/membership"
                     onClick={() => setMenuOpen(false)}
@@ -257,7 +258,7 @@ export default function Header() {
                   </Link>
                 )}
                 <Link
-                  href="/dashboard/profile"
+                  href={user.role === 'employee' ? '/employee' : '/dashboard/profile'}
                   onClick={() => setMenuOpen(false)}
                   className="flex items-center gap-3 px-4 py-4 text-dark hover:bg-cream transition-colors"
                 >
@@ -269,7 +270,7 @@ export default function Header() {
 
             {/* Site nav */}
             <div className="bg-card rounded-2xl border border-border overflow-hidden mb-3">
-              {navLinks.map((l, i) => (
+              {visibleNavLinks.map((l, i) => (
                 <Link
                   key={l.href}
                   href={l.href}

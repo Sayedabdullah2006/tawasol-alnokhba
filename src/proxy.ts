@@ -42,6 +42,7 @@ export async function proxy(request: NextRequest) {
   const protectedPath =
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/admin') ||
+    pathname.startsWith('/employee') ||
     pathname.startsWith('/request') ||
     pathname.startsWith('/payment')
 
@@ -61,6 +62,7 @@ export const config = {
   matcher: [
     '/dashboard/:path*',
     '/admin/:path*',
+    '/employee/:path*',
     '/request',
     '/request/:path*',
     '/payment/:path*',

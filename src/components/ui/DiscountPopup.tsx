@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 
 // المسارات التي لا نُظهر فيها نافذة الخصم — لأنها تعترض رحلة العميل بدل أن تجذبه إليها
-const SUPPRESS_ON = ['/request', '/payment', '/auth', '/dashboard', '/admin']
+const SUPPRESS_ON = ['/request', '/payment', '/auth', '/dashboard', '/admin', '/employee']
 
 interface ActiveDiscount {
   id: string

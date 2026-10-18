@@ -33,7 +33,7 @@ export default function LoginPage() {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).single()
     const nextParam = new URLSearchParams(window.location.search).get('next')
     const safeNext = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : null
-    router.push(profile?.role === 'admin' ? '/admin' : (safeNext ?? '/dashboard'))
+    router.push(profile?.role === 'admin' ? (safeNext?.startsWith('/admin') ? safeNext : '/admin') : profile?.role === 'employee' ? '/employee' : (safeNext ?? '/dashboard'))
     router.refresh()
   }
 

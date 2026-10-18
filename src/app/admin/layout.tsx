@@ -1,12 +1,14 @@
-import Sidebar, { type NavEntry, type NavLeaf } from '@/components/layout/Sidebar'
-import BottomNav from '@/components/layout/BottomNav'
-import GenerationJobMonitor from '@/components/admin/GenerationJobMonitor'
+import { type NavEntry, type NavLeaf } from '@/components/layout/Sidebar'
+import AdminAreaShell from '@/components/workforce/AdminAreaShell'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
 // قائمة شجرية: أقسام رئيسية وتحتها روابط فرعية ذات علاقة.
 const adminNav: NavEntry[] = [
   { href: '/admin', label: 'الإحصائيات', icon: '📊' },
+  { href: '/admin/workforce', label: 'إدارة الموظفين', icon: '👥' },
   {
     label: 'الطلبات والعملاء',
     icon: '📋',
@@ -55,15 +57,13 @@ const adminNav: NavEntry[] = [
 // نسخة مسطّحة (روابط فقط) لشريط التنقّل السفلي في الجوال.
 const adminFlatNav: NavLeaf[] = adminNav.flatMap(e => ('children' in e ? e.children : [e]))
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const auth = await createServerSupabaseClient()
+  const { data: { user } } = await auth.auth.getUser()
+  if (!user) redirect('/auth/login?next=/admin')
+  const { data: profile } = await auth.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'admin') redirect(profile?.role === 'employee' ? '/employee' : '/dashboard')
   return (
-    <div className="admin-shell flex w-full min-w-0 flex-1 overflow-x-clip">
-      <Sidebar items={adminNav} title="لوحة الإدارة" />
-      <div className="admin-content w-full min-w-0 flex-1 overflow-x-clip pb-20 md:pb-0">
-        {children}
-      </div>
-      <BottomNav items={adminFlatNav} />
-      <GenerationJobMonitor />
-    </div>
+    <AdminAreaShell items={adminNav} flatItems={adminFlatNav}>{children}</AdminAreaShell>
   )
 }

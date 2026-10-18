@@ -1,6 +1,7 @@
 import Sidebar from '@/components/layout/Sidebar'
 import BottomNav from '@/components/layout/BottomNav'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
+import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +25,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   let membership: ActiveMembership | null = null
 
   if (user) {
+    const { data: profile } = await auth.from('profiles').select('role').eq('id', user.id).single()
+    if (profile?.role === 'employee') redirect('/employee')
     const service = await createServiceRoleClient()
     const { data } = await service
       .from('memberships')
