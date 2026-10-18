@@ -11,6 +11,10 @@ export type Employee = {
   department_id: string | null;
   job_title: string;
   responsibilities: string;
+  national_id?: string;
+  birth_date?: string | null;
+  qualification?: string;
+  national_address?: string;
   contract_type: string;
   start_date: string;
   contract_end: string | null;

@@ -97,6 +97,8 @@ export async function GET(request: Request, context: Context) {
             basic_amount: String(result.basic_amount),
             allowances_amount: String(result.allowances_amount),
             total_amount: String(result.total_amount),
+            gross_amount: String(result.gross_amount),
+            deductions_amount: String(result.deductions_amount),
             paid_amount: String(result.paid_amount),
           }
         : null,

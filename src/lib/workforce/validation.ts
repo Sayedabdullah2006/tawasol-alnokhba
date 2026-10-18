@@ -69,7 +69,35 @@ export function employeeFields(body: Record<string, unknown>) {
     phone: textField(body.phone ?? "", "الهاتف", 0, 30),
     city: textField(body.city ?? "", "المدينة", 0, 100),
     job_title: textField(body.job_title ?? "", "المسمى", 0, 150),
-    ...(body.responsibilities !== undefined ? { responsibilities: textField(body.responsibilities, "المهام والمسؤوليات", 0, 10000) } : {}),
+    ...(body.responsibilities !== undefined
+      ? {
+          responsibilities: textField(
+            body.responsibilities,
+            "المهام والمسؤوليات",
+            0,
+            10000,
+          ),
+        }
+      : {}),
+    ...(body.national_id !== undefined
+      ? { national_id: textField(body.national_id, "الهوية", 0, 30) }
+      : {}),
+    ...(body.birth_date !== undefined
+      ? { birth_date: dateField(body.birth_date, true) }
+      : {}),
+    ...(body.qualification !== undefined
+      ? { qualification: textField(body.qualification, "المؤهل", 0, 250) }
+      : {}),
+    ...(body.national_address !== undefined
+      ? {
+          national_address: textField(
+            body.national_address,
+            "العنوان الوطني",
+            0,
+            250,
+          ),
+        }
+      : {}),
     department_id: body.department_id ? uuid(body.department_id) : null,
     contract_type,
     start_date,

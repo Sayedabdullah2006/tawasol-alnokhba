@@ -12,8 +12,15 @@ export type PayrollInput = {
   basic_amount: string;
   allowances_amount: string;
   items: PayrollItem[];
+  deductions: PayrollDeduction[];
   notes: string;
   reason: string;
+};
+export type PayrollDeduction = {
+  title: string;
+  kind: "insurance" | "other";
+  amount: string;
+  reference: string;
 };
 export type PayrollStatement = PayrollInput & {
   id: string;
@@ -22,6 +29,8 @@ export type PayrollStatement = PayrollInput & {
   version: number;
   status: "draft" | "approved" | "paid";
   total_amount: string;
+  gross_amount: string;
+  deductions_amount: string;
   paid_amount: string;
   approved_at: string | null;
 };
@@ -98,12 +107,15 @@ export function payrollInput(value: unknown): PayrollInput {
           "basic_amount",
           "allowances_amount",
           "items",
+          "deductions",
           "notes",
           "reason",
         ].includes(key),
     ) ||
     !Array.isArray(body.items) ||
-    body.items.length > 100
+    body.items.length > 100 ||
+    (body.deductions !== undefined &&
+      (!Array.isArray(body.deductions) || body.deductions.length > 100))
   )
     throw new WorkforceError("بنود الكشف غير صحيحة");
   return {
@@ -111,6 +123,24 @@ export function payrollInput(value: unknown): PayrollInput {
     allowances_amount: moneyValue(body.allowances_amount),
     notes: textField(body.notes ?? "", "الملاحظات", 0, 2000),
     reason: textField(body.reason, "السبب", 3, 2000),
+    deductions: ((body.deductions ?? []) as unknown[]).map((raw) => {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw))
+        throw new WorkforceError("بند الحسم غير صحيح");
+      const deduction = raw as Record<string, unknown>;
+      if (
+        Object.keys(deduction).some(
+          (key) => !["title", "kind", "amount", "reference"].includes(key),
+        ) ||
+        !["insurance", "other"].includes(String(deduction.kind))
+      )
+        throw new WorkforceError("بند الحسم غير صحيح");
+      return {
+        title: textField(deduction.title, "اسم الحسم", 3, 150),
+        kind: deduction.kind as PayrollDeduction["kind"],
+        amount: moneyValue(deduction.amount),
+        reference: textField(deduction.reference, "مرجع الحسم", 3, 500),
+      };
+    }),
     items: body.items.map((raw) => {
       if (
         !raw ||

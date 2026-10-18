@@ -1,4 +1,5 @@
 import AttendanceHub from "@/components/workforce/AttendanceHub";
+import EmployeeWorkPages from "@/components/workforce/EmployeeWorkPages";
 import { REQUEST_KINDS } from "@/lib/workforce/requests";
 import RequestCenter from "@/components/workforce/RequestCenter";
 import { notFound, redirect } from "next/navigation";
@@ -21,6 +22,7 @@ export default async function Page({
   const { section } = await params;
   const path = `/employee/${section.join("/")}`;
   const { employee } = await employeePageActor();
+  if(section[0] === "work" && section.length === 2 && ["projects","calendar","time","deliveries","archive"].includes(section[1])) return <EmployeeWorkPages key={path} section={section[1]}/>;
   if (path === "/employee/documents") redirect("/employee/profile/documents");
   if (path === "/employee/payment-details")
     redirect("/employee/finance/payment-details");
@@ -31,7 +33,7 @@ export default async function Page({
         !["overview", "schedule", "leave-balances"].includes(section[1]))
     )
       notFound();
-    return <AttendanceHub section={section[1] || "overview"} />;
+    return <AttendanceHub key={path} section={section[1] || "overview"} />;
   }
   if (
     section[0] === "requests" &&
@@ -44,6 +46,7 @@ export default async function Page({
   if (section[0] === "requests" && section[1] !== "profile-change")
     return (
       <RequestCenter
+        key={path}
         initialRequest={(await searchParams).request}
         startNew={!!section[1] && Object.hasOwn(REQUEST_KINDS, section[1])}
         initialKind={

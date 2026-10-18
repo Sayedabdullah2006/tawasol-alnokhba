@@ -10,6 +10,10 @@ export type EmployeeForm = {
   city: string;
   job_title: string;
   responsibilities: string;
+  national_id: string;
+  birth_date: string;
+  qualification: string;
+  national_address: string;
   department_id: string;
   contract_type: string;
   start_date: string;
@@ -23,6 +27,10 @@ export const emptyEmployeeForm: EmployeeForm = {
   city: "",
   job_title: "",
   responsibilities: "",
+  national_id: "",
+  birth_date: "",
+  qualification: "",
+  national_address: "",
   department_id: "",
   contract_type: "full_time",
   start_date: "",
@@ -93,6 +101,10 @@ export default function EmployeeFields({
       {input("city", "المدينة", "text", false, 100)}
       {!employee && (
         <>
+          {input("national_id", "رقم الهوية أو الإقامة", "text", false, 30)}
+          {input("birth_date", "تاريخ الميلاد", "date")}
+          {input("qualification", "المؤهل والتخصص", "text", false, 250)}
+          {input("national_address", "العنوان الوطني", "text", false, 250)}
           {input("job_title", "المسمى الوظيفي")}
           <div className="sm:col-span-2">
             <Field label="الوصف الوظيفي" id="employee-responsibilities">

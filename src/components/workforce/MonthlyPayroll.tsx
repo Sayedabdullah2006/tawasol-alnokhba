@@ -260,6 +260,7 @@ export default function MonthlyPayroll({
         task_id: item.task_id ?? "",
         reference: item.reference,
       })),
+      deductions: data.statement?.deductions ?? [],
       notes: data.statement?.notes ?? "",
       reason: "",
     };
@@ -295,12 +296,15 @@ export default function MonthlyPayroll({
   let preview: string | null = null;
   if (form) {
     try {
-      preview = fromCents(
-        form.items.reduce(
-          (sum, item) => sum + moneyCents(itemAmount(item)),
-          moneyCents(form.basic_amount) + moneyCents(form.allowances_amount),
-        ),
+      const gross = form.items.reduce(
+        (sum, item) => sum + moneyCents(itemAmount(item)),
+        moneyCents(form.basic_amount) + moneyCents(form.allowances_amount),
       );
+      const deducted = form.deductions.reduce(
+        (sum, item) => sum + moneyCents(item.amount),
+        BigInt(0),
+      );
+      preview = deducted <= gross ? fromCents(gross - deducted) : null;
     } catch {
       preview = null;
     }
@@ -386,7 +390,7 @@ export default function MonthlyPayroll({
             </p>
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
               {[
-                ["إجمالي المتوقع", expected],
+                ["الصافي المتوقع", expected],
                 ["المعتمد", approved],
                 ["المصروف المسجل", paid],
                 ["المتبقي من المعتمد", remaining],
@@ -469,6 +473,33 @@ export default function MonthlyPayroll({
                         )}
                       </div>
                     ))}
+                    {!!statement?.deductions.length && (
+                      <section className="rounded-xl border p-3">
+                        <p className="font-bold">الحسومات</p>
+                        <p>
+                          الإجمالي قبل الحسومات: {money(statement.gross_amount)}
+                        </p>
+                        {statement.deductions.map((item, index) => (
+                          <div
+                            key={index}
+                            className="mt-2 flex flex-wrap justify-between gap-2"
+                          >
+                            <span>
+                              {item.kind === "insurance"
+                                ? "التأمينات الاجتماعية"
+                                : item.title}{" "}
+                              · {item.reference}
+                            </span>
+                            <strong className="text-red-700">
+                              − {money(item.amount)}
+                            </strong>
+                          </div>
+                        ))}
+                        <p className="mt-2 font-bold">
+                          مجموع الحسومات: {money(statement.deductions_amount)}
+                        </p>
+                      </section>
+                    )}
                     {statement?.notes && (
                       <p className="whitespace-pre-wrap">{statement.notes}</p>
                     )}
@@ -637,6 +668,155 @@ export default function MonthlyPayroll({
                     >
                       إضافة حافز أو عمولة
                     </Button>
+                    <section className="space-y-3 rounded-xl border p-4">
+                      <h3 className="font-bold">الحسومات</h3>
+                      {form.deductions.map((item, index) => (
+                        <fieldset
+                          key={index}
+                          className="grid gap-3 rounded-xl border p-3 sm:grid-cols-2"
+                        >
+                          <legend>حسم {index + 1}</legend>
+                          <Field
+                            label="نوع الحسم"
+                            id={`deduction-kind-${index}`}
+                          >
+                            <select
+                              id={`deduction-kind-${index}`}
+                              className={controlClass}
+                              value={item.kind}
+                              onChange={(e) =>
+                                setForm({
+                                  ...form,
+                                  deductions: form.deductions.map((row, i) =>
+                                    i === index
+                                      ? {
+                                          ...row,
+                                          kind: e.target.value as
+                                            | "insurance"
+                                            | "other",
+                                          title:
+                                            e.target.value === "insurance"
+                                              ? "التأمينات الاجتماعية"
+                                              : "حسم آخر",
+                                        }
+                                      : row,
+                                  ),
+                                })
+                              }
+                            >
+                              <option value="insurance">
+                                التأمينات الاجتماعية
+                              </option>
+                              <option value="other">حسم آخر</option>
+                            </select>
+                          </Field>
+                          <Field
+                            label="اسم الحسم"
+                            id={`deduction-title-${index}`}
+                          >
+                            <input
+                              id={`deduction-title-${index}`}
+                              required
+                              minLength={3}
+                              maxLength={150}
+                              className={controlClass}
+                              value={item.title}
+                              onChange={(e) =>
+                                setForm({
+                                  ...form,
+                                  deductions: form.deductions.map((row, i) =>
+                                    i === index
+                                      ? { ...row, title: e.target.value }
+                                      : row,
+                                  ),
+                                })
+                              }
+                            />
+                          </Field>
+                          <Field
+                            label="مبلغ الحسم"
+                            id={`deduction-amount-${index}`}
+                          >
+                            <input
+                              id={`deduction-amount-${index}`}
+                              required
+                              inputMode="decimal"
+                              className={controlClass}
+                              value={item.amount}
+                              onChange={(e) =>
+                                setForm({
+                                  ...form,
+                                  deductions: form.deductions.map((row, i) =>
+                                    i === index
+                                      ? { ...row, amount: e.target.value }
+                                      : row,
+                                  ),
+                                })
+                              }
+                            />
+                          </Field>
+                          <Field
+                            label="مرجع الحسم"
+                            id={`deduction-reference-${index}`}
+                          >
+                            <input
+                              id={`deduction-reference-${index}`}
+                              required
+                              minLength={3}
+                              maxLength={500}
+                              className={controlClass}
+                              value={item.reference}
+                              onChange={(e) =>
+                                setForm({
+                                  ...form,
+                                  deductions: form.deductions.map((row, i) =>
+                                    i === index
+                                      ? { ...row, reference: e.target.value }
+                                      : row,
+                                  ),
+                                })
+                              }
+                            />
+                          </Field>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              setForm({
+                                ...form,
+                                deductions: form.deductions.filter(
+                                  (_, i) => i !== index,
+                                ),
+                              })
+                            }
+                          >
+                            حذف الحسم
+                          </Button>
+                        </fieldset>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={form.deductions.length >= 100}
+                        onClick={() =>
+                          setForm({
+                            ...form,
+                            deductions: [
+                              ...form.deductions,
+                              {
+                                title: "التأمينات الاجتماعية",
+                                kind: "insurance",
+                                amount: "",
+                                reference: "",
+                              },
+                            ],
+                          })
+                        }
+                      >
+                        إضافة حسم
+                      </Button>
+                    </section>
                     <Field label="ملاحظات كشف الشهر" id="payroll-notes">
                       <textarea
                         id="payroll-notes"
@@ -665,7 +845,7 @@ export default function MonthlyPayroll({
                       />
                     </Field>
                     <p className="font-bold">
-                      معاينة الإجمالي:{" "}
+                      معاينة الصافي:{" "}
                       {preview === null
                         ? "تحقق من مبالغ البنود"
                         : money(preview)}

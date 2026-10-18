@@ -43,7 +43,39 @@ export default function TaskBoard({
     [over, setOver] = useState(""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [pendingMove, setPendingMove] = useState<{
+    id: string;
+    column: TaskColumn;
+    position: number;
+  } | null>(null);
+  const visibleTasks = tasks.map((task) =>
+    pendingMove?.id === task.id
+      ? {
+          ...task,
+          column_id: pendingMove.column.id,
+          column: pendingMove.column,
+          position: pendingMove.position,
+        }
+      : task,
+  );
+  const visibleCounts = { ...counts };
+  const originalTask =
+    pendingMove && tasks.find((task) => task.id === pendingMove.id);
+  if (
+    originalTask &&
+    pendingMove &&
+    originalTask.column.kind !== pendingMove.column.kind
+  ) {
+    visibleCounts[originalTask.column.kind] = Math.max(
+      0,
+      (visibleCounts[originalTask.column.kind] || 0) - 1,
+    );
+    visibleCounts[pendingMove.column.kind] =
+      (visibleCounts[pendingMove.column.kind] || 0) + 1;
+  }
   const lock = useRef(false),
+    dragId = useRef<string | null>(null),
+    board = useRef<HTMLDivElement | null>(null),
     touch = useRef<{ id: string; x: number; y: number; moved: boolean } | null>(
       null,
     );
@@ -55,7 +87,14 @@ export default function TaskBoard({
   async function move(task: WorkTask, kind: string) {
     if (lock.current) return;
     const action = cardAction(task, kind, admin);
-    if (!action) return;
+    if (!action) {
+      setError(
+        kind === "done"
+          ? "أرسلي التسليم للمراجعة أولًا، ثم تعتمد الإدارة إنجازه."
+          : "لا يمكن نقل هذه المهمة إلى الحالة المحددة.",
+      );
+      return;
+    }
     setDragging(null);
     setOver("");
     setError("");
@@ -85,6 +124,7 @@ export default function TaskBoard({
       ) + 1024;
     lock.current = true;
     setBusy(true);
+    setPendingMove({ id: task.id, column, position });
     try {
       const result = await api<{ version: number }>("/api/workforce/tasks", {
         method: "POST",
@@ -114,6 +154,7 @@ export default function TaskBoard({
     } finally {
       lock.current = false;
       setBusy(false);
+      setPendingMove(null);
     }
   }
   return (
@@ -125,11 +166,12 @@ export default function TaskBoard({
         </p>
       )}
       <div
+        ref={board}
         className="flex gap-4 overflow-x-auto pb-5"
         aria-label="قوائم المهام"
       >
         {kinds.map((kind) => {
-          const rows = tasks
+          const rows = visibleTasks
             .filter((task) => task.column.kind === kind)
             .sort(
               (a, b) =>
@@ -141,10 +183,11 @@ export default function TaskBoard({
             <section
               key={kind}
               data-task-lane={kind}
-              aria-label={`${TASK_STATES[kind]} — ${counts[kind] || 0} مهمة`}
+              aria-label={`${TASK_STATES[kind]} — ${visibleCounts[kind] || 0} مهمة`}
               className={`max-h-[65dvh] min-h-80 w-72 shrink-0 overflow-y-auto rounded-2xl border-t-4 bg-slate-100/90 p-3 ${shades[kind]} ${over === kind && allowed ? "ring-2 ring-green" : ""}`}
               onDragOver={(e) => {
-                if (allowed) {
+                const source = tasks.find((row) => row.id === dragId.current);
+                if (source && cardAction(source, kind, admin)) {
                   e.preventDefault();
                   e.dataTransfer.dropEffect = "move";
                   setOver(kind);
@@ -152,14 +195,17 @@ export default function TaskBoard({
               }}
               onDrop={(e) => {
                 e.preventDefault();
-                if (moving && allowed) void move(moving, kind);
+                const source = tasks.find((row) => row.id === dragId.current);
+                if (source && cardAction(source, kind, admin))
+                  void move(source, kind);
+                dragId.current = null;
                 setOver("");
               }}
             >
               <header className="mb-3 flex items-center justify-between gap-3 px-1">
                 <h3 className="text-sm font-black">{TASK_STATES[kind]}</h3>
                 <span className="rounded-lg bg-white px-2 py-1 text-xs font-bold">
-                  {counts[kind] ?? rows.length}
+                  {visibleCounts[kind] ?? rows.length}
                 </span>
               </header>
               <div className="space-y-3">
@@ -184,10 +230,12 @@ export default function TaskBoard({
                           return;
                         }
                         setDragging(task.id);
+                        dragId.current = task.id;
                         e.dataTransfer.effectAllowed = "move";
                         e.dataTransfer.setData("text/plain", task.id);
                       }}
                       onDragEnd={() => {
+                        dragId.current = null;
                         setDragging(null);
                         setOver("");
                       }}
@@ -205,7 +253,10 @@ export default function TaskBoard({
                             className="touch-none cursor-grab rounded px-2 text-lg text-slate-400 active:cursor-grabbing"
                             disabled={busy}
                             onPointerDown={(e) => {
-                              if (e.pointerType === "mouse") return;
+                              if (busy || e.button !== 0) return;
+                              // A button does not reliably initiate its parent's HTML
+                              // drag on desktop. Use the handle for all pointer types.
+                              e.preventDefault();
                               e.currentTarget.setPointerCapture(e.pointerId);
                               touch.current = {
                                 id: task.id,
@@ -216,7 +267,7 @@ export default function TaskBoard({
                             }}
                             onPointerMove={(e) => {
                               const state = touch.current;
-                              if (!state || e.pointerType === "mouse") return;
+                              if (!state) return;
                               if (
                                 Math.hypot(
                                   e.clientX - state.x,
@@ -224,7 +275,16 @@ export default function TaskBoard({
                                 ) > 10
                               ) {
                                 state.moved = true;
+                                dragId.current = task.id;
                                 setDragging(task.id);
+                                const bounds =
+                                  board.current?.getBoundingClientRect();
+                                if (bounds && board.current) {
+                                  if (e.clientX < bounds.left + 40)
+                                    board.current.scrollBy({ left: -24 });
+                                  else if (e.clientX > bounds.right - 40)
+                                    board.current.scrollBy({ left: 24 });
+                                }
                                 const lane = document
                                   .elementFromPoint(e.clientX, e.clientY)
                                   ?.closest<HTMLElement>("[data-task-lane]")
@@ -235,6 +295,13 @@ export default function TaskBoard({
                             onPointerUp={(e) => {
                               const state = touch.current;
                               touch.current = null;
+                              dragId.current = null;
+                              if (
+                                e.currentTarget.hasPointerCapture(e.pointerId)
+                              )
+                                e.currentTarget.releasePointerCapture(
+                                  e.pointerId,
+                                );
                               const lane = document
                                 .elementFromPoint(e.clientX, e.clientY)
                                 ?.closest<HTMLElement>("[data-task-lane]")
@@ -245,6 +312,7 @@ export default function TaskBoard({
                             }}
                             onPointerCancel={() => {
                               touch.current = null;
+                              dragId.current = null;
                               setDragging(null);
                               setOver("");
                             }}
@@ -254,6 +322,7 @@ export default function TaskBoard({
                         )}
                       </div>
                       <Link
+                        draggable={false}
                         href={`${base}/${task.id}`}
                         onClick={
                           onOpen

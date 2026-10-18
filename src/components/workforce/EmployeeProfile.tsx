@@ -40,7 +40,13 @@ export default function EmployeeProfile({
   id: string;
   role: InternalRole;
   section?:
-    "profile" | "documents" | "requests" | "payment-details" | "compensation";
+    | "profile"
+    | "documents"
+    | "requests"
+    | "payment-details"
+    | "compensation"
+    | "job-description"
+    | "contract";
 }) {
   const [data, setData] = useState<EmployeeDetail | null>(null);
   const [form, setForm] = useState<EmployeeForm>(emptyEmployeeForm);
@@ -68,6 +74,8 @@ export default function EmployeeProfile({
     requests: "طلبات تعديل البيانات",
     "payment-details": "بيانات الصرف",
     compensation: "الراتب والبدلات المتفق عليها",
+    "job-description": "الوصف الوظيفي",
+    contract: "بيانات العقد",
   }[section];
   const dirty =
     !!data &&
@@ -88,6 +96,7 @@ export default function EmployeeProfile({
       ...result.employee,
       department_id: result.employee.department_id ?? "",
       contract_end: result.employee.contract_end ?? "",
+      birth_date: result.employee.birth_date ?? "",
     };
     setForm(next);
     setOriginal(JSON.stringify(next));
@@ -229,7 +238,7 @@ export default function EmployeeProfile({
             {STATUS_LABELS[employee.status]}
           </span>
         </div>
-        {(admin || section === "profile") && (
+        {admin && (
           <dl className="mt-6 grid gap-4 border-t border-white/20 pt-5 text-sm sm:grid-cols-3">
             <div>
               <dt className="text-white/60">نوع التعاقد</dt>
@@ -262,11 +271,61 @@ export default function EmployeeProfile({
         }
       >
         <div className="space-y-6">
-          {!admin && section === "profile" && (
+          {!admin && section === "job-description" && (
             <Panel title="الوصف الوظيفي">
               <p className="whitespace-pre-wrap break-words text-sm leading-7">
                 {employee.responsibilities || "—"}
               </p>
+            </Panel>
+          )}
+          {!admin && section === "contract" && (
+            <Panel title="بيانات العقد">
+              <dl className="grid gap-4 text-sm sm:grid-cols-2">
+                {[
+                  ["نوع التعاقد", CONTRACT_LABELS[employee.contract_type]],
+                  ["تاريخ المباشرة", formatDate(employee.start_date)],
+                  [
+                    "انتهاء العقد",
+                    employee.contract_end
+                      ? formatDate(employee.contract_end)
+                      : "—",
+                  ],
+                  ["المسمى الوظيفي", employee.job_title],
+                  [
+                    "القسم",
+                    data.departments.find(
+                      (d) => d.id === employee.department_id,
+                    )?.name || "—",
+                  ],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="text-muted">{label}</dt>
+                    <dd className="mt-1 font-bold">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </Panel>
+          )}
+          {!admin && section === "profile" && (
+            <Panel title="البيانات الشخصية">
+              <dl className="grid gap-4 text-sm sm:grid-cols-2">
+                {[
+                  ["الاسم", employee.full_name],
+                  ["بريد تسجيل الدخول", employee.email],
+                  ["الهوية أو الإقامة", employee.national_id || "—"],
+                  [
+                    "تاريخ الميلاد",
+                    employee.birth_date ? formatDate(employee.birth_date) : "—",
+                  ],
+                  ["المؤهل والتخصص", employee.qualification || "—"],
+                  ["العنوان الوطني", employee.national_address || "—"],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="text-muted">{label}</dt>
+                    <dd className="mt-1 break-words font-bold">{value}</dd>
+                  </div>
+                ))}
+              </dl>
             </Panel>
           )}
           {(admin || section === "profile") && (
@@ -309,7 +368,7 @@ export default function EmployeeProfile({
               </form>
             </Panel>
           )}
-          {(admin || section === "profile" || section === "compensation") && (
+          {(admin || section === "compensation") && (
             <CompensationPanel
               employeeId={id}
               startDate={employee.start_date}

@@ -160,7 +160,12 @@ export async function PATCH(request: Request) {
       id = uuid(body.employee_id);
     const scheduleMode = body.schedule_mode ?? "fixed";
     const dailyMinutes = body.daily_minutes ?? 480;
-    if (!["fixed", "flexible"].includes(scheduleMode) || !Number.isInteger(dailyMinutes) || dailyMinutes < 60 || dailyMinutes > 960)
+    if (
+      !["fixed", "flexible"].includes(scheduleMode) ||
+      !Number.isInteger(dailyMinutes) ||
+      dailyMinutes < 60 ||
+      dailyMinutes > 960
+    )
       throw new WorkforceError("حدد نوع الدوام وساعات العمل اليومية");
     if (
       !Array.isArray(body.workdays) ||
@@ -173,10 +178,10 @@ export async function PATCH(request: Request) {
     )
       throw new WorkforceError("أيام العمل غير صحيحة");
     if (
-      scheduleMode === "fixed" && (
-      !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.starts_at) ||
-      !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.ends_at) ||
-      body.ends_at <= body.starts_at)
+      scheduleMode === "fixed" &&
+      (!/^([01]\d|2[0-3]):[0-5]\d$/.test(body.starts_at) ||
+        !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.ends_at) ||
+        body.ends_at <= body.starts_at)
     )
       throw new WorkforceError("ساعات الدوام غير صحيحة");
     if (

@@ -5,7 +5,13 @@ export type EmployeeScreen = {
   related: string[];
   available: boolean;
   live?:
-    "profile" | "documents" | "requests" | "payment-details" | "compensation";
+    | "profile"
+    | "documents"
+    | "requests"
+    | "payment-details"
+    | "compensation"
+    | "job-description"
+    | "contract";
 };
 export type EmployeeModule = {
   key: string;
@@ -27,19 +33,37 @@ const screen = (
   purpose,
   related: related.map((p) => `/employee/${p}`),
   live,
-  available: available || !!live,
+  available:
+    available ||
+    !!live ||
+    [
+      "work/projects",
+      "work/calendar",
+      "work/time",
+      "work/deliveries",
+      "work/archive",
+      "requests/general",
+      "requests/leave",
+      "requests/permission",
+      "requests/remote-work",
+      "requests/expenses",
+      "requests/advance",
+      "requests/attendance-correction",
+      "requests/letter",
+      "requests/payroll-review",
+    ].includes(path),
 });
 
 export const employeeModules: EmployeeModule[] = [
   {
     key: "work",
-    title: "العمل والإنجاز",
+    title: "مهامي",
     purpose: "إدارة أعمالك اليومية والمشاريع التي تشارك فيها.",
     adminArea: "إدارة العمل: اللوحات والتكليفات والمشاريع والتسليمات",
     screens: [
       screen(
         "work/tasks",
-        "مهامي",
+        "لوحة المهام",
         "لوحة وقائمة للمهام المسندة والذاتية، وأولوياتها وعوائقها وتسليماتها.",
         ["work/projects", "work/calendar", "work/time", "performance/goals"],
         undefined,
@@ -63,6 +87,8 @@ export const employeeModules: EmployeeModule[] = [
         "الوقت التقديري والفعلي على المهام، بصورة مستقلة عن الحضور.",
         ["work/tasks", "attendance/overview"],
       ),
+      screen("work/deliveries", "تسليماتي", "", [], undefined, true),
+      screen("work/archive", "أرشيف المهام", "", [], undefined, true),
     ],
   },
   {
@@ -152,19 +178,25 @@ export const employeeModules: EmployeeModule[] = [
         "attendance/overview",
         "حضوري وانصرافي",
         "تسجيل الحضور والانصراف والراحة ومراجعة سجلاتك.",
-        ["attendance/schedule", "requests/attendance-correction"],undefined,true,
+        ["attendance/schedule", "requests/attendance-correction"],
+        undefined,
+        true,
       ),
       screen(
         "attendance/schedule",
         "جدول دوامي",
         "أيام العمل وساعاته والاستثناءات والإجازات المعتمدة.",
-        ["work/calendar", "requests/remote-work"],undefined,true,
+        ["work/calendar", "requests/remote-work"],
+        undefined,
+        true,
       ),
       screen(
         "attendance/leave-balances",
         "أرصدة الإجازات",
         "المستحق والمستخدم والمحجوز والمتاح وتاريخ حركة الرصيد.",
-        ["requests/leave", "requests/history"],undefined,true,
+        ["requests/leave", "requests/history"],
+        undefined,
+        true,
       ),
     ],
   },
@@ -174,6 +206,7 @@ export const employeeModules: EmployeeModule[] = [
     purpose: "مركز موحد لطلبات الموظف ومتابعة قرار الإدارة وآثاره.",
     adminArea: "صندوق الموافقات الموحد: مراجعة الطلب والقرار وأثره وسجله",
     screens: [
+      screen("requests/general", "طلب إداري", "", [], undefined, true),
       screen(
         "requests/history",
         "كل طلباتي",
@@ -260,10 +293,40 @@ export const employeeModules: EmployeeModule[] = [
     screens: [
       screen(
         "profile",
-        "بيانات العمل والتواصل",
+        "بياناتي الشخصية والتواصل",
         "بيانات التعاقد والقسم والمسمى وتحديث الهاتف والمدينة.",
         ["requests/profile-change"],
         "profile",
+      ),
+      screen(
+        "profile/job-description",
+        "الوصف الوظيفي",
+        "",
+        [],
+        "job-description",
+      ),
+      screen("profile/contract", "بيانات العقد", "", [], "contract"),
+      screen(
+        "profile/compensation",
+        "الراتب والبدلات المتفق عليها",
+        "",
+        [],
+        "compensation",
+      ),
+      screen(
+        "finance/overview",
+        "كشف الراتب والحوافز",
+        "",
+        [],
+        undefined,
+        true,
+      ),
+      screen(
+        "profile/payment-details",
+        "بيانات الصرف",
+        "",
+        [],
+        "payment-details",
       ),
       screen(
         "profile/documents",
