@@ -114,7 +114,7 @@ export default function AttendanceHub({
     }
   }
   return (
-    <div className="mx-auto max-w-5xl space-y-5 p-4 md:p-6">
+    <div className="mx-auto w-full min-w-0 max-w-5xl space-y-5 p-4 md:p-6">
       {warning}
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-black">

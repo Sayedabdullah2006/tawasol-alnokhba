@@ -257,7 +257,7 @@ export default function EmployeeProfile({
       <div
         className={
           admin
-            ? "grid items-start gap-6 lg:grid-cols-[1.4fr_1fr]"
+            ? "grid items-start gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]"
             : "space-y-6"
         }
       >

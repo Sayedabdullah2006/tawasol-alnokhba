@@ -107,7 +107,7 @@ export default function AdminDashboard({ userId }: { userId: string }) {
     window.dispatchEvent(new Event("workforce-notifications"));
   }
   return (
-    <div className="mx-auto max-w-screen-2xl space-y-6 p-4 md:p-8">
+    <div className="mx-auto w-full min-w-0 max-w-screen-2xl space-y-6 p-4 md:p-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="mt-2 text-3xl font-black">الفريق والمهام</h1>

@@ -64,7 +64,7 @@ export default function ProfileApprovals() {
     setPage(next);
   };
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-8">
+    <div className="mx-auto w-full min-w-0 max-w-5xl space-y-6 p-4 md:p-8">
       {unsavedWarning}
       <Notice message={error} error />
       <Notice message={message} />

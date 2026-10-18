@@ -164,7 +164,7 @@ export default function RequestCenter({
     setOpen(false);
   }
   return (
-    <div className="mx-auto max-w-5xl space-y-5 p-4 md:p-6">
+    <div className="mx-auto w-full min-w-0 max-w-5xl space-y-5 p-4 md:p-6">
       {confirmation}
       {warning}
       <header className="flex flex-wrap items-center justify-between gap-3">
