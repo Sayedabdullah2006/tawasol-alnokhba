@@ -2,7 +2,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import type {
+  RealtimeChannel,
+  RealtimePostgresChangesPayload,
+} from "@supabase/supabase-js";
 import { api } from "./shared";
 export default function NotificationBell({ admin }: { admin: boolean }) {
   const [count, setCount] = useState<number | null>(null);
@@ -12,13 +15,27 @@ export default function NotificationBell({ admin }: { admin: boolean }) {
     let channel: RealtimeChannel | undefined,
       connecting = false;
     let changeTimer: number | undefined;
-    const announce = () => {
+    const taskIds = new Set<string>(),
+      tables = new Set<string>();
+    const announce = (
+      payload: RealtimePostgresChangesPayload<Record<string, unknown>>,
+    ) => {
+      tables.add(payload.table);
+      const row = { ...payload.old, ...payload.new } as Record<string, unknown>;
+      const taskId = payload.table === "wf_tasks" ? row.id : row.task_id;
+      if (typeof taskId === "string") taskIds.add(taskId);
       clearTimeout(changeTimer);
       changeTimer = window.setTimeout(() => {
         if (document.visibilityState === "visible") {
           update();
-          window.dispatchEvent(new Event("workforce-data-changed"));
+          window.dispatchEvent(
+            new CustomEvent("workforce-data-changed", {
+              detail: { taskIds: [...taskIds], tables: [...tables] },
+            }),
+          );
         }
+        taskIds.clear();
+        tables.clear();
       }, 250);
     };
     const update = () => {

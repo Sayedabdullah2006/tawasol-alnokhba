@@ -55,6 +55,8 @@ export default function TaskDetail({
   const [message, setMessage] = useState("");
   const [commandBusy, setBusy] = useState(false);
   const lock = useRef(false);
+  const loadingDetails = useRef(false),
+    queuedRefresh = useRef(false);
   const retry = useRef({ payload: "", key: "" });
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(taskForm());
@@ -82,14 +84,20 @@ export default function TaskDetail({
   );
   const base = admin ? "/admin/workforce/tasks" : "/employee/work/tasks";
   useEffect(() => {
-    const refresh = () => {
-      if (!busy && !hasUnsavedWorkforceChanges()) setReload((n) => n + 1);
+    const refresh = (event: Event) => {
+      const detail = (event as CustomEvent<{ taskIds?: string[] }>).detail;
+      if (detail && !detail.taskIds?.includes(id)) return;
+      if (!busy && !hasUnsavedWorkforceChanges()) {
+        if (loadingDetails.current) queuedRefresh.current = true;
+        else setReload((n) => n + 1);
+      }
     };
     window.addEventListener("workforce-data-changed", refresh);
     return () => window.removeEventListener("workforce-data-changed", refresh);
-  }, [busy]);
+  }, [busy, id]);
   useEffect(() => {
     const abort = new AbortController();
+    loadingDetails.current = true;
     api<Detail>(`/api/workforce/tasks/${id}`, { signal: abort.signal })
       .then(async (result) => {
         setData(result);
@@ -102,6 +110,14 @@ export default function TaskDetail({
           setBoard(null);
         }
         if (e.name !== "AbortError") setError(e.message);
+      })
+      .finally(() => {
+        if (abort.signal.aborted) return;
+        loadingDetails.current = false;
+        if (queuedRefresh.current) {
+          queuedRefresh.current = false;
+          setReload((n) => n + 1);
+        }
       });
     return () => abort.abort();
   }, [id, reload]);

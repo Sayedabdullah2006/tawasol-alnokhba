@@ -53,14 +53,6 @@ export default function EmployeeNavigation() {
         id="employee-section-links"
         className={`${mobileOpen ? "block" : "hidden"} space-y-2 p-3 ${collapsed ? "lg:hidden" : "lg:block"} lg:p-0`}
       >
-        <Link
-          href="/employee"
-          onClick={() => setMobileOpen(false)}
-          aria-current={pathname === "/employee" ? "page" : undefined}
-          className={`block rounded-xl px-4 py-3 text-sm font-bold ${pathname === "/employee" ? "bg-dark text-white" : "hover:bg-slate-100"}`}
-        >
-          الرئيسية
-        </Link>
         {[
           ...employeeModules.filter((module) => module.key === "profile"),
           ...employeeModules.filter(
@@ -92,7 +84,12 @@ export default function EmployeeNavigation() {
           ) : (
             <details
               key={module.key}
-              open={screens.some((screen) => pathname === screen.path)}
+              open={screens.some(
+                (screen) =>
+                  pathname === screen.path ||
+                  (screen.path === "/employee/work/tasks" &&
+                    pathname.startsWith(screen.path + "/")),
+              )}
               className="rounded-xl border border-border"
             >
               <summary className="cursor-pointer px-4 py-3 text-sm font-bold">

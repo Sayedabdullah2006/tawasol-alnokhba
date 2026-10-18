@@ -66,6 +66,8 @@ export default function TaskWorkspace({
     [weeklyOpen, setWeeklyOpen] = useState(false);
   const [task, setTask] = useState(taskForm());
   const taskId = useRef("");
+  const loadingTasks = useRef(false),
+    queuedRefresh = useRef(false);
   const retry = useRef({ serialized: "", key: "" }),
     lock = useRef(false);
   const { confirm, confirmation } = useConfirm();
@@ -76,8 +78,20 @@ export default function TaskWorkspace({
   const Heading = embedded ? "h2" : "h1";
   const page = Number(params.get("page") || "1");
   useEffect(() => {
-    const refresh = () => {
-      if (!taskOpen && !weeklyOpen) setRevision((n) => n + 1);
+    const refresh = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{ tables?: string[]; taskIds?: string[] }>
+      ).detail;
+      if (
+        detail &&
+        !detail.tables?.includes("wf_tasks") &&
+        !detail.taskIds?.length
+      )
+        return;
+      if (!taskOpen && !weeklyOpen) {
+        if (loadingTasks.current) queuedRefresh.current = true;
+        else setRevision((n) => n + 1);
+      }
     };
     window.addEventListener("workforce-data-changed", refresh);
     return () => window.removeEventListener("workforce-data-changed", refresh);
@@ -114,6 +128,7 @@ export default function TaskWorkspace({
   useEffect(() => {
     const abort = new AbortController();
     const requestParams = new URLSearchParams(query);
+    loadingTasks.current = true;
     requestParams.set("view", view);
     if (view === "board") {
       requestParams.set("page", "1");
@@ -140,6 +155,14 @@ export default function TaskWorkspace({
         if (e.name !== "AbortError") {
           setError(e.message);
           setLoading(false);
+        }
+      })
+      .finally(() => {
+        if (abort.signal.aborted) return;
+        loadingTasks.current = false;
+        if (queuedRefresh.current) {
+          queuedRefresh.current = false;
+          setRevision((n) => n + 1);
         }
       });
     return () => abort.abort();
