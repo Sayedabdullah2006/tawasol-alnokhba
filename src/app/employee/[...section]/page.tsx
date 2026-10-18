@@ -13,8 +13,10 @@ export const dynamic = "force-dynamic";
 
 export default async function Page({
   params,
+  searchParams,
 }: {
   params: Promise<{ section: string[] }>;
+  searchParams: Promise<{ request?: string }>;
 }) {
   const { section } = await params;
   const path = `/employee/${section.join("/")}`;
@@ -42,6 +44,7 @@ export default async function Page({
   if (section[0] === "requests" && section[1] !== "profile-change")
     return (
       <RequestCenter
+        initialRequest={(await searchParams).request}
         startNew={!!section[1] && Object.hasOwn(REQUEST_KINDS, section[1])}
         initialKind={
           section[1] && section[1] !== "history" ? section[1] : "general"

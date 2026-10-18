@@ -39,16 +39,21 @@ export default function RequestCenter({
   initialKind = "general",
   startNew = false,
   initialTab = "requests",
+  initialRequest = "",
 }: {
   admin?: boolean;
   initialKind?: string;
   startNew?: boolean;
   initialTab?: string;
+  initialRequest?: string;
 }) {
+  const focused = initialRequest;
+  const [dismissedFocus, setDismissedFocus] = useState("");
+  const focusOnly = !!focused && dismissedFocus !== focused;
   const [rows, setRows] = useState<EmployeeRequest[]>([]),
     [count, setCount] = useState(0),
     [page, setPage] = useState(1),
-    [status, setStatus] = useState(admin ? "pending" : ""),
+    [status, setStatus] = useState(admin && !focused ? "pending" : ""),
     [revision, setRevision] = useState(0),
     [loadedKey, setLoadedKey] = useState("");
   const [error, setError] = useState(""),
@@ -66,12 +71,6 @@ export default function RequestCenter({
       request: string;
       file: RequestFile;
     } | null>(null);
-  const [focused] = useState(() =>
-    typeof window === "undefined"
-      ? ""
-      : new URLSearchParams(window.location.search).get("request") || "",
-  );
-  const [focusOnly, setFocusOnly] = useState(!!focused);
   const requestKey = `${page}:${status}:${revision}:${focusOnly}:${focused}`;
   const loading = loadedKey !== requestKey;
   const [attendance, setAttendance] = useState<AttendanceData | null>(null);
@@ -225,8 +224,9 @@ export default function RequestCenter({
           <select
             aria-label="حالة الطلبات"
             className="rounded-xl border bg-white p-3 text-sm"
-            value={status}
+            value={focusOnly ? "" : status}
             onChange={(e) => {
+              setDismissedFocus(focused);
               setStatus(e.target.value);
               setPage(1);
             }}
@@ -242,11 +242,12 @@ export default function RequestCenter({
             size="sm"
             variant="outline"
             onClick={() => {
-              setFocusOnly(false);
+              setDismissedFocus(focused);
+              if (focusOnly) setStatus("");
               setRevision((n) => n + 1);
             }}
           >
-            تحديث{focusOnly ? " · كل الطلبات" : ""}
+            {focusOnly ? "كل الطلبات" : "تحديث"}
           </Button>
         </div>
         {loading && !rows.length ? (
@@ -458,7 +459,7 @@ export default function RequestCenter({
               setFiles([]);
               setPage(1);
               setStatus("");
-              setFocusOnly(false);
+              setDismissedFocus(focused);
               setMessage("تم إرسال الطلب");
               setRevision((n) => n + 1);
               window.dispatchEvent(new Event("workforce-notifications"));
