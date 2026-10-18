@@ -21,4 +21,7 @@ export type AdminWorkDashboard = {
     metrics: WorkMetrics;
   }[];
   clients: string[];
+  pendingSubmissions: { id: string; taskId: string; title: string; client: string; employeeName: string; createdAt: string }[];
+  pendingRequests: { id: string; title: string; employeeName: string; createdAt: string; type: "requests" | "profile" }[];
+  pendingRequestCount: number;
 };

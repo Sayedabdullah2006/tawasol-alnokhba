@@ -40,14 +40,19 @@ export default function RequestCenter({
   startNew = false,
   initialTab = "requests",
   initialRequest = "",
+  embedded = false,
+  onChanged,
 }: {
   admin?: boolean;
   initialKind?: string;
   startNew?: boolean;
   initialTab?: string;
   initialRequest?: string;
+  embedded?: boolean;
+  onChanged?: () => void;
 }) {
-  const focused = initialRequest;
+  const focused = initialTab === "profile" ? "" : initialRequest;
+  const Heading = embedded ? "h2" : "h1";
   const [dismissedFocus, setDismissedFocus] = useState("");
   const focusOnly = !!focused && dismissedFocus !== focused;
   const [rows, setRows] = useState<EmployeeRequest[]>([]),
@@ -146,6 +151,7 @@ export default function RequestCenter({
       });
       setMessage("تم حفظ القرار");
       setRevision((n) => n + 1);
+      onChanged?.();
       window.dispatchEvent(new Event("workforce-notifications"));
     } catch (e) {
       setError((e as Error).message);
@@ -164,13 +170,13 @@ export default function RequestCenter({
     setOpen(false);
   }
   return (
-    <div className="mx-auto w-full min-w-0 max-w-5xl space-y-5 p-4 md:p-6">
+    <div className={embedded ? "min-w-0 space-y-5" : "mx-auto w-full min-w-0 max-w-5xl space-y-5 p-4 md:p-6"}>
       {confirmation}
       {warning}
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-black">
+        <Heading className="text-2xl font-black">
           {admin ? "طلبات الموظفات" : "طلباتي"}
-        </h1>
+        </Heading>
         {!admin && (
           <Button
             onClick={() => {
@@ -216,7 +222,7 @@ export default function RequestCenter({
       <Notice message={message} />
       {profileVisited && (
         <section hidden={tab !== "profile"}>
-          <ProfileApprovals />
+          <ProfileApprovals onChanged={onChanged} embedded={embedded} requestId={initialTab === "profile" ? initialRequest : undefined} />
         </section>
       )}
       <section hidden={tab !== "requests"} className="space-y-5">

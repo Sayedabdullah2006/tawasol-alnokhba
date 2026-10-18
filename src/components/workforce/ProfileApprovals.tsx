@@ -13,7 +13,7 @@ import {
   useUnsavedChanges,
 } from "./shared";
 type RequestRow = ProfileChange & { wf_employees: { full_name: string } };
-export default function ProfileApprovals() {
+export default function ProfileApprovals({ onChanged, embedded = false, requestId }: { onChanged?: () => void; embedded?: boolean; requestId?: string } = {}) {
   const [requests, setRequests] = useState<RequestRow[]>([]);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -36,7 +36,7 @@ export default function ProfileApprovals() {
   useEffect(() => {
     const abort = new AbortController();
     api<{ requests: RequestRow[]; count: number }>(
-      `/api/workforce/profile-changes?page=${page}`,
+      `/api/workforce/profile-changes?page=${page}${requestId ? `&request=${encodeURIComponent(requestId)}` : ""}`,
       {
         signal: abort.signal,
       },
@@ -58,13 +58,13 @@ export default function ProfileApprovals() {
         }
       });
     return () => abort.abort();
-  }, [revision, page]);
+  }, [revision, page, requestId]);
   const changePage = (next: number) => {
     setLoading(true);
     setPage(next);
   };
   return (
-    <div className="mx-auto w-full min-w-0 max-w-5xl space-y-6 p-4 md:p-8">
+    <div className={embedded ? "min-w-0 space-y-6" : "mx-auto w-full min-w-0 max-w-5xl space-y-6 p-4 md:p-8"}>
       {unsavedWarning}
       <Notice message={error} error />
       <Notice message={message} />
@@ -123,6 +123,7 @@ export default function ProfileApprovals() {
                       : "تم رفض الطلب مع تسجيل السبب",
                   );
                   setRevision((v) => v + 1);
+                  onChanged?.();
                 } catch (e) {
                   setError((e as Error).message);
                 } finally {

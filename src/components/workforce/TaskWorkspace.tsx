@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Button from "@/components/ui/Button";
@@ -24,6 +24,7 @@ import {
   useUnsavedChanges,
 } from "./shared";
 
+export type TaskWorkspaceActions = { createTask: (assigneeId?: string) => void };
 export default function TaskWorkspace({
   admin,
   canManageTasks = admin,
@@ -33,6 +34,7 @@ export default function TaskWorkspace({
   onChanged,
   refreshKey = 0,
   clients = [],
+  actionsRef,
 }: {
   admin: boolean;
   canManageTasks?: boolean;
@@ -43,6 +45,7 @@ export default function TaskWorkspace({
   onChanged?: () => void;
   refreshKey?: number;
   clients?: string[];
+  actionsRef?: Ref<TaskWorkspaceActions>;
 }) {
   const router = useRouter(),
     pathname = usePathname(),
@@ -79,6 +82,13 @@ export default function TaskWorkspace({
   const base = admin ? "/admin/workforce/tasks" : "/employee/work/tasks";
   const Heading = embedded ? "h2" : "h1";
   const page = Number(params.get("page") || "1");
+  const newAssignee = params.get("assignee_id") || "", newClient = params.get("client_name") || "";
+  const createTask = useCallback((assigneeId?: string) => {
+    taskId.current = crypto.randomUUID();
+    setTask({ ...taskForm(), assignee_id: assigneeId ?? newAssignee, client_name: newClient });
+    setTaskOpen(true);
+  }, [newAssignee, newClient]);
+  useImperativeHandle(actionsRef, () => ({ createTask }), [createTask]);
   useEffect(() => {
     const refresh = (event: Event) => {
       const detail = (
@@ -193,15 +203,7 @@ export default function TaskWorkspace({
           <div className="flex flex-wrap gap-3">
             <Button
               id="workforce-add-task"
-              onClick={() => {
-                taskId.current = crypto.randomUUID();
-                setTask({
-                  ...taskForm(),
-                  assignee_id: params.get("assignee_id") || "",
-                  client_name: params.get("client_name") || "",
-                });
-                setTaskOpen(true);
-              }}
+              onClick={() => createTask()}
             >
               إضافة مهمة
             </Button>

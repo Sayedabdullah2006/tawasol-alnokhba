@@ -15,23 +15,29 @@ export async function GET(request: Request) {
   try {
     const actor = await workforceActor();
     requireAdmin(actor);
-    const requestedPage = new URL(request.url).searchParams.get("page") ?? "1";
+    const params = new URL(request.url).searchParams;
+    const requestedPage = params.get("page") ?? "1";
+    const focused = params.get("request") ? uuid(params.get("request")) : null;
     if (!/^[1-9]\d{0,5}$/.test(requestedPage))
       throw new WorkforceError("رقم الصفحة غير صحيح");
     const page = Number(requestedPage);
     const pageSize = 20;
-    const { data, error, count } = await actor.db
+    let query = actor.db
       .from("wf_profile_change_requests")
       .select("*,wf_employees(full_name)", { count: "exact" })
       .eq("status", "pending")
       .order("created_at")
       .order("id")
       .range((page - 1) * pageSize, page * pageSize - 1);
+    if (focused) query = query.eq("id", focused);
+    const { data, error, count } = await query;
     if (error?.code === "PGRST103") {
-      const total = await actor.db
+      let totalQuery = actor.db
         .from("wf_profile_change_requests")
         .select("id", { count: "exact", head: true })
         .eq("status", "pending");
+      if (focused) totalQuery = totalQuery.eq("id", focused);
+      const total = await totalQuery;
       if (total.error) throw total.error;
       return Response.json(
         { requests: [], count: total.count, page, pageSize },
