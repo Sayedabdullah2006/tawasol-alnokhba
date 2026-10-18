@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { WorkforceActor } from "@/lib/workforce/server";
 import { employeeDashboard } from "@/lib/workforce/employee-dashboard";
 import { TASK_STATES, workDate } from "@/lib/workforce/task-types";
+import DashboardJourneys from "./DashboardJourneys";
 
 type IconName = "tasks" | "clock" | "check" | "review" | "calendar" | "wallet" | "request" | "profile";
 const paths: Record<IconName, ReactNode> = {
@@ -83,6 +84,7 @@ export default async function WorkDashboard({ actor }: { actor: WorkforceActor }
         <Link href="/employee/profile/job-description" className={footer}><span>الوصف الوظيفي</span><span aria-hidden>←</span></Link>
       </section>
     </div>
+    <DashboardJourneys />
   </div>;
 }
 

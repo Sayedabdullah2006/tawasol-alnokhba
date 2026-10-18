@@ -33,25 +33,19 @@ export default function EmployeeNavigation() {
     >
       <ul className="flex w-full flex-wrap items-center gap-2">
         {modules.map((module) => {
-          const screens = module.screens.filter(
-            (s) =>
-              s.available &&
-              ![
-                "/employee/finance/payslips",
-                "/employee/finance/commissions",
-              ].includes(s.path),
-          );
+          const screens = module.screens.filter((s) => s.available);
           if (!screens.length) return null;
+          if (module.key === "profile") {
+            const finance = employeeModules.find((m) => m.key === "finance");
+            for (const path of ["payslips", "commissions", "advances"]) {
+              const page = finance?.screens.find((s) => s.path === `/employee/finance/${path}` && s.available);
+              if (page) screens.push(page);
+            }
+          }
           const active = screens.some(
             (s) => pathname === s.path || pathname.startsWith(s.path + "/"),
           );
           const style = `flex min-h-12 items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-colors ${active ? "bg-dark text-white" : "text-dark hover:bg-slate-100"}`;
-          if (module.key === "profile") {
-            const advances = employeeModules
-              .find((m) => m.key === "finance")
-              ?.screens.find((s) => s.path === "/employee/finance/advances");
-            if (advances) screens.push(advances);
-          }
           return screens.length === 1 ? (
             <li key={module.key}>
               <Link
