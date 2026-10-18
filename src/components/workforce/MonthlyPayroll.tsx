@@ -451,11 +451,11 @@ export default function MonthlyPayroll({
                         <p className="font-bold">
                           {item.title} — {money(item.amount ?? "0")}
                         </p>
-                        <p>
-                          {item.mode === "percent"
-                            ? `${item.value}٪ من ${money(item.basis_amount)}`
-                            : `مبلغ ثابت: ${money(item.value)}`}
-                        </p>
+                        {item.mode === "percent" && (
+                          <p>
+                            {item.value}٪ من {money(item.basis_amount)}
+                          </p>
+                        )}
                         <p className="break-words text-muted">
                           {item.reference}
                         </p>
