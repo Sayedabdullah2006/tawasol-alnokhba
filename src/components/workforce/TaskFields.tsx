@@ -2,7 +2,7 @@
 import { useEffect, useId, useState } from "react";
 import { TASK_PRIORITIES, type WorkTask } from "@/lib/workforce/task-types";
 import { api, controlClass, Field, Notice } from "./shared";
-import DateInput from "./DateInput";
+import DateRangePicker from "./DateRangePicker";
 import { dateField } from "@/lib/workforce/validation";
 import Button from "@/components/ui/Button";
 
@@ -84,7 +84,6 @@ export function EmployeePicker({
   includeAdmins?: boolean;
 }) {
   const pickerId = useId();
-  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [rows, setRows] = useState<{ id: string; full_name: string }[]>([]);
   const [count, setCount] = useState(0);
@@ -92,7 +91,7 @@ export function EmployeePicker({
   useEffect(() => {
     const abort = new AbortController();
     api<{ employees: typeof rows; count: number }>(
-      `/api/workforce/team?q=${encodeURIComponent(search)}&page=${page}${includeAdmins ? "&assignable=true" : ""}`,
+      `/api/workforce/team?page=${page}${includeAdmins ? "&assignable=true" : ""}`,
       { signal: abort.signal },
     )
       .then((data) => {
@@ -104,27 +103,15 @@ export function EmployeePicker({
         if (e.name !== "AbortError") setError(e.message);
       });
     return () => abort.abort();
-  }, [search, page, includeAdmins]);
+  }, [page, includeAdmins]);
   return (
-    <fieldset className="space-y-3 rounded-xl border border-border p-3">
-      <legend className="font-bold">{title}</legend>
+    <fieldset className="space-y-3">
       <Notice message={error} error />
-      <Field label="البحث عن موظف" id={`${pickerId}-search`}>
-        <input
-          id={`${pickerId}-search`}
-          className={controlClass}
-          value={search}
-          onChange={(e) => {
-            setPage(1);
-            setSearch(e.target.value);
-          }}
-          placeholder="الاسم…"
-        />
-      </Field>
-      <Field label={selectLabel} id={`${pickerId}-assignee`}>
+      <Field label={title} id={`${pickerId}-assignee`}>
         <select
           id={`${pickerId}-assignee`}
           className={controlClass}
+          aria-label={selectLabel}
           value={value}
           onChange={(e) =>
             onChange(
@@ -182,55 +169,8 @@ export default function TaskFields({
   canAssign?: boolean;
 }) {
   const change = (patch: Partial<TaskForm>) => onChange({ ...value, ...patch });
-  const when = (field: "starts_at" | "due_at", label: string) => (
-    <div className="space-y-2">
-      <DateInput
-        id={`task-${field}`}
-        label={label}
-        value={value[field].slice(0, 10)}
-        onChange={(day) =>
-          change({
-            [field]: day ? `${day}T${value[field].slice(11) || "09:00"}` : "",
-          })
-        }
-      />
-      <Field label={`وقت ${label} — الرياض`} id={`task-${field}-time`}>
-        <input
-          id={`task-${field}-time`}
-          type="time"
-          className={controlClass}
-          value={value[field].slice(11)}
-          disabled={!value[field]}
-          onChange={(e) =>
-            change({
-              [field]: `${value[field].slice(0, 10)}T${e.target.value || "09:00"}`,
-            })
-          }
-        />
-      </Field>
-    </div>
-  );
   return (
     <div className="space-y-4">
-      <Field
-        label="العميل أو مجال العمل"
-        id="task-client"
-        hint="اكتبي أي عميل جديد، أو تطوير الشركة للأعمال الداخلية."
-      >
-        <input
-          id="task-client"
-          className={controlClass}
-          maxLength={150}
-          list="task-clients"
-          value={value.client_name}
-          onChange={(e) => change({ client_name: e.target.value })}
-        />
-        <datalist id="task-clients">
-          <option value="أول سعودي" />
-          <option value="بلاتفورم" />
-          <option value="تطوير الشركة" />
-        </datalist>
-      </Field>
       <Field label="عنوان المهمة" id="task-title">
         <input
           id="task-title"
@@ -242,17 +182,17 @@ export default function TaskFields({
           onChange={(e) => change({ title: e.target.value })}
         />
       </Field>
-      <Field label="وصف العمل المطلوب" id="task-description">
+      <Field label="تفاصيل المهمة" id="task-description">
         <textarea
           id="task-description"
-          rows={3}
+          rows={2}
           maxLength={30000}
           className={controlClass}
           value={value.description}
           onChange={(e) => change({ description: e.target.value })}
         />
       </Field>
-      <Field label="معيار الإنجاز والتسليم" id="task-criteria">
+      <Field label="المطلوب تسليمه" id="task-criteria">
         <textarea
           id="task-criteria"
           rows={2}
@@ -260,17 +200,16 @@ export default function TaskFields({
           className={controlClass}
           value={value.completion_criteria}
           onChange={(e) => change({ completion_criteria: e.target.value })}
-          placeholder="ما النتيجة المطلوبة لقبول المهمة؟"
         />
       </Field>
-      {canAssign && (
-        <EmployeePicker
-          includeAdmins
-          value={value.assignee_id}
-          onChange={(id) => change({ assignee_id: id })}
-        />
-      )}
       <div className="grid gap-4 sm:grid-cols-2">
+        {canAssign && (
+          <EmployeePicker
+            includeAdmins
+            value={value.assignee_id}
+            onChange={(id) => change({ assignee_id: id })}
+          />
+        )}
         <Field label="الأولوية" id="task-priority">
           <select
             id="task-priority"
@@ -285,21 +224,17 @@ export default function TaskFields({
             ))}
           </select>
         </Field>
-        <Field label="الوقت التقديري بالدقائق — اختياري" id="task-estimate">
-          <input
-            id="task-estimate"
-            type="number"
-            min={0}
-            max={525600}
-            step={1}
-            className={controlClass}
-            value={value.estimate_minutes}
-            onChange={(e) => change({ estimate_minutes: e.target.value })}
-          />
-        </Field>
-        {when("starts_at", "بداية المهمة")}
-        {when("due_at", "موعد التسليم")}
       </div>
+      <DateRangePicker
+        start={value.starts_at.slice(0, 10)}
+        end={value.due_at.slice(0, 10)}
+        onChange={({ start, end }) =>
+          change({
+            starts_at: start ? `${start}T00:00` : "",
+            due_at: end ? `${end}T23:59` : "",
+          })
+        }
+      />
       {admin && (
         <div className="space-y-3 text-sm">
           <label className="flex gap-3">
@@ -308,7 +243,7 @@ export default function TaskFields({
               checked={value.requires_approval}
               onChange={(e) => change({ requires_approval: e.target.checked })}
             />
-            يتطلب الإكمال اعتماد المدير
+            اعتماد المدير عند التسليم
           </label>
         </div>
       )}

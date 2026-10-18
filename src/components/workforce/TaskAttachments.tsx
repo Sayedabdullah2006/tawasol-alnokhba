@@ -32,17 +32,19 @@ function FileActions({ file }: { file: TaskAttachment }) {
             type="button"
             size="sm"
             variant="outline"
+            aria-label={`معاينة ${file.filename}`}
             onClick={() => setPreview(true)}
           >
-            معاينة {file.filename}
+            معاينة
           </Button>
         )}
         <a
           className="rounded-xl border border-border px-3 py-2 font-bold"
           href={endpoint}
           download={file.filename}
+          aria-label={`تنزيل ${file.filename}`}
         >
-          تنزيل {file.filename}
+          تنزيل
         </a>
       </div>
       <Dialog
@@ -96,6 +98,7 @@ export default function TaskAttachments({
   selected = [],
   onSelected,
   onBusy,
+  onPendingChange,
   onChanged,
 }: {
   taskId: string;
@@ -107,6 +110,7 @@ export default function TaskAttachments({
   selected?: string[];
   onSelected?: (ids: string[]) => void;
   onBusy?: (busy: boolean) => void;
+  onPendingChange?: (pending: boolean) => void;
   onChanged?: () => void;
 }) {
   const [data, setData] = useState<AttachmentList | null>(null),
@@ -123,6 +127,10 @@ export default function TaskAttachments({
     lock = useRef(false);
   const { confirm, confirmation } = useConfirm();
   const unsaved = useUnsavedChanges(pending.length > 0 || busy);
+  useEffect(() => {
+    onPendingChange?.(pending.length > 0);
+    return () => onPendingChange?.(false);
+  }, [pending.length, onPendingChange]);
   const canUpload = !submissionId && canWork && !frozen && data?.canUpload;
   useEffect(() => {
     const abort = new AbortController();
@@ -256,7 +264,7 @@ export default function TaskAttachments({
       )}
       {canUpload && (
         <form
-          className="space-y-3 rounded-xl border border-border p-4"
+          className="space-y-3 rounded-2xl border border-sky-200 bg-white/80 p-4"
           onSubmit={(e) => {
             e.preventDefault();
             void upload();
@@ -270,7 +278,7 @@ export default function TaskAttachments({
               multiple
               accept={ATTACHMENT_ACCEPT}
               disabled={busy || disabled}
-              className="block w-full min-w-0 text-sm"
+              className="block w-full min-w-0 rounded-xl border border-dashed border-sky-300 bg-white p-3 text-sm file:me-3 file:rounded-lg file:border-0 file:bg-sky-100 file:px-3 file:py-2 file:font-bold file:text-sky-900"
               onChange={(e) => {
                 const files = [...(e.target.files || [])];
                 setError("");
@@ -337,7 +345,7 @@ export default function TaskAttachments({
                   if (input.current) input.current.value = "";
                 }}
               >
-                إلغاء اختيار الملفات
+                مسح الاختيار
               </Button>
             )}
           </div>
@@ -361,7 +369,7 @@ export default function TaskAttachments({
               disabled={busy || disabled}
               onClick={() => onSelected([])}
             >
-              إلغاء تحديد مرفقات التسليم
+              إلغاء التحديد
             </Button>
           )}
         </div>
@@ -369,14 +377,12 @@ export default function TaskAttachments({
       {!data && !error && <p role="status">جارٍ تحميل المرفقات…</p>}
       {data && (
         <>
-          <p className="text-sm text-muted">
-            {data.count ? `${data.count} مرفق` : "لا توجد مرفقات."}
-          </p>
-          <ul className="space-y-3">
+          {!data.count && <p className="text-sm text-muted">لا توجد مرفقات</p>}
+          <ul className="grid items-start gap-3 sm:grid-cols-2">
             {data.attachments.map((file) => (
               <li
                 key={file.id}
-                className="space-y-3 rounded-xl border border-border p-3 text-sm"
+                className="min-w-0 space-y-3 rounded-2xl border border-sky-100 bg-white p-4 text-sm"
               >
                 <div className="min-w-0">
                   <p className="break-all font-bold">{file.title}</p>
@@ -413,7 +419,7 @@ export default function TaskAttachments({
                           )
                         }
                       />
-                      تضمين هذا الملف في التسليم التالي
+                      إرفاق بالتسليم
                     </label>
                   )}
                 {file.canManage && !submissionId && (
@@ -467,6 +473,8 @@ export default function TaskAttachments({
       {content}
     </div>
   ) : (
-    <Panel title="مرفقات المهمة والتسليم">{content}</Panel>
+    <Panel title="المرفقات" tone="sky">
+      {content}
+    </Panel>
   );
 }

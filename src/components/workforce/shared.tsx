@@ -29,13 +29,17 @@ export function Panel({
   title,
   description,
   children,
+  tone = "white",
 }: {
   title: string;
   description?: string;
+  tone?: "white" | "sky" | "violet" | "emerald" | "amber";
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-white/90 p-5 shadow-sm md:p-6">
+    <section
+      className={`rounded-3xl border p-5 shadow-sm md:p-6 ${{ white: "border-border bg-white/90", sky: "border-sky-200 bg-sky-50", violet: "border-violet-200 bg-violet-50", emerald: "border-emerald-200 bg-emerald-50", amber: "border-amber-200 bg-amber-50" }[tone]}`}
+    >
       <h2 className="text-lg font-bold text-dark">{title}</h2>
       {description && (
         <p className="mt-1 text-sm leading-7 text-muted">{description}</p>

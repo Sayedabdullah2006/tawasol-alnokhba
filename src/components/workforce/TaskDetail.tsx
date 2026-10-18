@@ -65,6 +65,7 @@ export default function TaskDetail({
   const [summary, setSummary] = useState("");
   const [attachmentIds, setAttachmentIds] = useState<string[]>([]);
   const [attachmentBusy, setAttachmentBusy] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState(false);
   const busy = commandBusy || attachmentBusy;
   const attachmentBusyChanged = useCallback(
     (value: boolean) => setAttachmentBusy(value),
@@ -231,7 +232,7 @@ export default function TaskDetail({
           ← جميع المهام
         </Link>
       )}
-      <header className="space-y-3 rounded-2xl border border-border bg-white p-6 text-dark">
+      <header className="space-y-3 rounded-3xl bg-[#102b57] p-6 text-white shadow-sm">
         <div className="flex flex-wrap gap-2 text-sm">
           <span>{task.column.title}</span>
           {task.priority !== "normal" && (
@@ -265,7 +266,7 @@ export default function TaskDetail({
               setEditing(true);
             }}
           >
-            تعديل تفاصيل المهمة
+            تعديل وإسناد
           </Button>
         )}
         {data.canArchive && !board.board.archived_at && !reviewing && (
@@ -294,7 +295,7 @@ export default function TaskDetail({
       </div>
       <nav
         aria-label="تفاصيل المهمة"
-        className="flex flex-wrap gap-2 border-b border-border pb-3"
+        className="flex flex-wrap gap-2 rounded-2xl bg-white p-3 shadow-sm"
       >
         {[
           ["brief", "التفاصيل"],
@@ -310,60 +311,61 @@ export default function TaskDetail({
             onClick={() => show(key)}
           >
             {label}
-            {key === "files" && attachmentIds.length
-              ? ` (${attachmentIds.length})`
-              : ""}
           </Button>
         ))}
       </nav>
       <div className="space-y-5">
         <div className="space-y-6">
           <section hidden={tab !== "brief"} className="space-y-5">
-            <Panel title="التكليف">
-              <div className="space-y-5 text-sm leading-7">
-                <p className="font-bold">
-                  العميل / مجال العمل: {task.client_name || "غير محدد"}
+            <div className="grid items-start gap-4 md:grid-cols-2">
+              <Panel title="تفاصيل المهمة" tone="sky">
+                <p className="whitespace-pre-wrap break-words text-sm leading-7">
+                  {task.description || "—"}
                 </p>
-                {!data.canWork && !data.canEdit && (
-                  <p className="rounded-xl bg-slate-100 p-3">للقراءة فقط</p>
-                )}
-                <p className="whitespace-pre-wrap break-words">
-                  {task.description}
-                </p>
-                <div>
-                  <h3 className="font-bold">معيار الإنجاز والتسليم</h3>
-                  <p className="whitespace-pre-wrap break-words">
-                    {task.completion_criteria}
-                  </p>
-                </div>
-                <dl className="grid gap-3 sm:grid-cols-2">
+                <dl className="mt-5 grid gap-4 border-t border-sky-200 pt-4 text-sm sm:grid-cols-2">
                   {task.starts_at && (
                     <div>
-                      <dt>البداية</dt>
-                      <dd>{workDate(task.starts_at)}</dd>
+                      <dt className="text-muted">البداية</dt>
+                      <dd className="mt-1 font-bold">
+                        {new Date(task.starts_at).toLocaleDateString("ar-SA", {
+                          calendar: "gregory",
+                          timeZone: "Asia/Riyadh",
+                        })}
+                      </dd>
                     </div>
                   )}
                   <div>
-                    <dt>موعد التسليم — الرياض</dt>
-                    <dd>{workDate(task.due_at)}</dd>
-                  </div>
-                  {task.estimate_minutes != null && (
-                    <div>
-                      <dt>الوقت التقديري</dt>
-                      <dd>{task.estimate_minutes} دقيقة</dd>
-                    </div>
-                  )}
-                  <div>
-                    <dt>اعتماد الإكمال</dt>
-                    <dd>
-                      {task.requires_approval
-                        ? "مطلوب من المدير"
-                        : "يمكن الإكمال بعد استيفاء المتطلبات"}
+                    <dt className="text-muted">التسليم</dt>
+                    <dd className="mt-1 font-bold">
+                      {task.due_at
+                        ? new Date(task.due_at).toLocaleDateString("ar-SA", {
+                            calendar: "gregory",
+                            timeZone: "Asia/Riyadh",
+                          })
+                        : "—"}
                     </dd>
                   </div>
                 </dl>
-              </div>
-            </Panel>
+              </Panel>
+              <Panel title="المطلوب تسليمه" tone="violet">
+                <p className="whitespace-pre-wrap break-words text-sm leading-7">
+                  {task.completion_criteria || "—"}
+                </p>
+                <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-violet-200 pt-4">
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-bold">
+                    {task.requires_approval ? "باعتماد المدير" : "إنجاز مباشر"}
+                  </span>
+                  {!frozen &&
+                    !done &&
+                    ((data.canWork && !reviewing) ||
+                      (data.canReview && reviewing)) && (
+                      <Button size="sm" onClick={() => show("submit")}>
+                        {reviewing ? "مراجعة التسليم" : "تسليم المهمة"}
+                      </Button>
+                    )}
+                </div>
+              </Panel>
+            </div>
             {(data.canConfigureChecklist || data.checklist.length > 0) && (
               <TaskChecklist
                 items={data.checklist}
@@ -379,8 +381,19 @@ export default function TaskDetail({
               />
             )}
           </section>
-          {visited.files && (
-            <section hidden={tab !== "files"}>
+          {(visited.files || visited.submit) && (
+            <section
+              hidden={
+                tab !== "files" &&
+                !(
+                  tab === "submit" &&
+                  data.canWork &&
+                  !frozen &&
+                  !reviewing &&
+                  !done
+                )
+              }
+            >
               <TaskAttachments
                 taskId={id}
                 version={task.version}
@@ -390,14 +403,18 @@ export default function TaskDetail({
                 selected={attachmentIds}
                 onSelected={setAttachmentIds}
                 onBusy={attachmentBusyChanged}
+                onPendingChange={setPendingAttachments}
                 onChanged={() => setDiscussionRevision((n) => n + 1)}
               />
             </section>
           )}
           {visited.submit && (
-            <section hidden={tab !== "submit"} className="space-y-5">
+            <section
+              hidden={tab !== "submit"}
+              className={`grid items-start gap-4 ${data.canReview && reviewing ? "lg:grid-cols-2" : ""}`}
+            >
               {submission && (
-                <Panel title="آخر تسليم وقرار المراجعة">
+                <Panel title="آخر تسليم" tone="sky">
                   <div className="space-y-3 text-sm leading-7">
                     <p className="font-bold">
                       {
@@ -434,7 +451,7 @@ export default function TaskDetail({
                 </Panel>
               )}
               {data.canWork && !frozen && !reviewing && !done && (
-                <Panel title="رفع التسليم">
+                <Panel title="إرسال التسليم" tone="emerald">
                   <form
                     className="space-y-4"
                     onSubmit={(e) => {
@@ -459,18 +476,11 @@ export default function TaskDetail({
                       />
                     </Field>
                     <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => show("files")}
-                    >
-                      اختيار مرفقات{" "}
-                      {attachmentIds.length ? `(${attachmentIds.length})` : ""}
-                    </Button>
-                    <Button
                       type="submit"
                       loading={busy}
                       disabled={
                         attachmentBusy ||
+                        pendingAttachments ||
                         !!task.blocked_reason ||
                         data.checklist.some(
                           (item) => item.required && !item.completed,
@@ -479,23 +489,29 @@ export default function TaskDetail({
                     >
                       إرسال للمراجعة
                     </Button>
-                    {task.blocked_reason && (
-                      <p className="text-sm text-muted">
-                        أزل العائق بعد معالجته قبل التسليم.
+                    {pendingAttachments && (
+                      <p
+                        role="status"
+                        className="text-sm font-bold text-amber-800"
+                      >
+                        ارفع الملفات المختارة أولًا
                       </p>
+                    )}
+                    {task.blocked_reason && (
+                      <p className="text-sm text-muted">المهمة متوقفة بعائق</p>
                     )}
                     {data.checklist.some(
                       (item) => item.required && !item.completed,
                     ) && (
                       <p className="text-sm text-muted">
-                        أكمل بنود التحقق المطلوبة قبل التسليم.
+                        بنود التحقق غير مكتملة
                       </p>
                     )}
                   </form>
                 </Panel>
               )}
               {data.canReview && reviewing && !frozen && (
-                <Panel title="قرار المدير">
+                <Panel title="اعتماد التسليم" tone="amber">
                   <form
                     className="space-y-4"
                     onSubmit={(e) => {
@@ -671,7 +687,7 @@ export default function TaskDetail({
           />
         </section>
       )}
-      <Dialog title="تعديل تفاصيل المهمة" open={editing} onClose={closeEdit}>
+      <Dialog title="تعديل وإسناد" open={editing} onClose={closeEdit}>
         <form
           className="space-y-5"
           onSubmit={(e) => {

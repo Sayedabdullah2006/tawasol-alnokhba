@@ -96,6 +96,7 @@ export default function RequestCenter({
       });
     return () => abort.abort();
   }, [form.kind, admin]);
+  const requestFiles = useRef<HTMLInputElement>(null);
   const key = useRef(crypto.randomUUID()),
     lock = useRef(false);
   const { confirm, confirmation } = useConfirm();
@@ -170,7 +171,13 @@ export default function RequestCenter({
     setOpen(false);
   }
   return (
-    <div className={embedded ? "min-w-0 space-y-5" : "mx-auto w-full min-w-0 max-w-5xl space-y-5 p-4 md:p-6"}>
+    <div
+      className={
+        embedded
+          ? "min-w-0 space-y-5"
+          : "mx-auto w-full min-w-0 max-w-6xl space-y-5 p-4 md:p-6"
+      }
+    >
       {confirmation}
       {warning}
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -222,7 +229,11 @@ export default function RequestCenter({
       <Notice message={message} />
       {profileVisited && (
         <section hidden={tab !== "profile"}>
-          <ProfileApprovals onChanged={onChanged} embedded={embedded} requestId={initialTab === "profile" ? initialRequest : undefined} />
+          <ProfileApprovals
+            onChanged={onChanged}
+            embedded={embedded}
+            requestId={initialTab === "profile" ? initialRequest : undefined}
+          />
         </section>
       )}
       <section hidden={tab !== "requests"} className="space-y-5">
@@ -263,153 +274,157 @@ export default function RequestCenter({
             لا توجد طلبات
           </div>
         ) : (
-          rows.map((row) => (
-            <article
-              key={row.id}
-              className="space-y-4 rounded-2xl border border-border bg-white p-5"
-            >
-              <div className="flex flex-wrap justify-between gap-2">
-                <span className="text-xs text-muted">
-                  {REQUEST_KINDS[row.kind]}
-                  {row.kind === "leave"
-                    ? row.leave_type === "unpaid"
-                      ? " · بدون راتب"
-                      : " · سنوية"
-                    : ""}
-                  {admin ? ` · ${row.employeeName || ""}` : ""}
-                </span>
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-bold ${row.status === "pending" ? "bg-amber-50 text-amber-800" : row.status === "approved" ? "bg-green-50 text-green-800" : "bg-slate-100 text-slate-600"}`}
-                >
-                  {REQUEST_STATUS[row.status]}
-                </span>
-              </div>
-              <h2 className="font-black">{row.title}</h2>
-              <p className="whitespace-pre-wrap break-words text-sm leading-7">
-                {row.body}
-              </p>
-              <div className="flex flex-wrap gap-4 text-xs text-muted">
-                <time>
-                  {new Date(row.created_at).toLocaleDateString("ar-SA", {
-                    calendar: "gregory",
-                  })}
-                </time>
-                {row.starts_at && (
-                  <span>
-                    {new Date(row.starts_at).toLocaleString("ar-SA", {
+          <div
+            className={`grid items-start gap-4 ${focusOnly ? "" : "md:grid-cols-2"}`}
+          >
+            {rows.map((row) => (
+              <article
+                key={row.id}
+                className={`min-w-0 space-y-4 rounded-3xl border p-5 shadow-sm ${row.status === "pending" ? "border-amber-200 bg-amber-50/70" : row.status === "approved" ? "border-emerald-200 bg-emerald-50/70" : "border-slate-200 bg-slate-50"}`}
+              >
+                <div className="flex flex-wrap justify-between gap-2">
+                  <span className="text-xs text-muted">
+                    {REQUEST_KINDS[row.kind]}
+                    {row.kind === "leave"
+                      ? row.leave_type === "unpaid"
+                        ? " · بدون راتب"
+                        : " · سنوية"
+                      : ""}
+                    {admin ? ` · ${row.employeeName || ""}` : ""}
+                  </span>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-bold ${row.status === "pending" ? "bg-amber-50 text-amber-800" : row.status === "approved" ? "bg-green-50 text-green-800" : "bg-slate-100 text-slate-600"}`}
+                  >
+                    {REQUEST_STATUS[row.status]}
+                  </span>
+                </div>
+                <h2 className="font-black">{row.title}</h2>
+                <p className="whitespace-pre-wrap break-words text-sm leading-7">
+                  {row.body}
+                </p>
+                <div className="flex flex-wrap gap-4 text-xs text-muted">
+                  <time>
+                    {new Date(row.created_at).toLocaleDateString("ar-SA", {
                       calendar: "gregory",
-                      timeZone: "Asia/Riyadh",
-                    })}{" "}
-                    ←{" "}
-                    {row.ends_at &&
-                      new Date(row.ends_at).toLocaleString("ar-SA", {
+                    })}
+                  </time>
+                  {row.starts_at && (
+                    <span>
+                      {new Date(row.starts_at).toLocaleString("ar-SA", {
                         calendar: "gregory",
                         timeZone: "Asia/Riyadh",
-                      })}
-                  </span>
-                )}
-                {row.amount && (
-                  <strong className="text-dark">
-                    {Number(row.amount).toLocaleString("ar-SA")} ر.س
-                  </strong>
-                )}
-              </div>
-              {!!row.attachments.length && (
-                <ul className="space-y-2">
-                  {row.attachments.map((file) => (
-                    <li
-                      key={file.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 p-3 text-sm"
-                    >
-                      <span className="break-all">{file.filename}</span>
-                      <div className="flex gap-3">
-                        {(file.mime_type === "application/pdf" ||
-                          file.mime_type.startsWith("image/")) && (
-                          <button
-                            className="font-bold text-green"
-                            onClick={() =>
-                              setPreview({ request: row.id, file })
-                            }
-                          >
-                            معاينة
-                          </button>
-                        )}
-                        <a
-                          className="font-bold"
-                          href={`/api/workforce/requests/${row.id}/attachments/${file.id}`}
-                          download
-                        >
-                          تنزيل
-                        </a>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {row.decision_reason && (
-                <div className="rounded-xl bg-slate-50 p-3 text-sm">
-                  <strong>قرار الإدارة</strong>
-                  <p className="mt-2 whitespace-pre-wrap break-words">
-                    {row.decision_reason}
-                  </p>
+                      })}{" "}
+                      ←{" "}
+                      {row.ends_at &&
+                        new Date(row.ends_at).toLocaleString("ar-SA", {
+                          calendar: "gregory",
+                          timeZone: "Asia/Riyadh",
+                        })}
+                    </span>
+                  )}
+                  {row.amount && (
+                    <strong className="text-dark">
+                      {Number(row.amount).toLocaleString("ar-SA")} ر.س
+                    </strong>
+                  )}
                 </div>
-              )}
-              {row.status === "pending" &&
-                (admin ? (
-                  <form
-                    className="space-y-3"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const value = (
-                        (e.nativeEvent as SubmitEvent)
-                          .submitter as HTMLButtonElement
-                      )?.value;
-                      if (["approved", "rejected"].includes(value))
-                        void decide(row, value);
-                    }}
-                  >
-                    <Field id={`decision-${row.id}`} label="سبب القرار">
-                      <textarea
-                        id={`decision-${row.id}`}
-                        className={controlClass}
-                        required
-                        minLength={3}
-                        maxLength={2000}
-                        value={reasons[row.id] || ""}
-                        onChange={(e) =>
-                          setReasons((current) => ({
-                            ...current,
-                            [row.id]: e.target.value,
-                          }))
-                        }
-                      />
-                    </Field>
-                    <div className="flex gap-3">
-                      <Button type="submit" value="approved" disabled={busy}>
-                        موافقة
-                      </Button>
-                      <Button
-                        type="submit"
-                        value="rejected"
-                        variant="outline"
-                        disabled={busy}
+                {!!row.attachments.length && (
+                  <ul className="space-y-2">
+                    {row.attachments.map((file) => (
+                      <li
+                        key={file.id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 p-3 text-sm"
                       >
-                        رفض
-                      </Button>
-                    </div>
-                  </form>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => void decide(row, "cancelled")}
-                  >
-                    إلغاء الطلب
-                  </Button>
-                ))}
-            </article>
-          ))
+                        <span className="break-all">{file.filename}</span>
+                        <div className="flex gap-3">
+                          {(file.mime_type === "application/pdf" ||
+                            file.mime_type.startsWith("image/")) && (
+                            <button
+                              className="font-bold text-green"
+                              onClick={() =>
+                                setPreview({ request: row.id, file })
+                              }
+                            >
+                              معاينة
+                            </button>
+                          )}
+                          <a
+                            className="font-bold"
+                            href={`/api/workforce/requests/${row.id}/attachments/${file.id}`}
+                            download
+                          >
+                            تنزيل
+                          </a>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {row.decision_reason && (
+                  <div className="rounded-xl bg-slate-50 p-3 text-sm">
+                    <strong>قرار الإدارة</strong>
+                    <p className="mt-2 whitespace-pre-wrap break-words">
+                      {row.decision_reason}
+                    </p>
+                  </div>
+                )}
+                {row.status === "pending" &&
+                  (admin ? (
+                    <form
+                      className="space-y-3 rounded-2xl border border-white bg-white/80 p-4"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const value = (
+                          (e.nativeEvent as SubmitEvent)
+                            .submitter as HTMLButtonElement
+                        )?.value;
+                        if (["approved", "rejected"].includes(value))
+                          void decide(row, value);
+                      }}
+                    >
+                      <Field id={`decision-${row.id}`} label="سبب القرار">
+                        <textarea
+                          id={`decision-${row.id}`}
+                          className={controlClass}
+                          required
+                          minLength={3}
+                          maxLength={2000}
+                          value={reasons[row.id] || ""}
+                          onChange={(e) =>
+                            setReasons((current) => ({
+                              ...current,
+                              [row.id]: e.target.value,
+                            }))
+                          }
+                        />
+                      </Field>
+                      <div className="flex gap-3">
+                        <Button type="submit" value="approved" disabled={busy}>
+                          موافقة
+                        </Button>
+                        <Button
+                          type="submit"
+                          value="rejected"
+                          variant="outline"
+                          disabled={busy}
+                        >
+                          رفض
+                        </Button>
+                      </div>
+                    </form>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => void decide(row, "cancelled")}
+                    >
+                      إلغاء الطلب
+                    </Button>
+                  ))}
+              </article>
+            ))}
+          </div>
         )}
         {(count > 20 || page > 1) && (
           <nav
@@ -622,16 +637,15 @@ export default function RequestCenter({
               }
             />
           </Field>
-          <Field
-            id="request-files"
-            label="المرفقات — حتى 5 ملفات، 4 م.ب لكل ملف"
-          >
+          <Field id="request-files" label="المرفقات · 5 ملفات × 4 م.ب">
             <input
+              ref={requestFiles}
               id="request-files"
               type="file"
               multiple
               accept={ATTACHMENT_ACCEPT}
-              className={controlClass}
+              className="sr-only"
+              disabled={busy}
               onChange={(e) => {
                 const next = Array.from(e.target.files || []);
                 if (
@@ -644,10 +658,45 @@ export default function RequestCenter({
                 } else {
                   setError("");
                   setFiles(next);
+                  e.target.value = "";
                 }
               }}
             />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => requestFiles.current?.click()}
+            >
+              اختيار ملفات أو صور
+            </Button>
           </Field>
+          {!!files.length && (
+            <ul className="space-y-2">
+              {files.map((file, index) => (
+                <li
+                  key={`${file.name}-${index}`}
+                  className="flex items-center justify-between gap-3 rounded-xl bg-sky-50 px-3 py-2 text-sm"
+                >
+                  <span className="min-w-0 break-all">{file.name}</span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy}
+                    aria-label={`إزالة ${file.name}`}
+                    onClick={() =>
+                      setFiles((current) =>
+                        current.filter((_, i) => i !== index),
+                      )
+                    }
+                  >
+                    إزالة
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
           <Notice message={error} error />
           <Button type="submit" loading={busy}>
             إرسال الطلب
