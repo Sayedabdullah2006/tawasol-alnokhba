@@ -12,6 +12,16 @@ export const journeySections = {
   },
 } as const;
 export type JourneyKind = keyof typeof journeySections;
+export const journeyStates: Record<JourneyKind, string[]> = {
+  goal: ["active", "submitted", "approved", "changes"],
+  review: ["active", "submitted", "published", "changes"],
+  appeal: ["pending", "approved", "rejected"],
+  advance: ["active", "settled"],
+  asset: ["active", "approved", "return_requested", "returned"],
+  onboarding: ["active", "submitted", "approved", "changes"],
+  policy: ["active", "published"],
+  preferences: [],
+};
 export const journeyStatus: Record<string, string> = {
   active: "نشط",
   submitted: "بانتظار الاعتماد",

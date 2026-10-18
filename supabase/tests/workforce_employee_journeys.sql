@@ -14,6 +14,9 @@ begin
    id:=gen_random_uuid();
    r:=public.wf_hr_command(owner,run,id,0,'create',jsonb_build_object('kind',k,'employee_id',e.id,'title','اختبار مسار '||k,'details','تفاصيل اختبار معزول لا يرسل رسائل','target','10','principal','100.01','installment','20','checklist',jsonb_build_array('خطوة أولى','خطوة ثانية')),gen_random_uuid());
    v:=(r->>'version')::int;
+   insert into public.wf_notifications(recipient_id,kind,title,body,href,event_key)
+   values(e.user_id,'hr','اختبار حاجز الإرسال','جولة صامتة','/employee','hr:'||id||':probe');
+   if exists(select 1 from public.wf_notifications where event_key='hr:'||id||':probe') then raise exception 'HR notification guard failed';end if;
    begin perform public.wf_hr_command(e.user_id,run,gen_random_uuid(),0,'create',jsonb_build_object('kind',k,'employee_id',e.id,'title','غير مسموح'),gen_random_uuid());raise exception 'Employee created admin record';exception when insufficient_privilege then null;end;
    if k<>'policy' then
     begin perform public.wf_hr_command(peer,run,id,v,'submit','{"response":"غير مسموح"}',gen_random_uuid());raise exception 'Peer wrote record';exception when insufficient_privilege then null;end;
@@ -62,6 +65,10 @@ begin
   perform public.wf_preferences_command(e.user_id,run,0,settings);
   if exists(select 1 from public.wf_notification_preferences where user_id=e.user_id and test_run_id is null) then raise exception 'Test preferences changed real settings';end if;
  end loop;
+ begin
+  perform public.wf_hr_command(owner,null,gen_random_uuid(),0,'create','{"kind":"policy","title":"WF-TEST: unmarked","details":"اختبار منع الإرسال غير المعزول"}',gen_random_uuid());
+  raise exception 'Unmarked test record accepted';
+ exception when sqlstate 'PT400' then null;end;
  if (select count(*) from public.wf_notifications)<>before_n or (select count(*) from public.wf_notification_deliveries)<>before_d then raise exception 'Quiet journey emitted notification';end if;
  -- Transaction-only normal controls prove independent inbox/email preferences.
  select user_id into e from public.wf_employees where status='active' limit 1;

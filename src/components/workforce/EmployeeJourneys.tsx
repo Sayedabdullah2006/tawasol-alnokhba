@@ -15,6 +15,7 @@ import {
   defaultPreferences,
   journeySections,
   journeyStatus,
+  journeyStates,
   notificationGroups,
   type JourneyData,
   type JourneyItem,
@@ -453,9 +454,9 @@ export default function EmployeeJourneys({
               }}
             >
               <option value="">كل الحالات</option>
-              {Object.entries(journeyStatus).map(([k, v]) => (
+              {journeyStates[section].map((k) => (
                 <option key={k} value={k}>
-                  {v}
+                  {journeyStatus[k]}
                 </option>
               ))}
             </select>
