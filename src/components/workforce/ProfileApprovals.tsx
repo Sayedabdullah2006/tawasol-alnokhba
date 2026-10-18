@@ -27,6 +27,13 @@ export default function ProfileApprovals() {
     Object.values(reasons).some((value) => value.trim().length > 0),
   );
   useEffect(() => {
+    const refresh = () => {
+      if (!busy) setRevision((n) => n + 1);
+    };
+    window.addEventListener("workforce-data-changed", refresh);
+    return () => window.removeEventListener("workforce-data-changed", refresh);
+  }, [busy]);
+  useEffect(() => {
     const abort = new AbortController();
     api<{ requests: RequestRow[]; count: number }>(
       `/api/workforce/profile-changes?page=${page}`,
@@ -70,11 +77,9 @@ export default function ProfileApprovals() {
       {loading ? (
         <p role="status">جارٍ تحميل الطلبات…</p>
       ) : requests.length === 0 ? (
-        <Panel title="لا توجد طلبات معلقة">
-          <p className="text-sm text-muted">
-            ستظهر هنا طلبات الموظفين الجديدة التي تحتاج قرارك.
-          </p>
-        </Panel>
+        <p className="rounded-2xl border border-border bg-white p-5 text-sm text-muted">
+          لا توجد طلبات معلقة
+        </p>
       ) : (
         requests.map((request) => (
           <Panel
@@ -170,28 +175,30 @@ export default function ProfileApprovals() {
           </Panel>
         ))
       )}
-      <nav
-        aria-label="صفحات طلبات تغيير البيانات"
-        className="flex flex-wrap items-center justify-between gap-3"
-      >
-        <Button
-          variant="outline"
-          disabled={loading || !!busy || page === 1}
-          onClick={() => changePage(page - 1)}
+      {(count > 20 || page > 1) && (
+        <nav
+          aria-label="صفحات طلبات تغيير البيانات"
+          className="flex flex-wrap items-center justify-between gap-3"
         >
-          السابق
-        </Button>
-        <span className="text-sm">
-          الصفحة {page} من {Math.max(1, Math.ceil(count / 20))}
-        </span>
-        <Button
-          variant="outline"
-          disabled={loading || !!busy || page * 20 >= count}
-          onClick={() => changePage(page + 1)}
-        >
-          التالي
-        </Button>
-      </nav>
+          <Button
+            variant="outline"
+            disabled={loading || !!busy || page === 1}
+            onClick={() => changePage(page - 1)}
+          >
+            السابق
+          </Button>
+          <span className="text-sm">
+            الصفحة {page} من {Math.max(1, Math.ceil(count / 20))}
+          </span>
+          <Button
+            variant="outline"
+            disabled={loading || !!busy || page * 20 >= count}
+            onClick={() => changePage(page + 1)}
+          >
+            التالي
+          </Button>
+        </nav>
+      )}
     </div>
   );
 }

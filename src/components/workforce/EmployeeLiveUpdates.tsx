@@ -1,0 +1,12 @@
+"use client";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+export default function EmployeeLiveUpdates() {
+  const router = useRouter();
+  useEffect(() => {
+    const refresh = () => router.refresh();
+    window.addEventListener("workforce-data-changed", refresh);
+    return () => window.removeEventListener("workforce-data-changed", refresh);
+  }, [router]);
+  return null;
+}

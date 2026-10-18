@@ -278,30 +278,32 @@ export default function AttendanceHub({
                     </tbody>
                   </table>
                 </div>
-                <nav
-                  aria-label="صفحات الحضور"
-                  className="flex justify-between gap-3"
-                >
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={page === 1 || loading}
-                    onClick={() => setPage((n) => n - 1)}
+                {(data.count > 20 || page > 1) && (
+                  <nav
+                    aria-label="صفحات الحضور"
+                    className="flex justify-between gap-3"
                   >
-                    السابق
-                  </Button>
-                  <span className="text-xs">
-                    {page} / {Math.max(1, Math.ceil(data.count / 20))}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={page * 20 >= data.count || loading}
-                    onClick={() => setPage((n) => n + 1)}
-                  >
-                    التالي
-                  </Button>
-                </nav>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={page === 1 || loading}
+                      onClick={() => setPage((n) => n - 1)}
+                    >
+                      السابق
+                    </Button>
+                    <span className="text-xs">
+                      {page} / {Math.max(1, Math.ceil(data.count / 20))}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={page * 20 >= data.count || loading}
+                      onClick={() => setPage((n) => n + 1)}
+                    >
+                      التالي
+                    </Button>
+                  </nav>
+                )}
               </>
             )}
             {tab === "schedule" && (

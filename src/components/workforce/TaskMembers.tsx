@@ -238,11 +238,7 @@ export default function TaskMembers({
             >
               إضافة إلى المشاركين
             </Button>
-            {chosen.id === data?.assignee?.employee_id && (
-              <p className="text-sm text-muted">
-                المسؤول الأساسي لديه صلاحية التنفيذ بالفعل.
-              </p>
-            )}
+
             <ul className="space-y-3">
               {draft.map((member) => (
                 <li

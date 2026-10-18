@@ -293,9 +293,6 @@ export default function EmployeeDirectory({ userId }: { userId: string }) {
         ) : (
           <div className="py-12 text-center">
             <h3 className="font-bold">لا يوجد موظفون في هذه القائمة</h3>
-            <p className="mt-2 text-sm text-muted">
-              أضف موظفًا جديدًا أو غيّر خيارات البحث.
-            </p>
           </div>
         )}
         {data && data.count > 20 && (
@@ -324,9 +321,7 @@ export default function EmployeeDirectory({ userId }: { userId: string }) {
         <summary className="cursor-pointer font-bold">
           إدارة أقسام الشركة
         </summary>
-        <p className="mt-3 text-sm leading-7 text-muted">
-          الأقسام للتنظيم فقط؛ الصلاحيات تبقى مدير النظام والموظف.
-        </p>
+
         <form
           className="mt-4 flex flex-wrap items-end gap-3"
           onSubmit={async (event) => {

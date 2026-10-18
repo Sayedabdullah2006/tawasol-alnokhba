@@ -152,11 +152,7 @@ export default function TaskChecklist({
             إضافة بند تحقق
           </Button>
         )}
-        {frozen && (
-          <p className="text-sm text-muted">
-            قائمة التحقق للقراءة في حالة المراجعة أو الإكمال أو الأرشفة.
-          </p>
-        )}
+        {frozen && <p className="text-sm text-muted">للقراءة فقط</p>}
       </div>
       <Dialog
         title={draft?.adding ? "إضافة بند تحقق" : "تعديل بند تحقق"}
@@ -205,11 +201,7 @@ export default function TaskChecklist({
               />
               مطلوب قبل التسليم
             </label>
-            {!draft.adding && (
-              <p className="text-sm text-muted">
-                حفظ التعديل يعيد البند إلى غير مكتمل للتحقق منه مجددًا.
-              </p>
-            )}
+
             <Notice message={error} error />
             <Button type="submit" loading={busy} disabled={!draft.title.trim()}>
               حفظ بند التحقق

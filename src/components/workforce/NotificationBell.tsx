@@ -11,6 +11,16 @@ export default function NotificationBell({ admin }: { admin: boolean }) {
       db = createClient();
     let channel: RealtimeChannel | undefined,
       connecting = false;
+    let changeTimer: number | undefined;
+    const announce = () => {
+      clearTimeout(changeTimer);
+      changeTimer = window.setTimeout(() => {
+        if (document.visibilityState === "visible") {
+          update();
+          window.dispatchEvent(new Event("workforce-data-changed"));
+        }
+      }, 250);
+    };
     const update = () => {
       if (document.visibilityState === "visible")
         api<{ unread: number; recipientId: string }>(
@@ -41,10 +51,12 @@ export default function NotificationBell({ admin }: { admin: boolean }) {
                     table: "wf_notifications",
                     filter: `recipient_id=eq.${result.recipientId}`,
                   },
-                  () => {
-                    update();
-                    window.dispatchEvent(new Event("workforce-data-changed"));
-                  },
+                  announce,
+                )
+                .on(
+                  "postgres_changes",
+                  { event: "*", schema: "public", table: "wf_tasks" },
+                  announce,
                 )
                 .subscribe();
             }
@@ -63,6 +75,7 @@ export default function NotificationBell({ admin }: { admin: boolean }) {
       abort.abort();
       if (channel) void db.removeChannel(channel);
       clearInterval(timer);
+      clearTimeout(changeTimer);
       window.removeEventListener("workforce-notifications", update);
       window.removeEventListener("focus", focus);
     };

@@ -171,6 +171,13 @@ export default function MonthlyPayroll({
   const unsaved = useUnsavedChanges(dirty);
   const setDirty = useCallback((value: boolean) => setConfigDirty(value), []);
   useEffect(() => {
+    const refresh = () => {
+      if (!busy && !dirty) setRevision((n) => n + 1);
+    };
+    window.addEventListener("workforce-data-changed", refresh);
+    return () => window.removeEventListener("workforce-data-changed", refresh);
+  }, [busy, dirty]);
+  useEffect(() => {
     const abort = new AbortController();
     api<PayrollData>(
       `/api/workforce/employees/${employeeId}/payroll?month=${month}`,

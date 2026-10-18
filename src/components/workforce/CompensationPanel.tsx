@@ -37,9 +37,6 @@ function Terms({ value }: { value: CompensationVersion }) {
           <dd className="mt-1 text-lg font-bold">
             {money(fixedCompensation(value))}
           </dd>
-          <p className="mt-1 text-xs text-muted">
-            الأساسي والبدلات، قبل الخصومات والمتغيرات.
-          </p>
         </div>
       </dl>
       <div>

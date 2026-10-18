@@ -404,30 +404,32 @@ export default function RequestCenter({
             </article>
           ))
         )}
-        <nav
-          aria-label="صفحات الطلبات"
-          className="flex items-center justify-between gap-3"
-        >
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={page === 1 || loading || busy}
-            onClick={() => setPage((n) => n - 1)}
+        {(count > 20 || page > 1) && (
+          <nav
+            aria-label="صفحات الطلبات"
+            className="flex items-center justify-between gap-3"
           >
-            السابق
-          </Button>
-          <span className="text-xs">
-            {page} / {Math.max(1, Math.ceil(count / 20))}
-          </span>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={page * 20 >= count || loading || busy}
-            onClick={() => setPage((n) => n + 1)}
-          >
-            التالي
-          </Button>
-        </nav>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={page === 1 || loading || busy}
+              onClick={() => setPage((n) => n - 1)}
+            >
+              السابق
+            </Button>
+            <span className="text-xs">
+              {page} / {Math.max(1, Math.ceil(count / 20))}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={page * 20 >= count || loading || busy}
+              onClick={() => setPage((n) => n + 1)}
+            >
+              التالي
+            </Button>
+          </nav>
+        )}
       </section>
       <Dialog title="طلب جديد" open={open} onClose={() => void close()}>
         <form

@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { employeePageActor } from "@/lib/workforce/employee-page";
+import EmployeeLiveUpdates from "@/components/workforce/EmployeeLiveUpdates";
 import WorkDashboard from "@/components/workforce/WorkDashboard";
 export const dynamic = "force-dynamic";
 export default async function Page() {
   const actor = await employeePageActor();
   return (
     <div className="space-y-5 p-4 md:p-6">
+      <EmployeeLiveUpdates />
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-black">
           مرحبًا، {actor.employee.full_name}

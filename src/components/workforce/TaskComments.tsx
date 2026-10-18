@@ -275,9 +275,7 @@ export default function TaskComments({
           </form>
         )}
         {data && (!data.canComment || frozen) && (
-          <p className="text-sm text-muted">
-            التعليقات للقراءة فقط بحسب صلاحيتك وحالة الأرشفة.
-          </p>
+          <p className="text-sm text-muted">للقراءة فقط</p>
         )}
         <form
           className="flex flex-wrap items-end gap-3"
@@ -467,9 +465,7 @@ export default function TaskComments({
                 }
               />
             </Field>
-            <p className="text-sm text-muted">
-              النسخة السابقة تبقى في تاريخ التعليق.
-            </p>
+
             <Notice message={error} error />
             <Button
               type="submit"
