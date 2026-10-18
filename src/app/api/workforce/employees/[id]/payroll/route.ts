@@ -22,7 +22,19 @@ export async function GET(request: Request, context: Context) {
     const actor = await workforceActor(),
       id = uuid((await context.params).id);
     requireEmployeeAccess(actor, id);
-    const month = payrollMonth(new URL(request.url).searchParams.get("month"));
+    const params = new URL(request.url).searchParams;
+    if (params.get("history") === "true") {
+      const page = Number(params.get("page") || 1);
+      if (!Number.isSafeInteger(page) || page < 1 || page > 10000)
+        throw new WorkforceError("رقم الصفحة غير صحيح");
+      const result = await actor.db.from("wf_monthly_payroll")
+        .select("id,month,status,total_amount,paid_amount", { count: "exact" })
+        .eq("employee_id", id).order("month", { ascending: false }).order("id")
+        .range((page - 1) * 20, page * 20 - 1);
+      if (result.error) throw result.error;
+      return privateResponse({ rows: result.data, count: result.count, page });
+    }
+    const month = payrollMonth(params.get("month"));
     const end = new Date(`${month}T12:00:00Z`);
     end.setUTCMonth(end.getUTCMonth() + 1);
     end.setUTCDate(0);

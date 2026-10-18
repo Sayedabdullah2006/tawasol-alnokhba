@@ -1,4 +1,6 @@
-import { redirect } from "next/navigation";
-export default function Page() {
-  redirect("/employee/finance/overview");
+import EmployeeFinanceRecords from "@/components/workforce/EmployeeFinanceRecords";
+import { employeePageActor } from "@/lib/workforce/employee-page";
+export default async function Page() {
+  const { employee } = await employeePageActor();
+  return <EmployeeFinanceRecords employeeId={employee.id} section="commissions" />;
 }

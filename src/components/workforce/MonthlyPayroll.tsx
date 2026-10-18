@@ -135,14 +135,16 @@ export default function MonthlyPayroll({
   employeeId,
   admin = false,
   compact = false,
+  initialMonth,
   onClose,
 }: {
   employeeId: string;
   admin?: boolean;
   compact?: boolean;
+  initialMonth?: string;
   onClose?: () => void;
 }) {
-  const [month, setMonth] = useState(currentMonth),
+  const [month, setMonth] = useState(initialMonth || currentMonth),
     [data, setData] = useState<PayrollData | null>(null),
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
