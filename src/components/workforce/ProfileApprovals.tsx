@@ -59,20 +59,9 @@ export default function ProfileApprovals() {
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-8">
       {unsavedWarning}
-      <Link href="/admin/workforce" className="text-sm font-bold">
-        → إدارة الموظفين
-      </Link>
-      <h1 className="text-3xl font-black">طلبات تغيير البيانات</h1>
-      <p className="text-sm leading-7 text-muted">
-        راجع طلبات الموظفين قبل تحديث الأسماء أو بيانات الصرف. يُحفظ القرار
-        وسببه في سجل الطلب.
-      </p>
       <Notice message={error} error />
       <Notice message={message} />
-      <p className="text-sm text-muted">
-        {count} طلب بانتظار القرار · تُحفظ أسباب القرارات المكتوبة أثناء التنقل
-        بين الصفحات.
-      </p>
+      <p className="text-sm text-muted">{count} طلب بانتظار القرار</p>
       {error && (
         <Button onClick={() => setRevision((v) => v + 1)}>
           إعادة المحاولة

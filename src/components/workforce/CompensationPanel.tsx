@@ -86,11 +86,6 @@ function Terms({ value }: { value: CompensationVersion }) {
           <p className="mt-2 text-muted">لا توجد بنود عمولة مسجلة.</p>
         )}
       </div>
-      <p className="text-xs leading-6 text-muted">
-        هذه إعدادات الاستحقاق الوظيفي. العمولة المسجلة هنا لا تعني مبلغًا
-        مكتسبًا أو مصروفًا؛ تظهر العمليات الفعلية بعد احتسابها واعتمادها في
-        موديول العمولات والرواتب.
-      </p>
     </div>
   );
 }
@@ -321,10 +316,7 @@ export default function CompensationPanel({
                   onChange={(value) => update({ effective_from: value })}
                 />
               </div>
-              <p className="text-xs text-muted">
-                لا يمكن أن يسبق تاريخ السريان تاريخ الانضمام أو آخر إعداد محفوظ.
-                للتصحيح في التاريخ نفسه احفظ نسخة جديدة مع السبب.
-              </p>
+
               <div className="space-y-3">
                 <h4 className="font-bold">البدلات الشهرية</h4>
                 {form.allowances.map((item, index) => (

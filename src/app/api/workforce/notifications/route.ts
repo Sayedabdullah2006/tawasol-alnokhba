@@ -11,6 +11,18 @@ export async function GET(request: Request) {
   try {
     const actor = await workforceActor();
     const params = new URL(request.url).searchParams;
+    if (params.get("summary") === "true") {
+      const result = await actor.db
+        .from("wf_notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("recipient_id", actor.user.id)
+        .is("read_at", null);
+      if (result.error) throw result.error;
+      return privateResponse({
+        unread: result.count || 0,
+        recipientId: actor.user.id,
+      });
+    }
     const { page, from, to } = workPage(params);
     let query = actor.db
       .from("wf_notifications")
@@ -31,6 +43,7 @@ export async function GET(request: Request) {
     if (result.error && result.error.code !== "PGRST103") throw result.error;
     if (unread.error) throw unread.error;
     return privateResponse({
+      recipientId: actor.user.id,
       notifications: result.data ?? [],
       count: result.count ?? 0,
       unread: unread.count ?? 0,

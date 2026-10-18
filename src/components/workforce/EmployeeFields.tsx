@@ -95,10 +95,7 @@ export default function EmployeeFields({
         <>
           {input("job_title", "المسمى الوظيفي")}
           <div className="sm:col-span-2">
-            <Field
-              label="المهام والمسؤوليات الوظيفية"
-              id="employee-responsibilities"
-            >
+            <Field label="الوصف الوظيفي" id="employee-responsibilities">
               <textarea
                 id="employee-responsibilities"
                 rows={4}
@@ -108,7 +105,6 @@ export default function EmployeeFields({
                 onChange={(event) =>
                   onChange({ ...value, responsibilities: event.target.value })
                 }
-                placeholder="اكتب مسؤوليات الوظيفة ونطاق العمل. تُسند المهام اليومية من قسم المهام."
               />
             </Field>
           </div>

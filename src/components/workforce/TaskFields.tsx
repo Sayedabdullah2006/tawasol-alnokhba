@@ -201,9 +201,24 @@ export default function TaskFields({
   );
   return (
     <div className="space-y-4">
-      <Field label="العميل أو مجال العمل" id="task-client" hint="اكتبي أي عميل جديد، أو تطوير الشركة للأعمال الداخلية.">
-        <input id="task-client" className={controlClass} maxLength={150} list="task-clients" value={value.client_name} onChange={(e) => change({ client_name: e.target.value })} />
-        <datalist id="task-clients"><option value="أول سعودي" /><option value="بلاتفورم" /><option value="تطوير الشركة" /></datalist>
+      <Field
+        label="العميل أو مجال العمل"
+        id="task-client"
+        hint="اكتبي أي عميل جديد، أو تطوير الشركة للأعمال الداخلية."
+      >
+        <input
+          id="task-client"
+          className={controlClass}
+          maxLength={150}
+          list="task-clients"
+          value={value.client_name}
+          onChange={(e) => change({ client_name: e.target.value })}
+        />
+        <datalist id="task-clients">
+          <option value="أول سعودي" />
+          <option value="بلاتفورم" />
+          <option value="تطوير الشركة" />
+        </datalist>
       </Field>
       <Field label="عنوان المهمة" id="task-title">
         <input
@@ -283,7 +298,6 @@ export default function TaskFields({
             />
             يتطلب الإكمال اعتماد المدير
           </label>
-          <p className="text-muted">تظهر مهام الفريق للقراءة، وتقتصر إجراءات التنفيذ على الموظفة المسندة إليها المهمة.</p>
         </div>
       )}
     </div>

@@ -295,9 +295,7 @@ export default function TaskAttachments({
             />
           </Field>
           <p className="text-xs text-muted">
-            حتى 4 ميجابايت للملف: PDF، PNG، JPG، WebP، Word، Excel، PowerPoint،
-            TXT، CSV، ZIP. معاينة الصور وPDF داخل الموقع؛ بقية الأنواع تُنزّل
-            لفتحها.
+            4 م.ب · PDF، صور، Office، TXT، CSV، ZIP
           </p>
           <Field label="استخدام المرفقات" id={`attachment-purpose-${taskId}`}>
             <select
@@ -351,12 +349,6 @@ export default function TaskAttachments({
             </p>
           )}
         </form>
-      )}
-      {!submissionId && !canUpload && (
-        <p className="text-sm text-muted">
-          المرفقات للقراءة فقط. الإرفاق متاح للأدمن أو الموظفة المسؤولة قبل
-          المراجعة والإكمال والأرشفة.
-        </p>
       )}
       {onSelected && canUpload && (
         <div className="space-y-2">

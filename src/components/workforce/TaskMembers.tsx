@@ -201,11 +201,6 @@ export default function TaskMembers({
               }
             }}
           >
-            <p className="text-sm leading-7">
-              المشارك يستطيع تحديث التنفيذ والتحقق والتعليق والتسليم، ولا يغير
-              تكليف المدير أو يعتمد التسليم. المتابع يقرأ التفاصيل والنقاش
-              والتاريخ فقط. إضافة شخص لا تكشف راتب المسؤول أو ملفه الخاص.
-            </p>
             <EmployeePicker
               value={chosen.id}
               onChange={(id, name) => setChosen({ id, name: name ?? "موظف" })}

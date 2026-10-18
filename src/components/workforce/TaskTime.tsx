@@ -411,11 +411,6 @@ export default function TaskTime({
             <Notice message={error} error />
             {editing.command !== "archive" && (
               <>
-                <p className="text-sm">
-                  حدد يوم البداية ووقتها بتوقيت الرياض، ثم مدة العمل بالدقائق.
-                  سجل فترة سابقة لا تتجاوز24 ساعة؛ الفترات المتداخلة لك ترفض حتى
-                  لو كانت في مهمة أخرى.
-                </p>
                 <DateInput
                   id="work-time-date"
                   label="تاريخ بداية العمل"
@@ -485,10 +480,7 @@ export default function TaskTime({
                 />
               </Field>
             )}
-            <p className="text-sm text-muted">
-              يحفظ التاريخ النسخ السابقة. الأرشفة تستبعد الفترة من الإجمالي دون
-              حذفها.
-            </p>
+
             <Button type="submit" disabled={busy}>
               حفظ سجل الوقت
             </Button>

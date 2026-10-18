@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 const links = [
   ["/admin/workforce", "الأداء والمهام"],
   ["/admin/workforce/employees", "الموظفات"],
+  ["/admin/workforce/attendance", "الحضور والإجازات"],
   ["/admin/workforce/payroll", "الرواتب والحوافز"],
   ["/admin/workforce/approvals", "طلبات الموظفات"],
   ["/admin/workforce/notifications", "الإشعارات"],

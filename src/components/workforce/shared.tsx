@@ -27,7 +27,6 @@ export function Field({
 }
 export function Panel({
   title,
-  description,
   children,
 }: {
   title: string;
@@ -37,9 +36,6 @@ export function Panel({
   return (
     <section className="rounded-2xl border border-border bg-white/90 p-5 shadow-sm md:p-6">
       <h2 className="text-lg font-bold text-dark">{title}</h2>
-      {description && (
-        <p className="mt-1 text-sm leading-7 text-muted">{description}</p>
-      )}
       <div className="mt-5">{children}</div>
     </section>
   );

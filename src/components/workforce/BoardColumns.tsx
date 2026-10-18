@@ -154,12 +154,6 @@ export default function BoardColumns({
             }
           }}
         >
-          <p className="text-sm leading-7 text-muted">
-            سمّ المراحل بحسب أعمال الشركة ورتّبها بأزرار التقديم والتأخير. لكل
-            مرحلة حالة أساسية تضبط قواعد العمل، ولا تتغير بعد حفظها. يحتفظ
-            النظام بمرحلة متاحة لكل حالة؛ أول مرحلة نشطة من النوع تستقبل الإنشاء
-            أو قرار المراجعة تلقائيًا.
-          </p>
           <Notice message={error} error />
           {loading ? (
             <p role="status">جارٍ تحميل المراحل…</p>
@@ -286,10 +280,7 @@ export default function BoardColumns({
                       </li>
                     ))}
                   </ol>
-                  <p className="text-sm text-muted">
-                    الأرشفة تتطلب نقل جميع مهام المرحلة أولًا، حتى المؤرشفة.
-                    التغييرات لا تنفذ حتى تحفظها معًا.
-                  </p>
+
                   <div className="flex flex-wrap gap-3">
                     <Button
                       type="button"

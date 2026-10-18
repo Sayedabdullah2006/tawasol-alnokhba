@@ -1,0 +1,200 @@
+import {
+  apiError,
+  assertMutation,
+  requireAdmin,
+  requireEmployeeAccess,
+  workforceActor,
+  createServiceRoleClient,
+} from "@/lib/workforce/server";
+import { uuid, textField, WorkforceError } from "@/lib/workforce/validation";
+import { workPage, privateResponse } from "@/lib/workforce/task-server";
+export async function GET(request: Request) {
+  try {
+    const actor = await workforceActor(),
+      params = new URL(request.url).searchParams,
+      { page, from, to } = workPage(params),
+      today = new Date().toLocaleDateString("en-CA", {
+        timeZone: "Asia/Riyadh",
+      }),
+      year = Number(params.get("year") || today.slice(0, 4));
+    if (!Number.isInteger(year) || year < 2020 || year > 2200)
+      throw new WorkforceError("السنة غير صحيحة");
+    const id =
+      actor.role === "admin"
+        ? uuid(params.get("employee_id"))
+        : actor.employee!.id;
+    requireEmployeeAccess(actor, id);
+    const exists = await actor.db
+      .from("wf_employees")
+      .select("id,full_name")
+      .eq("id", id)
+      .maybeSingle();
+    if (exists.error) throw exists.error;
+    if (!exists.data) throw new WorkforceError("الموظفة غير متاحة", 404);
+    let sessions = actor.db
+      .from("wf_attendance_sessions")
+      .select("*", { count: "exact" })
+      .eq("employee_id", id)
+      .gte("business_date", `${year}-01-01`)
+      .lte("business_date", `${year}-12-31`)
+      .order("checked_in", { ascending: false })
+      .order("id")
+      .range(from, to);
+    const month = params.get("month");
+    if (month) {
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))
+        throw new WorkforceError("الشهر غير صحيح");
+      sessions = sessions
+        .gte("business_date", `${month}-01`)
+        .lt(
+          "business_date",
+          new Date(
+            Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 1),
+          )
+            .toISOString()
+            .slice(0, 10),
+        );
+    }
+    const [records, open, settings, entitlement, movements, approved] =
+      await Promise.all([
+        sessions,
+        actor.db
+          .from("wf_attendance_sessions")
+          .select("*")
+          .eq("employee_id", id)
+          .is("checked_out", null)
+          .maybeSingle(),
+        actor.db
+          .from("wf_attendance_settings")
+          .select("workdays,starts_at,ends_at")
+          .eq("employee_id", id)
+          .maybeSingle(),
+        actor.db
+          .from("wf_leave_entitlements")
+          .select("days")
+          .eq("employee_id", id)
+          .eq("year", year)
+          .maybeSingle(),
+        actor.db
+          .from("wf_leave_movements")
+          .select("days")
+          .eq("employee_id", id)
+          .eq("year", year),
+        actor.db
+          .from("wf_employee_requests")
+          .select("id,kind,title,starts_at,ends_at,leave_type")
+          .eq("employee_id", id)
+          .eq("status", "approved")
+          .in("kind", ["leave", "permission", "remote-work"])
+          .gte("ends_at", `${year}-01-01T00:00:00+03:00`)
+          .lte("starts_at", `${year}-12-31T23:59:59+03:00`)
+          .order("starts_at", { ascending: false })
+          .limit(100),
+      ]);
+    for (const result of [
+      records,
+      open,
+      settings,
+      entitlement,
+      movements,
+      approved,
+    ])
+      if (result.error && result.error.code !== "PGRST103") throw result.error;
+    const granted = Number(entitlement.data?.days || 0),
+      used = (movements.data || []).reduce(
+        (sum, row) => sum + Number(row.days),
+        0,
+      );
+    return privateResponse({
+      employee: exists.data,
+      sessions: records.data || [],
+      count: records.count || 0,
+      page,
+      open: open.data,
+      settings: settings.data || {
+        workdays: [0, 1, 2, 3, 4],
+        starts_at: "09:00",
+        ends_at: "17:00",
+      },
+      leave: { year, granted, used, available: granted - used },
+      approved: approved.data || [],
+      today,
+    });
+  } catch (e) {
+    return apiError(e);
+  }
+}
+export async function POST(request: Request) {
+  try {
+    assertMutation(request);
+    const actor = await workforceActor(),
+      body = await request.json();
+    if (!actor.employee)
+      throw new WorkforceError("تسجيل الحضور للموظفة فقط", 403);
+    if (!["in", "out"].includes(body.command))
+      throw new WorkforceError("إجراء غير صحيح");
+    if (
+      Object.keys(body).some((key) => !["command", "request_key"].includes(key))
+    )
+      throw new WorkforceError("وقت الحضور يحدده النظام");
+    const service = await createServiceRoleClient(),
+      result = await service.rpc("wf_clock_attendance", {
+        p_actor: actor.user.id,
+        p_command: body.command,
+        p_key: uuid(body.request_key),
+      });
+    if (result.error) throw result.error;
+    return Response.json(result.data);
+  } catch (e) {
+    return apiError(e);
+  }
+}
+export async function PATCH(request: Request) {
+  try {
+    assertMutation(request);
+    const actor = await workforceActor();
+    requireAdmin(actor);
+    const body = await request.json(),
+      id = uuid(body.employee_id);
+    if (
+      !Array.isArray(body.workdays) ||
+      !body.workdays.length ||
+      body.workdays.length > 7 ||
+      body.workdays.some(
+        (day: unknown) =>
+          !Number.isInteger(day) || Number(day) < 0 || Number(day) > 6,
+      )
+    )
+      throw new WorkforceError("أيام العمل غير صحيحة");
+    if (
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.starts_at) ||
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.ends_at) ||
+      body.ends_at <= body.starts_at
+    )
+      throw new WorkforceError("ساعات الدوام غير صحيحة");
+    if (
+      !Number.isInteger(body.year) ||
+      body.year < 2020 ||
+      body.year > 2200 ||
+      !Number.isFinite(Number(body.days)) ||
+      Number(body.days) < 0 ||
+      Number(body.days) > 366
+    )
+      throw new WorkforceError("استحقاق الإجازة غير صحيح");
+    const service = await createServiceRoleClient(),
+      result = await service.rpc("wf_save_attendance_settings", {
+        p_actor: actor.user.id,
+        p_employee: id,
+        p_workdays: [...new Set(body.workdays)],
+        p_start: body.starts_at,
+        p_end: body.ends_at,
+        p_year: body.year,
+        p_days: Number(body.days),
+        p_reason: textField(body.reason, "سبب التعديل", 3, 2000),
+      });
+    if (result.error) throw result.error;
+    return Response.json({ success: true });
+  } catch (e) {
+    return apiError(e);
+  }
+}

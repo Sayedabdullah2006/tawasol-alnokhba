@@ -54,7 +54,7 @@ export default function EmployeeDirectory({ userId }: { userId: string }) {
           `wf-employee-directory-filters:${userId}`,
         );
         if (!query && saved) {
-          router.replace(`${pathname}?${saved}`, { scroll: false });
+          window.history.replaceState(null, "", `${pathname}?${saved}`);
           return;
         }
       }
@@ -93,7 +93,7 @@ export default function EmployeeDirectory({ userId }: { userId: string }) {
     pendingQuery.current = next.toString();
     setLoading(true);
     if (next.toString() === query) setRevision((v) => v + 1);
-    else router.replace(`${pathname}?${next}`, { scroll: false });
+    else window.history.replaceState(null, "", `${pathname}?${next}`);
   };
   const close = async () => {
     if (saving) return;
@@ -134,10 +134,6 @@ export default function EmployeeDirectory({ userId }: { userId: string }) {
             تواصل النخبة / فريق العمل
           </p>
           <h1 className="text-3xl font-black text-dark">إدارة الموظفين</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-muted">
-            ملف واحد لكل موظف، وبيانات منظمة وصلاحيات واضحة. ابدأ بإضافة فريقك
-            وأقسام الشركة.
-          </p>
         </div>
         <Button
           onClick={() => {
@@ -151,8 +147,18 @@ export default function EmployeeDirectory({ userId }: { userId: string }) {
         </Button>
       </div>
       <nav aria-label="إدارة الفريق" className="flex flex-wrap gap-3 text-sm">
-        <Link href="/admin/workforce" className="rounded-full border border-border bg-white px-4 py-2">داشبورد الفريق</Link>
-        <Link href="/admin/workforce/tasks" className="rounded-full border border-border bg-white px-4 py-2">المهام والعمل</Link>
+        <Link
+          href="/admin/workforce"
+          className="rounded-full border border-border bg-white px-4 py-2"
+        >
+          داشبورد الفريق
+        </Link>
+        <Link
+          href="/admin/workforce/tasks"
+          className="rounded-full border border-border bg-white px-4 py-2"
+        >
+          المهام والعمل
+        </Link>
         <span
           aria-current="page"
           className="rounded-full bg-dark px-4 py-2 text-white"
@@ -379,12 +385,6 @@ export default function EmployeeDirectory({ userId }: { userId: string }) {
       </details>
       <Dialog title="إضافة موظف جديد" open={open} onClose={close}>
         <form onSubmit={submit} className="space-y-5">
-          <p className="text-sm leading-7 text-muted">
-            سيُنشأ حساب موظف جديد. سلّم بيانات الدخول للموظف عبر قناتك المعتمدة؛
-            لن يُرسل بريد تلقائيًا.
-            يظهر لها إشعار ترحيبي داخل بوابتها فور إنشاء الحساب، ثم إشعار عند إسناد مهمة.
-            بعد الإنشاء يفتح ملف الموظف لإعداد الراتب والبدلات وبنود العمولة.
-          </p>
           <EmployeeFields
             value={form}
             onChange={setForm}

@@ -12,6 +12,7 @@ export const TASK_PRIORITIES = {
   urgent: "عاجلة",
 } as const;
 export type TaskColumn = {
+  board_id?: string;
   id: string;
   title: string;
   kind: keyof typeof TASK_STATES;
@@ -32,6 +33,7 @@ export type WorkTask = {
   canWork?: boolean;
   id: string;
   board_id: string;
+  position: number;
   column_id: string;
   title: string;
   description: string;
@@ -66,6 +68,7 @@ export type TaskSubmission = {
   submission_number: number;
 };
 export type TaskDetail = {
+  boardDetail: BoardDetail;
   task: WorkTask;
   canWork: boolean;
   canEdit: boolean;

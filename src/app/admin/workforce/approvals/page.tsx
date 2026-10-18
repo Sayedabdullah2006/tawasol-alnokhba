@@ -1,4 +1,2 @@
-import ProfileApprovals from "@/components/workforce/ProfileApprovals";
-export default function Page() {
-  return <ProfileApprovals />;
-}
+import RequestCenter from '@/components/workforce/RequestCenter';
+export default function Page(){return <RequestCenter admin/>;}

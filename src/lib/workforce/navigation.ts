@@ -98,7 +98,7 @@ export const employeeModules: EmployeeModule[] = [
     screens: [
       screen(
         "finance/overview",
-        "ملخص مستحقاتي",
+        "الراتب والحوافز",
         "مستحقات الشهر المتوقعة والمعتمدة والمصروف المسجل والمتبقي من المعتمد.",
         ["finance/payslips", "finance/commissions", "finance/advances"],
         undefined,
@@ -152,19 +152,19 @@ export const employeeModules: EmployeeModule[] = [
         "attendance/overview",
         "حضوري وانصرافي",
         "تسجيل الحضور والانصراف والراحة ومراجعة سجلاتك.",
-        ["attendance/schedule", "requests/attendance-correction"],
+        ["attendance/schedule", "requests/attendance-correction"],undefined,true,
       ),
       screen(
         "attendance/schedule",
         "جدول دوامي",
         "أيام العمل وساعاته والاستثناءات والإجازات المعتمدة.",
-        ["work/calendar", "requests/remote-work"],
+        ["work/calendar", "requests/remote-work"],undefined,true,
       ),
       screen(
         "attendance/leave-balances",
         "أرصدة الإجازات",
         "المستحق والمستخدم والمحجوز والمتاح وتاريخ حركة الرصيد.",
-        ["requests/leave", "requests/history"],
+        ["requests/leave", "requests/history"],undefined,true,
       ),
     ],
   },
@@ -179,6 +179,8 @@ export const employeeModules: EmployeeModule[] = [
         "كل طلباتي",
         "البحث والتصفية في طلباتك وحالاتها ومرفقاتها وقراراتها.",
         ["requests/leave", "requests/expenses", "requests/profile-change"],
+        undefined,
+        true,
       ),
       screen(
         "requests/leave",

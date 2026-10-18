@@ -35,7 +35,7 @@ const currentMonth = () =>
     .slice(0, 7);
 const money = (value: string | null) =>
   value === null
-    ? "لم يحدد"
+    ? "—"
     : `${Number(value).toLocaleString("ar-SA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ر.س`;
 const emptyItem = (): PayrollItem => ({
   title: "",
@@ -375,9 +375,7 @@ export default function MonthlyPayroll({
         data && (
           <>
             <p className="mb-4 text-sm font-bold">
-              {statement
-                ? payrollStatus[statement.status]
-                : "تقدير أولي حسب إعدادات الراتب؛ لم يُعد كشف الشهر بعد"}
+              {statement ? payrollStatus[statement.status] : "قيد الإعداد"}
             </p>
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
               {[
@@ -397,11 +395,7 @@ export default function MonthlyPayroll({
                 </div>
               ))}
             </div>
-            <p className="my-3 text-xs leading-6 text-muted">
-              المتوقع تقدير للشهر، ويصبح مبلغًا معتمدًا بعد مراجعة الإدارة.
-              المصروف هو ما وثقته الإدارة بعد الدفع الفعلي. الحوافز تُحسب من
-              مبالغ المهام أو الصفقات التي يسجلها الأدمن.
-            </p>
+
             {compact ? (
               <Link
                 className="inline-block py-3 text-sm font-bold text-green"
@@ -425,14 +419,7 @@ export default function MonthlyPayroll({
                     />
                   </details>
                 )}
-                {!statement && (
-                  <p className="my-3 text-sm text-muted">
-                    {data.defaults
-                      ? `الإعداد المستخدم ساري من ${data.defaults.effective_from}. راجع مبلغ الشهر عند تغير السريان أو أيام الاستحقاق.`
-                      : "لم تُضبط مبالغ الراتب لهذا الشهر بعد."}
-                  </p>
-                )}
-                {!editing && (
+                {!editing && (statement || data.defaults) && (
                   <div className="my-4 space-y-3 text-sm">
                     <p>
                       الراتب الأساسي:{" "}
@@ -761,10 +748,7 @@ export default function MonthlyPayroll({
                               onChange={(e) => setReference(e.target.value)}
                             />
                           </Field>
-                          <p className="text-xs text-muted">
-                            لتوثيق دفعة تمت خارج الموقع؛ هذا الإجراء لا ينفذ
-                            تحويلًا بنكيًا.
-                          </p>
+
                           <Button
                             loading={busy}
                             disabled={

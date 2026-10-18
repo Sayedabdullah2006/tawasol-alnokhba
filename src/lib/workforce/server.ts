@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { employeeRecords } from "./employee-records";
 import {
   createServerSupabaseClient,
@@ -7,7 +8,8 @@ import {
 import { WorkforceError } from "./validation";
 import type { Employee, InternalRole } from "./types";
 
-export async function workforceActor() {
+// Deduplicate only inside one server render; never cache an identity between requests.
+export const workforceActor = cache(async function workforceActor() {
   const db = await createServerSupabaseClient();
   const {
     data: { user },
@@ -43,7 +45,7 @@ export async function workforceActor() {
     employee = data as Employee;
   }
   return { user, role, employee, db };
-}
+});
 export type WorkforceActor = Awaited<ReturnType<typeof workforceActor>>;
 export function requireAdmin(actor: WorkforceActor) {
   if (actor.role !== "admin")
@@ -75,10 +77,23 @@ export function apiError(error: unknown) {
   // PT400/PT409 are explicit, user-facing domain errors from our checked RPCs.
   // Never return Postgres details, hints or raw constraint error messages.
   if (code === "PT400" || code === "PT409") {
-    const message = error && typeof error === "object" && "message" in error && typeof error.message === "string" ? error.message : "تعذر إتمام الإجراء؛ حدّث البيانات وتحقق من المتطلبات";
-    return Response.json({ error: message }, { status: code === "PT400" ? 400 : 409 });
+    const message =
+      error &&
+      typeof error === "object" &&
+      "message" in error &&
+      typeof error.message === "string"
+        ? error.message
+        : "تعذر إتمام الإجراء؛ حدّث البيانات وتحقق من المتطلبات";
+    return Response.json(
+      { error: message },
+      { status: code === "PT400" ? 400 : 409 },
+    );
   }
-  if (["PT400", "23502", "23514", "22P02", "22003", "22007", "22008"].includes(code))
+  if (
+    ["PT400", "23502", "23514", "22P02", "22003", "22007", "22008"].includes(
+      code,
+    )
+  )
     return Response.json(
       { error: "تحقق من الحقول المطلوبة وصحة القيم والتواريخ" },
       { status: 400 },

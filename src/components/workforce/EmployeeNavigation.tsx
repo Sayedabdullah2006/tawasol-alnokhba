@@ -34,42 +34,44 @@ export default function EmployeeNavigation() {
         >
           الرئيسية
         </Link>
-        {employeeModules.map((module) => (
-          <details
-            key={module.key}
-            open={
-              module.screens.some((screen) => pathname === screen.path) ||
-              pathname === `/employee/${module.key}`
-            }
-            className="rounded-xl border border-border"
-          >
-            <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-dark">
-              {module.title}
-            </summary>
-            <div className="space-y-1 px-2 pb-2">
-              {module.key !== "profile" && (
-                <Link
-                  href={`/employee/${module.key}`}
-                  onClick={() => setMobileOpen(false)}
-                  className="block rounded-lg px-4 py-2 text-xs font-bold text-muted hover:bg-slate-100"
-                >
-                  نظرة عامة على القسم
-                </Link>
-              )}
-              {module.screens.map((screen) => (
-                <Link
-                  key={screen.path}
-                  href={screen.path}
-                  onClick={() => setMobileOpen(false)}
-                  aria-current={pathname === screen.path ? "page" : undefined}
-                  className={`block rounded-lg px-4 py-3 text-sm leading-6 ${pathname === screen.path ? "bg-dark text-white" : "text-dark hover:bg-slate-100"}`}
-                >
-                  {screen.title}
-                </Link>
-              ))}
-            </div>
-          </details>
-        ))}
+        {employeeModules.map((module) => {
+          const screens = module.screens.filter(
+            (screen) =>
+              screen.available &&
+              ![
+                "/employee/finance/payslips",
+                "/employee/finance/commissions",
+              ].includes(screen.path) &&
+              (module.key !== "requests" ||
+                screen.path === "/employee/requests/history"),
+          );
+          if (!screens.length) return null;
+          const links = screens.map((screen) => (
+            <Link
+              key={screen.path}
+              href={screen.path}
+              onClick={() => setMobileOpen(false)}
+              aria-current={pathname === screen.path ? "page" : undefined}
+              className={`block rounded-lg px-4 py-3 text-sm ${pathname === screen.path ? "bg-dark text-white" : "hover:bg-slate-100"}`}
+            >
+              {screen.title}
+            </Link>
+          ));
+          return screens.length === 1 ? (
+            <div key={module.key}>{links}</div>
+          ) : (
+            <details
+              key={module.key}
+              open={screens.some((screen) => pathname === screen.path)}
+              className="rounded-xl border border-border"
+            >
+              <summary className="cursor-pointer px-4 py-3 text-sm font-bold">
+                {module.title}
+              </summary>
+              <div className="px-2 pb-2">{links}</div>
+            </details>
+          );
+        })}
       </div>
     </nav>
   );

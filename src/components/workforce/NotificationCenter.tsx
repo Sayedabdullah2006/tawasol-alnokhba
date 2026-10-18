@@ -22,6 +22,13 @@ export default function NotificationCenter() {
   const [busy, setBusy] = useState(false),
     lock = useRef(false);
   useEffect(() => {
+    const refresh = () => {
+      setRevision((n) => n + 1);
+    };
+    window.addEventListener("workforce-data-changed", refresh);
+    return () => window.removeEventListener("workforce-data-changed", refresh);
+  }, []);
+  useEffect(() => {
     const abort = new AbortController();
     api<Result>(`/api/workforce/notifications?page=${page}&unread=${unread}`, {
       signal: abort.signal,
@@ -56,9 +63,7 @@ export default function NotificationCenter() {
   return (
     <section className="mx-auto max-w-4xl space-y-5 p-4 md:p-8">
       <h1 className="text-3xl font-black">الإشعارات</h1>
-      <p className="text-sm text-muted">
-        الترحيب بالفريق والتكليفات والتعليقات والتسليمات وقرارات الاعتماد.
-      </p>
+
       <div className="flex flex-wrap items-center gap-4">
         <label className="flex gap-2">
           <input

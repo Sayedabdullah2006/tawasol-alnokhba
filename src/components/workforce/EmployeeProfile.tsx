@@ -204,7 +204,10 @@ export default function EmployeeProfile({
       {unsavedPrompt}
       {confirmation}
       {admin && (
-        <Link className="text-sm font-bold text-green" href="/admin/workforce/employees">
+        <Link
+          className="text-sm font-bold text-green"
+          href="/admin/workforce/employees"
+        >
           → جميع الموظفين
         </Link>
       )}
@@ -220,7 +223,7 @@ export default function EmployeeProfile({
                 : sectionLabel}
             </h1>
             <p className="mt-3 text-sm leading-7 text-white/80">
-              {employee.job_title || "لم يحدد المسمى"} ·{" "}
+              {employee.job_title || "—"} ·{" "}
               {data.departments.find((d) => d.id === employee.department_id)
                 ?.name || "دون قسم"}
             </p>
@@ -263,10 +266,9 @@ export default function EmployeeProfile({
       >
         <div className="space-y-6">
           {!admin && section === "profile" && (
-            <Panel title="المهام والمسؤوليات الوظيفية">
+            <Panel title="الوصف الوظيفي">
               <p className="whitespace-pre-wrap break-words text-sm leading-7">
-                {employee.responsibilities ||
-                  "لم يسجل المدير المسؤوليات الوظيفية بعد."}
+                {employee.responsibilities || "—"}
               </p>
             </Panel>
           )}

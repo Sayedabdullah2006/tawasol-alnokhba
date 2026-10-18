@@ -57,11 +57,6 @@ export default function BoardMembers({
       {unsaved}
       <Dialog title="أعضاء لوحة العمل" open onClose={close}>
         <div className="space-y-4">
-          <p className="text-sm leading-7 text-muted">
-            الأعضاء يرون المهام المشتركة مع اللوحة ويستطيعون إنشاء مهام ذاتية
-            إذا سمحت سياسة اللوحة. إزالة العضوية لا تلغي تكليفات الموظف المسندة
-            إليه.
-          </p>
           <Notice message={error} error />
           {version === null ? (
             <Button type="button" onClick={() => setReload((n) => n + 1)}>

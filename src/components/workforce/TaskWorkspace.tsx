@@ -8,9 +8,11 @@ import {
   TASK_STATES,
   workDate,
   type WorkTask,
+  type TaskColumn,
 } from "@/lib/workforce/task-types";
 import TaskFields, { taskForm, taskPayload } from "./TaskFields";
 import WeeklyPlan from "./WeeklyPlan";
+import TaskBoard from "./TaskBoard";
 import {
   api,
   controlClass,
@@ -35,7 +37,7 @@ export default function TaskWorkspace({
   userId: string;
   employeeId?: string;
   embedded?: boolean;
-  onOpenTask?: (id: string) => void;
+  onOpenTask?: (id: string, panel?: string) => void;
   onChanged?: () => void;
   refreshKey?: number;
   clients?: string[];
@@ -46,6 +48,11 @@ export default function TaskWorkspace({
   const query = params.toString();
   const pendingQuery = useRef(query);
   const [tasks, setTasks] = useState<WorkTask[]>([]);
+  const [columns, setColumns] = useState<TaskColumn[]>([]);
+  const [laneCounts, setLaneCounts] = useState<Record<string, number>>({});
+  const [lanePages, setLanePages] = useState<Record<string, number>>({});
+  const [more, setMore] = useState<Record<string, number>>({});
+  const view = params.get("view") === "list" ? "list" : "board";
   const [employees, setEmployees] = useState<
     { id: string; full_name: string }[]
   >([]);
@@ -69,6 +76,13 @@ export default function TaskWorkspace({
   const Heading = embedded ? "h2" : "h1";
   const page = Number(params.get("page") || "1");
   useEffect(() => {
+    const refresh = () => {
+      if (!taskOpen && !weeklyOpen) setRevision((n) => n + 1);
+    };
+    window.addEventListener("workforce-data-changed", refresh);
+    return () => window.removeEventListener("workforce-data-changed", refresh);
+  }, [taskOpen, weeklyOpen]);
+  useEffect(() => {
     pendingQuery.current = query;
   }, [query]);
   function change(key: string, value: string) {
@@ -81,7 +95,7 @@ export default function TaskWorkspace({
     pendingQuery.current = next.toString();
     setLoading(true);
     if (next.toString() === query) setRevision((n) => n + 1);
-    router.replace(`${pathname}?${next}`, { scroll: false });
+    window.history.replaceState(null, "", `${pathname}?${next}`);
   }
   useEffect(() => {
     const abort = new AbortController();
@@ -96,15 +110,29 @@ export default function TaskWorkspace({
         if (e.name !== "AbortError") setTeamError(e.message);
       });
     return () => abort.abort();
-  }, [revision]);
+  }, []);
   useEffect(() => {
     const abort = new AbortController();
-    api<{ tasks: WorkTask[]; count: number }>(`/api/workforce/tasks?${query}`, {
+    const requestParams = new URLSearchParams(query);
+    requestParams.set("view", view);
+    if (view === "board") {
+      requestParams.set("page", "1");
+      if (!requestParams.has("sort")) requestParams.set("sort", "position");
+    }
+    api<{
+      tasks: WorkTask[];
+      count: number;
+      columns: TaskColumn[];
+      laneCounts?: Record<string, number>;
+    }>(`/api/workforce/tasks?${requestParams}`, {
       signal: abort.signal,
     })
       .then((result) => {
         setTasks(result.tasks);
         setCount(result.count);
+        setColumns(result.columns);
+        setLaneCounts(result.laneCounts || {});
+        setLanePages({});
         setError("");
         setLoading(false);
       })
@@ -115,7 +143,7 @@ export default function TaskWorkspace({
         }
       });
     return () => abort.abort();
-  }, [query, revision, refreshKey]);
+  }, [query, revision, refreshKey, view]);
   const close = async () => {
     if (busy) return;
     if (
@@ -126,32 +154,17 @@ export default function TaskWorkspace({
     setTaskOpen(false);
   };
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
+    <div className={embedded ? "space-y-4" : "space-y-4 p-4 md:p-6"}>
       {confirmation}
       {unsaved}
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          {!embedded && (
-            <Link
-              href={admin ? "/admin/workforce" : "/employee"}
-              className="text-sm font-bold"
-            >
-              ← {admin ? "إدارة الموظفين" : "داشبورد الموظفة"}
-            </Link>
-          )}
-          <Heading className="mt-3 text-3xl font-black">
-            {admin ? "إدارة مهام الفريق" : "مهامي ومهام الفريق"}
-          </Heading>
-          <p className="mt-3 text-sm leading-7 text-muted">
-            كل العملاء وأعمال الشركة في مساحة واحدة.{" "}
-            {admin
-              ? "أسند المهمة وحدد موعدها ومعيار التسليم، ثم راجع النتيجة واعتمدها."
-              : "مهام الفريق للقراءة، وإجراءات التنفيذ والتعليق والتسليم على مهامك فقط."}
-          </p>
+          <Heading className="text-2xl font-black">المهام</Heading>
         </div>
         {admin && (
           <div className="flex flex-wrap gap-3">
             <Button
+              id="workforce-add-task"
               onClick={() => {
                 taskId.current = crypto.randomUUID();
                 setTask({
@@ -164,170 +177,249 @@ export default function TaskWorkspace({
             >
               إضافة مهمة
             </Button>
-            <Button variant="outline" onClick={() => setWeeklyOpen(true)}>
+            <Button
+              id="workforce-weekly-plan"
+              variant="outline"
+              onClick={() => setWeeklyOpen(true)}
+            >
               إسناد خطة أسبوعية
+            </Button>
+          </div>
+        )}
+        {employeeId && (
+          <div className="flex gap-3">
+            <Button
+              variant={params.get("scope") ? "primary" : "outline"}
+              onClick={() => change("scope", "assigned")}
+            >
+              مهامي
+            </Button>
+            <Button
+              variant={
+                !params.get("scope") && !params.get("assignee_id")
+                  ? "primary"
+                  : "outline"
+              }
+              onClick={() => change("scope", "")}
+            >
+              مهام الفريق
             </Button>
           </div>
         )}
       </header>
       <Notice message={error || teamError} error />
-      {employeeId && (
-        <div className="flex gap-3">
-          <Button
-            variant={params.get("scope") ? "primary" : "outline"}
-            onClick={() => change("scope", "assigned")}
-          >
-            مهامي
-          </Button>
-          <Button
-            variant={
-              !params.get("scope") && !params.get("assignee_id")
-                ? "primary"
-                : "outline"
-            }
-            onClick={() => change("scope", "")}
-          >
-            مهام الفريق
-          </Button>
-        </div>
-      )}
-      <Panel title="البحث والتصفية">
-        <form
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            change("q", String(new FormData(e.currentTarget).get("q") || ""));
-          }}
-        >
-          <Field label="البحث في المهام" id="task-search">
-            <input
-              key={params.get("q") || ""}
-              id="task-search"
-              name="q"
-              defaultValue={params.get("q") || ""}
-              className={controlClass}
-            />
-          </Field>
-          <Field label="الموظفة المسؤولة" id="assignee-filter">
-            <select
-              id="assignee-filter"
-              className={controlClass}
-              value={
-                params.get("assignee_id") ||
-                (params.get("scope") && employeeId ? employeeId : "")
-              }
-              onChange={(e) => change("assignee_id", e.target.value)}
-            >
-              <option value="">كل الفريق</option>
-              {employees.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.full_name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="الحالة" id="state-filter">
-            <select
-              id="state-filter"
-              className={controlClass}
-              value={params.get("state") || ""}
-              onChange={(e) => change("state", e.target.value)}
-            >
-              <option value="">كل الحالات</option>
-              {Object.entries(TASK_STATES).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="العميل أو مجال العمل" id="client-filter">
-            <input
-              key={params.get("client_name") || ""}
-              id="client-filter"
-              list="work-client-options"
-              className={controlClass}
-              defaultValue={params.get("client_name") || ""}
-              placeholder="أي عميل، أو تطوير الشركة"
-              onBlur={(e) => {
-                if (e.target.value.trim() !== (params.get("client_name") || ""))
-                  change("client_name", e.target.value.trim());
-              }}
-            />
-            <datalist id="work-client-options">
-              {clients.map((client) => (
-                <option key={client} value={client} />
-              ))}
-            </datalist>
-          </Field>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-2">
           {[
-            ["due_from", "موعد التسليم من"],
-            ["due_to", "موعد التسليم إلى"],
+            ["board", "قوائم"],
+            ["list", "قائمة مختصرة"],
           ].map(([key, label]) => (
-            <Field key={key} label={label} id={key}>
+            <Button
+              key={key}
+              size="sm"
+              variant={view === key ? "primary" : "outline"}
+              onClick={() => change("view", key)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+        <span className="text-xs text-muted" role="status">
+          {loading ? "جارٍ التحديث…" : `${count} مهمة`}
+        </span>
+      </div>
+      <details className="rounded-2xl border border-border bg-white p-4">
+        <summary className="cursor-pointer text-sm font-bold">
+          بحث وتصفية
+        </summary>
+        <div className="pt-4">
+          <form
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              change("q", String(new FormData(e.currentTarget).get("q") || ""));
+            }}
+          >
+            <Field label="البحث في المهام" id="task-search">
               <input
-                id={key}
-                type="date"
+                key={params.get("q") || ""}
+                id="task-search"
+                name="q"
+                defaultValue={params.get("q") || ""}
                 className={controlClass}
-                value={params.get(key) || ""}
-                onChange={(e) => change(key, e.target.value)}
               />
             </Field>
-          ))}
-          <div className="flex items-end gap-3">
-            <Button type="submit">بحث</Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                pendingQuery.current = "";
-                router.replace(pathname);
-                setRevision((n) => n + 1);
-              }}
+            <Field label="الموظفة المسؤولة" id="assignee-filter">
+              <select
+                id="assignee-filter"
+                className={controlClass}
+                value={
+                  params.get("assignee_id") ||
+                  (params.get("scope") && employeeId ? employeeId : "")
+                }
+                onChange={(e) => change("assignee_id", e.target.value)}
+              >
+                <option value="">كل الفريق</option>
+                {employees.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.full_name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="الحالة" id="state-filter">
+              <select
+                id="state-filter"
+                className={controlClass}
+                value={params.get("state") || ""}
+                onChange={(e) => change("state", e.target.value)}
+              >
+                <option value="">كل الحالات</option>
+                {Object.entries(TASK_STATES).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="العميل أو مجال العمل" id="client-filter">
+              <input
+                key={params.get("client_name") || ""}
+                id="client-filter"
+                list="work-client-options"
+                className={controlClass}
+                defaultValue={params.get("client_name") || ""}
+                placeholder="أي عميل، أو تطوير الشركة"
+                onBlur={(e) => {
+                  if (
+                    e.target.value.trim() !== (params.get("client_name") || "")
+                  )
+                    change("client_name", e.target.value.trim());
+                }}
+              />
+              <datalist id="work-client-options">
+                {clients.map((client) => (
+                  <option key={client} value={client} />
+                ))}
+              </datalist>
+            </Field>
+            {[
+              ["due_from", "موعد التسليم من"],
+              ["due_to", "موعد التسليم إلى"],
+            ].map(([key, label]) => (
+              <Field key={key} label={label} id={key}>
+                <input
+                  id={key}
+                  type="date"
+                  className={controlClass}
+                  value={params.get(key) || ""}
+                  onChange={(e) => change(key, e.target.value)}
+                />
+              </Field>
+            ))}
+            <div className="flex items-end gap-3">
+              <Button type="submit">بحث</Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  pendingQuery.current = "";
+                  window.history.replaceState(null, "", pathname);
+                  setRevision((n) => n + 1);
+                }}
+              >
+                مسح التصفية
+              </Button>
+            </div>
+          </form>
+          <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
+            {[
+              ["overdue", "متأخرة"],
+              ["open", "غير مكتملة"],
+              ["blocked", "متوقفة"],
+              ["archived", "مؤرشفة"],
+            ].map(([key, label]) => (
+              <label key={key} className="flex gap-2">
+                <input
+                  type="checkbox"
+                  checked={params.get(key) === "true"}
+                  onChange={(e) => change(key, e.target.checked ? "true" : "")}
+                />
+                {label}
+              </label>
+            ))}
+            <select
+              aria-label="ترتيب المهام"
+              className="rounded-xl border p-2"
+              value={params.get("sort") || "updated"}
+              onChange={(e) => change("sort", e.target.value)}
             >
-              مسح التصفية
+              <option value="updated">آخر تحديث</option>
+              <option value="due">أقرب موعد تسليم</option>
+              <option value="title">العنوان</option>
+            </select>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setRevision((n) => n + 1)}
+            >
+              تحديث
             </Button>
           </div>
-        </form>
-        <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
-          {[
-            ["overdue", "متأخرة"],
-            ["open", "غير مكتملة"],
-            ["blocked", "متوقفة"],
-            ["archived", "مؤرشفة"],
-          ].map(([key, label]) => (
-            <label key={key} className="flex gap-2">
-              <input
-                type="checkbox"
-                checked={params.get(key) === "true"}
-                onChange={(e) => change(key, e.target.checked ? "true" : "")}
-              />
-              {label}
-            </label>
-          ))}
-          <select
-            aria-label="ترتيب المهام"
-            className="rounded-xl border p-2"
-            value={params.get("sort") || "updated"}
-            onChange={(e) => change("sort", e.target.value)}
-          >
-            <option value="updated">آخر تحديث</option>
-            <option value="due">أقرب موعد تسليم</option>
-            <option value="title">العنوان</option>
-          </select>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setRevision((n) => n + 1)}
-          >
-            تحديث
-          </Button>
         </div>
-      </Panel>
-      {loading ? (
+      </details>
+      {loading && !tasks.length ? (
         <p role="status">جارٍ تحميل المهام…</p>
       ) : error ? (
         <p role="alert">تعذر تحميل المهام. أعيدي المحاولة.</p>
+      ) : view === "board" ? (
+        <TaskBoard
+          tasks={tasks}
+          columns={columns}
+          counts={laneCounts}
+          admin={admin}
+          base={base}
+          onOpen={onOpenTask}
+          more={more}
+          onMoved={(updated) => {
+            setTasks(updated);
+            setRevision((n) => n + 1);
+            onChanged?.();
+          }}
+          onMore={async (kind) => {
+            if (more[kind]) return;
+            setMore((current) => ({ ...current, [kind]: 1 }));
+            try {
+              const next = new URLSearchParams(query);
+              next.set("view", "list");
+              next.set("state", kind);
+              next.set("sort", "position");
+              const page = (lanePages[kind] || 1) + 1;
+              next.set("page", String(page));
+              const result = await api<{
+                tasks: WorkTask[];
+                columns: TaskColumn[];
+              }>(`/api/workforce/tasks?${next}`);
+              setTasks((current) => [
+                ...current,
+                ...result.tasks.filter(
+                  (row) => !current.some((item) => item.id === row.id),
+                ),
+              ]);
+              setColumns((current) => [
+                ...current,
+                ...result.columns.filter(
+                  (row) => !current.some((item) => item.id === row.id),
+                ),
+              ]);
+              setLanePages((current) => ({ ...current, [kind]: page }));
+            } catch (e) {
+              setError((e as Error).message);
+            } finally {
+              setMore((current) => ({ ...current, [kind]: 0 }));
+            }
+          }}
+        />
       ) : (
         <>
           <p className="text-sm text-muted">

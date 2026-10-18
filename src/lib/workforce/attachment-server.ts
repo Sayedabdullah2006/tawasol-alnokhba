@@ -45,8 +45,8 @@ export async function attachmentTask(
 }
 
 /** Bound the actual body, including chunked requests, before parsing multipart. */
-export async function attachmentForm(request: Request) {
-  const limit = MAX_ATTACHMENT_BYTES + 128 * 1024;
+export async function attachmentForm(request: Request, maxBytes = MAX_ATTACHMENT_BYTES) {
+  const limit = maxBytes + 128 * 1024;
   if (Number(request.headers.get("content-length") || 0) > limit)
     throw new WorkforceError("الحد الأقصى للملف 4 ميجابايت", 413);
   const reader = request.body?.getReader();
