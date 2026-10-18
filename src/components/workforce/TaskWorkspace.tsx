@@ -130,9 +130,9 @@ export default function TaskWorkspace({
     const requestParams = new URLSearchParams(query);
     loadingTasks.current = true;
     requestParams.set("view", view);
+    if (!requestParams.has("sort")) requestParams.set("sort", "due");
     if (view === "board") {
       requestParams.set("page", "1");
-      if (!requestParams.has("sort")) requestParams.set("sort", "position");
     }
     api<{
       tasks: WorkTask[];
@@ -376,12 +376,13 @@ export default function TaskWorkspace({
             <select
               aria-label="ترتيب المهام"
               className="rounded-xl border p-2"
-              value={params.get("sort") || "updated"}
+              value={params.get("sort") || "due"}
               onChange={(e) => change("sort", e.target.value)}
             >
               <option value="updated">آخر تحديث</option>
               <option value="due">أقرب موعد تسليم</option>
               <option value="title">العنوان</option>
+              <option value="position">الترتيب اليدوي</option>
             </select>
             <Button
               size="sm"
@@ -403,6 +404,7 @@ export default function TaskWorkspace({
           columns={columns}
           counts={laneCounts}
           admin={admin}
+          sort={params.get("sort") || "due"}
           base={base}
           onOpen={onOpenTask}
           more={more}
@@ -418,7 +420,7 @@ export default function TaskWorkspace({
               const next = new URLSearchParams(query);
               next.set("view", "list");
               next.set("state", kind);
-              next.set("sort", "position");
+              if (!next.has("sort")) next.set("sort", "due");
               const page = (lanePages[kind] || 1) + 1;
               next.set("page", String(page));
               const result = await api<{

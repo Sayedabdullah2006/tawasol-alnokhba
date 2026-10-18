@@ -22,7 +22,7 @@ export async function GET(request: Request) {
       throw new WorkforceError("تصفية المشاركة غير صحيحة");
     if (scope && !actor.employee)
       throw new WorkforceError("تصفية المشاركة متاحة لحساب الموظف فقط", 400);
-    const sort = params.get("sort") ?? "updated";
+    const sort = params.get("sort") ?? "due";
     if (!["updated", "due", "title", "position"].includes(sort))
       throw new WorkforceError("ترتيب غير صحيح");
     const view = params.get("view") || "list";
@@ -91,6 +91,17 @@ export async function GET(request: Request) {
         query = query.neq("blocked_reason", "");
       if (params.get("open") === "true")
         query = query.neq("column.kind", "done");
+      if (params.get("actionable") === "true")
+        query = query.not("column.kind", "in", "(done,review)");
+      const completedFrom = params.get("completed_from");
+      if (completedFrom) {
+        if (
+          !/^\d{4}-\d{2}-\d{2}$/.test(completedFrom) ||
+          !Number.isFinite(Date.parse(completedFrom))
+        )
+          throw new WorkforceError("تاريخ الإنجاز غير صحيح");
+        query = query.gte("completed_at", `${completedFrom}T00:00:00+03:00`);
+      }
       if (params.get("overdue") === "true")
         query = query
           .lt("due_at", new Date().toISOString())

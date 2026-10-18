@@ -61,7 +61,7 @@ export default function EmployeeWorkPages({ section }: { section: string }) {
     if (["time", "deliveries"].includes(section)) params.set("mode", section);
     else {
       params.set("scope", "assigned");
-      params.set("sort", section === "calendar" ? "due" : "updated");
+      params.set("sort", "due");
       if (query) params.set("client_name", query);
       if (section === "archive") params.set("archived", "true");
       if (section === "calendar") {

@@ -9,6 +9,7 @@ import {
   type TaskColumn,
 } from "@/lib/workforce/task-types";
 import { cardAction } from "@/lib/workforce/task-move";
+import { compareTasks } from "@/lib/workforce/task-order";
 import { api, Notice } from "./shared";
 const kinds = Object.keys(TASK_STATES) as (keyof typeof TASK_STATES)[];
 const shades = {
@@ -28,6 +29,7 @@ export default function TaskBoard({
   onMoved,
   more,
   onMore,
+  sort = "due",
 }: {
   tasks: WorkTask[];
   columns: TaskColumn[];
@@ -38,6 +40,7 @@ export default function TaskBoard({
   onMoved: (tasks: WorkTask[]) => void;
   more: Record<string, number>;
   onMore: (kind: string) => Promise<void>;
+  sort?: string;
 }) {
   const [dragging, setDragging] = useState<string | null>(null),
     [over, setOver] = useState(""),
@@ -173,11 +176,7 @@ export default function TaskBoard({
         {kinds.map((kind) => {
           const rows = visibleTasks
             .filter((task) => task.column.kind === kind)
-            .sort(
-              (a, b) =>
-                Number(a.position) - Number(b.position) ||
-                a.id.localeCompare(b.id),
-            );
+            .sort((a, b) => compareTasks(sort, a, b));
           const allowed = !!moving && !!cardAction(moving, kind, admin);
           return (
             <section
