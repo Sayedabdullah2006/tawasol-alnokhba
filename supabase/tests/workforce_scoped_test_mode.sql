@@ -4,7 +4,7 @@ set local role service_role;
 select set_config('workforce.notification_wake','1',true);
 do $$
 #variable_conflict use_variable
-declare owner uuid; staff uuid; staff_user uuid; run uuid; t uuid;
+declare owner uuid; staff uuid; staff_user uuid; run uuid; other_run uuid; t uuid;
  fixture uuid:=gen_random_uuid(); overdue_fixture uuid:=gen_random_uuid(); pending_fixture uuid:=gen_random_uuid();
  real_task uuid:=gen_random_uuid(); real_request uuid:=gen_random_uuid(); test_request uuid:=gen_random_uuid(); attachment uuid:=gen_random_uuid(); v integer; n integer; col uuid;
 begin
@@ -13,6 +13,9 @@ begin
  run:=(public.wf_test_run('start',owner)->>'id')::uuid;
  begin perform public.wf_test_run('start',staff_user);raise exception 'Employee started a test run';exception when insufficient_privilege then null;end;
  perform public.wf_test_run('join',staff_user,run);
+ other_run:=(public.wf_test_run('start',owner)->>'id')::uuid;
+ update workforce_private.test_runs set participants=array[owner,null::uuid] where id=other_run;
+ begin perform public.wf_test_run('join',staff_user,other_run);raise exception 'Nonparticipant joined through NULL membership';exception when insufficient_privilege then null;end;
  foreach t in array array[fixture,overdue_fixture,pending_fixture] loop
   perform public.wf_test_task_command(run,owner,t,null,'create',jsonb_build_object('title','WF-TEST: persisted quiet task','assignee_id',staff,'requires_approval',true,'due_at',now()-interval '2 days','completion_criteria','مرفق وملخص التسليم'),gen_random_uuid());
  end loop;
