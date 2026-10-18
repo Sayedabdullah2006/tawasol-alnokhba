@@ -141,6 +141,12 @@ export default function DateRangePicker({
   return (
     <fieldset
       ref={root}
+      onPointerLeave={() => {
+        if (!drag.current) setHover(null);
+      }}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setHover(null);
+      }}
       dir="rtl"
       className="select-none rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 to-white p-3 sm:p-4"
       data-date-range-picker
