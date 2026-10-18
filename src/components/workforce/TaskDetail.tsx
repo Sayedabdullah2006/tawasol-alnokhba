@@ -324,7 +324,7 @@ export default function TaskDetail({
                 <p className="font-bold">
                   العميل / مجال العمل: {task.client_name || "غير محدد"}
                 </p>
-                {!data.canWork && (
+                {!data.canWork && !data.canEdit && (
                   <p className="rounded-xl bg-slate-100 p-3">للقراءة فقط</p>
                 )}
                 <p className="whitespace-pre-wrap break-words">
@@ -364,7 +364,7 @@ export default function TaskDetail({
                 </dl>
               </div>
             </Panel>
-            {(data.canEdit || data.checklist.length > 0) && (
+            {(data.canConfigureChecklist || data.checklist.length > 0) && (
               <TaskChecklist
                 items={data.checklist}
                 version={task.version}
