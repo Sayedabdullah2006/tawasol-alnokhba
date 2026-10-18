@@ -318,11 +318,11 @@ export default function TaskBoard({
                                 </option>
                               ))}
                           </select>
-                        ) : (
+                        ) : !task.canWork ? (
                           <span className="text-[10px] text-slate-400">
-                            {task.canWork ? "بانتظار القرار" : "للقراءة"}
+                            للقراءة
                           </span>
-                        )}
+                        ) : null}
                       </div>
                     </article>
                   );
