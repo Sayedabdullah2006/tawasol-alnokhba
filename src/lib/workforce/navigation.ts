@@ -292,6 +292,8 @@ export const employeeModules: EmployeeModule[] = [
     adminArea:
       "دليل الموظفين: الملف الوظيفي والمستندات والعهد والتهيئة والمغادرة",
     screens: [
+      screen("profile/account", "حسابي وكلمة المرور", "", [], undefined, true),
+      screen("profile/business-card", "بطاقة العمل", "", [], undefined, true),
       screen(
         "profile",
         "بياناتي الشخصية والتواصل",

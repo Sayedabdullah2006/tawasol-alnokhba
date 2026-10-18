@@ -62,6 +62,7 @@ export default function WorkforceHeader({ admin }: { admin: boolean }) {
           className="flex items-center gap-2"
         >
           <NotificationBell admin={admin} />
+          <Link href={admin ? "/admin/workforce/profile" : "/employee/profile/account"} className="rounded-xl px-3 py-3 text-sm font-bold text-dark hover:bg-slate-100">حسابي</Link>
           <Link
             href={admin ? "/admin" : "/employee"}
             className="rounded-xl px-3 py-3 text-sm font-bold text-dark hover:bg-slate-100"

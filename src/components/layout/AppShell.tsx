@@ -10,6 +10,7 @@ import WorkforceHeader from "@/components/workforce/WorkforceHeader";
 /** Internal workspaces never mount customer navigation, marketing or promotions. */
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  if (pathname.startsWith("/card/")) return <>{children}</>;
   const employee =
     pathname === "/employee" || pathname.startsWith("/employee/");
   const workforceAdmin =
