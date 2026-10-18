@@ -17,7 +17,7 @@ const png=await readFile('.workforce-test/sample.png');let first,attachment;
 const cmd=(actor,id,command,payload,version=null)=>actor.request('/api/workforce/tasks',{method:'POST',body:JSON.stringify({id,command,payload,version,request_key:crypto.randomUUID()})});
 try{
  await check('requests: anonymous/client denied, all nine types submit with dates and amounts',async()=>{
- assert.equal((await fetch(base+'/api/workforce/requests')).status,401);assert.equal((await client.request('/api/workforce/requests')).status,403);
+ assert.equal((await fetch(base+'/api/workforce/requests')).status,401);assert.equal((await client.request('/api/workforce/requests')).status,403);assert.equal((await a.request('/api/workforce/requests',{method:'POST',body:form(),headers:{Origin:'https://example.org'}})).status,403);
  for(const kind of ['general','leave','permission','remote-work','expenses','advance','letter','payroll-review','attendance-correction']){const id=crypto.randomUUID();ids.push(id);const data=form(kind,id,kind==='general');await ok(await a.request('/api/workforce/requests',{method:'POST',body:data}));}
  first=ids[0];const data=await ok(await a.request('/api/workforce/requests?request='+first));assert.equal(data.requests[0].status,'pending');attachment=data.requests[0].attachments[0];assert(attachment);assert(!JSON.stringify(data).includes('object_path'));assert(!JSON.stringify(data).includes('fingerprint'));
  });

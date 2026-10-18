@@ -60,7 +60,17 @@ export function requireEmployeeAccess(
 }
 export function assertMutation(request: Request) {
   const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin)
+  if (!origin) return;
+  // Railway terminates TLS before Next. Validate against our configured public
+  // origin rather than the internal request scheme or untrusted forwarded headers.
+  const configured = process.env.NEXT_PUBLIC_SITE_URL;
+  const expected = configured
+    ? new URL(configured).origin
+    : new URL(request.url).origin;
+  const development =
+    process.env.NODE_ENV !== "production" &&
+    origin === new URL(request.url).origin;
+  if (origin !== expected && !development)
     throw new WorkforceError("مصدر الطلب غير مسموح", 403);
 }
 export function apiError(error: unknown) {
