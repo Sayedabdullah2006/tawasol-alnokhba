@@ -13,7 +13,7 @@ export default function EmployeeLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto flex w-full max-w-screen-2xl flex-col lg:flex-row lg:items-start lg:gap-4 lg:p-5">
+    <div className="mx-auto flex w-full max-w-screen-2xl flex-col">
       <EmployeeNavigation />
       <div className="min-w-0 flex-1">{children}</div>
     </div>

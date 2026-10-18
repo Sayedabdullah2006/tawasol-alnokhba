@@ -7,6 +7,7 @@ const links = [
   ["/admin/workforce/attendance", "الحضور والإجازات"],
   ["/admin/workforce/payroll", "الرواتب والحوافز"],
   ["/admin/workforce/approvals", "طلبات الموظفات"],
+  ["/admin/workforce/knowledge", "مركز المعرفة"],
   ["/admin/workforce/notifications", "الإشعارات"],
 ];
 export default function AdminNavigation() {

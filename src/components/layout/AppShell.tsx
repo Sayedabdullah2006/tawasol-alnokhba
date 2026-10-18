@@ -21,7 +21,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <WorkforceHeader admin={workforceAdmin} />
         <main
           id="workspace-main"
-          className="flex min-w-0 flex-1 flex-col pt-28 sm:pt-24"
+          className="flex min-w-0 flex-1 flex-col pt-[132px] sm:pt-24"
         >
           {children}
         </main>

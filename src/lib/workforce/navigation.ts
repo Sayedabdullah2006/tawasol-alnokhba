@@ -56,6 +56,13 @@ const screen = (
 
 export const employeeModules: EmployeeModule[] = [
   {
+    key: "knowledge",
+    title: "مركز المعرفة",
+    purpose: "",
+    adminArea: "مركز المعرفة",
+    screens: [screen("knowledge", "مركز المعرفة", "", [], undefined, true)],
+  },
+  {
     key: "work",
     title: "مهامي",
     purpose: "إدارة أعمالك اليومية والمشاريع التي تشارك فيها.",
