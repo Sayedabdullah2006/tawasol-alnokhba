@@ -276,12 +276,6 @@ export const employeeModules: EmployeeModule[] = [
         "طلب مراجعة نتيجة أو تقييم مع الدليل والتعليق.",
         ["performance/reviews"],
       ),
-      screen(
-        "requests/general",
-        "طلب إداري آخر",
-        "عنوان ووصف ومرفقات لطلب لا تغطيه الأنواع المحددة.",
-        ["requests/history"],
-      ),
     ],
   },
   {

@@ -402,7 +402,7 @@ export default function TaskBoard({
                   لا توجد مهام
                 </div>
               )}
-              {rows.length < (counts[kind] || 0) && (
+              {rows.length < (visibleCounts[kind] || 0) && (
                 <Button
                   type="button"
                   size="sm"
