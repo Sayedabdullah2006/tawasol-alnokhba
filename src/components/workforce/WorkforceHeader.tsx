@@ -6,6 +6,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase";
 import Button from "@/components/ui/Button";
 import NotificationBell from "./NotificationBell";
+import WorkforceTestMode from "./WorkforceTestMode";
 
 export default function WorkforceHeader({ admin }: { admin: boolean }) {
   const router = useRouter();
@@ -18,6 +19,11 @@ export default function WorkforceHeader({ admin }: { admin: boolean }) {
     setBusy(true);
     setError("");
     try {
+      await fetch("/api/workforce/test-mode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "leave" }),
+      });
       const { error: logoutError } = await createClient().auth.signOut();
       if (logoutError) throw logoutError;
       router.replace(`/auth/login?next=${home}`);
@@ -61,8 +67,16 @@ export default function WorkforceHeader({ admin }: { admin: boolean }) {
           aria-label={admin ? "تنقل إدارة الفريق" : "تنقل الموظف"}
           className="flex items-center gap-2"
         >
+          <WorkforceTestMode admin={admin} compact />
           <NotificationBell admin={admin} />
-          <Link href={admin ? "/admin/workforce/profile" : "/employee/profile/account"} className="rounded-xl px-3 py-3 text-sm font-bold text-dark hover:bg-slate-100">حسابي</Link>
+          <Link
+            href={
+              admin ? "/admin/workforce/profile" : "/employee/profile/account"
+            }
+            className="rounded-xl px-3 py-3 text-sm font-bold text-dark hover:bg-slate-100"
+          >
+            حسابي
+          </Link>
           <Link
             href={admin ? "/admin" : "/employee"}
             className="rounded-xl px-3 py-3 text-sm font-bold text-dark hover:bg-slate-100"

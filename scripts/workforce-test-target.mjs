@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
-/** Production mutation tests require both an explicit flag and the verified company origin. */
+/** Legacy suites are local-only: a production flag must never bypass quiet mode. */
 export function assertWorkforceTestTarget(base){
  const url=new URL(base);
  assert(!url.username&&!url.password&&!url.search&&!url.hash&&url.pathname==='/','Unexpected test URL');
- const local=['localhost','127.0.0.1'].includes(url.hostname);
- const production=process.env.WORKFORCE_ALLOW_PRODUCTION_TESTS==='1'&&url.origin==='https://nukhba.media';
- assert(local||production,'Production QA must be explicitly enabled for https://nukhba.media');
+ assert(['localhost','127.0.0.1'].includes(url.hostname),'Legacy workforce suites are local-only. Production tests must use a manager-issued quiet test run.');
+}
+/** Explicit API clients send this header on EVERY request in a quiet production run. */
+export function quietWorkforceTestHeaders(run){
+ assert(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(run||''),'A manager-issued quiet test run is required');
+ return {'x-workforce-test-run':run};
 }

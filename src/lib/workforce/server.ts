@@ -65,6 +65,19 @@ export function requireEmployeeAccess(
     throw new WorkforceError("الملف غير متاح", 404);
 }
 export function assertMutation(request: Request) {
+  const inTestMode =
+    request.headers.has("x-workforce-test-run") ||
+    /(?:^|;\s*)wf_test_run=/.test(request.headers.get("cookie") || "");
+  if (
+    inTestMode &&
+    !/^\/api\/workforce\/(?:test-mode|notifications|requests|tasks(?:\/[0-9a-f-]+\/attachments)?|checklist|comments|time|members|attachments\/[0-9a-f-]+)$/i.test(
+      new URL(request.url).pathname,
+    )
+  )
+    throw new WorkforceError(
+      "هذا القسم غير متاح في وضع اختبار المهام والطلبات الإدارية",
+      409,
+    );
   const origin = request.headers.get("origin");
   if (!origin) return;
   // Railway terminates TLS before Next. Validate against our configured public

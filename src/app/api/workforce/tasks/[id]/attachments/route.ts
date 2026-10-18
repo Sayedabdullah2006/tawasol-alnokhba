@@ -1,3 +1,4 @@
+import { requestTestRun, requireTestTask } from "@/lib/workforce/test-mode";
 import {
   apiError,
   assertMutation,
@@ -73,6 +74,7 @@ export async function POST(request: Request, context: Context) {
     assertMutation(request);
     const actor = await workforceActor(),
       taskId = uuid((await context.params).id);
+    await requireTestTask(actor, await requestTestRun(request, actor), taskId);
     const access = await attachmentTask(actor, taskId, true);
     const form = await attachmentForm(request);
     attachmentId = uuid(form.get("request_key"));

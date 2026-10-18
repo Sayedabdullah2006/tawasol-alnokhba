@@ -1,3 +1,4 @@
+import { requestTestRun } from "@/lib/workforce/test-mode";
 import { createHash, randomUUID } from "node:crypto";
 import {
   apiError,
@@ -88,9 +89,12 @@ export async function POST(request: Request) {
     const actor = await workforceActor();
     if (!actor.employee)
       throw new WorkforceError("هذا الإجراء للموظفة فقط", 403);
+    const testRun = await requestTestRun(request, actor);
     const form = await attachmentForm(request, 20 * 1024 * 1024),
       id = uuid(form.get("request_key")),
       kind = textField(form.get("kind"), "نوع الطلب", 1, 40);
+    if (testRun && kind !== "general")
+      throw new WorkforceError("اختر طلبًا إداريًا أثناء الاختبار", 400);
     if (!Object.hasOwn(REQUEST_KINDS, kind))
       throw new WorkforceError("نوع طلب غير صحيح");
     const attendance_session_id = form.get("attendance_session_id")
@@ -167,13 +171,14 @@ export async function POST(request: Request) {
     const service = await createServiceRoleClient();
     const previous = await service
       .from("wf_employee_requests")
-      .select("id,employee_id,fingerprint")
+      .select("id,employee_id,fingerprint,test_run_id")
       .eq("id", id)
       .maybeSingle();
     if (previous.error) throw previous.error;
     if (previous.data) {
       if (
         previous.data.employee_id !== actor.employee.id ||
+        (testRun !== null && previous.data.test_run_id !== testRun) ||
         previous.data.fingerprint !== fingerprint
       )
         throw new WorkforceError("مفتاح الطلب مستخدم لبيانات أخرى", 409);
@@ -214,6 +219,7 @@ export async function POST(request: Request) {
       const result = await service.from("wf_employee_requests").insert({
         id,
         employee_id: actor.employee.id,
+        test_run_id: testRun,
         kind,
         title,
         body,
@@ -249,13 +255,19 @@ export async function PATCH(request: Request) {
       throw new WorkforceError("قرار غير صحيح");
     if (actor.role !== "admin" && decision !== "cancelled")
       throw new WorkforceError("القرار للإدارة فقط", 403);
+    const testRun = await requestTestRun(request, actor);
     const visible = await actor.db
       .from("wf_employee_requests")
-      .select("id")
+      .select("id,test_run_id")
       .eq("id", id)
       .maybeSingle();
     if (visible.error) throw visible.error;
     if (!visible.data) throw new WorkforceError("الطلب غير متاح", 404);
+    if (testRun && visible.data.test_run_id !== testRun)
+      throw new WorkforceError(
+        "هذا الطلب حقيقي. اخرج من وضع الاختبار للتعديل عليه",
+        409,
+      );
     const reason =
       decision === "cancelled"
         ? "ألغت الموظفة الطلب"

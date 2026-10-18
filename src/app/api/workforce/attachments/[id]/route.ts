@@ -1,3 +1,4 @@
+import { requestTestRun, requireTestTask } from "@/lib/workforce/test-mode";
 import {
   apiError,
   assertMutation,
@@ -69,6 +70,11 @@ export async function PATCH(request: Request, context: Context) {
       .maybeSingle();
     if (error) throw error;
     if (!file) throw new WorkforceError("المرفق غير متاح", 404);
+    await requireTestTask(
+      actor,
+      await requestTestRun(request, actor),
+      file.task_id,
+    );
     await attachmentTask(actor, file.task_id, true);
     const service = await createServiceRoleClient();
     const result = await service.rpc("wf_attachment_command", {

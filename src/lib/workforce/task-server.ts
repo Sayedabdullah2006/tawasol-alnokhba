@@ -5,6 +5,7 @@ import {
   createServiceRoleClient,
   workforceActor,
 } from "./server";
+import { requestTestRun, requireTestTask } from "./test-mode";
 import { textField, uuid, WorkforceError } from "./validation";
 
 export const privateResponse = (body: unknown, status = 200) =>
@@ -72,14 +73,26 @@ export async function workCommand(
     )
       throw new WorkforceError("بيانات الإجراء غير صحيحة أو كبيرة جدًا");
     const service = await createServiceRoleClient();
-    const { data, error } = await service.rpc(`wf_${scope}_command`, {
-      p_actor: actor.user.id,
-      p_id: id,
-      p_version: command === "create" ? null : input.version,
-      p_command: command,
-      p_payload: input.payload,
-      p_key: key,
-    });
+    const testRun = await requestTestRun(request, actor);
+    if (testRun && scope !== "task") {
+      if (!["checklist", "comments", "time", "members"].includes(scope))
+        throw new WorkforceError("هذا الإجراء غير متاح في جولة الاختبار", 409);
+      await requireTestTask(actor, testRun, id);
+    }
+    const { data, error } = await service.rpc(
+      testRun && scope === "task"
+        ? "wf_test_task_command"
+        : `wf_${scope}_command`,
+      {
+        ...(testRun && scope === "task" ? { p_run: testRun } : {}),
+        p_actor: actor.user.id,
+        p_id: id,
+        p_version: command === "create" ? null : input.version,
+        p_command: command,
+        p_payload: input.payload,
+        p_key: key,
+      },
+    );
     if (error) throw error;
     return privateResponse(data);
   } catch (error) {
