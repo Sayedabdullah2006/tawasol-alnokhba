@@ -2,7 +2,6 @@ import {
   apiError,
   assertMutation,
   createServiceRoleClient,
-  requireAdmin,
   workforceActor,
 } from "@/lib/workforce/server";
 import { privateResponse } from "@/lib/workforce/task-server";
@@ -12,7 +11,8 @@ export async function POST(request: Request) {
   try {
     assertMutation(request);
     const actor = await workforceActor();
-    requireAdmin(actor);
+    if (!actor.canManageTasks)
+      throw new WorkforceError("ليس لديك صلاحية إسناد المهام", 403);
     const body = await request.json();
     if (
       !body ||

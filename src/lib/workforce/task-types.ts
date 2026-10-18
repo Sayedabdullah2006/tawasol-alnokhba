@@ -39,6 +39,8 @@ export type WorkTask = {
   description: string;
   completion_criteria: string;
   assignee_id: string | null;
+  assignee_admin_id?: string | null;
+  canEdit?: boolean;
   assignment_origin: "admin" | "self";
   priority: keyof typeof TASK_PRIORITIES;
   starts_at: string | null;
@@ -73,6 +75,9 @@ export type TaskDetail = {
   canWork: boolean;
   canEdit: boolean;
   canReview: boolean;
+  canAssign: boolean;
+  canArchive: boolean;
+  canConfigureChecklist: boolean;
   assigneeName: string | null;
   latestSubmission: TaskSubmission | null;
   checklist: ChecklistItem[];

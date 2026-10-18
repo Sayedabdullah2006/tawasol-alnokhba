@@ -268,7 +268,7 @@ export default function TaskDetail({
             تعديل تفاصيل المهمة
           </Button>
         )}
-        {data.canEdit && !board.board.archived_at && !reviewing && (
+        {data.canArchive && !board.board.archived_at && !reviewing && (
           <Button
             type="button"
             variant="outline"
@@ -368,7 +368,7 @@ export default function TaskDetail({
               <TaskChecklist
                 items={data.checklist}
                 version={task.version}
-                canEdit={data.canEdit}
+                canEdit={data.canConfigureChecklist}
                 canWork={data.canWork}
                 frozen={frozen || reviewing || done}
                 busy={busy}
@@ -679,7 +679,7 @@ export default function TaskDetail({
             try {
               void command(
                 "edit",
-                taskPayload(form, admin),
+                taskPayload(form, admin, data.canAssign),
                 "تم حفظ تفاصيل المهمة",
                 editVersion,
               );
@@ -688,7 +688,12 @@ export default function TaskDetail({
             }
           }}
         >
-          <TaskFields value={form} onChange={setForm} admin={admin} />
+          <TaskFields
+            value={form}
+            onChange={setForm}
+            admin={admin}
+            canAssign={data.canAssign}
+          />
           <Notice message={error} error />
           <Button type="submit" loading={busy}>
             حفظ تفاصيل المهمة

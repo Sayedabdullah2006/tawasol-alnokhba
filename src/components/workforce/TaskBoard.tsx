@@ -388,7 +388,7 @@ export default function TaskBoard({
                           </select>
                         ) : !task.canWork ? (
                           <span className="text-[10px] text-slate-400">
-                            للقراءة
+                            {task.canEdit ? "يمكنك تعديل التكليف" : "للقراءة"}
                           </span>
                         ) : null}
                       </div>

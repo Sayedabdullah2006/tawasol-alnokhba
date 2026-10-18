@@ -44,7 +44,13 @@ export const workforceActor = cache(async function workforceActor() {
       );
     employee = data as Employee;
   }
-  return { user, role, employee, db };
+  return {
+    user,
+    role,
+    employee,
+    db,
+    canManageTasks: role === "admin" || employee?.can_manage_tasks === true,
+  };
 });
 export type WorkforceActor = Awaited<ReturnType<typeof workforceActor>>;
 export function requireAdmin(actor: WorkforceActor) {

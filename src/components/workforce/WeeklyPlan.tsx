@@ -51,7 +51,7 @@ export default function WeeklyPlan({
             setError("");
             try {
               if (employees.some((id) => !id) || employees[0] === employees[1])
-                throw new Error("اختاري موظفتين مختلفتين");
+                throw new Error("اختاري مسؤولين مختلفين");
               if (new Date(`${weekDate(start, 0)}T00:00:00Z`).getUTCDay() !== 0)
                 throw new Error("اختاري يوم الأحد لبداية الأسبوع");
               const tasks = rows.map((row) => ({
@@ -59,7 +59,12 @@ export default function WeeklyPlan({
                 title: row.title,
                 client_name: row.client_name,
                 completion_criteria: row.completion_criteria,
-                assignee_id: employees[row.employee],
+                assignee_id: employees[row.employee].startsWith("admin:")
+                  ? null
+                  : employees[row.employee],
+                assignee_admin_id: employees[row.employee].startsWith("admin:")
+                  ? employees[row.employee].slice(6)
+                  : null,
                 starts_at: `${weekDate(start, row.day)}T09:00:00+03:00`,
                 due_at: `${weekDate(start, row.day)}T16:00:00+03:00`,
                 requires_approval: true,
@@ -89,9 +94,10 @@ export default function WeeklyPlan({
           />
           {employees.map((id, index) => (
             <EmployeePicker
+              includeAdmins
               key={index}
               value={id}
-              title={`الموظفة ${index === 0 ? "الأولى" : "الثانية"}`}
+              title={`المسؤول ${index === 0 ? "الأول" : "الثاني"}`}
               onChange={(id) =>
                 setEmployees((previous) =>
                   previous.map((value, i) => (i === index ? id : value)),
@@ -105,8 +111,8 @@ export default function WeeklyPlan({
               className="space-y-3 rounded-xl border border-border p-4"
             >
               <legend className="font-bold">
-                {WEEK_DAYS[row.day]} · الموظفة{" "}
-                {row.employee === 0 ? "الأولى" : "الثانية"}
+                {WEEK_DAYS[row.day]} · المسؤول{" "}
+                {row.employee === 0 ? "الأول" : "الثاني"}
               </legend>
               {(
                 [
@@ -145,7 +151,7 @@ export default function WeeklyPlan({
           ))}
           <Notice message={error} error />
           <Button type="submit" loading={busy}>
-            إسناد المهام العشر وإشعار الموظفتين
+            إسناد المهام وإشعار المسؤولين
           </Button>
         </form>
       </Dialog>

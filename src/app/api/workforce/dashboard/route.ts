@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     const { data, error } = await actor.db.rpc("wf_admin_dashboard", {
       p_from: from,
       p_to: to,
-      p_employee: employee ? uuid(employee) : null,
+      p_employee: employee ? uuid(employee.replace(/^admin:/, "")) : null,
       p_client:
         textField(params.get("client_name") ?? "", "العميل", 0, 150) || null,
     });

@@ -30,7 +30,9 @@ export const taskForm = (task?: WorkTask): TaskForm => ({
   title: task?.title ?? "",
   description: task?.description ?? "",
   completion_criteria: task?.completion_criteria ?? "",
-  assignee_id: task?.assignee_id ?? "",
+  assignee_id: task?.assignee_admin_id
+    ? `admin:${task.assignee_admin_id}`
+    : (task?.assignee_id ?? ""),
   priority: task?.priority ?? "normal",
   starts_at: localDate(task?.starts_at ?? null),
   due_at: localDate(task?.due_at ?? null),
@@ -38,7 +40,7 @@ export const taskForm = (task?: WorkTask): TaskForm => ({
   requires_approval: task?.requires_approval ?? true,
   shared_with_board: task?.shared_with_board ?? false,
 });
-export function taskPayload(form: TaskForm, admin: boolean) {
+export function taskPayload(form: TaskForm, admin: boolean, canAssign = admin) {
   const date = (value: string) => {
     if (!value) return null;
     dateField(value.slice(0, 10));
@@ -54,10 +56,15 @@ export function taskPayload(form: TaskForm, admin: boolean) {
     due_at: date(form.due_at),
     estimate_minutes:
       form.estimate_minutes === "" ? null : Number(form.estimate_minutes),
-    ...(admin
+    ...(canAssign
       ? {
-          assignee_id: form.assignee_id || null,
-          requires_approval: form.requires_approval,
+          assignee_id: form.assignee_id.startsWith("admin:")
+            ? null
+            : form.assignee_id || null,
+          assignee_admin_id: form.assignee_id.startsWith("admin:")
+            ? form.assignee_id.slice(6)
+            : null,
+          requires_approval: admin ? form.requires_approval : true,
           shared_with_board: form.shared_with_board,
         }
       : {}),
@@ -68,11 +75,13 @@ export function EmployeePicker({
   onChange,
   title = "المسؤول الأساسي",
   selectLabel = "اختيار المسؤول",
+  includeAdmins = false,
 }: {
   value: string;
   onChange: (id: string, name?: string) => void;
   title?: string;
   selectLabel?: string;
+  includeAdmins?: boolean;
 }) {
   const pickerId = useId();
   const [search, setSearch] = useState("");
@@ -83,7 +92,7 @@ export function EmployeePicker({
   useEffect(() => {
     const abort = new AbortController();
     api<{ employees: typeof rows; count: number }>(
-      `/api/workforce/employees?status=active&q=${encodeURIComponent(search)}&page=${page}&sort=name`,
+      `/api/workforce/team?q=${encodeURIComponent(search)}&page=${page}${includeAdmins ? "&assignable=true" : ""}`,
       { signal: abort.signal },
     )
       .then((data) => {
@@ -95,7 +104,7 @@ export function EmployeePicker({
         if (e.name !== "AbortError") setError(e.message);
       });
     return () => abort.abort();
-  }, [search, page]);
+  }, [search, page, includeAdmins]);
   return (
     <fieldset className="space-y-3 rounded-xl border border-border p-3">
       <legend className="font-bold">{title}</legend>
@@ -109,7 +118,7 @@ export function EmployeePicker({
             setPage(1);
             setSearch(e.target.value);
           }}
-          placeholder="الاسم أو المسمى…"
+          placeholder="الاسم…"
         />
       </Field>
       <Field label={selectLabel} id={`${pickerId}-assignee`}>
@@ -124,7 +133,7 @@ export function EmployeePicker({
             )
           }
         >
-          <option value="">اختر موظفًا أو اتركه دون اختيار</option>
+          <option value="">اختر المسؤول</option>
           {value && !rows.some((row) => row.id === value) && (
             <option value={value}>الموظف المحدد حاليًا</option>
           )}
@@ -165,10 +174,12 @@ export default function TaskFields({
   value,
   onChange,
   admin,
+  canAssign = admin,
 }: {
   value: TaskForm;
   onChange: (value: TaskForm) => void;
   admin: boolean;
+  canAssign?: boolean;
 }) {
   const change = (patch: Partial<TaskForm>) => onChange({ ...value, ...patch });
   const when = (field: "starts_at" | "due_at", label: string) => (
@@ -252,8 +263,9 @@ export default function TaskFields({
           placeholder="ما النتيجة المطلوبة لقبول المهمة؟"
         />
       </Field>
-      {admin && (
+      {canAssign && (
         <EmployeePicker
+          includeAdmins
           value={value.assignee_id}
           onChange={(id) => change({ assignee_id: id })}
         />

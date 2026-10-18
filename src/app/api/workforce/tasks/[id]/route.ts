@@ -46,7 +46,13 @@ export async function GET(
             .select("full_name")
             .eq("id", task.assignee_id)
             .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
+        : task.assignee_admin_id
+          ? service
+              .from("wf_task_assignment_admins")
+              .select("full_name:display_name")
+              .eq("user_id", task.assignee_admin_id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
     ]);
     for (const result of [submissionResult, checklistResult, assignee])
       if (result.error) throw result.error;
@@ -68,11 +74,22 @@ export async function GET(
       canWork:
         actor.role === "admin" || task.assignee_id === actor.employee?.id,
       canEdit:
-        actor.role === "admin" ||
+        actor.canManageTasks ||
         (task.assignment_origin === "self" &&
           task.created_by === actor.user.id &&
           task.assignee_id === actor.employee?.id),
       canReview: actor.role === "admin",
+      canAssign: actor.canManageTasks,
+      canArchive:
+        actor.role === "admin" ||
+        (task.assignment_origin === "self" &&
+          task.created_by === actor.user.id &&
+          task.assignee_id === actor.employee?.id),
+      canConfigureChecklist:
+        actor.role === "admin" ||
+        (task.assignment_origin === "self" &&
+          task.created_by === actor.user.id &&
+          task.assignee_id === actor.employee?.id),
     });
   } catch (error) {
     return apiError(error);

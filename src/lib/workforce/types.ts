@@ -11,6 +11,7 @@ export type Employee = {
   department_id: string | null;
   job_title: string;
   responsibilities: string;
+  can_manage_tasks: boolean;
   national_id?: string;
   birth_date?: string | null;
   qualification?: string;

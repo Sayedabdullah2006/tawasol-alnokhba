@@ -26,6 +26,7 @@ import {
 
 export default function TaskWorkspace({
   admin,
+  canManageTasks = admin,
   employeeId,
   embedded = false,
   onOpenTask,
@@ -34,6 +35,7 @@ export default function TaskWorkspace({
   clients = [],
 }: {
   admin: boolean;
+  canManageTasks?: boolean;
   userId: string;
   employeeId?: string;
   embedded?: boolean;
@@ -113,9 +115,12 @@ export default function TaskWorkspace({
   }
   useEffect(() => {
     const abort = new AbortController();
-    api<{ employees: typeof employees }>("/api/workforce/team", {
-      signal: abort.signal,
-    })
+    api<{ employees: typeof employees }>(
+      `/api/workforce/team${canManageTasks ? "?assignable=true" : ""}`,
+      {
+        signal: abort.signal,
+      },
+    )
       .then((result) => {
         setEmployees(result.employees);
         setTeamError("");
@@ -124,7 +129,7 @@ export default function TaskWorkspace({
         if (e.name !== "AbortError") setTeamError(e.message);
       });
     return () => abort.abort();
-  }, []);
+  }, [canManageTasks]);
   useEffect(() => {
     const abort = new AbortController();
     const requestParams = new URLSearchParams(query);
@@ -184,7 +189,7 @@ export default function TaskWorkspace({
         <div>
           <Heading className="text-2xl font-black">المهام</Heading>
         </div>
-        {admin && (
+        {canManageTasks && (
           <div className="flex flex-wrap gap-3">
             <Button
               id="workforce-add-task"
@@ -521,7 +526,7 @@ export default function TaskWorkspace({
                   }
                   className="inline-block py-2 text-sm font-bold text-green"
                 >
-                  {item.canWork
+                  {item.canWork || item.canEdit
                     ? "فتح المهمة والإجراءات"
                     : "عرض المهمة — للقراءة فقط"}{" "}
                   ←
@@ -560,7 +565,7 @@ export default function TaskWorkspace({
             try {
               if (!task.assignee_id)
                 throw new Error("اختاري الموظفة المسؤولة عن المهمة");
-              const payload = taskPayload(task, admin),
+              const payload = taskPayload(task, admin, canManageTasks),
                 serialized = JSON.stringify(payload);
               if (retry.current.serialized !== serialized)
                 retry.current = { serialized, key: crypto.randomUUID() };
@@ -587,7 +592,12 @@ export default function TaskWorkspace({
             }
           }}
         >
-          <TaskFields value={task} onChange={setTask} admin={admin} />
+          <TaskFields
+            value={task}
+            onChange={setTask}
+            admin={admin}
+            canAssign={canManageTasks}
+          />
           <Notice message={error} error />
           <Button type="submit" loading={busy}>
             إسناد المهمة

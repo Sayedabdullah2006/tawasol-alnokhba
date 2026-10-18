@@ -71,7 +71,11 @@ export async function GET(request: Request) {
         "parent_id",
       ]) {
         const value = params.get(field);
-        if (value) query = query.eq(field, uuid(value));
+        if (value)
+          query =
+            field === "assignee_id" && value.startsWith("admin:")
+              ? query.eq("assignee_admin_id", uuid(value.slice(6)))
+              : query.eq(field, uuid(value));
       }
       const priority = params.get("priority");
       if (priority) {
@@ -151,7 +155,10 @@ export async function GET(request: Request) {
       ...new Set((data ?? []).map((task) => task.assignee_id).filter(Boolean)),
     ];
     const boardIds = [...new Set(data.map((task) => task.board_id))];
-    const [names, columns] = await Promise.all([
+    const adminIds = [
+      ...new Set(data.map((task) => task.assignee_admin_id).filter(Boolean)),
+    ];
+    const [names, columns, adminNames] = await Promise.all([
       ids.length
         ? service.from("wf_employees").select("id,full_name").in("id", ids)
         : Promise.resolve({ data: [], error: null }),
@@ -163,16 +170,30 @@ export async function GET(request: Request) {
             .is("archived_at", null)
             .order("position")
         : Promise.resolve({ data: [], error: null }),
+      adminIds.length
+        ? service
+            .from("wf_task_assignment_admins")
+            .select("user_id,display_name")
+            .in("user_id", adminIds)
+        : Promise.resolve({ data: [], error: null }),
     ]);
     if (columns.error) throw columns.error;
     if (names.error) throw names.error;
+    if (adminNames.error) throw adminNames.error;
     const nameMap = new Map(
       (names.data ?? []).map((row) => [row.id, row.full_name]),
+    );
+    const adminNameMap = new Map(
+      (adminNames.data || []).map((row) => [row.user_id, row.display_name]),
     );
     return privateResponse({
       tasks: (data ?? []).map((task) => ({
         ...task,
-        assigneeName: nameMap.get(task.assignee_id) ?? null,
+        assigneeName:
+          (task.assignee_admin_id
+            ? adminNameMap.get(task.assignee_admin_id)
+            : nameMap.get(task.assignee_id)) ?? null,
+        canEdit: actor.canManageTasks,
         canWork:
           actor.role === "admin" || task.assignee_id === actor.employee?.id,
       })),
