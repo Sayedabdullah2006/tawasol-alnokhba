@@ -4,6 +4,7 @@ import Link from "next/link";
 import Button from "@/components/ui/Button";
 import { workDate } from "@/lib/workforce/task-types";
 import { api, Notice } from "./shared";
+import NotificationDelivery from "./NotificationDelivery";
 type Notification = {
   id: string;
   title: string;
@@ -13,7 +14,11 @@ type Notification = {
   created_at: string;
 };
 type Result = { notifications: Notification[]; count: number; unread: number };
-export default function NotificationCenter() {
+export default function NotificationCenter({
+  admin = false,
+}: {
+  admin?: boolean;
+}) {
   const [data, setData] = useState<Result | null>(null),
     [error, setError] = useState("");
   const [page, setPage] = useState(1),
@@ -63,6 +68,7 @@ export default function NotificationCenter() {
   return (
     <section className="mx-auto w-full min-w-0 max-w-4xl space-y-5 p-4 md:p-8">
       <h1 className="text-3xl font-black">الإشعارات</h1>
+      {admin && <NotificationDelivery />}
 
       <div className="flex flex-wrap items-center gap-4">
         <label className="flex gap-2">
