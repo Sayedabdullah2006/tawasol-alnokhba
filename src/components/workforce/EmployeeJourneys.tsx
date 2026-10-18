@@ -75,6 +75,7 @@ export default function EmployeeJourneys({
     [loaded, setLoaded] = useState("");
   const [editor, setEditor] = useState<{
       command: string;
+      id: string;
       row?: JourneyItem;
     } | null>(null),
     [fields, setFields] = useState<Record<string, string>>({}),
@@ -82,6 +83,7 @@ export default function EmployeeJourneys({
     [prefDirty, setPrefDirty] = useState(false),
     [formDirty, setFormDirty] = useState(false);
   const lock = useRef(false),
+    retry = useRef<{ signature: string; key: string } | null>(null),
     { confirm, confirmation } = useConfirm(),
     key = `${section}:${page}:${filter}:${status}:${revision}`,
     loading = key !== loaded;
@@ -129,7 +131,8 @@ export default function EmployeeJourneys({
       parent_id: data?.reviews[0]?.id || "",
       source_request: "",
     });
-    setEditor({ command, row });
+    setEditor({ command, row, id: row?.id || crypto.randomUUID() });
+    retry.current = null;
     setFormDirty(false);
     setError("");
     setMessage("");
@@ -151,17 +154,27 @@ export default function EmployeeJourneys({
     setError("");
     setMessage("");
     try {
+      const id = row?.id || editor?.id || crypto.randomUUID();
+      const signature = JSON.stringify({
+        id,
+        version: row?.version || 0,
+        command,
+        payload,
+      });
+      if (retry.current?.signature !== signature)
+        retry.current = { signature, key: crypto.randomUUID() };
       await api("/api/workforce/journeys", {
         method: "POST",
         body: JSON.stringify({
-          id: row?.id || crypto.randomUUID(),
+          id,
           version: row?.version || 0,
           command,
           payload,
-          request_key: crypto.randomUUID(),
+          request_key: retry.current.key,
         }),
       });
       setEditor(null);
+      retry.current = null;
       setFormDirty(false);
       setMessage("تم الحفظ");
       setRevision((n) => n + 1);
