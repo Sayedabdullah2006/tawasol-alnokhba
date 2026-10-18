@@ -66,7 +66,7 @@ export async function GET(request: Request) {
           .maybeSingle(),
         actor.db
           .from("wf_attendance_settings")
-          .select("workdays,starts_at,ends_at")
+          .select("workdays,starts_at,ends_at,schedule_mode,daily_minutes")
           .eq("employee_id", id)
           .maybeSingle(),
         actor.db
@@ -115,6 +115,8 @@ export async function GET(request: Request) {
         workdays: [0, 1, 2, 3, 4],
         starts_at: "09:00",
         ends_at: "17:00",
+        schedule_mode: "fixed",
+        daily_minutes: 480,
       },
       leave: { year, granted, used, available: granted - used },
       approved: approved.data || [],
@@ -156,6 +158,10 @@ export async function PATCH(request: Request) {
     requireAdmin(actor);
     const body = await request.json(),
       id = uuid(body.employee_id);
+    const scheduleMode = body.schedule_mode ?? "fixed";
+    const dailyMinutes = body.daily_minutes ?? 480;
+    if (!["fixed", "flexible"].includes(scheduleMode) || !Number.isInteger(dailyMinutes) || dailyMinutes < 60 || dailyMinutes > 960)
+      throw new WorkforceError("حدد نوع الدوام وساعات العمل اليومية");
     if (
       !Array.isArray(body.workdays) ||
       !body.workdays.length ||
@@ -167,9 +173,10 @@ export async function PATCH(request: Request) {
     )
       throw new WorkforceError("أيام العمل غير صحيحة");
     if (
+      scheduleMode === "fixed" && (
       !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.starts_at) ||
       !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.ends_at) ||
-      body.ends_at <= body.starts_at
+      body.ends_at <= body.starts_at)
     )
       throw new WorkforceError("ساعات الدوام غير صحيحة");
     if (
@@ -186,8 +193,10 @@ export async function PATCH(request: Request) {
         p_actor: actor.user.id,
         p_employee: id,
         p_workdays: [...new Set(body.workdays)],
-        p_start: body.starts_at,
-        p_end: body.ends_at,
+        p_start: scheduleMode === "flexible" ? "09:00" : body.starts_at,
+        p_end: scheduleMode === "flexible" ? "17:00" : body.ends_at,
+        p_mode: scheduleMode,
+        p_minutes: dailyMinutes,
         p_year: body.year,
         p_days: Number(body.days),
         p_reason: textField(body.reason, "سبب التعديل", 3, 2000),

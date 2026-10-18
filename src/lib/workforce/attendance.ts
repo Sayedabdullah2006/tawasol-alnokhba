@@ -23,7 +23,7 @@ export type AttendanceData = {
   count: number;
   page: number;
   open: AttendanceSession | null;
-  settings: { workdays: number[]; starts_at: string; ends_at: string };
+  settings: { workdays: number[]; starts_at: string; ends_at: string; schedule_mode: "fixed" | "flexible"; daily_minutes: number };
   leave: { year: number; granted: number; used: number; available: number };
   approved: {
     id: string;

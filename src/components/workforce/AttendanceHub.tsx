@@ -37,6 +37,8 @@ export default function AttendanceHub({
       workdays: [0, 1, 2, 3, 4],
       starts_at: "09:00",
       ends_at: "17:00",
+      schedule_mode: "fixed",
+      daily_minutes: 480,
       days: "0",
       reason: "",
     });
@@ -318,10 +320,10 @@ export default function AttendanceHub({
                     </span>
                   ))}
                 </div>
-                <p className="text-lg font-black" dir="ltr">
+                {data.settings.schedule_mode === "flexible" ? <p className="text-lg font-black">دوام مرن · {data.settings.daily_minutes / 60} ساعات يوميًا</p> : <p className="text-lg font-black" dir="ltr">
                   {data.settings.starts_at.slice(0, 5)} —{" "}
                   {data.settings.ends_at.slice(0, 5)}
-                </p>
+                </p>}
                 {!admin && (
                   <Link
                     href="/employee/requests/remote-work"
@@ -372,6 +374,8 @@ export default function AttendanceHub({
                         workdays: data.settings.workdays,
                         starts_at: data.settings.starts_at.slice(0, 5),
                         ends_at: data.settings.ends_at.slice(0, 5),
+                        schedule_mode: data.settings.schedule_mode,
+                        daily_minutes: data.settings.daily_minutes,
                         days: String(data.leave.granted),
                         reason: "",
                       });
@@ -437,7 +441,12 @@ export default function AttendanceHub({
                       </div>
                     </fieldset>
                     <div className="grid gap-4 sm:grid-cols-3">
-                      {[
+                      <Field id="schedule-mode" label="نوع الدوام">
+                        <select id="schedule-mode" className={controlClass} value={settings.schedule_mode} onChange={(e) => setSettings((current) => ({...current, schedule_mode:e.target.value}))}>
+                          <option value="fixed">مواعيد ثابتة</option><option value="flexible">دوام مرن</option>
+                        </select>
+                      </Field>
+                      {settings.schedule_mode === "flexible" ? <Field id="daily-hours" label="الساعات اليومية"><input id="daily-hours" type="number" min="1" max="16" step="0.5" required className={controlClass} value={settings.daily_minutes / 60} onChange={(e) => setSettings((current) => ({...current,daily_minutes:Number(e.target.value)*60}))} /></Field> : [
                         ["starts_at", "بداية الدوام"],
                         ["ends_at", "نهاية الدوام"],
                       ].map(([key, label]) => (
