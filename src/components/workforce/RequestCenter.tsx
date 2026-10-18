@@ -38,10 +38,12 @@ export default function RequestCenter({
   admin = false,
   initialKind = "general",
   startNew = false,
+  initialTab = "requests",
 }: {
   admin?: boolean;
   initialKind?: string;
   startNew?: boolean;
+  initialTab?: string;
 }) {
   const [rows, setRows] = useState<EmployeeRequest[]>([]),
     [count, setCount] = useState(0),
@@ -53,7 +55,10 @@ export default function RequestCenter({
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
     [open, setOpen] = useState(startNew),
-    [tab, setTab] = useState("requests");
+    [tab, setTab] = useState(initialTab);
+  const [profileVisited, setProfileVisited] = useState(
+    initialTab === "profile",
+  );
   const [form, setForm] = useState(initialForm(initialKind)),
     [files, setFiles] = useState<File[]>([]),
     [reasons, setReasons] = useState<Record<string, string>>({}),
@@ -191,7 +196,10 @@ export default function RequestCenter({
             </Button>
             <Button
               variant={tab === "profile" ? "primary" : "outline"}
-              onClick={() => setTab("profile")}
+              onClick={() => {
+                setProfileVisited(true);
+                setTab("profile");
+              }}
             >
               تعديل البيانات
             </Button>
@@ -207,219 +215,220 @@ export default function RequestCenter({
       </nav>
       <Notice message={error} error />
       <Notice message={message} />
-      {tab === "profile" ? (
-        <ProfileApprovals />
-      ) : (
-        <>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <select
-              aria-label="حالة الطلبات"
-              className="rounded-xl border bg-white p-3 text-sm"
-              value={status}
-              onChange={(e) => {
-                setStatus(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="">كل الحالات</option>
-              {Object.entries(REQUEST_STATUS).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setFocusOnly(false);
-                setRevision((n) => n + 1);
-              }}
-            >
-              تحديث{focusOnly ? " · كل الطلبات" : ""}
-            </Button>
+      {profileVisited && (
+        <section hidden={tab !== "profile"}>
+          <ProfileApprovals />
+        </section>
+      )}
+      <section hidden={tab !== "requests"} className="space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <select
+            aria-label="حالة الطلبات"
+            className="rounded-xl border bg-white p-3 text-sm"
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">كل الحالات</option>
+            {Object.entries(REQUEST_STATUS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setFocusOnly(false);
+              setRevision((n) => n + 1);
+            }}
+          >
+            تحديث{focusOnly ? " · كل الطلبات" : ""}
+          </Button>
+        </div>
+        {loading && !rows.length ? (
+          <p role="status">جارٍ التحميل…</p>
+        ) : !rows.length ? (
+          <div className="rounded-2xl border bg-white p-8 text-center text-sm text-muted">
+            لا توجد طلبات
           </div>
-          {loading && !rows.length ? (
-            <p role="status">جارٍ التحميل…</p>
-          ) : !rows.length ? (
-            <div className="rounded-2xl border bg-white p-8 text-center text-sm text-muted">
-              لا توجد طلبات
-            </div>
-          ) : (
-            rows.map((row) => (
-              <article
-                key={row.id}
-                className="space-y-4 rounded-2xl border border-border bg-white p-5"
-              >
-                <div className="flex flex-wrap justify-between gap-2">
-                  <span className="text-xs text-muted">
-                    {REQUEST_KINDS[row.kind]}
-                    {row.kind === "leave"
-                      ? row.leave_type === "unpaid"
-                        ? " · بدون راتب"
-                        : " · سنوية"
-                      : ""}
-                    {admin ? ` · ${row.employeeName || ""}` : ""}
-                  </span>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-bold ${row.status === "pending" ? "bg-amber-50 text-amber-800" : row.status === "approved" ? "bg-green-50 text-green-800" : "bg-slate-100 text-slate-600"}`}
-                  >
-                    {REQUEST_STATUS[row.status]}
-                  </span>
-                </div>
-                <h2 className="font-black">{row.title}</h2>
-                <p className="whitespace-pre-wrap break-words text-sm leading-7">
-                  {row.body}
-                </p>
-                <div className="flex flex-wrap gap-4 text-xs text-muted">
-                  <time>
-                    {new Date(row.created_at).toLocaleDateString("ar-SA", {
+        ) : (
+          rows.map((row) => (
+            <article
+              key={row.id}
+              className="space-y-4 rounded-2xl border border-border bg-white p-5"
+            >
+              <div className="flex flex-wrap justify-between gap-2">
+                <span className="text-xs text-muted">
+                  {REQUEST_KINDS[row.kind]}
+                  {row.kind === "leave"
+                    ? row.leave_type === "unpaid"
+                      ? " · بدون راتب"
+                      : " · سنوية"
+                    : ""}
+                  {admin ? ` · ${row.employeeName || ""}` : ""}
+                </span>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-bold ${row.status === "pending" ? "bg-amber-50 text-amber-800" : row.status === "approved" ? "bg-green-50 text-green-800" : "bg-slate-100 text-slate-600"}`}
+                >
+                  {REQUEST_STATUS[row.status]}
+                </span>
+              </div>
+              <h2 className="font-black">{row.title}</h2>
+              <p className="whitespace-pre-wrap break-words text-sm leading-7">
+                {row.body}
+              </p>
+              <div className="flex flex-wrap gap-4 text-xs text-muted">
+                <time>
+                  {new Date(row.created_at).toLocaleDateString("ar-SA", {
+                    calendar: "gregory",
+                  })}
+                </time>
+                {row.starts_at && (
+                  <span>
+                    {new Date(row.starts_at).toLocaleString("ar-SA", {
                       calendar: "gregory",
-                    })}
-                  </time>
-                  {row.starts_at && (
-                    <span>
-                      {new Date(row.starts_at).toLocaleString("ar-SA", {
+                      timeZone: "Asia/Riyadh",
+                    })}{" "}
+                    ←{" "}
+                    {row.ends_at &&
+                      new Date(row.ends_at).toLocaleString("ar-SA", {
                         calendar: "gregory",
                         timeZone: "Asia/Riyadh",
-                      })}{" "}
-                      ←{" "}
-                      {row.ends_at &&
-                        new Date(row.ends_at).toLocaleString("ar-SA", {
-                          calendar: "gregory",
-                          timeZone: "Asia/Riyadh",
-                        })}
-                    </span>
-                  )}
-                  {row.amount && (
-                    <strong className="text-dark">
-                      {Number(row.amount).toLocaleString("ar-SA")} ر.س
-                    </strong>
-                  )}
-                </div>
-                {!!row.attachments.length && (
-                  <ul className="space-y-2">
-                    {row.attachments.map((file) => (
-                      <li
-                        key={file.id}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 p-3 text-sm"
-                      >
-                        <span className="break-all">{file.filename}</span>
-                        <div className="flex gap-3">
-                          {(file.mime_type === "application/pdf" ||
-                            file.mime_type.startsWith("image/")) && (
-                            <button
-                              className="font-bold text-green"
-                              onClick={() =>
-                                setPreview({ request: row.id, file })
-                              }
-                            >
-                              معاينة
-                            </button>
-                          )}
-                          <a
-                            className="font-bold"
-                            href={`/api/workforce/requests/${row.id}/attachments/${file.id}`}
-                            download
-                          >
-                            تنزيل
-                          </a>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                      })}
+                  </span>
                 )}
-                {row.decision_reason && (
-                  <div className="rounded-xl bg-slate-50 p-3 text-sm">
-                    <strong>قرار الإدارة</strong>
-                    <p className="mt-2 whitespace-pre-wrap break-words">
-                      {row.decision_reason}
-                    </p>
-                  </div>
+                {row.amount && (
+                  <strong className="text-dark">
+                    {Number(row.amount).toLocaleString("ar-SA")} ر.س
+                  </strong>
                 )}
-                {row.status === "pending" &&
-                  (admin ? (
-                    <form
-                      className="space-y-3"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        const value = (
-                          (e.nativeEvent as SubmitEvent)
-                            .submitter as HTMLButtonElement
-                        )?.value;
-                        if (["approved", "rejected"].includes(value))
-                          void decide(row, value);
-                      }}
+              </div>
+              {!!row.attachments.length && (
+                <ul className="space-y-2">
+                  {row.attachments.map((file) => (
+                    <li
+                      key={file.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 p-3 text-sm"
                     >
-                      <Field id={`decision-${row.id}`} label="سبب القرار">
-                        <textarea
-                          id={`decision-${row.id}`}
-                          className={controlClass}
-                          required
-                          minLength={3}
-                          maxLength={2000}
-                          value={reasons[row.id] || ""}
-                          onChange={(e) =>
-                            setReasons((current) => ({
-                              ...current,
-                              [row.id]: e.target.value,
-                            }))
-                          }
-                        />
-                      </Field>
+                      <span className="break-all">{file.filename}</span>
                       <div className="flex gap-3">
-                        <Button type="submit" value="approved" disabled={busy}>
-                          موافقة
-                        </Button>
-                        <Button
-                          type="submit"
-                          value="rejected"
-                          variant="outline"
-                          disabled={busy}
+                        {(file.mime_type === "application/pdf" ||
+                          file.mime_type.startsWith("image/")) && (
+                          <button
+                            className="font-bold text-green"
+                            onClick={() =>
+                              setPreview({ request: row.id, file })
+                            }
+                          >
+                            معاينة
+                          </button>
+                        )}
+                        <a
+                          className="font-bold"
+                          href={`/api/workforce/requests/${row.id}/attachments/${file.id}`}
+                          download
                         >
-                          رفض
-                        </Button>
+                          تنزيل
+                        </a>
                       </div>
-                    </form>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() => void decide(row, "cancelled")}
-                    >
-                      إلغاء الطلب
-                    </Button>
+                    </li>
                   ))}
-              </article>
-            ))
-          )}
-          <nav
-            aria-label="صفحات الطلبات"
-            className="flex items-center justify-between gap-3"
+                </ul>
+              )}
+              {row.decision_reason && (
+                <div className="rounded-xl bg-slate-50 p-3 text-sm">
+                  <strong>قرار الإدارة</strong>
+                  <p className="mt-2 whitespace-pre-wrap break-words">
+                    {row.decision_reason}
+                  </p>
+                </div>
+              )}
+              {row.status === "pending" &&
+                (admin ? (
+                  <form
+                    className="space-y-3"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const value = (
+                        (e.nativeEvent as SubmitEvent)
+                          .submitter as HTMLButtonElement
+                      )?.value;
+                      if (["approved", "rejected"].includes(value))
+                        void decide(row, value);
+                    }}
+                  >
+                    <Field id={`decision-${row.id}`} label="سبب القرار">
+                      <textarea
+                        id={`decision-${row.id}`}
+                        className={controlClass}
+                        required
+                        minLength={3}
+                        maxLength={2000}
+                        value={reasons[row.id] || ""}
+                        onChange={(e) =>
+                          setReasons((current) => ({
+                            ...current,
+                            [row.id]: e.target.value,
+                          }))
+                        }
+                      />
+                    </Field>
+                    <div className="flex gap-3">
+                      <Button type="submit" value="approved" disabled={busy}>
+                        موافقة
+                      </Button>
+                      <Button
+                        type="submit"
+                        value="rejected"
+                        variant="outline"
+                        disabled={busy}
+                      >
+                        رفض
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => void decide(row, "cancelled")}
+                  >
+                    إلغاء الطلب
+                  </Button>
+                ))}
+            </article>
+          ))
+        )}
+        <nav
+          aria-label="صفحات الطلبات"
+          className="flex items-center justify-between gap-3"
+        >
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={page === 1 || loading || busy}
+            onClick={() => setPage((n) => n - 1)}
           >
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={page === 1 || loading || busy}
-              onClick={() => setPage((n) => n - 1)}
-            >
-              السابق
-            </Button>
-            <span className="text-xs">
-              {page} / {Math.max(1, Math.ceil(count / 20))}
-            </span>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={page * 20 >= count || loading || busy}
-              onClick={() => setPage((n) => n + 1)}
-            >
-              التالي
-            </Button>
-          </nav>
-        </>
-      )}
+            السابق
+          </Button>
+          <span className="text-xs">
+            {page} / {Math.max(1, Math.ceil(count / 20))}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={page * 20 >= count || loading || busy}
+            onClick={() => setPage((n) => n + 1)}
+          >
+            التالي
+          </Button>
+        </nav>
+      </section>
       <Dialog title="طلب جديد" open={open} onClose={() => void close()}>
         <form
           className="space-y-4"
