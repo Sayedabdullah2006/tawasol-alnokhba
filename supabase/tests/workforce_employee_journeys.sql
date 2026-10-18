@@ -3,7 +3,7 @@ select set_config('workforce.notification_wake','1',true);
 set local role service_role;
 do $$
 #variable_conflict use_variable
-declare owner uuid; e record; peer uuid; run uuid; id uuid; review_id uuid; policy_id uuid; k text; r jsonb; v integer; item jsonb; settings jsonb; before_n bigint; before_d bigint;
+declare owner uuid; e record; peer uuid; run uuid; id uuid; request_id uuid; review_id uuid; policy_id uuid; k text; r jsonb; v integer; item jsonb; settings jsonb; before_n bigint; before_d bigint;
 begin
  select a.user_id into strict owner from public.wf_task_assignment_admins a join public.profiles p on p.id=a.user_id where p.role='admin' limit 1;
  run:=(public.wf_test_run('start',owner)->>'id')::uuid;
@@ -78,6 +78,14 @@ begin
  settings:=jsonb_set(settings,'{hr,email}','true');perform public.wf_preferences_command(e.user_id,null,1,settings);
  id:=gen_random_uuid();insert into public.wf_notifications(id,recipient_id,kind,title,body,href,event_key) values(id,e.user_id,'hr','اختبار ملغى','اختبار','/employee/profile/assets','hr:rollback:'||id);
  if not exists(select 1 from public.wf_notification_deliveries where notification_id=id) or (select inbox_visible from public.wf_notifications where wf_notifications.id=id) then raise exception 'Independent email channel failed';end if;
+ settings:=jsonb_set(settings,'{finance,email}','false');perform public.wf_preferences_command(e.user_id,null,2,settings);
+ request_id:=gen_random_uuid();
+ insert into public.wf_employee_requests(id,employee_id,kind,title,body,amount,fingerprint) values(request_id,(select s.id from public.wf_employees s where s.user_id=e.user_id),'advance','سلفة تكامل ملغاة','اختبار الربط داخل معاملة ملغاة',100.01,request_id::text);
+ perform public.wf_decide_employee_request(request_id,owner,1,'approved','اعتماد اختبار تكامل ملغى');
+ id:=gen_random_uuid();perform public.wf_hr_command(owner,null,id,0,'create',jsonb_build_object('kind','advance','employee_id',(select s.id from public.wf_employees s where s.user_id=e.user_id),'title','سلفة تكامل ملغاة','principal','100.01','installment','20','source_request',request_id),gen_random_uuid());
+ if not exists(select 1 from public.wf_hr_items x where x.id=id and x.source_request=request_id and principal=100.01) then raise exception 'Approved advance request not linked';end if;
+ if not exists(select 1 from public.wf_notifications n where n.event_key='hr:'||id||':1' and n.kind='payroll') then raise exception 'Advance not categorized as financial';end if;
+ if exists(select 1 from public.wf_notification_deliveries d join public.wf_notifications n on n.id=d.notification_id where n.event_key='hr:'||id||':1') then raise exception 'Advance ignored financial email preference';end if;
 end $$;
 rollback;
 select 'PASS: all eight journeys, both actors, authorization, immutable test scopes, exact balances, appeal reopening and independent notification channels; all rolled back' result;
