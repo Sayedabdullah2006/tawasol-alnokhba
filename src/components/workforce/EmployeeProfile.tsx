@@ -272,14 +272,14 @@ export default function EmployeeProfile({
       >
         <div className="space-y-6">
           {!admin && section === "job-description" && (
-            <Panel title="الوصف الوظيفي">
+            <section className="rounded-2xl border border-border bg-white p-5">
               <p className="whitespace-pre-wrap break-words text-sm leading-7">
                 {employee.responsibilities || "—"}
               </p>
-            </Panel>
+            </section>
           )}
           {!admin && section === "contract" && (
-            <Panel title="بيانات العقد">
+            <section className="rounded-2xl border border-border bg-white p-5">
               <dl className="grid gap-4 text-sm sm:grid-cols-2">
                 {[
                   ["نوع التعاقد", CONTRACT_LABELS[employee.contract_type]],
@@ -304,7 +304,7 @@ export default function EmployeeProfile({
                   </div>
                 ))}
               </dl>
-            </Panel>
+            </section>
           )}
           {!admin && section === "profile" && (
             <Panel title="البيانات الشخصية">
