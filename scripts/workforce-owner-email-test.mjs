@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { renderWorkforceEmail } from "../supabase/functions/_shared/workforce-email.ts";
 
-for (const kind of ["attendance_in", "attendance_out", "task_created", "task_activity", "employee_request"]) {
+for (const kind of ["attendance_in", "attendance_out", "attendance_missing", "due_24h", "task_created", "task_activity", "employee_request"]) {
   const body = "نور — 2026-10-19 09:00 <script>";
   const mail = renderWorkforceEmail({
     email: "preview@example.com", name: "المدير", kind, title: "إشعار العمل", body,
