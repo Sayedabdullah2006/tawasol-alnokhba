@@ -28,6 +28,11 @@ begin
   select c.id into state_id from public.wf_tasks x join public.wf_task_columns c on c.board_id=x.board_id and c.kind='in_progress' and c.archived_at is null where x.id=t limit 1;
   perform public.wf_task_command(e.user_id,t,v,'move',jsonb_build_object('column_id',state_id),gen_random_uuid());
   if (select count(*) from public.wf_notifications where task_id=t and recipient_id=owner)<>2 then raise exception 'Duplicate/missing employee state notice';end if;
+  if not exists(select 1 from public.wf_notifications notice join public.wf_notification_deliveries d on d.notification_id=notice.id
+   where notice.task_id=t and notice.recipient_id=owner and notice.kind='task_activity'
+    and notice.body like '%'||e.full_name||'%' and notice.body like '%الحالة السابقة: جديدة%'
+    and notice.body like '%الحالة الجديدة: قيد التنفيذ%' and d.snapshot->>'body'=notice.body)
+   then raise exception 'Employee transition missing from owner notice/email snapshot';end if;
   select version into v from public.wf_tasks where id=t;
   perform public.wf_task_command(e.user_id,t,v,'submit','{"summary":"تسليم داخل معاملة ملغاة"}',gen_random_uuid());
   if (select count(*) from public.wf_notifications where task_id=t and recipient_id=owner)<>3 then raise exception 'Submission/state notice duplicated';end if;

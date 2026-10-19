@@ -16,4 +16,14 @@ for (const kind of ["attendance_in", "attendance_out", "attendance_missing", "at
   assert(mail.html.includes("https://nukhba.media/logo.png"));
   assert(mail.text.includes("https://nukhba.media/admin/workforce/attendance"));
 }
-console.log("PASS: clock/task/request details, admin links, logo and HTML escaping; no email sent");
+const transition = renderWorkforceEmail({
+  email: "preview@example.com", name: "المدير", kind: "task_activity",
+  title: "تغيرت حالة مهمة", taskTitle: "مهمة موثقة",
+  body: "مهمة موثقة\nالمسؤول: نور\nالحالة السابقة: جديدة\nالحالة الجديدة: قيد التنفيذ",
+  href: "/admin/workforce/tasks/preview", createdAt: "2026-10-19T06:00:00Z",
+});
+for (const value of ["المسؤول: نور", "الحالة السابقة: جديدة", "الحالة الجديدة: قيد التنفيذ"]) {
+  assert(transition.text.includes(value));
+  assert(transition.html.includes(value));
+}
+console.log("PASS: clock/task/request details, state transition, admin links, logo and HTML escaping; no email sent");
