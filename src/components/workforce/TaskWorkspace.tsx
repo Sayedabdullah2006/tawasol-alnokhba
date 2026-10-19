@@ -13,6 +13,7 @@ import {
 import TaskFields, { taskForm, taskPayload } from "./TaskFields";
 import WeeklyPlan from "./WeeklyPlan";
 import TaskBoard from "./TaskBoard";
+import TaskEditAction from "./TaskEditAction";
 import {
   api,
   controlClass,
@@ -533,6 +534,7 @@ export default function TaskWorkspace({
                     : "عرض المهمة — للقراءة فقط"}{" "}
                   ←
                 </Link>
+                <TaskEditAction task={item} base={base} onOpen={onOpenTask} />
               </article>
             ))}
           </div>

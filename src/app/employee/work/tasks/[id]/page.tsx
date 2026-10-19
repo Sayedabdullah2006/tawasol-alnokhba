@@ -4,5 +4,5 @@ export default async function Page({ params,searchParams }: { params: Promise<{ 
   await employeePageActor();
   const { id } = await params;
   const panel=(await searchParams).panel;
-  return <TaskDetail initialPanel={panel && ["brief","files","submit","comments","history"].includes(panel)?panel:"brief"} key={id} id={id} admin={false} />;
+  return <TaskDetail initialPanel={panel && ["brief","files","submit","comments","history","edit"].includes(panel)?panel:"brief"} key={id} id={id} admin={false} />;
 }

@@ -11,6 +11,7 @@ import {
 import { cardAction } from "@/lib/workforce/task-move";
 import { compareTasks } from "@/lib/workforce/task-order";
 import { api, Notice } from "./shared";
+import TaskEditAction from "./TaskEditAction";
 const kinds = Object.keys(TASK_STATES) as (keyof typeof TASK_STATES)[];
 const shades = {
   new: "border-slate-300",
@@ -386,12 +387,13 @@ export default function TaskBoard({
                                 </option>
                               ))}
                           </select>
-                        ) : !task.canWork ? (
+                        ) : !task.canWork && !task.canEdit ? (
                           <span className="text-[10px] text-slate-400">
-                            {task.canEdit ? "يمكنك تعديل التكليف" : "للقراءة"}
+                            للقراءة
                           </span>
                         ) : null}
                       </div>
+                      <TaskEditAction task={task} base={base} onOpen={onOpen} />
                     </article>
                   );
                 })}

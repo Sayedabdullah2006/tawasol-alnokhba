@@ -4,5 +4,5 @@ export default async function Page({ params,searchParams }: { params: Promise<{ 
   requireAdmin(await workforceActor());
   const { id } = await params;
   const panel=(await searchParams).panel;
-  return <TaskDetail initialPanel={panel==="submit"?"submit":"brief"} key={id} id={id} admin />;
+  return <TaskDetail initialPanel={panel && ["brief","files","submit","comments","history","edit"].includes(panel)?panel:"brief"} key={id} id={id} admin />;
 }

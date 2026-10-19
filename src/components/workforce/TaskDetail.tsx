@@ -14,6 +14,7 @@ import TaskHistory from "./TaskHistory";
 import TaskComments from "./TaskComments";
 import TaskTime from "./TaskTime";
 import TaskAttachments from "./TaskAttachments";
+import { taskEditReason } from "./TaskEditAction";
 import {
   api,
   controlClass,
@@ -39,9 +40,11 @@ export default function TaskDetail({
   onChanged?: () => void;
   onClose?: () => void;
 }) {
-  const [tab, setTab] = useState(initialPanel);
+  const startingPanel = initialPanel === "edit" ? "brief" : initialPanel;
+  const editRequested = useRef(initialPanel === "edit");
+  const [tab, setTab] = useState(startingPanel);
   const [visited, setVisited] = useState<Record<string, boolean>>({
-    [initialPanel]: true,
+    [startingPanel]: true,
   });
   function show(panel: string) {
     setTab(panel);
@@ -104,6 +107,16 @@ export default function TaskDetail({
         setData(result);
         setBoard(result.boardDetail);
         setError("");
+        if (editRequested.current) {
+          editRequested.current = false;
+          if (result.canEdit && !taskEditReason(result.task)) {
+            const next = taskForm(result.task);
+            setForm(next);
+            setOriginal(JSON.stringify(next));
+            setEditVersion(result.task.version);
+            setEditing(true);
+          }
+        }
       })
       .catch((e) => {
         if ([401, 403, 404].includes(e.status)) {
@@ -255,9 +268,11 @@ export default function TaskDetail({
         >
           تحديث المهمة
         </Button>
-        {data.canEdit && !frozen && !reviewing && !done && (
+        {data.canEdit && (
           <Button
             type="button"
+            disabled={busy || !!taskEditReason(task)}
+            title={taskEditReason(task) || undefined}
             onClick={() => {
               const next = taskForm(task);
               setForm(next);
@@ -266,7 +281,7 @@ export default function TaskDetail({
               setEditing(true);
             }}
           >
-            تعديل وإسناد
+            {data.canAssign ? "تعديل وإعادة الإسناد" : "تعديل المهمة"}
           </Button>
         )}
         {data.canArchive && !board.board.archived_at && !reviewing && (
