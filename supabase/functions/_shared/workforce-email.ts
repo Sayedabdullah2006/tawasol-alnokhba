@@ -21,6 +21,7 @@ const escape = (value: string) =>
       ]!,
   );
 const taskKinds = new Set([
+  "task_created",
   "assigned",
   "updated",
   "deadline",
@@ -37,6 +38,10 @@ const taskKinds = new Set([
   "overdue",
 ]);
 const intro: Record<string, string> = {
+  task_created: "أُضيفت مهمة جديدة إلى نظام العمل. يمكنك متابعة المسؤول عنها وموعد تسليمها من لوحة إدارة الفريق.",
+  task_activity: "تغيرت حالة مهمة في نظام العمل. تفاصيل التغيير والمسؤول عنها متاحة أدناه وفي لوحة إدارة الفريق.",
+  attendance_in: "سُجّل حضور أحد أعضاء الفريق. اسم الموظفة ووقت تسجيل الحضور بتوقيت الرياض موضحان أدناه.",
+  attendance_out: "سُجّل انصراف أحد أعضاء الفريق. اسم الموظفة ووقت تسجيل الانصراف بتوقيت الرياض موضحان أدناه.",
   welcome:
     "أهلًا بك في فريق تواصل النخبة. ملفك الوظيفي ومهامك وتسليماتك متاحة من لوحتك الخاصة.",
   assigned:
@@ -106,6 +111,8 @@ export function renderWorkforceEmail(mail: WorkforceMail) {
         ["المطلوب تسليمه", mail.deliverable],
       ].filter((row): row is [string, string] => !!row[1])
     : [];
+  if (mail.body && (!isTask || mail.body !== mail.taskTitle))
+    details.unshift(["التفاصيل", mail.body]);
   const label = isTask
     ? "فتح المهمة"
     : mail.href.startsWith("/admin/workforce")
