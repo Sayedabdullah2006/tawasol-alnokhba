@@ -47,8 +47,9 @@ export async function attachmentTask(
 /** Bound the actual body, including chunked requests, before parsing multipart. */
 export async function attachmentForm(request: Request, maxBytes = MAX_ATTACHMENT_BYTES) {
   const limit = maxBytes + 128 * 1024;
+  const limitMessage = `الحد الأقصى لحجم الرفع ${maxBytes / 1024 / 1024} ميجابايت`;
   if (Number(request.headers.get("content-length") || 0) > limit)
-    throw new WorkforceError("الحد الأقصى للملف 4 ميجابايت", 413);
+    throw new WorkforceError(limitMessage, 413);
   const reader = request.body?.getReader();
   if (!reader) throw new WorkforceError("اختر ملفًا");
   const parts: Uint8Array[] = [];
@@ -60,7 +61,7 @@ export async function attachmentForm(request: Request, maxBytes = MAX_ATTACHMENT
       length += value.length;
       if (length > limit) {
         await reader.cancel();
-        throw new WorkforceError("الحد الأقصى للملف 4 ميجابايت", 413);
+        throw new WorkforceError(limitMessage, 413);
       }
       parts.push(value);
     }
@@ -77,9 +78,9 @@ export async function attachmentForm(request: Request, maxBytes = MAX_ATTACHMENT
   }
 }
 
-export async function validateAttachment(file: File) {
-  if (file.size < 1 || file.size > MAX_ATTACHMENT_BYTES)
-    throw new WorkforceError("اختر ملفًا غير فارغ حتى 4 ميجابايت", 413);
+export async function validateAttachment(file: File, maxBytes = MAX_ATTACHMENT_BYTES) {
+  if (file.size < 1 || file.size > maxBytes)
+    throw new WorkforceError(`اختر ملفًا غير فارغ حتى ${maxBytes / 1024 / 1024} ميجابايت`, 413);
   const filename = file.name
     .replace(/[\u0000-\u001f\u007f\\/\u202a-\u202e\u2066-\u2069]/g, "_")
     .trim()

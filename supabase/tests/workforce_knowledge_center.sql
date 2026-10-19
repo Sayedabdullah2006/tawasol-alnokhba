@@ -1,4 +1,5 @@
 begin;
+select set_config('workforce.notification_wake','1',true);
 set local role service_role;
 do $$
 #variable_conflict use_variable

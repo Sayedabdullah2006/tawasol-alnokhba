@@ -15,10 +15,9 @@ import {
   WorkforceError,
   dateField,
 } from "@/lib/workforce/validation";
-import {
-  attachmentForm,
-  validateAttachment,
-} from "@/lib/workforce/attachment-server";
+import { attachmentForm } from "@/lib/workforce/attachment-server";
+import { validateKnowledgeUpload } from "@/lib/workforce/knowledge-upload-server";
+import { MAX_KNOWLEDGE_BYTES } from "@/lib/workforce/knowledge";
 import type { KnowledgeFile } from "@/lib/workforce/knowledge";
 type KnowledgeRow = Omit<
   KnowledgeFile,
@@ -156,12 +155,12 @@ export async function POST(request: Request) {
   try {
     assertMutation(request);
     const actor = await workforceActor(),
-      form = await attachmentForm(request);
+      form = await attachmentForm(request, MAX_KNOWLEDGE_BYTES);
     id = uuid(form.get("request_key"));
     const folder = uuid(form.get("folder_id")),
       file = form.get("file");
     if (!(file instanceof File)) throw new WorkforceError("اختر ملفًا");
-    const checked = await validateAttachment(file),
+    const checked = await validateKnowledgeUpload(file),
       title = textField(
         form.get("title") || checked.filename,
         "العنوان",

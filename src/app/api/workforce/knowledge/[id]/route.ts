@@ -4,6 +4,7 @@ import {
   workforceActor,
 } from "@/lib/workforce/server";
 import { uuid, WorkforceError } from "@/lib/workforce/validation";
+import { KNOWLEDGE_INLINE_MIMES } from "@/lib/workforce/knowledge";
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -28,14 +29,7 @@ export async function GET(
       throw result.error || new Error("Storage unavailable");
     const inline =
       new URL(request.url).searchParams.get("preview") === "true" &&
-      [
-        "image/png",
-        "image/jpeg",
-        "image/webp",
-        "application/pdf",
-        "text/plain",
-        "text/csv",
-      ].includes(file.data.mime_type);
+      KNOWLEDGE_INLINE_MIMES.includes(file.data.mime_type);
     return new Response(result.data, {
       headers: {
         "Content-Type": `${file.data.mime_type}${file.data.mime_type.startsWith("text/") ? "; charset=utf-8" : ""}`,

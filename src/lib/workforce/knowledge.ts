@@ -31,3 +31,12 @@ export type KnowledgeData = {
   page: number;
   admin: boolean;
 };
+export const MAX_KNOWLEDGE_BYTES = 50 * 1024 * 1024;
+export const KNOWLEDGE_INLINE_MIMES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "application/pdf",
+  "text/plain",
+  "text/csv",
+];

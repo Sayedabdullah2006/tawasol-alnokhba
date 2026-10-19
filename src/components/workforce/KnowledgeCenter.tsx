@@ -13,10 +13,7 @@ import {
   useUnsavedChanges,
 } from "./shared";
 import PdfAttachmentPreview from "./PdfAttachmentPreview";
-import {
-  ATTACHMENT_ACCEPT,
-  MAX_ATTACHMENT_BYTES,
-} from "@/lib/workforce/attachments";
+import { MAX_KNOWLEDGE_BYTES, KNOWLEDGE_INLINE_MIMES } from "@/lib/workforce/knowledge";
 import type {
   KnowledgeData,
   KnowledgeFile,
@@ -172,8 +169,12 @@ export default function KnowledgeCenter({ admin }: { admin: boolean }) {
       setError("اختر حتى 20 ملفًا في المرة الواحدة");
       return;
     }
-    if (files.some((f) => f.size > MAX_ATTACHMENT_BYTES || f.size === 0)) {
-      setError("اختر ملفات غير فارغة حتى 4 ميجابايت لكل ملف");
+    if (files.some((f) => f.size === 0)) {
+      setError("أحد الملفات فارغ؛ اختر ملفات تحتوي على بيانات");
+      return;
+    }
+    if (files.some((f) => f.size > MAX_KNOWLEDGE_BYTES)) {
+      setError("الحد الأقصى 50 ميجابايت لكل ملف");
       return;
     }
     setUploads(files.map((file) => ({ file, id: crypto.randomUUID() })));
@@ -202,9 +203,7 @@ export default function KnowledgeCenter({ admin }: { admin: boolean }) {
       : params.get("q")
         ? folders.filter((f) => f.name.includes(params.get("q")!))
         : folders.filter((f) => f.parent_id === (folder || null));
-  const canPreview = (file: KnowledgeFile) =>
-    file.mime_type.startsWith("image/") ||
-    ["application/pdf", "text/plain", "text/csv"].includes(file.mime_type);
+  const canPreview = (file: KnowledgeFile) => KNOWLEDGE_INLINE_MIMES.includes(file.mime_type);
   return (
     <div
       className="space-y-5 p-4 md:p-8"
@@ -742,14 +741,13 @@ export default function KnowledgeCenter({ admin }: { admin: boolean }) {
             </select>
           </Field>
           <Field
-            label="الملفات — حتى 4 ميجابايت للملف"
+            label="جميع الصيغ — حتى 50 ميجابايت للملف"
             id="knowledge-upload-files"
           >
             <input
               id="knowledge-upload-files"
               type="file"
               multiple
-              accept={ATTACHMENT_ACCEPT}
               disabled={busy}
               onChange={(e) => addUploads(Array.from(e.target.files || []))}
               className={controlClass}
