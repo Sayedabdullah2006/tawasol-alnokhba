@@ -12,6 +12,7 @@ import { turnstileEnabled } from '@/lib/turnstile'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
@@ -103,7 +104,7 @@ export default function LoginPage() {
               className={`py-2 rounded-lg transition ${mode === 'password' ? 'bg-card text-green shadow-sm' : 'text-muted'}`}>
               كلمة المرور
             </button>
-            <button type="button" onClick={() => { setMode('code'); setError('') }}
+            <button type="button" onClick={() => { setMode('code'); setShowPassword(false); setError('') }}
               className={`py-2 rounded-lg transition ${mode === 'code' ? 'bg-card text-green shadow-sm' : 'text-muted'}`}>
               رمز عبر البريد
             </button>
@@ -113,8 +114,22 @@ export default function LoginPage() {
             <form onSubmit={handleLogin} className="space-y-4">
               <Input id="email" label="البريد الإلكتروني" type="email" dir="ltr" placeholder="email@example.com"
                 value={email} onChange={e => setEmail(e.target.value)} required />
-              <Input id="password" label="كلمة المرور" type="password" dir="ltr" placeholder="••••••••"
-                value={password} onChange={e => setPassword(e.target.value)} required />
+              <div className="relative">
+                <Input id="password" label="كلمة المرور" type={showPassword ? 'text' : 'password'} dir="ltr" placeholder="••••••••"
+                  autoComplete="current-password" className="pl-14"
+                  value={password} onChange={e => setPassword(e.target.value)} required />
+                <button type="button" onClick={() => setShowPassword(visible => !visible)}
+                  aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                  aria-controls="password" aria-pressed={showPassword}
+                  title={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                  className="absolute bottom-1 left-1 flex h-10 w-10 items-center justify-center rounded-lg text-muted hover:text-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+                    <circle cx="12" cy="12" r="3" />
+                    {showPassword && <path d="m3 3 18 18" />}
+                  </svg>
+                </button>
+              </div>
               {captchaOn && <TurnstileWidget onVerify={setCaptchaToken} onExpire={() => setCaptchaToken(null)} />}
               {error && <p className="text-sm text-red-500 text-center">{error}</p>}
               <Button type="submit" loading={loading} className="w-full" disabled={captchaOn && !captchaToken}>
