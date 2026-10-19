@@ -1,4 +1,6 @@
 export const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
+export const MAX_TASK_ATTACHMENT_BYTES = 50 * 1024 * 1024;
+export const TASK_ATTACHMENT_INLINE_MIMES = ["image/png", "image/jpeg", "image/webp", "application/pdf"];
 export const ATTACHMENT_ACCEPT =
   ".pdf,.png,.jpg,.jpeg,.webp,.docx,.xlsx,.pptx,.txt,.csv,.zip";
 export type TaskAttachment = {

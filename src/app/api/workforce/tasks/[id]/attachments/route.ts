@@ -9,9 +9,10 @@ import {
   attachmentColumns,
   attachmentTask,
   attachmentForm,
-  validateAttachment,
   ATTACHMENT_BUCKET,
 } from "@/lib/workforce/attachment-server";
+import { MAX_TASK_ATTACHMENT_BYTES } from "@/lib/workforce/attachments";
+import { validateWorkforceUpload } from "@/lib/workforce/file-upload-server";
 import { privateResponse, workPage } from "@/lib/workforce/task-server";
 import { textField, uuid, WorkforceError } from "@/lib/workforce/validation";
 
@@ -76,7 +77,7 @@ export async function POST(request: Request, context: Context) {
       taskId = uuid((await context.params).id);
     await requireTestTask(actor, await requestTestRun(request, actor), taskId);
     const access = await attachmentTask(actor, taskId, true);
-    const form = await attachmentForm(request);
+    const form = await attachmentForm(request, MAX_TASK_ATTACHMENT_BYTES);
     attachmentId = uuid(form.get("request_key"));
     const file = form.get("file");
     if (!(file instanceof File)) throw new WorkforceError("اختر ملفًا");
@@ -89,7 +90,7 @@ export async function POST(request: Request, context: Context) {
     const purpose = form.get("purpose") || "task";
     if (!["task", "delivery"].includes(String(purpose)))
       throw new WorkforceError("نوع المرفق غير صحيح");
-    const checked = await validateAttachment(file);
+    const checked = await validateWorkforceUpload(file, MAX_TASK_ATTACHMENT_BYTES);
     const service = await createServiceRoleClient();
     const { data: previous, error: previousError } = await service
       .from("wf_task_attachments")

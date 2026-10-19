@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import Button from "@/components/ui/Button";
 import PdfAttachmentPreview from "./PdfAttachmentPreview";
 import {
-  ATTACHMENT_ACCEPT,
-  MAX_ATTACHMENT_BYTES,
+  MAX_TASK_ATTACHMENT_BYTES,
+  TASK_ATTACHMENT_INLINE_MIMES,
   type AttachmentList,
   type TaskAttachment,
 } from "@/lib/workforce/attachments";
@@ -23,7 +23,7 @@ function FileActions({ file }: { file: TaskAttachment }) {
   const [preview, setPreview] = useState(false);
   const endpoint = `/api/workforce/attachments/${file.id}`;
   const image = file.mime_type.startsWith("image/");
-  const previewable = image || file.mime_type === "application/pdf";
+  const previewable = TASK_ATTACHMENT_INLINE_MIMES.includes(file.mime_type);
   return (
     <>
       <div className="flex flex-wrap gap-3 text-sm">
@@ -270,13 +270,12 @@ export default function TaskAttachments({
             void upload();
           }}
         >
-          <Field id={`attachment-files-${taskId}`} label="اختيار ملفات أو صور">
+          <Field id={`attachment-files-${taskId}`} label="جميع الصيغ — حتى 50 ميجابايت للملف">
             <input
               ref={input}
               id={`attachment-files-${taskId}`}
               type="file"
               multiple
-              accept={ATTACHMENT_ACCEPT}
               disabled={busy || disabled}
               className="block w-full min-w-0 rounded-xl border border-dashed border-sky-300 bg-white p-3 text-sm file:me-3 file:rounded-lg file:border-0 file:bg-sky-100 file:px-3 file:py-2 file:font-bold file:text-sky-900"
               onChange={(e) => {
@@ -286,11 +285,11 @@ export default function TaskAttachments({
                   files.length > 20 ||
                   files.some(
                     (file) =>
-                      file.size > MAX_ATTACHMENT_BYTES || file.size === 0,
+                      file.size > MAX_TASK_ATTACHMENT_BYTES || file.size === 0,
                   )
                 ) {
                   setError(
-                    "اختر حتى 20 ملفًا، كل ملف غير فارغ وبحجم لا يتجاوز 4 ميجابايت",
+                    "اختر حتى 20 ملفًا، كل ملف غير فارغ وبحجم لا يتجاوز 50 ميجابايت",
                   );
                   e.target.value = "";
                   setPending([]);
@@ -302,9 +301,6 @@ export default function TaskAttachments({
               }}
             />
           </Field>
-          <p className="text-xs text-muted">
-            4 م.ب · PDF، صور، Office، TXT، CSV، ZIP
-          </p>
           <Field label="استخدام المرفقات" id={`attachment-purpose-${taskId}`}>
             <select
               id={`attachment-purpose-${taskId}`}

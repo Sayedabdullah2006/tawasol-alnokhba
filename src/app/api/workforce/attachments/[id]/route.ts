@@ -11,6 +11,7 @@ import {
 } from "@/lib/workforce/attachment-server";
 import { privateResponse } from "@/lib/workforce/task-server";
 import { uuid, WorkforceError } from "@/lib/workforce/validation";
+import { TASK_ATTACHMENT_INLINE_MIMES } from "@/lib/workforce/attachments";
 type Context = { params: Promise<{ id: string }> };
 export async function GET(request: Request, context: Context) {
   try {
@@ -32,9 +33,7 @@ export async function GET(request: Request, context: Context) {
     const preview = new URL(request.url).searchParams.get("preview") === "true";
     const inline =
       preview &&
-      ["image/png", "image/jpeg", "image/webp", "application/pdf"].includes(
-        file.mime_type,
-      );
+      TASK_ATTACHMENT_INLINE_MIMES.includes(file.mime_type);
     return new Response(data, {
       headers: {
         "Content-Type": file.mime_type,
