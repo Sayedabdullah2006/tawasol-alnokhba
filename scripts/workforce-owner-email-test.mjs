@@ -3,12 +3,12 @@
 import assert from "node:assert/strict";
 import { renderWorkforceEmail } from "../supabase/functions/_shared/workforce-email.ts";
 
-for (const kind of ["attendance_in", "attendance_out", "attendance_missing", "attendance_missing_admin", "due_24h", "task_created", "task_activity", "employee_request"]) {
+for (const kind of ["attendance_in", "attendance_out", "attendance_missing", "attendance_missing_admin", "due_24h", "overdue", "task_created", "task_activity", "employee_request"]) {
   const body = "نور — 2026-10-19 09:00 <script>";
   const mail = renderWorkforceEmail({
     email: "preview@example.com", name: "المدير", kind, title: "إشعار العمل", body,
     href: "/admin/workforce/attendance", createdAt: "2026-10-19T06:00:00Z",
-    ...(kind.startsWith("task") ? { taskTitle: "مهمة موثقة" } : {}),
+    ...(kind.startsWith("task") || kind === "overdue" ? { taskTitle: "مهمة موثقة" } : {}),
   });
   assert(mail.text.includes(body), `${kind}: missing event details in text`);
   assert(mail.html.includes("&lt;script&gt;"), `${kind}: missing escaped event details`);
