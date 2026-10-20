@@ -5,7 +5,7 @@ import { employeeDashboard } from "@/lib/workforce/employee-dashboard";
 
 import DashboardJourneys from "./DashboardJourneys";
 import EmployeeFocus from "./EmployeeFocus";
-import ProgressOrbit from "./ProgressOrbit";
+import AttendanceProgressCard from "./AttendanceProgressCard";
 
 type IconName = "tasks" | "clock" | "check" | "review" | "calendar" | "wallet" | "request" | "profile";
 const paths: Record<IconName, ReactNode> = {
@@ -32,10 +32,11 @@ export default async function WorkDashboard({ actor }: { actor: WorkforceActor }
   let data;
   try { data = await employeeDashboard(actor); }
   catch { return <p role="alert" className={`${card} bg-white`}>تعذر تحميل الملخص. <Link href="/employee" className="font-bold underline">إعادة المحاولة</Link></p>; }
+  return <EmployeeDashboardView data={data} />;
+}
+
+function EmployeeDashboardView({ data }: { data: Awaited<ReturnType<typeof employeeDashboard>> }) {
   const { tasks, attendance, payroll } = data;
-  const beforeStart = data.today < data.employee.start_date;
-  const attendanceState = beforeStart ? "قبل المباشرة" : attendance.open ? "الحضور مسجل" : attendance.minutes ? "تم الانصراف" : attendance.dayOff ? "يوم إجازة" : "لم يسجل الحضور";
-  const progress = attendance.dailyMinutes > 0 ? Math.min(100, Math.max(0, attendance.minutes / attendance.dailyMinutes * 100)) : 0;
   const statistics: { label: string; value: number; href: string; icon: IconName; color: string }[] = [
     { label: "مهام مفتوحة", value: tasks.open, href: "/employee/work/tasks?scope=assigned&open=true", icon: "tasks", color: "border-blue-200/70 bg-blue-50 text-blue-900" },
     { label: "متأخرة", value: tasks.overdue, href: "/employee/work/tasks?scope=assigned&overdue=true&actionable=true", icon: "clock", color: "border-rose-200/70 bg-rose-50 text-rose-900" },
@@ -48,11 +49,8 @@ export default async function WorkDashboard({ actor }: { actor: WorkforceActor }
     </nav>
     <div className="grid items-stretch gap-4 md:grid-cols-2 lg:grid-cols-3" data-dashboard-panels>
       <EmployeeFocus today={tasks.today} upcoming={tasks.upcoming} todayCount={tasks.todayCount} upcomingCount={tasks.upcomingCount} />
-      <section className={`${card} border-sky-200 bg-gradient-to-br from-sky-50 to-blue-100/80 text-sky-950`} aria-label="الحضور والإجازات">
-        <CardTitle title="الحضور والإجازات" icon="clock" />
-        <div className="flex-1"><span className="inline-block rounded-full border border-sky-200 bg-white/70 px-3 py-1.5 text-xs font-bold">{attendanceState}</span>{!beforeStart && <><div className="mb-3 mt-5 flex items-end justify-between gap-2"><p className="font-black"><span className="text-3xl tabular-nums">{Math.floor(attendance.minutes / 60).toLocaleString("en-US")}</span><span className="mx-1 text-sm">س</span><span className="text-lg tabular-nums">{(attendance.minutes % 60).toLocaleString("en-US")}</span><span className="mx-1 text-sm">د</span></p>{!attendance.dayOff && <span className="text-xs text-sky-800">من {attendance.dailyMinutes / 60} ساعات</span>}</div>{!attendance.dayOff && <div className="mt-4 flex justify-center"><ProgressOrbit value={progress} label="إنجاز ساعات اليوم" detail="ساعات اليوم" /></div>}</>}<div className="mt-5 flex justify-between text-sm"><span>رصيد الإجازة</span><strong>{data.leave.available} يوم</strong></div></div>
-        <Link href="/employee/attendance/overview" className={footer}><span>{beforeStart || attendance.dayOff ? "الحضور والإجازات" : attendance.open ? "تسجيل الانصراف" : "فتح سجل الحضور"}</span><span aria-hidden>←</span></Link>
-      </section>
+      <AttendanceProgressCard summary={attendance.summary} open={attendance.open} leaveDays={data.leave.available} />
+
       <section className={`${card} border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/80 text-emerald-950`} aria-label="مستحقاتي الخاصة">
         <CardTitle title="مستحقاتي" icon="wallet" />
         <div className="flex-1"><div className="flex flex-wrap items-center justify-between gap-2 text-xs"><span>{new Date(`${data.month}T12:00:00+03:00`).toLocaleDateString("ar-SA", { calendar: "gregory", month: "long", year: "numeric" })}</span>{payroll && <span className="rounded-full bg-white/70 px-3 py-1 font-bold">{payroll.status === "draft" ? "مسودة" : "معتمد"}</span>}</div>{payroll ? <><p className="mt-5 text-xs font-bold text-emerald-800">الصافي</p><p className="mt-1 flex flex-wrap items-baseline gap-2"><strong className="text-3xl font-black tabular-nums">{money(payroll.total_amount)}</strong><span className="text-sm">ر.س</span></p><div className="mt-5 flex flex-wrap justify-between gap-2 text-sm"><span>المصروف</span><strong>{money(payroll.paid_amount)} ر.س</strong></div></> : <p className="py-8 text-sm">لا يوجد كشف لهذا الشهر</p>}</div>

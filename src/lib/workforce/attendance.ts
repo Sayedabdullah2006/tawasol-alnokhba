@@ -1,3 +1,4 @@
+import type { AttendanceSummary } from "./attendance-summary";
 export const WORKDAYS = [
   "الأحد",
   "الاثنين",
@@ -40,4 +41,5 @@ export type AttendanceData = {
     leave_type: string;
   }[];
   today: string;
+  summary: AttendanceSummary;
 };

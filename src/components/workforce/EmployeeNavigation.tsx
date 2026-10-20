@@ -15,13 +15,13 @@ export default function EmployeeNavigation() {
         !["profile", "finance", "knowledge", "notifications"].includes(m.key),
     ),
     ...employeeModules.filter((m) =>
-      ["knowledge", "notifications"].includes(m.key),
+      m.key === "knowledge",
     ),
   ];
   return (
     <nav
       aria-label="أقسام بوابة الموظف"
-      className="portal-dock relative z-30 w-full"
+      className="portal-dock employee-dock relative z-30 w-full"
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           setOpen(null);
@@ -32,10 +32,11 @@ export default function EmployeeNavigation() {
         }
       }}
     >
-      <ul className="flex w-full flex-wrap items-center gap-2">
+      <ul className="grid w-full grid-cols-3 gap-2 lg:grid-cols-6">
         {modules.map((module) => {
           const screens = module.screens.filter((s) => s.available);
           if (!screens.length) return null;
+          if (module.key === "work") screens.unshift({ path: "/employee", title: "لوحتي", purpose: "", related: [], available: true });
           if (module.key === "profile") {
             const finance = employeeModules.find((m) => m.key === "finance");
             for (const path of ["payslips", "commissions", "advances"]) {
@@ -46,6 +47,7 @@ export default function EmployeeNavigation() {
           const active = screens.some(
             (s) => pathname === s.path || pathname.startsWith(s.path + "/"),
           );
+          const moduleActive = module.key === "work" ? pathname === "/employee" || pathname.startsWith("/employee/work/") : active;
           const style = "portal-launcher";
           const icon = module.key === "work" ? "tasks" : module.key;
           return screens.length === 1 ? (
@@ -53,11 +55,11 @@ export default function EmployeeNavigation() {
               <Link
                 href={screens[0].path}
                 className={style}
-                aria-current={active ? "page" : undefined}
+                aria-current={moduleActive ? "page" : undefined}
                 onClick={() => setOpen(null)}
               >
                 <PortalIcon name={icon} />
-                {module.title}
+                <span>{module.title}</span>
               </Link>
             </li>
           ) : (
@@ -79,7 +81,7 @@ export default function EmployeeNavigation() {
                 type="button"
                 className={style}
                 aria-expanded={open === module.key}
-                data-active={active}
+                data-active={moduleActive}
                 aria-controls={`employee-menu-${module.key}`}
                 onClick={() => setOpen(open === module.key ? null : module.key)}
                 onKeyDown={(event) => {
@@ -96,10 +98,10 @@ export default function EmployeeNavigation() {
                 }}
               >
                 <PortalIcon name={icon} />
-                {module.title}
+                <span>{module.title}</span>
                 <span
                   aria-hidden="true"
-                  className={`text-xs transition-transform ${open === module.key ? "rotate-180" : ""}`}
+                  className={`absolute end-2 top-2 text-xs opacity-60 transition-transform ${open === module.key ? "rotate-180" : ""}`}
                 >
                   ⌄
                 </span>

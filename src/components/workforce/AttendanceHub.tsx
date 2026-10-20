@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import { WORKDAYS, type AttendanceData } from "@/lib/workforce/attendance";
+import { attendanceDuration, liveAttendance } from "@/lib/workforce/attendance-summary";
 import { REQUEST_KINDS } from "@/lib/workforce/requests";
 import { api, controlClass, Field, Notice, useUnsavedChanges } from "./shared";
 const clock = (date: string | null) =>
@@ -42,6 +43,9 @@ export default function AttendanceHub({
       days: "0",
       reason: "",
     });
+  const [tick, setTick] = useState(0);
+  useEffect(() => { const timer = setInterval(() => setTick(Date.now()), 30000); return () => clearInterval(timer); }, []);
+  const attendance = data?.summary ? liveAttendance(data.summary, data.open, tick) : null;
   const [loadedKey, setLoadedKey] = useState("");
   const queryKey = `${employee}:${year}:${page}:${revision}`,
     loading = loadedKey !== queryKey;
@@ -215,6 +219,7 @@ export default function AttendanceHub({
                         {clock(data.open.checked_in)}
                       </p>
                     )}
+                    {attendance && <p className="mt-3 text-sm"><strong className="text-lg tabular-nums">{attendanceDuration(attendance.todayMinutes)}</strong><span className="mx-2 text-muted">اليوم · {attendance.todayPeriods} فترات حضور</span></p>}
                   </div>
                   {!admin && (
                     <div className="flex flex-wrap gap-3">
@@ -255,7 +260,7 @@ export default function AttendanceHub({
                           <td className="p-4">{clock(row.checked_out)}</td>
                           <td className="p-4">
                             {row.checked_out
-                              ? `${Math.floor((Date.parse(row.checked_out) - Date.parse(row.checked_in)) / 60000)} دقيقة`
+                              ? attendanceDuration((Date.parse(row.checked_out) - Date.parse(row.checked_in)) / 60000)
                               : "—"}
                           </td>
                           <td className="p-4">

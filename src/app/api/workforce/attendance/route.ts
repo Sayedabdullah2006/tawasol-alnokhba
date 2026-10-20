@@ -8,6 +8,8 @@ import {
 } from "@/lib/workforce/server";
 import { uuid, textField, WorkforceError } from "@/lib/workforce/validation";
 import { workPage, privateResponse } from "@/lib/workforce/task-server";
+import { attendanceMonthSessions } from "@/lib/workforce/attendance-server";
+import { DEFAULT_WORKDAYS, summarizeAttendance } from "@/lib/workforce/attendance-summary";
 export async function GET(request: Request) {
   try {
     const actor = await workforceActor(),
@@ -26,7 +28,7 @@ export async function GET(request: Request) {
     requireEmployeeAccess(actor, id);
     const exists = await actor.db
       .from("wf_employees")
-      .select("id,full_name")
+      .select("id,full_name,start_date")
       .eq("id", id)
       .maybeSingle();
     if (exists.error) throw exists.error;
@@ -55,7 +57,7 @@ export async function GET(request: Request) {
             .slice(0, 10),
         );
     }
-    const [records, open, settings, entitlement, movements, approved] =
+    const [records, open, settings, entitlement, movements, approved, monthSessions] =
       await Promise.all([
         sessions,
         actor.db
@@ -90,6 +92,7 @@ export async function GET(request: Request) {
           .lte("starts_at", `${year}-12-31T23:59:59+03:00`)
           .order("starts_at", { ascending: false })
           .limit(100),
+        attendanceMonthSessions(actor.db, id, exists.data.start_date, today.slice(0, 7)),
       ]);
     for (const result of [
       records,
@@ -98,6 +101,7 @@ export async function GET(request: Request) {
       entitlement,
       movements,
       approved,
+      monthSessions,
     ])
       if (result.error && result.error.code !== "PGRST103") throw result.error;
     const granted = Number(entitlement.data?.days || 0),
@@ -112,7 +116,7 @@ export async function GET(request: Request) {
       page,
       open: open.data,
       settings: settings.data || {
-        workdays: [0, 1, 2, 3, 4],
+        workdays: DEFAULT_WORKDAYS,
         starts_at: "09:00",
         ends_at: "17:00",
         schedule_mode: "fixed",
@@ -121,6 +125,9 @@ export async function GET(request: Request) {
       leave: { year, granted, used, available: granted - used },
       approved: approved.data || [],
       today,
+      summary: summarizeAttendance({ periods: monthSessions.data, startDate: exists.data.start_date,
+        month: today.slice(0, 7), now: new Date(), dailyMinutes: settings.data?.daily_minutes ?? 480,
+        workdays: settings.data?.workdays }),
     });
   } catch (e) {
     return apiError(e);

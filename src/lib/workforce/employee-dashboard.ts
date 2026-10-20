@@ -2,6 +2,8 @@ import "server-only";
 import type { WorkforceActor } from "./server";
 import { WorkforceError } from "./validation";
 import { executionScope } from "./task-scope";
+import { summarizeAttendance } from "./attendance-summary";
+import { attendanceMonthSessions } from "./attendance-server";
 
 export async function employeeDashboard(
   actor: WorkforceActor,
@@ -74,11 +76,7 @@ export async function employeeDashboard(
     taskCount()
       .eq("column.kind", "done")
       .gte("completed_at", `${month}T00:00:00+03:00`),
-    actor.db
-      .from("wf_attendance_sessions")
-      .select("checked_in,checked_out")
-      .eq("employee_id", employee.id)
-      .eq("business_date", today),
+    attendanceMonthSessions(actor.db, employee.id, employee.start_date, month.slice(0, 7)),
     actor.db
       .from("wf_attendance_sessions")
       .select("checked_in,business_date")
@@ -162,6 +160,9 @@ export async function employeeDashboard(
         task.completion_criteria,
     };
   };
+  const attendanceSummary = summarizeAttendance({ periods: attendance.data || [], startDate: employee.start_date,
+    month: month.slice(0, 7), now, dailyMinutes: settings.data?.daily_minutes ?? 480,
+    workdays: settings.data?.workdays });
   return {
     employee: {
       id: employee.id,
@@ -183,24 +184,10 @@ export async function employeeDashboard(
     },
     attendance: {
       open: attendanceOpen.data,
-      minutes: Math.floor(
-        (attendance.data || []).reduce(
-          (sum, row) =>
-            sum +
-            Math.max(
-              0,
-              Math.min(
-                now.getTime(),
-                row.checked_out ? Date.parse(row.checked_out) : now.getTime(),
-              ) - Date.parse(row.checked_in),
-            ),
-          0,
-        ) / 60000,
-      ),
-      dailyMinutes: settings.data?.daily_minutes ?? 480,
-      dayOff: !(settings.data?.workdays ?? [0, 1, 2, 3, 4]).includes(
-        new Date(`${today}T12:00:00Z`).getUTCDay(),
-      ),
+      minutes: attendanceSummary.todayMinutes,
+      dailyMinutes: attendanceSummary.dailyMinutes,
+      dayOff: attendanceSummary.dayOff,
+      summary: attendanceSummary,
     },
     requests: {
       pending: pendingRequests.count || 0,
