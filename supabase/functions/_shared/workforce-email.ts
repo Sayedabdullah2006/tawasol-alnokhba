@@ -86,6 +86,7 @@ const taskKinds = new Set([
   "overdue",
 ]);
 const intro: Record<string, string> = {
+  knowledge_file: "أُضيف ملف إلى مركز المعرفة وتمت مشاركته معك.",
   task_created: "أُضيفت مهمة جديدة إلى نظام العمل. يمكنك متابعة المسؤول عنها وموعد تسليمها من لوحة إدارة الفريق.",
   task_activity: "تغيرت حالة مهمة في نظام العمل. تفاصيل التغيير والمسؤول عنها متاحة أدناه وفي لوحة إدارة الفريق.",
   attendance_in: "سُجّل حضور أحد أعضاء الفريق. اسم الموظفة ووقت تسجيل الحضور بتوقيت الرياض موضحان أدناه.",
@@ -166,7 +167,7 @@ export function renderWorkforceEmail(mail: WorkforceMail) {
     : [];
   if (mail.body && (!isTask || mail.body !== mail.taskTitle))
     details.unshift(["التفاصيل", mail.body]);
-  const label = isTask
+  const label = mail.kind === "knowledge_file" ? "فتح الملف في مركز المعرفة" : isTask
     ? "فتح المهمة"
     : mail.href.startsWith("/admin/workforce")
       ? "فتح لوحة الموظفين"

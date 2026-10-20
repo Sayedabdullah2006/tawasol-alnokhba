@@ -69,6 +69,9 @@ export default function KnowledgeCenter({ admin }: { admin: boolean }) {
     [uploadFolder, setUploadFolder] = useState(""),
     [uploadTitle, setUploadTitle] = useState(""),
     [progress, setProgress] = useState("");
+  const [notifyEnabled, setNotifyEnabled] = useState(false),
+    [notifyRecipients, setNotifyRecipients] = useState<string[]>([]),
+    [notificationMessage, setNotificationMessage] = useState("");
   const [editor, setEditor] = useState<{
       id: string;
       version: number | null;
@@ -78,7 +81,7 @@ export default function KnowledgeCenter({ admin }: { admin: boolean }) {
     } | null>(null),
     [folderParent, setFolderParent] = useState("");
   const { confirm, confirmation } = useConfirm(),
-    unsaved = useUnsavedChanges(uploads.length > 0);
+    unsaved = useUnsavedChanges(uploads.length > 0 || notifyRecipients.length > 0 || !!notificationMessage);
   const requestKey = `${query}:${revision}`;
   const loading = loadedKey !== requestKey;
   useEffect(() => {
@@ -118,6 +121,7 @@ export default function KnowledgeCenter({ admin }: { admin: boolean }) {
   }, [data?.folders]);
   function navigate(patch: Record<string, string>) {
     const next = new URLSearchParams(query);
+    if (!Object.hasOwn(patch, "file")) next.delete("file");
     for (const [key, value] of Object.entries(patch)) {
       if (value) next.set(key, value);
       else next.delete(key);
@@ -685,11 +689,12 @@ export default function KnowledgeCenter({ admin }: { admin: boolean }) {
         onClose={async () => {
           if (
             !busy &&
-            (!uploads.length ||
+            ((!uploads.length && !notifyRecipients.length && !notificationMessage) ||
               (await confirm("إغلاق الرفع دون حفظ الملفات المتبقية؟")))
           ) {
             setUploads([]);
             setUploadOpen(false);
+            setNotifyEnabled(false); setNotifyRecipients([]); setNotificationMessage("");
           }
         }}
       >
@@ -698,6 +703,9 @@ export default function KnowledgeCenter({ admin }: { admin: boolean }) {
           onSubmit={async (e) => {
             e.preventDefault();
             if (busy || !uploads.length) return;
+            if (notifyEnabled && !notifyRecipients.length) {
+              setError("اختر موظفة واحدة على الأقل"); return;
+            }
             setBusy(true);
             setError("");
             try {
@@ -708,6 +716,8 @@ export default function KnowledgeCenter({ admin }: { admin: boolean }) {
                 body.set("file", item.file);
                 body.set("request_key", item.id);
                 body.set("folder_id", uploadFolder);
+                body.set("notify_user_ids", JSON.stringify(notifyEnabled ? notifyRecipients : []));
+                body.set("notification_message", notifyEnabled ? notificationMessage : "");
                 body.set(
                   "title",
                   uploads.length === 1 && uploadTitle.trim()
@@ -721,6 +731,7 @@ export default function KnowledgeCenter({ admin }: { admin: boolean }) {
                 setRevision((n) => n + 1);
               }
               setUploadOpen(false);
+              setNotifyEnabled(false); setNotifyRecipients([]); setNotificationMessage("");
               setMessage("تم رفع الملفات");
             } catch (e) {
               setError((e as Error).message);
@@ -773,6 +784,28 @@ export default function KnowledgeCenter({ admin }: { admin: boolean }) {
               />
             </Field>
           )}
+          <div className="space-y-3 rounded-2xl border border-border p-4">
+            <label className="flex items-center gap-2 text-sm font-bold">
+              <input type="checkbox" checked={notifyEnabled} disabled={busy}
+                onChange={e => { setNotifyEnabled(e.target.checked); if (!e.target.checked) { setNotifyRecipients([]); setNotificationMessage(""); } }} />
+              إشعار موظفات بالملفات
+            </label>
+            {notifyEnabled && <>
+              <fieldset className="space-y-2">
+                <legend className="mb-2 text-sm font-bold">المستلمات</legend>
+                {(data?.notificationRecipients || []).map(person => <label key={person.id} className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm">
+                  <input type="checkbox" checked={notifyRecipients.includes(person.id)} disabled={busy}
+                    onChange={e => setNotifyRecipients(ids => e.target.checked ? [...ids, person.id] : ids.filter(id => id !== person.id))} />
+                  {person.full_name}
+                </label>)}
+                {!data?.notificationRecipients?.length && <p className="text-sm text-muted">لا توجد موظفات متاحات</p>}
+              </fieldset>
+              <Field label="رسالة في الإيميل — اختياري" id="knowledge-notification-message">
+                <textarea id="knowledge-notification-message" rows={3} maxLength={5000} disabled={busy}
+                  className={controlClass} value={notificationMessage} onChange={e => setNotificationMessage(e.target.value)} />
+              </Field>
+            </>}
+          </div>
           <ul className="space-y-2 text-sm">
             {uploads.map((item) => (
               <li key={item.id} className="break-all" dir="auto">
@@ -785,7 +818,7 @@ export default function KnowledgeCenter({ admin }: { admin: boolean }) {
           <Button
             type="submit"
             loading={busy}
-            disabled={!uploads.length || !uploadFolder}
+            disabled={!uploads.length || !uploadFolder || (notifyEnabled && !notifyRecipients.length)}
           >
             رفع الملفات
           </Button>

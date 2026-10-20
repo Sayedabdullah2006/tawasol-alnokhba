@@ -29,6 +29,7 @@ export type KnowledgeData = {
   folders: KnowledgeFolder[];
   files: KnowledgeFile[];
   uploaders: { id: string; full_name: string }[];
+  notificationRecipients: { id: string; full_name: string }[];
   count: number;
   page: number;
   admin: boolean;

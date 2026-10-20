@@ -20,6 +20,7 @@ import { validateKnowledgeUpload } from "@/lib/workforce/knowledge-upload-server
 import { MAX_KNOWLEDGE_BYTES } from "@/lib/workforce/knowledge";
 import type { KnowledgeFile } from "@/lib/workforce/knowledge";
 import { knowledgeFolderCounts } from "@/lib/workforce/knowledge-folder-counts";
+import { knowledgeNotificationOptions } from "@/lib/workforce/knowledge-notifications";
 type KnowledgeRow = Omit<
   KnowledgeFile,
   "uploaderName" | "taskId" | "canManage" | "canTrash" | "sealed"
@@ -85,6 +86,7 @@ export async function GET(request: Request) {
       query = query.eq("folder_id", "00000000-0000-0000-0000-000000000000");
     if (search)
       query = query.or(`title.ilike.%${search}%,filename.ilike.%${search}%`);
+    if (params.get("file")) query = query.eq("id", uuid(params.get("file")));
     if (params.get("uploader"))
       query = query.eq("created_by", uuid(params.get("uploader")));
     for (const [name, method] of [
@@ -150,6 +152,7 @@ export async function GET(request: Request) {
         };
       }),
       uploaders: identities,
+      notificationRecipients: staff.data.map(e => ({id: e.user_id, full_name: e.full_name})),
       count: result.count || 0,
       page,
       admin: actor.role === "admin",
@@ -165,6 +168,7 @@ export async function POST(request: Request) {
     assertMutation(request);
     const actor = await workforceActor(),
       form = await attachmentForm(request, MAX_KNOWLEDGE_BYTES);
+    const notification = knowledgeNotificationOptions(form);
     id = uuid(form.get("request_key"));
     const folder = uuid(form.get("folder_id")),
       file = form.get("file");
@@ -177,6 +181,13 @@ export async function POST(request: Request) {
         250,
       ),
       service = await createServiceRoleClient();
+    if (notification.recipients.length) {
+      const recipients = await service.from("wf_employees").select("user_id")
+        .eq("status", "active").in("user_id", notification.recipients);
+      if (recipients.error) throw recipients.error;
+      if (recipients.data.length !== notification.recipients.length)
+        throw new WorkforceError("إحدى المستلمات غير متاحة");
+    }
     const permitted = await actor.db
       .from("wf_knowledge_folders")
       .select("id")
@@ -203,6 +214,11 @@ export async function POST(request: Request) {
         p.task_attachment_id
       )
         throw new WorkforceError("مفتاح الرفع مستخدم لملف آخر", 409);
+      const notice = await service.rpc("wf_knowledge_file_notify", {
+        p_actor: actor.user.id, p_file: id,
+        p_recipients: notification.recipients, p_message: notification.message,
+      });
+      if (notice.error) throw notice.error;
       return privateResponse({ id });
     }
     path = `${actor.user.id}/${id}/${crypto.randomUUID()}`;
@@ -213,7 +229,7 @@ export async function POST(request: Request) {
         upsert: false,
       });
     if (upload.error) throw upload.error;
-    const result = await service.rpc("wf_knowledge_file_create", {
+    const result = await service.rpc("wf_knowledge_file_create_notified", {
       p_actor: actor.user.id,
       p_id: id,
       p_folder: folder,
@@ -223,6 +239,8 @@ export async function POST(request: Request) {
       p_size: file.size,
       p_path: path,
       p_sha256: checked.sha256,
+      p_recipients: notification.recipients,
+      p_message: notification.message,
     });
     const verified = await service
       .from("wf_knowledge_files")
