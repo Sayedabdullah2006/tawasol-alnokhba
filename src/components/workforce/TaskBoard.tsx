@@ -31,6 +31,7 @@ export default function TaskBoard({
   more,
   onMore,
   sort = "due",
+  expandedHeight = false,
 }: {
   tasks: WorkTask[];
   columns: TaskColumn[];
@@ -42,6 +43,7 @@ export default function TaskBoard({
   more: Record<string, number>;
   onMore: (kind: string) => Promise<void>;
   sort?: string;
+  expandedHeight?: boolean;
 }) {
   const [dragging, setDragging] = useState<string | null>(null),
     [over, setOver] = useState(""),
@@ -184,7 +186,7 @@ export default function TaskBoard({
               key={kind}
               data-task-lane={kind}
               aria-label={`${TASK_STATES[kind]} — ${visibleCounts[kind] || 0} مهمة`}
-              className={`max-h-[65dvh] min-h-80 w-72 shrink-0 overflow-y-auto rounded-2xl border-t-4 bg-slate-100/90 p-3 ${shades[kind]} ${over === kind && allowed ? "ring-2 ring-green" : ""}`}
+              className={`${expandedHeight ? "h-[85dvh] min-h-[38rem]" : "max-h-[65dvh] min-h-80"} w-72 shrink-0 overflow-y-auto rounded-2xl border-t-4 bg-slate-100/90 p-3 ${shades[kind]} ${over === kind && allowed ? "ring-2 ring-green" : ""}`}
               onDragOver={(e) => {
                 const source = tasks.find((row) => row.id === dragId.current);
                 if (source && cardAction(source, kind, admin)) {

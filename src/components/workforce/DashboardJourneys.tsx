@@ -13,9 +13,9 @@ const tones = [
 ];
 
 export default function DashboardJourneys({ admin = false }: { admin?: boolean }) {
-  return (
+  const content = (
     <nav aria-label={admin ? "إدارة شؤون الفريق" : "الأهداف وشؤون عملي"} className="space-y-3">
-      <h2 className="text-lg font-black text-dark">{admin ? "شؤون الفريق" : "الأهداف وشؤون عملي"}</h2>
+      {!admin && <h2 className="text-lg font-black text-dark">الأهداف وشؤون عملي</h2>}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {Object.entries(journeySections).map(([key, section], index) => (
           <Link
@@ -29,4 +29,10 @@ export default function DashboardJourneys({ admin = false }: { admin?: boolean }
       </div>
     </nav>
   );
+  return admin ? (
+    <details className="space-y-4 rounded-3xl border border-border bg-white/60 p-4 sm:p-5">
+      <summary className="cursor-pointer py-2 text-lg font-black"><h2 className="inline text-lg font-black text-dark">شؤون الفريق</h2></summary>
+      {content}
+    </details>
+  ) : content;
 }

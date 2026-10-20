@@ -408,6 +408,7 @@ export default function TaskWorkspace({
         <p role="alert">تعذر تحميل المهام. أعيدي المحاولة.</p>
       ) : view === "board" ? (
         <TaskBoard
+          expandedHeight={admin && embedded}
           tasks={tasks}
           columns={columns}
           counts={laneCounts}
