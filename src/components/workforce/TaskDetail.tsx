@@ -114,6 +114,10 @@ export default function TaskDetail({
         setError("");
         if (editRequested.current) {
           editRequested.current = false;
+          if (result.canAssign && result.task.column.kind === "review") {
+            setTab("submit");
+            setVisited(current => ({ ...current, submit: true }));
+          }
           if (result.canEdit && !taskEditReason(result.task)) {
             const next = taskForm(result.task);
             setForm(next);

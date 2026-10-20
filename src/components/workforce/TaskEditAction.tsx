@@ -14,23 +14,26 @@ export default function TaskEditAction({ task, base, onOpen }: {
   onOpen?: (id: string, panel?: string) => void;
 }) {
   if (!task.canEdit) return null;
-  const reason = taskEditReason(task);
+  const reviewAssignment = task.column.kind === "review" && !task.archived_at && !task.board?.archived_at;
+  const panel = reviewAssignment ? "submit" : "edit";
+  const label = reviewAssignment ? "تعديل الإسناد" : "تعديل وإعادة الإسناد";
+  const reason = reviewAssignment ? "" : taskEditReason(task);
   const className = "inline-flex min-h-10 items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-900";
   if (reason) return <button type="button" disabled title={reason} className={`${className} cursor-not-allowed opacity-50`}>تعديل وإعادة الإسناد</button>;
   return (
     <Link
       draggable={false}
-      href={`${base}/${task.id}?panel=edit`}
+      href={`${base}/${task.id}?panel=${panel}`}
       className={className}
-      aria-label={`تعديل وإعادة إسناد: ${task.title}`}
+      aria-label={`${label}: ${task.title}`}
       onClick={onOpen ? (event) => {
         if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) {
           event.preventDefault();
-          onOpen(task.id, "edit");
+          onOpen(task.id, panel);
         }
       } : undefined}
     >
-      تعديل وإعادة الإسناد
+      {label}
     </Link>
   );
 }
