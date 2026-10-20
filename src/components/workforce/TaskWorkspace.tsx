@@ -498,9 +498,11 @@ export default function TaskWorkspace({
                 >
                   {item.title}
                 </Link>
-                <p className="text-sm">
-                  المسؤولة: {item.assigneeName || "لم تُسند بعد"}
-                </p>
+                <div className="space-y-0.5 text-[11px] leading-4 text-muted" aria-label="المكلّفون بالمهمة">
+                  {(item.assigneeName || "لم تُسند بعد").split("، ").map((name, index) => (
+                    <span key={index} className="block break-words">{name}</span>
+                  ))}
+                </div>
                 <p className="text-xs text-muted">
                   {TASK_PRIORITIES[item.priority]} · التسليم:{" "}
                   {workDate(item.due_at)}

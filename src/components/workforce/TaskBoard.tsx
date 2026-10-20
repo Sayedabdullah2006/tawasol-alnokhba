@@ -363,9 +363,11 @@ export default function TaskBoard({
                         )}
                       </div>
                       <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
-                        <span className="truncate text-xs text-slate-500">
-                          {task.assigneeName || "دون مسؤولة"}
-                        </span>
+                        <div className="min-w-0 space-y-0.5 text-[11px] leading-4 text-slate-500" aria-label="المكلّفون بالمهمة">
+                          {(task.assigneeName || "دون مسؤولة").split("، ").map((name, index) => (
+                            <span key={index} className="block break-words">{name}</span>
+                          ))}
+                        </div>
                         {editable ? (
                           <select
                             aria-label={`نقل: ${task.title}`}
