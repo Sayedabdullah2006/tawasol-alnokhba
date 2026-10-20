@@ -37,8 +37,6 @@ export async function GET(request: Request) {
       .from("wf_attendance_sessions")
       .select("*", { count: "exact" })
       .eq("employee_id", id)
-      .gte("business_date", `${year}-01-01`)
-      .lte("business_date", `${year}-12-31`)
       .order("checked_in", { ascending: false })
       .order("id")
       .range(from, to);
@@ -47,16 +45,14 @@ export async function GET(request: Request) {
       if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))
         throw new WorkforceError("الشهر غير صحيح");
       sessions = sessions
-        .gte("business_date", `${month}-01`)
+        .or(`checked_out.gte.${new Date(`${month}-01T00:00:00+03:00`).toISOString()},checked_out.is.null`)
         .lt(
-          "business_date",
+          "checked_in",
           new Date(
             Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 1),
-          )
-            .toISOString()
-            .slice(0, 10),
+          ).toISOString().slice(0, 10) + "T00:00:00+03:00",
         );
-    }
+    } else sessions = sessions.gte("business_date", `${year}-01-01`).lte("business_date", `${year}-12-31`);
     const [records, open, settings, entitlement, movements, approved, monthSessions] =
       await Promise.all([
         sessions,

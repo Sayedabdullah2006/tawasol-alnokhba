@@ -1,3 +1,5 @@
+import type { AttendanceSummary } from "./attendance-summary";
+export type TeamAttendance = { summary: AttendanceSummary; open: { checked_in: string } | null };
 export type WorkMetrics = {
   assigned: number;
   completed: number;
@@ -19,6 +21,7 @@ export type AdminWorkDashboard = {
     job_title: string;
     status: "active" | "suspended" | "ended";
     metrics: WorkMetrics;
+    attendance: TeamAttendance;
   }[];
   clients: string[];
   pendingSubmissions: { id: string; taskId: string; title: string; client: string; employeeName: string; createdAt: string }[];

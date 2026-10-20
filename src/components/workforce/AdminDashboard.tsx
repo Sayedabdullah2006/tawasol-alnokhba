@@ -13,6 +13,7 @@ import DashboardJourneys from "./DashboardJourneys";
 import DashboardLiveStatus from "./DashboardLiveStatus";
 import ProgressOrbit from "./ProgressOrbit";
 import PortalIntro from "@/components/layout/PortalIntro";
+import TeamAttendanceCard from "./TeamAttendanceCard";
 
 const count = (value: number) => value.toLocaleString("en-US");
 const percent = (part: number, total: number) => total ? `${count(Math.round(part * 100 / total))}%` : "—";
@@ -95,6 +96,7 @@ export default function AdminDashboard({ userId }: { userId: string }) {
           <div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/80 text-xl font-black">{employee.full_name.trim().slice(0,1)}</span><div className="min-w-0"><h3 className="font-black">{employee.full_name}</h3><p className="mt-1 text-xs opacity-75">{employee.job_title || "دون مسمى"} · {STATUS_LABELS[employee.status]}</p></div></div><span className="shrink-0 rounded-full bg-white/70 px-3 py-1.5 text-xs font-bold">{count(employee.metrics.assigned)} مسندة</span></div>
           <div className="my-5 grid grid-cols-3 gap-2">{metrics.filter(m => ["completed", "overdue", "pending"].includes(m.key)).map(m => <button key={m.key} type="button" disabled={disabled} onClick={() => metricFilter(m.key, employee.id)} className="rounded-xl border border-white/80 bg-white/60 p-3 text-right hover:bg-white disabled:opacity-60"><span className="block text-xs">{m.label}</span><strong className={`mt-2 block text-xl font-black tabular-nums ${m.key === "overdue" && employee.metrics.overdue ? "text-rose-700" : ""}`}>{count(employee.metrics[m.key])}</strong></button>)}</div>
           <div className="flex items-center gap-5 rounded-2xl border border-white/80 bg-white/45 p-3"><ProgressOrbit value={employee.metrics.assigned ? employee.metrics.completed * 100 / employee.metrics.assigned : 0} label={`نسبة إنجاز ${employee.full_name}`} detail="الإنجاز" className={i % 2 ? "text-emerald-600" : "text-sky-600"} /><div className="space-y-3 text-xs"><p>الالتزام بالموعد <strong className="mt-1 block text-lg">{percent(employee.metrics.on_time, employee.metrics.dated_completed)}</strong></p><p className={employee.metrics.blocked ? "font-bold text-amber-800" : "opacity-75"}>{employee.metrics.blocked ? `${count(employee.metrics.blocked)} مهام متوقفة` : "لا توجد عوائق مسجلة"}</p></div></div>
+          <TeamAttendanceCard employeeId={employee.id} attendance={employee.attendance} refreshKey={data.generated_at} />
           <div className="mt-5 flex flex-wrap gap-2 border-t border-current/10 pt-4"><Button size="sm" disabled={disabled || employee.status !== "active"} onClick={() => workspace.current?.createTask(employee.id)}>إسناد مهمة</Button><Button size="sm" variant="outline" disabled={disabled} onClick={() => metricFilter("assigned",employee.id)}>عرض مهامها</Button><Button size="sm" variant="ghost" disabled={disabled} onClick={() => { setSelectedPayroll(employee.id); scrollToWork(); }}>الراتب والحوافز</Button></div>
         </article>)}
       </div>
