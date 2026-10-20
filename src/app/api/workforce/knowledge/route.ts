@@ -19,6 +19,7 @@ import { attachmentForm } from "@/lib/workforce/attachment-server";
 import { validateKnowledgeUpload } from "@/lib/workforce/knowledge-upload-server";
 import { MAX_KNOWLEDGE_BYTES } from "@/lib/workforce/knowledge";
 import type { KnowledgeFile } from "@/lib/workforce/knowledge";
+import { knowledgeFolderCounts } from "@/lib/workforce/knowledge-folder-counts";
 type KnowledgeRow = Omit<
   KnowledgeFile,
   "uploaderName" | "taskId" | "canManage" | "canTrash" | "sealed"
@@ -102,6 +103,13 @@ export async function GET(request: Request) {
       { merge: false }
     >();
     if (result.error) throw result.error;
+    const countedFolders = await knowledgeFolderCounts(folders.data, (start, end) =>
+      actor.db.from("wf_knowledge_files")
+        .select("folder_id", { count: "exact" })
+        .is("deleted_at", null)
+        .order("id")
+        .range(start, end),
+    );
     const service = await createServiceRoleClient();
     const [staff, admins] = await Promise.all([
       service
@@ -119,7 +127,7 @@ export async function GET(request: Request) {
     ];
     const names = new Map(identities.map((p) => [p.id, p.full_name]));
     return privateResponse({
-      folders: folders.data,
+      folders: countedFolders,
       files: (result.data || []).map(({ attachment, ...file }) => {
         const manage =
           actor.role === "admin" || file.created_by === actor.user.id;

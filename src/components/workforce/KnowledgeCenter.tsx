@@ -439,7 +439,14 @@ export default function KnowledgeCenter({ admin }: { admin: boolean }) {
                     <span aria-hidden="true" className="text-3xl">
                       📁
                     </span>
-                    {f.name}
+                    <span className="min-w-0 flex-1 break-words">{f.name}</span>
+                    <span
+                      title="إجمالي الملفات في المجلد ومجلداته الفرعية"
+                      aria-label={`${f.file_count} ملف في ${f.name} ومجلداته الفرعية`}
+                      className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold tabular-nums ${f.file_count > 0 ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"}`}
+                    >
+                      {f.file_count > 0 ? `${f.file_count.toLocaleString("ar-SA")} ملف` : "فارغ"}
+                    </span>
                   </button>
                   {admin && !f.system_key && (
                     <details className="mt-2 text-sm">

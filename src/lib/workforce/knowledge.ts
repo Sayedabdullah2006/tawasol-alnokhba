@@ -4,6 +4,8 @@ export type KnowledgeFolder = {
   name: string;
   system_key: string | null;
   version: number;
+  direct_file_count: number;
+  file_count: number;
 };
 export type KnowledgeFile = {
   id: string;
