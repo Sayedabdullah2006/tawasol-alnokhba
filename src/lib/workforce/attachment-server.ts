@@ -5,6 +5,7 @@ import { PDFDocument } from "pdf-lib";
 import { MAX_ATTACHMENT_BYTES } from "./attachments";
 import { WorkforceError } from "./validation";
 import type { WorkforceActor } from "./server";
+import { canReviewTask } from "./task-review";
 
 export const ATTACHMENT_BUCKET = "workforce-task-files";
 export const attachmentColumns =
@@ -37,9 +38,11 @@ export async function attachmentTask(
   const editable =
     !task.archived_at &&
     !task.board.archived_at &&
-    !["review", "done"].includes(task.column.kind);
+    task.column.kind !== "done" &&
+    (task.column.kind !== "review" || canReviewTask(actor, task));
   const owner =
-    actor.role === "admin" || actor.employee?.id === task.assignee_id || task.co_assignee_ids.includes(actor.employee?.id ?? "");
+    actor.role === "admin" || actor.employee?.id === task.assignee_id || task.co_assignee_ids.includes(actor.employee?.id ?? "") ||
+    (task.column.kind === "review" && canReviewTask(actor, task));
   if (write && !owner)
     throw new WorkforceError("يمكنك الإرفاق على مهامك فقط", 403);
   return { task, canUpload: owner && editable, editable };

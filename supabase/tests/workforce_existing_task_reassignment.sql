@@ -32,9 +32,11 @@ begin
  select version into v from public.wf_tasks where id=task_id;
  perform public.wf_test_task_command(run,manager_user,task_id,v,'submit','{"summary":"تسليم داخل معاملة ملغاة"}',gen_random_uuid());
  select version into v from public.wf_tasks where id=task_id;
+ perform public.wf_test_task_command(run,manager_user,task_id,v,'edit',jsonb_build_object('assignee_id',member_employee),gen_random_uuid());
+ select version into v from public.wf_tasks where id=task_id;
  begin
-  perform public.wf_test_task_command(run,manager_user,task_id,v,'edit',jsonb_build_object('assignee_id',member_employee),gen_random_uuid());
-  raise exception 'Review task reassigned';
+  perform public.wf_test_task_command(run,manager_user,task_id,v,'edit',jsonb_build_object('title','تعديل محظور أثناء المراجعة'),gen_random_uuid());
+  raise exception 'Review task details changed';
  exception when sqlstate 'PT409' then null;end;
  perform public.wf_test_task_command(run,owner,task_id,v,'review','{"decision":"approved","reason":"اعتماد داخل معاملة ملغاة"}',gen_random_uuid());
  select version into v from public.wf_tasks where id=task_id;
@@ -46,4 +48,4 @@ begin
  if (select count(*) from public.wf_notifications)<>notices or (select count(*) from public.wf_notification_deliveries)<>deliveries then raise exception 'Silent run leaked notices';end if;
 end $$;
 rollback;
-select 'PASS: Noor edits existing admin task and reassigns to Monwa/admin, Monwa denied, approval preserved, review/done protected, no notifications or emails; all rolled back' as result;
+select 'PASS: Noor reassigns existing and review tasks, Monwa denied, approval preserved, review details/done protected, no notifications or emails; all rolled back' as result;

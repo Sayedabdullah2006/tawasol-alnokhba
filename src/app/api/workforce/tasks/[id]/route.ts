@@ -5,6 +5,7 @@ import {
 } from "@/lib/workforce/server";
 import { privateResponse } from "@/lib/workforce/task-server";
 import { uuid, WorkforceError } from "@/lib/workforce/validation";
+import { canReviewTask } from "@/lib/workforce/task-review";
 
 export async function GET(
   _request: Request,
@@ -78,7 +79,7 @@ export async function GET(
         (task.assignment_origin === "self" &&
           task.created_by === actor.user.id &&
           task.assignee_id === actor.employee?.id),
-      canReview: actor.role === "admin",
+      canReview: canReviewTask(actor, task),
       canAssign: actor.canManageTasks,
       canArchive:
         actor.role === "admin" ||

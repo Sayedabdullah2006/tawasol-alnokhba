@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import {
@@ -8,7 +9,7 @@ import {
   type BoardDetail,
   type TaskDetail as Detail,
 } from "@/lib/workforce/task-types";
-import TaskFields, { taskForm, taskPayload } from "./TaskFields";
+import TaskFields, { CoAssignees, EmployeePicker, taskForm, taskPayload } from "./TaskFields";
 import TaskChecklist from "./TaskChecklist";
 import TaskHistory from "./TaskHistory";
 import TaskComments from "./TaskComments";
@@ -41,6 +42,7 @@ export default function TaskDetail({
   onClose?: () => void;
 }) {
   const startingPanel = initialPanel === "edit" ? "brief" : initialPanel;
+  const router = useRouter();
   const editRequested = useRef(initialPanel === "edit");
   const [tab, setTab] = useState(startingPanel);
   const [visited, setVisited] = useState<Record<string, boolean>>({
@@ -75,6 +77,8 @@ export default function TaskDetail({
     [],
   );
   const [reason, setReason] = useState("");
+  const [reviewAssignment, setReviewAssignment] = useState<ReturnType<typeof taskForm> | null>(null);
+  const [pendingReviewFiles, setPendingReviewFiles] = useState(false);
   const [block, setBlock] = useState("");
   const [column, setColumn] = useState("");
   const { confirm, confirmation } = useConfirm();
@@ -84,6 +88,7 @@ export default function TaskDetail({
       attachmentIds.length > 0 ||
       attachmentBusy ||
       !!reason ||
+      !!reviewAssignment ||
       !!block,
   );
   const base = admin ? "/admin/workforce/tasks" : "/employee/work/tasks";
@@ -169,12 +174,18 @@ export default function TaskDetail({
       });
       onChanged?.();
       window.dispatchEvent(new Event("workforce-notifications"));
+      if (name === "delete") {
+        setReason(""); setSummary(""); setAttachmentIds([]); setReviewAssignment(null); setBlock("");
+        if (onClose) onClose(); else router.replace(base);
+        return true;
+      }
       if (name === "edit") setEditing(false);
       if (name === "submit") {
         setSummary("");
         setAttachmentIds([]);
       }
       if (name === "review") setReason("");
+      if (name === "edit") setReviewAssignment(null);
       if (name === "block") setBlock("");
       setColumn("");
       setMessage(success);
@@ -307,6 +318,10 @@ export default function TaskDetail({
             {task.archived_at ? "استعادة المهمة" : "أرشفة المهمة"}
           </Button>
         )}
+        {admin && <Button type="button" variant="outline" disabled={busy} onClick={async () => {
+          if (await confirm("حذف هذه المهمة دون إرسال إشعارات أو بريد؟"))
+            await command("delete", {}, "حُذفت المهمة");
+        }}>حذف المهمة</Button>}
       </div>
       <nav
         aria-label="تفاصيل المهمة"
@@ -453,7 +468,7 @@ export default function TaskDetail({
                     />
                     {submission.decision_reason && (
                       <div className="rounded-xl bg-slate-50 p-4">
-                        <h3 className="font-bold">سبب قرار المدير</h3>
+                        <h3 className="font-bold">سبب قرار المراجعة</h3>
                         <p className="whitespace-pre-wrap break-words">
                           {submission.decision_reason}
                         </p>
@@ -525,12 +540,30 @@ export default function TaskDetail({
                   </form>
                 </Panel>
               )}
+              {data.canAssign && reviewing && !frozen && (
+                <Panel title="المسند إليهم" tone="sky">
+                  <EmployeePicker includeAdmins value={(reviewAssignment ?? taskForm(task)).assignee_id}
+                    onChange={value => setReviewAssignment(current => ({ ...(current ?? taskForm(task)), assignee_id: value }))} />
+                  <CoAssignees value={(reviewAssignment ?? taskForm(task)).co_assignee_ids}
+                    primary={(reviewAssignment ?? taskForm(task)).assignee_id}
+                    onChange={ids => setReviewAssignment(current => ({ ...(current ?? taskForm(task)), co_assignee_ids: ids }))} />
+                  <Button disabled={busy || !reviewAssignment} onClick={() => {
+                    if (!reviewAssignment) return;
+                    const assignment = taskPayload(reviewAssignment, admin, true);
+                    void command("edit", { assignee_id: assignment.assignee_id, assignee_admin_id: assignment.assignee_admin_id,
+                      co_assignee_ids: assignment.co_assignee_ids }, "تم تحديث المسند إليهم");
+                  }}>حفظ الإسناد</Button>
+                </Panel>
+              )}
               {data.canReview && reviewing && !frozen && (
                 <Panel title="اعتماد التسليم" tone="amber">
+                  <TaskAttachments taskId={id} version={task.version} canWork reviewMode
+                    disabled={commandBusy} onBusy={attachmentBusyChanged} onPendingChange={setPendingReviewFiles} />
                   <form
                     className="space-y-4"
                     onSubmit={(e) => {
                       e.preventDefault();
+                      if (pendingReviewFiles || reviewAssignment) return;
                       void command(
                         "review",
                         { decision: "approved", reason },
@@ -538,12 +571,13 @@ export default function TaskDetail({
                       );
                     }}
                   >
+                    {reviewAssignment && <p role="status" className="text-sm font-bold">احفظ الإسناد أولًا</p>}
+                    {pendingReviewFiles && <p role="status" className="text-sm font-bold">ارفع المرفقات أولًا</p>}
                     <Field label="سبب قرار المراجعة" id="task-review-reason">
                       <textarea
                         id="task-review-reason"
                         required
                         minLength={3}
-                        maxLength={10000}
                         rows={3}
                         className={controlClass}
                         value={reason}
@@ -551,13 +585,13 @@ export default function TaskDetail({
                       />
                     </Field>
                     <div className="flex flex-wrap gap-3">
-                      <Button type="submit" loading={busy}>
+                      <Button type="submit" loading={busy} disabled={pendingReviewFiles || !!reviewAssignment}>
                         اعتماد التسليم
                       </Button>
                       <Button
                         type="button"
                         variant="outline"
-                        disabled={busy || reason.trim().length < 3}
+                        disabled={busy || reason.trim().length < 3 || pendingReviewFiles || !!reviewAssignment}
                         onClick={() =>
                           command(
                             "review",

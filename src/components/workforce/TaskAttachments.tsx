@@ -100,6 +100,7 @@ export default function TaskAttachments({
   onBusy,
   onPendingChange,
   onChanged,
+  reviewMode = false,
 }: {
   taskId: string;
   submissionId?: string;
@@ -112,6 +113,7 @@ export default function TaskAttachments({
   onBusy?: (busy: boolean) => void;
   onPendingChange?: (pending: boolean) => void;
   onChanged?: () => void;
+  reviewMode?: boolean;
 }) {
   const [data, setData] = useState<AttachmentList | null>(null),
     [error, setError] = useState(""),
@@ -120,7 +122,7 @@ export default function TaskAttachments({
     [archived, setArchived] = useState(false),
     [revision, setRevision] = useState(0);
   const [pending, setPending] = useState<{ file: File; key: string }[]>([]),
-    [purpose, setPurpose] = useState("delivery"),
+    [purpose, setPurpose] = useState(reviewMode ? "task" : "delivery"),
     [busy, setBusy] = useState(false),
     [progress, setProgress] = useState("");
   const input = useRef<HTMLInputElement>(null),
@@ -301,7 +303,7 @@ export default function TaskAttachments({
               }}
             />
           </Field>
-          <Field label="استخدام المرفقات" id={`attachment-purpose-${taskId}`}>
+          {!reviewMode && <Field label="استخدام المرفقات" id={`attachment-purpose-${taskId}`}>
             <select
               id={`attachment-purpose-${taskId}`}
               className="w-full rounded-xl border p-2"
@@ -312,7 +314,7 @@ export default function TaskAttachments({
               <option value="delivery">مرفقات التسليم</option>
               <option value="task">ملفات مرجعية للمهمة</option>
             </select>
-          </Field>
+          </Field>}
           {pending.length > 0 && (
             <ul className="space-y-1 text-sm">
               {pending.map((item) => (

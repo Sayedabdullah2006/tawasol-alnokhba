@@ -69,10 +69,16 @@ export async function workCommand(
       !input.payload ||
       typeof input.payload !== "object" ||
       Array.isArray(input.payload) ||
-      Buffer.byteLength(JSON.stringify(input.payload)) > 100000
+      (!(scope === "task" && command === "review") &&
+        Buffer.byteLength(JSON.stringify(input.payload)) > 100000)
     )
       throw new WorkforceError("بيانات الإجراء غير صحيحة أو كبيرة جدًا");
     const service = await createServiceRoleClient();
+    if ((scope === "task" && !["create", "delete"].includes(command)) || ["checklist", "comments", "members", "time"].includes(scope)) {
+      const visible = await actor.db.from("wf_tasks").select("id").eq("id", id).maybeSingle();
+      if (visible.error) throw visible.error;
+      if (!visible.data) throw new WorkforceError("المهمة غير متاحة", 404);
+    }
     const testRun = await requestTestRun(request, actor);
     if (testRun && scope !== "task") {
       if (!["checklist", "comments", "time", "members"].includes(scope))

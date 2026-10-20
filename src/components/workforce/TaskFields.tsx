@@ -160,7 +160,7 @@ export function EmployeePicker({
     </fieldset>
   );
 }
-function CoAssignees({ value, primary, onChange }: { value: string[]; primary: string; onChange: (ids: string[]) => void }) {
+export function CoAssignees({ value, primary, onChange }: { value: string[]; primary: string; onChange: (ids: string[]) => void }) {
   const [names, setNames] = useState<Record<string, string>>({});
   useEffect(() => {
     const abort = new AbortController();
