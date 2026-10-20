@@ -22,18 +22,17 @@ export type WeeklyReport = {
 };
 const duration = (minutes: number) => `${Math.floor(minutes / 60)} س ${Math.floor(minutes % 60)} د`;
 export function weeklyFeedback(report: WeeklyReport) {
-  const messages: string[] = [];
   const missing = Math.max(0, report.weekRequiredMinutes - report.weekWorkedMinutes);
-  if (report.weekRequiredMinutes > 0) messages.push(missing
-    ? `شكرًا لجهدك هذا الأسبوع. سجّل دوامك ${duration(report.weekWorkedMinutes)} من مستهدف ${duration(report.weekRequiredMinutes)}؛ الفارق ${duration(missing)}. راجعي فترات الحضور، وقدّمي طلب تصحيح إن كانت هناك ساعات غير مسجلة، ولنوزّع وقت الأسبوع القادم بما يساعدك على الوصول للمستهدف. نحن هنا لدعمك.`
-    : "أحسنتِ في تحقيق مستهدف ساعات الأسبوع، شكرًا لالتزامك وتنظيم وقتك. واصلي بهذا الإيقاع المتوازن.");
-  if (report.overdue || report.lateSubmissions) messages.push(`نقدّر ما تبذلينه. توجد ${report.overdue} مهمة متأخرة و${report.lateSubmissions} تسليمات بعد الموعد. ابدئي بالأقرب للتسليم، وحدّثي العوائق مبكرًا حتى نساعدك على تجاوزها خطوة بخطوة.`);
-  else if (report.onTime) messages.push(`رائع، رفعتِ ${report.onTime} من تسليماتك المؤرخة ضمن موعدها. شكرًا لحرصك، واصلي التخطيط المبكر والمحافظة على هذا الالتزام.`);
-  else messages.push("لا توجد تسليمات مؤرخة كافية هذا الأسبوع لقياس الالتزام بالمواعيد. اختاري أولويات الأسبوع القادم وراجعي المخرجات المطلوبة قبل البدء.");
-  if (report.repeatedChanges) messages.push(`احتاجت ${report.repeatedChanges} من مهامك إلى أكثر من جولة تعديل. كل مراجعة فرصة للتحسين؛ جرّبي قائمة تحقق قبل التسليم، واطلبي توضيح أي متطلب مبكرًا لتصلي إلى نتيجة أقرب للاعتماد من أول مرة.`);
-  else if (report.changesCount) messages.push("ملاحظات المراجعة تساعد على تطوير المخرجات. راجعيها نقطة بنقطة قبل رفع النسخة التالية، ونحن نثق بقدرتك على التحسين.");
-  if (report.pendingReview) messages.push(`لديك ${report.pendingReview} تسليمات بانتظار المراجعة، ولم تُحسب ضمن المهام المتأخرة. شكرًا لإتمام دورك في رفعها.`);
-  return messages;
+  const late = report.overdue > 0 || report.lateSubmissions > 0;
+  const lead = !late && report.onTime ? "شكرًا لالتزامك بالمواعيد." : "شكرًا لجهدك هذا الأسبوع.";
+  const focus: string[] = [];
+  if (late) focus.push("ابدئي بالأقرب للتسليم وشاركي العوائق مبكرًا");
+  if (report.repeatedChanges) focus.push("راجعي المتطلبات بقائمة تحقق قبل التسليم");
+  else if (report.changesCount) focus.push("استفيدي من ملاحظات المراجعة في النسخة المقبلة");
+  if (missing) focus.push("راجعي فترات حضورك ونظّمي وقتك للوصول إلى المستهدف");
+  if (focus.length) return [`${lead} ${focus.join("، و")}؛ نحن هنا لدعمك.`];
+  if (report.weekRequiredMinutes > 0) return [`${lead} أحسنتِ في تحقيق مستهدف الساعات، واصلي بهذا الإيقاع المتوازن.`];
+  return [`${lead} حددي أولوياتك وخطوتك القادمة، ونتطلع لإنجازاتك.`];
 }
 export function workforceMailCC(mail: WorkforceMail) {
   return mail.kind === "weekly_report" && mail.weeklyReport && mail.cc?.includes("elitecnnct@gmail.com")
@@ -48,6 +47,27 @@ const escape = (value: string) =>
         c
       ]!,
   );
+function renderWeeklyEmail(mail: WorkforceMail, weekly: WeeklyReport) {
+  const subject = `${mail.title.replace(/[\r\n]+/g, " ").slice(0,180)} | تواصل النخبة`;
+  const feedback = weeklyFeedback(weekly)[0];
+  const missing = Math.max(0,weekly.weekRequiredMinutes-weekly.weekWorkedMinutes);
+  const percent = weekly.weekRequiredMinutes ? Math.min(100,Math.round(weekly.weekWorkedMinutes*100/weekly.weekRequiredMinutes)) : 0;
+  const date = (value:string) => new Date(`${value}T12:00:00+03:00`).toLocaleDateString("ar-SA",{calendar:"gregory",day:"numeric",month:"short"});
+  const month = new Date(`${weekly.month}-01T12:00:00+03:00`).toLocaleDateString("ar-SA",{calendar:"gregory",month:"long"});
+  const cards = [
+    {label:"مهام منجزة",value:String(weekly.completed),background:"#e9f7ef",color:"#126541"},
+    {label:"غير مكتملة",value:String(weekly.unfinished),background:"#edf3ff",color:"#254d95"},
+    {label:"بانتظار المراجعة",value:String(weekly.pendingReview),background:"#f2edff",color:"#6945a3"},
+    {label:"مهام متأخرة",value:String(weekly.overdue),background:"#fff0ef",color:"#ae4541"},
+    {label:"ساعات الأسبوع",value:duration(weekly.weekWorkedMinutes),background:"#e9f7fc",color:"#17627d"},
+    {label:`ساعات ${month}`,value:duration(weekly.monthWorkedMinutes),background:"#fff5de",color:"#876022"},
+  ];
+  const tiles = [0,2,4].map(index=>`<tr>${cards.slice(index,index+2).map(card=>`<td width="50%" style="width:50%;padding:4px;vertical-align:top"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${card.background};border-radius:14px"><tr><td style="padding:12px 14px;text-align:right;color:${card.color}"><p style="margin:0;font-size:12px;line-height:1.5">${escape(card.label)}</p><p class="metric" style="margin:4px 0 0;font-size:26px;line-height:1.25;font-weight:bold;white-space:nowrap">${escape(card.value)}</p></td></tr></table></td>`).join("")}</tr>`).join("");
+  const quality = [`${weekly.onTime} تسليم ضمن الموعد`,...(weekly.lateSubmissions?[`${weekly.lateSubmissions} تسليم بعد الموعد`]:[]),...(weekly.changesCount?[`${weekly.changesCount} طلب تعديل`]:[]),...(weekly.repeatedChanges?[`${weekly.repeatedChanges} مهام تكرر إرجاعها`]:[])];
+  const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(subject)}</title><style>@media(max-width:480px){.weekly-pad{padding:16px!important}.metric{font-size:20px!important}.weekly-title{font-size:21px!important}}</style></head><body style="margin:0;background:#eef2f7;color:#102b57;font-family:Tahoma,Arial,sans-serif;direction:rtl;text-align:right"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:20px 10px"><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#fff;border-radius:20px;overflow:hidden;border:1px solid #dde5ef"><tr><td class="weekly-pad" style="padding:20px 24px;background:#102b57;border-top:4px solid #c9a961"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="text-align:right"><p style="margin:0 0 5px;color:#e6cf99;font-size:11px">تواصل النخبة · ${escape(date(weekly.periodStart))} — ${escape(date(weekly.periodEnd))}</p><h1 class="weekly-title" style="margin:0;color:#fff;font-size:24px;line-height:1.5">أسبوعكِ في لمحة</h1><p style="margin:5px 0 0;color:#d5dfed;font-size:13px">${escape(mail.name)}</p></td><td width="64" style="width:64px;vertical-align:middle"><img src="${site}/logo.png" width="60" alt="تواصل النخبة" style="display:block;width:60px;height:auto;background:#fff;border-radius:12px"></td></tr></table></td></tr><tr><td class="weekly-pad" style="padding:18px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${tiles}</table><div style="margin:12px 4px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="font-size:11px;color:#62718a;text-align:right">مستهدف الأسبوع <strong style="color:#102b57">${escape(duration(weekly.weekRequiredMinutes))}</strong></td><td style="font-size:11px;color:#62718a;text-align:left">المتبقي <strong style="color:${missing?"#976819":"#126541"}">${escape(duration(missing))}</strong></td></tr></table><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;background:#e9edf4;border-radius:6px;overflow:hidden"><tr>${percent?`<td width="${percent}%" style="height:6px;background:#c9a961;font-size:1px;line-height:6px">&nbsp;</td>`:""}${percent<100?`<td width="${100-percent}%" style="height:6px;font-size:1px;line-height:6px">&nbsp;</td>`:""}</tr></table></div><p style="margin:14px 4px;color:#62718a;font-size:11px;line-height:1.8">${quality.map(escape).join(" · ")}</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf6ec;border-radius:14px;border-right:3px solid #c9a961"><tr><td style="padding:14px 16px;text-align:right"><p style="margin:0 0 4px;color:#917039;font-size:11px;font-weight:bold">رسالة لكِ</p><p style="margin:0;color:#34445c;font-size:13px;line-height:1.9">${escape(feedback)}</p></td></tr></table><p style="margin:18px 0 0;text-align:center"><a href="${site}/employee" style="display:inline-block;padding:11px 30px;background:#102b57;color:#fff;border-radius:10px;text-decoration:none;font-size:13px;font-weight:bold">فتح لوحتي</a></p></td></tr><tr><td style="padding:12px;text-align:center;border-top:1px solid #edf0f5;color:#7d8a9d;font-size:10px"><a href="${site}" style="color:#7d8a9d;text-decoration:none">nukhba.media</a> · بتوقيت الرياض</td></tr></table></td></tr></table></body></html>`;
+  const text = [`${mail.name} — أسبوعكِ في لمحة`,`${weekly.periodStart} — ${weekly.periodEnd}`,...cards.map(card=>`${card.label}: ${card.value}`),`مستهدف الأسبوع: ${duration(weekly.weekRequiredMinutes)} · المتبقي: ${duration(missing)}`,quality.join(" · "),feedback,`فتح لوحتي: ${site}/employee`].join("\n\n");
+  return {subject,html,text};
+}
 const taskKinds = new Set([
   "task_created",
   "assigned",
@@ -118,12 +138,13 @@ const intro: Record<string, string> = {
 export function renderWorkforceEmail(mail: WorkforceMail) {
   if (mail.kind === "weekly_report" && !mail.weeklyReport) throw new Error("Weekly report snapshot missing");
   const weekly = mail.kind === "weekly_report" ? mail.weeklyReport : undefined;
+  if (weekly) return renderWeeklyEmail(mail,weekly);
   const href = /^\/(employee|admin\/workforce)(\/|\?|$)/.test(mail.href)
     ? site + mail.href
     : site + "/employee";
   const isTask = taskKinds.has(mail.kind) && !!mail.taskTitle;
   const message =
-    (weekly ? "إليك ملخص أسبوعك. شكرًا لمساهمتك في فريق تواصل النخبة، وكل أسبوع فرصة لخطوة أفضل." : intro[mail.kind]) ||
+    intro[mail.kind] ||
     (isTask
       ? "يوجد تحديث على المهمة. راجعي التفاصيل والحالة والملاحظات من الرابط أدناه."
       : "يوجد تحديث وظيفي جديد. يمكنك الاطلاع عليه من بوابتك الخاصة.");
@@ -145,19 +166,6 @@ export function renderWorkforceEmail(mail: WorkforceMail) {
     : [];
   if (mail.body && (!isTask || mail.body !== mail.taskTitle))
     details.unshift(["التفاصيل", mail.body]);
-  if (weekly) {
-    details.push(
-      ["فترة الأسبوع", `${weekly.periodStart} — ${weekly.periodEnd} (السبت إلى الجمعة)`],
-      ["المهام المنجزة خلال الأسبوع", String(weekly.completed)],
-      ["المهام غير المكتملة حتى نهاية الأسبوع", `${weekly.unfinished} — منها ${weekly.pendingReview} بانتظار المراجعة، و${weekly.overdue} متأخرة`],
-      ["ساعات الأسبوع", `${duration(weekly.weekWorkedMinutes)} من ${duration(weekly.weekRequiredMinutes)} — الفارق ${duration(Math.max(0,weekly.weekRequiredMinutes-weekly.weekWorkedMinutes))}`],
-      [`ساعات العمل التراكمية للشهر ${weekly.month} حتى ${weekly.periodEnd}`, duration(weekly.monthWorkedMinutes)],
-      ["الالتزام بالمواعيد", `${weekly.onTime} تسليمات ضمن الموعد · ${weekly.lateSubmissions} بعد الموعد`],
-      ["المراجعة والتحسين", `${weekly.changesCount} طلبات تعديل خلال الأسبوع · ${weekly.repeatedChanges} مهام تكرر إرجاعها`],
-      ["رسالة لكِ", weeklyFeedback(weekly).join("\n\n")],
-    );
-    if(weekly.openTasks.length) details.push(["أقرب المهام غير المكتملة",weekly.openTasks.map(task=>`${task.title}${task.pendingReview?" — بانتظار المراجعة":""}${task.dueAt?` — ${new Date(task.dueAt).toLocaleString("ar-SA",{calendar:"gregory",timeZone:"Asia/Riyadh",dateStyle:"short",timeStyle:"short"})}`:""}`).join("\n")]);
-  }
   const label = isTask
     ? "فتح المهمة"
     : mail.href.startsWith("/admin/workforce")
