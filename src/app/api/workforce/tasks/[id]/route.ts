@@ -57,6 +57,13 @@ export async function GET(
     ]);
     for (const result of [submissionResult, checklistResult, assignee])
       if (result.error) throw result.error;
+    const reviewResult = submissionResult.data?.status === "pending"
+      ? await actor.db.from("wf_task_submissions")
+          .select("id,summary,status,decision_reason,created_at,decided_at,submission_number")
+          .eq("task_id", id).not("decided_at", "is", null)
+          .order("submission_number", { ascending: false }).limit(1).maybeSingle()
+      : submissionResult;
+    if (reviewResult.error) throw reviewResult.error;
     const { columns, ...board } = task.board;
     return privateResponse({
       task,
@@ -70,6 +77,7 @@ export async function GET(
         canCreate: false,
       },
       latestSubmission: submissionResult.data,
+      latestReview: reviewResult.data,
       checklist: checklistResult.data || [],
       assigneeName: [assignee.data?.full_name, ...(task.co_assignee_ids?.length ? (await service.from("wf_employees").select("full_name").in("id", task.co_assignee_ids)).data?.map(row => row.full_name) ?? [] : [])].filter(Boolean).join("، ") || null,
       canWork:

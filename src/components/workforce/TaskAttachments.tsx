@@ -467,7 +467,7 @@ export default function TaskAttachments({
   );
   return submissionId ? (
     <div className="space-y-2">
-      <h3 className="font-bold">مرفقات هذه المحاولة</h3>
+      <h3 className="font-bold">مرفقات التسليم{data ? ` (${data.count})` : ""}</h3>
       {content}
     </div>
   ) : (

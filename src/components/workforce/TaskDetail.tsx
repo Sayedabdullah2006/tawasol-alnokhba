@@ -16,6 +16,7 @@ import TaskComments from "./TaskComments";
 import TaskTime from "./TaskTime";
 import TaskAttachments from "./TaskAttachments";
 import { taskEditReason } from "./TaskEditAction";
+import { taskNextAction } from "@/lib/workforce/task-next-action";
 import {
   api,
   controlClass,
@@ -44,6 +45,11 @@ export default function TaskDetail({
   const startingPanel = initialPanel === "edit" ? "brief" : initialPanel;
   const router = useRouter();
   const editRequested = useRef(initialPanel === "edit");
+  const workflowForm = useRef<HTMLElement>(null);
+  const uploadWorkflow = useRef<HTMLElement>(null);
+  const blockers = useRef<HTMLDetailsElement>(null);
+  const pendingWorkflowFocus = useRef(false);
+  const [focusWorkflow, setFocusWorkflow] = useState(0);
   const [tab, setTab] = useState(startingPanel);
   const [visited, setVisited] = useState<Record<string, boolean>>({
     [startingPanel]: true,
@@ -52,6 +58,14 @@ export default function TaskDetail({
     setTab(panel);
     setVisited((current) => ({ ...current, [panel]: true }));
   }
+  useEffect(() => {
+    if (pendingWorkflowFocus.current && tab === "submit") {
+      const target = uploadWorkflow.current && !uploadWorkflow.current.hidden ? uploadWorkflow.current : workflowForm.current;
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      target?.focus({ preventScroll: true });
+      pendingWorkflowFocus.current = false;
+    }
+  }, [focusWorkflow, tab]);
   const [data, setData] = useState<Detail | null>(null);
   const [board, setBoard] = useState<BoardDetail | null>(null);
   const [reload, setReload] = useState(0);
@@ -247,6 +261,10 @@ export default function TaskDetail({
   const reviewing = task.column.kind === "review";
   const done = task.column.kind === "done";
   const submission = data.latestSubmission;
+  const review = data.latestReview ?? (submission?.status !== "pending" ? submission : null);
+  const nextAction = taskNextAction({ frozen, kind: task.column.kind,
+    canWork: data.canWork, canReview: data.canReview,
+    blocked: !!task.blocked_reason, submissionStatus: submission?.status });
   return (
     <div className="mx-auto w-full min-w-0 max-w-6xl space-y-6 p-4 md:p-8">
       {confirmation}
@@ -352,6 +370,39 @@ export default function TaskDetail({
           </Button>
         ))}
       </nav>
+      {(tab === "brief" || tab === "submit") && (
+        <section aria-label="التسليم والمراجعة" className="grid items-start gap-4 lg:grid-cols-2">
+          <Panel title="آخر تسليم" tone="sky">
+            {submission ? <div className="space-y-4 text-sm leading-7">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className={`rounded-full px-3 py-1 text-xs font-bold ${submission.status === "approved" ? "bg-emerald-100 text-emerald-800" : submission.status === "changes" ? "bg-amber-100 text-amber-900" : "bg-violet-100 text-violet-900"}`}>
+                  {{pending: "بانتظار المراجعة", approved: "معتمد", changes: "أعيد للتعديل"}[submission.status]}
+                </span>
+                <span className="text-xs text-muted">المحاولة {submission.submission_number} · {workDate(submission.created_at)}</span>
+              </div>
+              <p className="max-h-64 overflow-auto whitespace-pre-wrap break-words">{submission.summary}</p>
+              <TaskAttachments key={submission.id} taskId={id} submissionId={submission.id} version={task.version} />
+            </div> : <p className="text-sm text-muted">لم يُرسل تسليم بعد</p>}
+          </Panel>
+          <div className="space-y-4">
+            <Panel title="ملاحظات المراجعة" tone="amber">
+              {review?.decision_reason ? <div className="space-y-2 text-sm leading-7">
+                <p className="text-xs font-bold">{review.status === "approved" ? "اعتماد" : "طلب تعديل"} · المحاولة {review.submission_number}</p>
+                <p className="max-h-64 overflow-auto whitespace-pre-wrap break-words">{review.decision_reason}</p>
+                <p className="text-xs text-muted">{workDate(review.decided_at)}</p>
+              </div> : <p className="text-sm text-muted">{submission?.status === "pending" ? "لم يصدر قرار بعد" : "لا توجد ملاحظات"}</p>}
+            </Panel>
+            <Panel title="الإجراء التالي" tone="emerald">
+              <p className="text-sm font-bold">{nextAction.label}</p>
+              {nextAction.action && <Button className="mt-4" disabled={busy} onClick={() => {
+                if (nextAction.action === "block") {
+                  if (blockers.current) { blockers.current.open = true; blockers.current.scrollIntoView({behavior: "smooth", block: "start"}); }
+                } else { pendingWorkflowFocus.current = true; show("submit"); setFocusWorkflow(n => n + 1); }
+              }}>{nextAction.button}</Button>}
+            </Panel>
+          </div>
+        </section>
+      )}
       <div className="space-y-5">
         <div className="space-y-6">
           <section hidden={tab !== "brief"} className="space-y-5">
@@ -391,16 +442,8 @@ export default function TaskDetail({
                 </p>
                 <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-violet-200 pt-4">
                   <span className="rounded-full bg-white px-3 py-1 text-xs font-bold">
-                    {task.requires_approval ? "باعتماد المدير" : "إنجاز مباشر"}
+                    {task.requires_approval ? "يتطلب اعتمادًا" : "إنجاز مباشر"}
                   </span>
-                  {!frozen &&
-                    !done &&
-                    ((data.canWork && !reviewing) ||
-                      (data.canReview && reviewing)) && (
-                      <Button size="sm" onClick={() => show("submit")}>
-                        {reviewing ? "مراجعة التسليم" : "تسليم المهمة"}
-                      </Button>
-                    )}
                 </div>
               </Panel>
             </div>
@@ -421,6 +464,9 @@ export default function TaskDetail({
           </section>
           {(visited.files || visited.submit) && (
             <section
+              ref={uploadWorkflow}
+              tabIndex={-1}
+              aria-label="تجهيز المرفقات"
               hidden={
                 tab !== "files" &&
                 !(
@@ -448,46 +494,12 @@ export default function TaskDetail({
           )}
           {visited.submit && (
             <section
+              ref={workflowForm}
+              tabIndex={-1}
+              aria-label={reviewing ? "قرار المراجعة" : "تجهيز التسليم"}
               hidden={tab !== "submit"}
               className={`grid items-start gap-4 ${data.canReview && reviewing ? "lg:grid-cols-2" : ""}`}
             >
-              {submission && (
-                <Panel title="آخر تسليم" tone="sky">
-                  <div className="space-y-3 text-sm leading-7">
-                    <p className="font-bold">
-                      {
-                        {
-                          pending: "بانتظار قرار المدير",
-                          approved: "تسليم معتمد",
-                          changes: "أعيد للتعديل",
-                        }[submission.status]
-                      }
-                    </p>
-                    <p className="whitespace-pre-wrap break-words">
-                      {submission.summary}
-                    </p>
-                    <p className="text-muted">
-                      التسليم: {workDate(submission.created_at)}
-                    </p>
-                    <TaskAttachments
-                      taskId={id}
-                      submissionId={submission.id}
-                      version={task.version}
-                    />
-                    {submission.decision_reason && (
-                      <div className="rounded-xl bg-slate-50 p-4">
-                        <h3 className="font-bold">سبب قرار المراجعة</h3>
-                        <p className="whitespace-pre-wrap break-words">
-                          {submission.decision_reason}
-                        </p>
-                        <p className="text-muted">
-                          {workDate(submission.decided_at)}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </Panel>
-              )}
               {data.canWork && !frozen && !reviewing && !done && (
                 <Panel title="إرسال التسليم" tone="emerald">
                   <form
@@ -538,6 +550,7 @@ export default function TaskDetail({
                     {task.blocked_reason && (
                       <p className="text-sm text-muted">المهمة متوقفة بعائق</p>
                     )}
+                    {attachmentIds.length > 0 && <p className="text-sm font-bold">{attachmentIds.length} مرفق مع التسليم</p>}
                     {data.checklist.some(
                       (item) => item.required && !item.completed,
                     ) && (
@@ -564,9 +577,12 @@ export default function TaskDetail({
                 </Panel>
               )}
               {data.canReview && reviewing && !frozen && (
-                <Panel title="اعتماد التسليم" tone="amber">
-                  <TaskAttachments taskId={id} version={task.version} canWork reviewMode
-                    disabled={commandBusy} onBusy={attachmentBusyChanged} onPendingChange={setPendingReviewFiles} />
+                <Panel title="قرار المراجعة" tone="amber">
+                  <details className="mb-4 rounded-xl border border-border p-3">
+                    <summary className="cursor-pointer text-sm font-bold">إرفاق ملفات للمراجعة</summary>
+                    <div className="mt-3"><TaskAttachments taskId={id} version={task.version} canWork reviewMode
+                      disabled={commandBusy} onBusy={attachmentBusyChanged} onPendingChange={setPendingReviewFiles} /></div>
+                  </details>
                   <form
                     className="space-y-4"
                     onSubmit={(e) => {
@@ -614,13 +630,10 @@ export default function TaskDetail({
                   </form>
                 </Panel>
               )}
-              {!submission && (!data.canWork || frozen || done) && (
-                <p className="text-sm text-muted">لا يوجد تسليم</p>
-              )}
             </section>
           )}
         </div>
-        <details className="rounded-2xl border border-border bg-white p-4">
+        <details ref={blockers} className="rounded-2xl border border-border bg-white p-4">
           <summary className="cursor-pointer text-sm font-bold">
             الحالة والعوائق
           </summary>

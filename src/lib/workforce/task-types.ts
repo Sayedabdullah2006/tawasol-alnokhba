@@ -81,6 +81,7 @@ export type TaskDetail = {
   canConfigureChecklist: boolean;
   assigneeName: string | null;
   latestSubmission: TaskSubmission | null;
+  latestReview?: TaskSubmission | null;
   checklist: ChecklistItem[];
 };
 export type ChecklistItem = {
