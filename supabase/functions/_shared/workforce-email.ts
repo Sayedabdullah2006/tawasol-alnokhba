@@ -10,7 +10,35 @@ export type WorkforceMail = {
   client?: string | null;
   dueAt?: string | null;
   deliverable?: string | null;
+  cc?: string[];
+  weeklyReport?: WeeklyReport;
 };
+export type WeeklyReport = {
+  periodStart: string; periodEnd: string; asOf: string; month: string;
+  completed: number; unfinished: number; pendingReview: number; overdue: number;
+  onTime: number; lateSubmissions: number; changesCount: number; repeatedChanges: number;
+  weekWorkedMinutes: number; weekRequiredMinutes: number; monthWorkedMinutes: number;
+  openTasks: {title:string;dueAt:string|null;pendingReview:boolean}[];
+};
+const duration = (minutes: number) => `${Math.floor(minutes / 60)} س ${Math.floor(minutes % 60)} د`;
+export function weeklyFeedback(report: WeeklyReport) {
+  const messages: string[] = [];
+  const missing = Math.max(0, report.weekRequiredMinutes - report.weekWorkedMinutes);
+  if (report.weekRequiredMinutes > 0) messages.push(missing
+    ? `شكرًا لجهدك هذا الأسبوع. سجّل دوامك ${duration(report.weekWorkedMinutes)} من مستهدف ${duration(report.weekRequiredMinutes)}؛ الفارق ${duration(missing)}. راجعي فترات الحضور، وقدّمي طلب تصحيح إن كانت هناك ساعات غير مسجلة، ولنوزّع وقت الأسبوع القادم بما يساعدك على الوصول للمستهدف. نحن هنا لدعمك.`
+    : "أحسنتِ في تحقيق مستهدف ساعات الأسبوع، شكرًا لالتزامك وتنظيم وقتك. واصلي بهذا الإيقاع المتوازن.");
+  if (report.overdue || report.lateSubmissions) messages.push(`نقدّر ما تبذلينه. توجد ${report.overdue} مهمة متأخرة و${report.lateSubmissions} تسليمات بعد الموعد. ابدئي بالأقرب للتسليم، وحدّثي العوائق مبكرًا حتى نساعدك على تجاوزها خطوة بخطوة.`);
+  else if (report.onTime) messages.push(`رائع، رفعتِ ${report.onTime} من تسليماتك المؤرخة ضمن موعدها. شكرًا لحرصك، واصلي التخطيط المبكر والمحافظة على هذا الالتزام.`);
+  else messages.push("لا توجد تسليمات مؤرخة كافية هذا الأسبوع لقياس الالتزام بالمواعيد. اختاري أولويات الأسبوع القادم وراجعي المخرجات المطلوبة قبل البدء.");
+  if (report.repeatedChanges) messages.push(`احتاجت ${report.repeatedChanges} من مهامك إلى أكثر من جولة تعديل. كل مراجعة فرصة للتحسين؛ جرّبي قائمة تحقق قبل التسليم، واطلبي توضيح أي متطلب مبكرًا لتصلي إلى نتيجة أقرب للاعتماد من أول مرة.`);
+  else if (report.changesCount) messages.push("ملاحظات المراجعة تساعد على تطوير المخرجات. راجعيها نقطة بنقطة قبل رفع النسخة التالية، ونحن نثق بقدرتك على التحسين.");
+  if (report.pendingReview) messages.push(`لديك ${report.pendingReview} تسليمات بانتظار المراجعة، ولم تُحسب ضمن المهام المتأخرة. شكرًا لإتمام دورك في رفعها.`);
+  return messages;
+}
+export function workforceMailCC(mail: WorkforceMail) {
+  return mail.kind === "weekly_report" && mail.weeklyReport && mail.cc?.includes("elitecnnct@gmail.com")
+    && mail.email.toLowerCase() !== "elitecnnct@gmail.com" ? ["elitecnnct@gmail.com"] : undefined;
+}
 const site = "https://nukhba.media";
 const escape = (value: string) =>
   value.replace(
@@ -88,12 +116,14 @@ const intro: Record<string, string> = {
     "تم تفعيل إشعارات العمل والتسليم والطلبات. يمكنك الآن مراجعة مهام الأسبوع ومواعيدها من لوحتك الخاصة.",
 };
 export function renderWorkforceEmail(mail: WorkforceMail) {
+  if (mail.kind === "weekly_report" && !mail.weeklyReport) throw new Error("Weekly report snapshot missing");
+  const weekly = mail.kind === "weekly_report" ? mail.weeklyReport : undefined;
   const href = /^\/(employee|admin\/workforce)(\/|\?|$)/.test(mail.href)
     ? site + mail.href
     : site + "/employee";
   const isTask = taskKinds.has(mail.kind) && !!mail.taskTitle;
   const message =
-    intro[mail.kind] ||
+    (weekly ? "إليك ملخص أسبوعك. شكرًا لمساهمتك في فريق تواصل النخبة، وكل أسبوع فرصة لخطوة أفضل." : intro[mail.kind]) ||
     (isTask
       ? "يوجد تحديث على المهمة. راجعي التفاصيل والحالة والملاحظات من الرابط أدناه."
       : "يوجد تحديث وظيفي جديد. يمكنك الاطلاع عليه من بوابتك الخاصة.");
@@ -115,6 +145,19 @@ export function renderWorkforceEmail(mail: WorkforceMail) {
     : [];
   if (mail.body && (!isTask || mail.body !== mail.taskTitle))
     details.unshift(["التفاصيل", mail.body]);
+  if (weekly) {
+    details.push(
+      ["فترة الأسبوع", `${weekly.periodStart} — ${weekly.periodEnd} (السبت إلى الجمعة)`],
+      ["المهام المنجزة خلال الأسبوع", String(weekly.completed)],
+      ["المهام غير المكتملة حتى نهاية الأسبوع", `${weekly.unfinished} — منها ${weekly.pendingReview} بانتظار المراجعة، و${weekly.overdue} متأخرة`],
+      ["ساعات الأسبوع", `${duration(weekly.weekWorkedMinutes)} من ${duration(weekly.weekRequiredMinutes)} — الفارق ${duration(Math.max(0,weekly.weekRequiredMinutes-weekly.weekWorkedMinutes))}`],
+      [`ساعات العمل التراكمية للشهر ${weekly.month} حتى ${weekly.periodEnd}`, duration(weekly.monthWorkedMinutes)],
+      ["الالتزام بالمواعيد", `${weekly.onTime} تسليمات ضمن الموعد · ${weekly.lateSubmissions} بعد الموعد`],
+      ["المراجعة والتحسين", `${weekly.changesCount} طلبات تعديل خلال الأسبوع · ${weekly.repeatedChanges} مهام تكرر إرجاعها`],
+      ["رسالة لكِ", weeklyFeedback(weekly).join("\n\n")],
+    );
+    if(weekly.openTasks.length) details.push(["أقرب المهام غير المكتملة",weekly.openTasks.map(task=>`${task.title}${task.pendingReview?" — بانتظار المراجعة":""}${task.dueAt?` — ${new Date(task.dueAt).toLocaleString("ar-SA",{calendar:"gregory",timeZone:"Asia/Riyadh",dateStyle:"short",timeStyle:"short"})}`:""}`).join("\n")]);
+  }
   const label = isTask
     ? "فتح المهمة"
     : mail.href.startsWith("/admin/workforce")

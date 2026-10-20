@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.103.3";
 import {
   renderWorkforceEmail,
+  workforceMailCC,
   type WorkforceMail,
 } from "../_shared/workforce-email.ts";
 
@@ -55,6 +56,7 @@ Deno.serve(async (req: Request) => {
           body: JSON.stringify({
             from: "تواصل النخبة <noreply@nukhba.media>",
             to: [item.snapshot.email],
+            cc: workforceMailCC(item.snapshot),
             reply_to: "support@nukhba.media",
             subject: email.subject,
             html: email.html,
