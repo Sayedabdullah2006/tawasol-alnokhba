@@ -1,5 +1,5 @@
 import type { AttendanceSummary } from "./attendance-summary";
-export type TeamAttendance = { summary: AttendanceSummary; open: { checked_in: string } | null };
+export type TeamAttendance = { summary: AttendanceSummary; todaySummary: AttendanceSummary; open: { checked_in: string } | null };
 export type WorkMetrics = {
   assigned: number;
   completed: number;

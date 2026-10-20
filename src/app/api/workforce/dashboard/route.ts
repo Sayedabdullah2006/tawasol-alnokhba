@@ -8,14 +8,14 @@ import {
 } from "@/lib/workforce/validation";
 import { FIELD_LABELS } from "@/lib/workforce/types";
 import type { AdminWorkDashboard } from "@/lib/workforce/dashboard-types";
-import { attendanceMonthSessions } from "@/lib/workforce/attendance-server";
-import { riyadhDate, summarizeAttendance } from "@/lib/workforce/attendance-summary";
+import { attendanceMonth, employeeMonthAttendance } from "@/lib/workforce/attendance-server";
 
 export async function GET(request: Request) {
   try {
     const actor = await workforceActor();
     requireAdmin(actor);
     const params = new URL(request.url).searchParams;
+    const now = new Date(), month = attendanceMonth(params.get("attendance_month"), now);
     const from = dateField(params.get("due_from"), true);
     const to = dateField(params.get("due_to"), true);
     if (from && to && from > to)
@@ -51,20 +51,12 @@ export async function GET(request: Request) {
     ]);
     for (const result of [summary, deliveryResult, requestResult, profileResult]) if (result.error) throw result.error;
     const data = summary.data as AdminWorkDashboard;
-    const now = new Date(), month = riyadhDate(now).slice(0, 7);
     const employees = await Promise.all(data.employees.map(async employee => {
-      const [record, settings, open] = await Promise.all([
-        actor.db.from("wf_employees").select("start_date").eq("id", employee.id).single(),
-        actor.db.from("wf_attendance_settings").select("daily_minutes,workdays").eq("employee_id", employee.id).maybeSingle(),
-        actor.db.from("wf_attendance_sessions").select("checked_in").eq("employee_id", employee.id).is("checked_out", null).maybeSingle(),
-      ]);
-      for (const result of [record, settings, open]) if (result.error) throw result.error;
-      const sessions = await attendanceMonthSessions(actor.db, employee.id, record.data!.start_date, month);
-      if (sessions.error) throw sessions.error;
-      return { ...employee, attendance: { open: open.data, summary: summarizeAttendance({
-        periods: sessions.data, startDate: record.data!.start_date, month, now,
-        dailyMinutes: settings.data?.daily_minutes ?? 480, workdays: settings.data?.workdays,
-      }) } };
+      const record = await actor.db.from("wf_employees").select("start_date").eq("id", employee.id).single();
+      if (record.error) throw record.error;
+      const { periods: _periods, ...attendance } = await employeeMonthAttendance(actor.db, employee.id, record.data.start_date, month, now);
+      void _periods;
+      return { ...employee, attendance };
     }));
     const one = <T,>(value: T | T[]) => Array.isArray(value) ? value[0] : value;
     return privateResponse({ ...data, employees,

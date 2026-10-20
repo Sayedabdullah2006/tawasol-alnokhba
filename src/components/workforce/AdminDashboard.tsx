@@ -14,6 +14,7 @@ import DashboardLiveStatus from "./DashboardLiveStatus";
 import ProgressOrbit from "./ProgressOrbit";
 import PortalIntro from "@/components/layout/PortalIntro";
 import TeamAttendanceCard from "./TeamAttendanceCard";
+import { riyadhDate } from "@/lib/workforce/attendance-summary";
 
 const count = (value: number) => value.toLocaleString("en-US");
 const percent = (part: number, total: number) => total ? `${count(Math.round(part * 100 / total))}%` : "—";
@@ -32,6 +33,8 @@ export default function AdminDashboard({ userId }: { userId: string }) {
   const params = useSearchParams(), pathname = usePathname();
   const [data, setData] = useState<AdminWorkDashboard | null>(null);
   const [error, setError] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const attendanceMonth = params.get("attendance_month") || riyadhDate(new Date()).slice(0, 7);
   const [revision, setRevision] = useState(0);
   const [selectedPanel, setSelectedPanel] = useState("brief");
   const [selectedTask, setSelectedTask] = useState<string | null>(null);
@@ -43,7 +46,7 @@ export default function AdminDashboard({ userId }: { userId: string }) {
   const pendingQuery = useRef(params.toString());
   const { confirm, confirmation } = useConfirm();
   const summaryParams = new URLSearchParams();
-  for (const key of ["due_from", "due_to", "assignee_id", "client_name"]) { const value = params.get(key); if (value) summaryParams.set(key, value); }
+  for (const key of ["due_from", "due_to", "assignee_id", "client_name", "attendance_month"]) { const value = params.get(key); if (value) summaryParams.set(key, value); }
   const summaryQuery = summaryParams.toString(), requestKey = `${summaryQuery}:${revision}`, loading = loadedKey !== requestKey, query = params.toString();
   useEffect(() => {
     const refresh = () => setRevision(n => n + 1);
@@ -72,6 +75,21 @@ export default function AdminDashboard({ userId }: { userId: string }) {
     filter({ state: key === "completed" ? "done" : key === "pending" ? "review" : "", overdue: key === "overdue" ? "true" : "", open: key === "open" ? "true" : "", blocked: "", ...(employee ? { assignee_id: employee } : {}) });
   }
   function changed() { setRevision(n => n + 1); window.dispatchEvent(new Event("workforce-notifications")); }
+  function changeAttendanceMonth(value: string) {
+    if (!value) return;
+    const next = new URLSearchParams(pendingQuery.current); next.set("attendance_month", value);
+    pendingQuery.current = next.toString(); window.history.replaceState(null, "", `${pathname}?${next}`);
+  }
+  async function exportAttendance() {
+    setExporting(true); setError("");
+    try {
+      const response = await fetch(`/api/workforce/attendance/export?month=${encodeURIComponent(attendanceMonth)}`, {cache:"no-store"});
+      if (!response.ok) { const result = await response.json(); throw new Error(result.error || "تعذر تحميل التقرير"); }
+      const url = URL.createObjectURL(await response.blob()), link = document.createElement("a");
+      link.href = url; link.download = `nukhba-attendance-${attendanceMonth}.xlsx`; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) { setError((error as Error).message); } finally { setExporting(false); }
+  }
   function openTask(id: string, panel = "brief") { setSelectedPanel(panel); setSelectedTask(id); scrollToWork(); }
   function openRequests(tab: "requests" | "profile" = "requests", id?: string) { setSelectedRequest({ tab, id }); scrollToWork(); }
   async function closeRequests() {
@@ -89,7 +107,7 @@ export default function AdminDashboard({ userId }: { userId: string }) {
       {metrics.map(item => <button key={item.key} type="button" disabled={disabled} onClick={() => metricFilter(item.key)} className={`group rounded-2xl border p-4 text-right transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-default disabled:opacity-60 motion-reduce:transform-none ${item.color}`}><span className="text-xs font-bold sm:text-sm">{item.label}</span><span className="mt-4 flex items-end justify-between"><strong className="text-3xl font-black tabular-nums">{data ? count(data.totals[item.key]) : "—"}</strong><span aria-hidden className="opacity-40">↗</span></span></button>)}
       <button type="button" disabled={disabled} onClick={() => openRequests()} className="group rounded-2xl border border-violet-200 bg-violet-50 p-4 text-right text-violet-950 transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-default disabled:opacity-60 motion-reduce:transform-none"><span className="text-xs font-bold sm:text-sm">طلبات معلقة</span><span className="mt-4 flex items-end justify-between"><strong className="text-3xl font-black tabular-nums">{data ? count(data.pendingRequestCount) : "—"}</strong><span aria-hidden className="opacity-40">↗</span></span></button>
     </section>
-    <section aria-labelledby="staff-performance" className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><h2 id="staff-performance" className="text-lg font-black text-dark">نبض الفريق</h2><div role="group" aria-label="تصفية أداء الموظفات" className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white/80 p-1">{([{ id: "all", title: "الفريق" }, { id: "attention", title: "تحتاج متابعة" }, { id: "review", title: "للاعتماد" }] as const).map(tab => <button key={tab.id} type="button" aria-pressed={staffView === tab.id} onClick={() => setStaffView(tab.id)} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${staffView === tab.id ? "bg-[#102b57] text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"}`}>{tab.title}</button>)}</div></div>
+    <section aria-labelledby="staff-performance" className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap items-center gap-3"><h2 id="staff-performance" className="text-lg font-black text-dark">نبض الفريق</h2><label className="flex items-center gap-2 text-xs font-bold">شهر الحضور<input type="month" aria-label="شهر الحضور" min="2020-01" max="2200-12" value={attendanceMonth} onChange={event => changeAttendanceMonth(event.target.value)} className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" /></label><Button size="sm" variant="outline" disabled={loading || !data || exporting} onClick={() => void exportAttendance()}>{exporting ? "جارٍ تجهيز التقرير…" : "تحميل تقرير Excel"}</Button></div><div role="group" aria-label="تصفية أداء الموظفات" className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white/80 p-1">{([{ id: "all", title: "الفريق" }, { id: "attention", title: "تحتاج متابعة" }, { id: "review", title: "للاعتماد" }] as const).map(tab => <button key={tab.id} type="button" aria-pressed={staffView === tab.id} onClick={() => setStaffView(tab.id)} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${staffView === tab.id ? "bg-[#102b57] text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"}`}>{tab.title}</button>)}</div></div>
       <div className="grid gap-4 md:grid-cols-2" data-staff-cards>
         {!data && loading && [0,1].map(n => <div key={n} role="status" aria-label="جارٍ تحميل أداء الموظفات" className="h-64 animate-pulse rounded-3xl border border-white bg-white/70 motion-reduce:animate-none" />)}
         {data?.employees.filter(employee => staffView === "all" || (staffView === "attention" ? employee.metrics.overdue > 0 || employee.metrics.blocked > 0 : employee.metrics.pending > 0)).map((employee, i) => <article key={employee.id} className={`${box} ${i % 2 ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/70 text-emerald-950" : "border-sky-200 bg-gradient-to-br from-sky-50 to-blue-100/80 text-sky-950"}`} data-staff-card={employee.id}>
