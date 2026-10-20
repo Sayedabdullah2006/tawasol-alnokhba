@@ -21,7 +21,7 @@ export async function GET(
     const { page, from, to } = workPage(search);
     const task = await actor.db
       .from("wf_tasks")
-      .select("id,assignee_id,archived_at,board:wf_boards!inner(archived_at)")
+      .select("id,assignee_id,co_assignee_ids,archived_at,board:wf_boards!inner(archived_at)")
       .eq("id", id)
       .maybeSingle();
     if (task.error) throw task.error;
@@ -76,7 +76,7 @@ export async function GET(
       !task.data.archived_at &&
       !board?.archived_at &&
       (actor.role === "admin" ||
-        task.data.assignee_id === actor.employee?.id);
+        task.data.assignee_id === actor.employee?.id || task.data.co_assignee_ids.includes(actor.employee?.id ?? ""));
     let query = actor.db
       .from("wf_task_comments")
       .select("id,body,version,author_id,created_at,edited_at,archived_at", {

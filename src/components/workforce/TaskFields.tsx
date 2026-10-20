@@ -12,6 +12,7 @@ export type TaskForm = {
   description: string;
   completion_criteria: string;
   assignee_id: string;
+  co_assignee_ids: string[];
   priority: string;
   starts_at: string;
   due_at: string;
@@ -33,6 +34,7 @@ export const taskForm = (task?: WorkTask): TaskForm => ({
   assignee_id: task?.assignee_admin_id
     ? `admin:${task.assignee_admin_id}`
     : (task?.assignee_id ?? ""),
+  co_assignee_ids: task?.co_assignee_ids ?? [],
   priority: task?.priority ?? "normal",
   starts_at: localDate(task?.starts_at ?? null),
   due_at: localDate(task?.due_at ?? null),
@@ -58,6 +60,7 @@ export function taskPayload(form: TaskForm, admin: boolean, canAssign = admin) {
       form.estimate_minutes === "" ? null : Number(form.estimate_minutes),
     ...(canAssign
       ? {
+          co_assignee_ids: form.co_assignee_ids.filter(id => id !== form.assignee_id),
           assignee_id: form.assignee_id.startsWith("admin:")
             ? null
             : form.assignee_id || null,
@@ -157,6 +160,21 @@ export function EmployeePicker({
     </fieldset>
   );
 }
+function CoAssignees({ value, primary, onChange }: { value: string[]; primary: string; onChange: (ids: string[]) => void }) {
+  const [names, setNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const abort = new AbortController();
+    api<{ employees: { id: string; full_name: string }[] }>("/api/workforce/team", { signal: abort.signal })
+      .then(data => setNames(Object.fromEntries(data.employees.map(e => [e.id, e.full_name])))).catch(() => {});
+    return () => abort.abort();
+  }, []);
+  return <div className="space-y-3 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4">
+    <EmployeePicker title="مسؤولون إضافيون" selectLabel="إضافة مسؤول مشترك" value="" onChange={(id, name) => {
+      if (id && id !== primary && !value.includes(id)) { onChange([...value, id]); if (name) setNames(previous => ({ ...previous, [id]: name })); }
+    }} />
+    {!!value.length && <div className="flex flex-wrap gap-2">{value.filter(id => id !== primary).map(id => <span key={id} className="inline-flex items-center gap-3 rounded-full bg-white px-3 py-2 text-sm font-bold text-indigo-950">{names[id] || "مسؤول مشترك"}<button type="button" aria-label={`إزالة ${names[id] || "المسؤول المشترك"}`} onClick={() => onChange(value.filter(item => item !== id))} className="rounded-full px-1 hover:bg-indigo-100">×</button></span>)}</div>}
+  </div>;
+}
 export default function TaskFields({
   value,
   onChange,
@@ -225,6 +243,7 @@ export default function TaskFields({
           </select>
         </Field>
       </div>
+      {canAssign && <CoAssignees value={value.co_assignee_ids} primary={value.assignee_id} onChange={ids => change({ co_assignee_ids: ids })} />}
       <DateRangePicker
         start={value.starts_at.slice(0, 10)}
         end={value.due_at.slice(0, 10)}

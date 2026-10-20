@@ -28,6 +28,7 @@ type KnowledgeRow = Omit<
     links: { submission_id: string }[];
     task: {
       assignee_id: string | null;
+      co_assignee_ids: string[];
       archived_at: string | null;
       column: { kind: string };
       board: { archived_at: string | null };
@@ -53,7 +54,7 @@ export async function GET(request: Request) {
     let query = actor.db
       .from("wf_knowledge_files")
       .select(
-        "id,folder_id,title,filename,mime_type,size_bytes,created_at,created_by,deleted_at,version,task_attachment_id,attachment:wf_task_attachments(task_id,task:wf_tasks(assignee_id,archived_at,column:wf_task_columns(kind),board:wf_boards(archived_at)),links:wf_submission_attachments(submission_id))",
+        "id,folder_id,title,filename,mime_type,size_bytes,created_at,created_by,deleted_at,version,task_attachment_id,attachment:wf_task_attachments(task_id,task:wf_tasks(assignee_id,co_assignee_ids,archived_at,column:wf_task_columns(kind),board:wf_boards(archived_at)),links:wf_submission_attachments(submission_id))",
         { count: "exact" },
       )
       .order("created_at", { ascending: false })
@@ -130,7 +131,7 @@ export async function GET(request: Request) {
             !task.board?.archived_at &&
             !["review", "done"].includes(task.column?.kind || "") &&
             (actor.role === "admin" ||
-              task.assignee_id === actor.employee?.id));
+              task.assignee_id === actor.employee?.id || task.co_assignee_ids.includes(actor.employee?.id ?? "")));
         return {
           ...file,
           uploaderName: names.get(file.created_by) || "عضو الفريق",

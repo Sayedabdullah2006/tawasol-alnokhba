@@ -22,13 +22,13 @@ export async function GET(request: Request) {
     const employeeId = employee ? uuid(employee.replace(/^admin:/, "")) : null;
     const client = textField(params.get("client_name") ?? "", "العميل", 0, 150) || null;
     let submissions = actor.db.from("wf_task_submissions")
-      .select("id,created_at,task:wf_tasks!inner(id,title,client_name,assignee_id,assignee_admin_id,due_at,archived_at,column:wf_task_columns!inner(kind),board:wf_boards!inner(archived_at))")
+      .select("id,created_at,task:wf_tasks!inner(id,title,client_name,assignee_id,co_assignee_ids,assignee_admin_id,due_at,archived_at,column:wf_task_columns!inner(kind),board:wf_boards!inner(archived_at))")
       .eq("status", "pending").eq("task.column.kind", "review")
       .is("task.archived_at", null).is("task.board.archived_at", null)
       .order("created_at").order("id").limit(5);
     if (from) submissions = submissions.gte("task.due_at", `${from}T00:00:00+03:00`);
     if (to) submissions = submissions.lt("task.due_at", new Date(Date.parse(`${to}T00:00:00+03:00`) + 86400000).toISOString());
-    if (employeeId) submissions = submissions.eq(employee?.startsWith("admin:") ? "task.assignee_admin_id" : "task.assignee_id", employeeId);
+    if (employeeId) submissions = employee?.startsWith("admin:") ? submissions.eq("task.assignee_admin_id", employeeId) : submissions.or(`assignee_id.eq.${employeeId},co_assignee_ids.cs.{${employeeId}}`, { referencedTable: "task" });
     if (client) submissions = submissions.eq("task.client_name", client);
     // Counts cover all pending requests; only the five oldest items are previewed.
     // These queries keep the caller's RLS and never read financial or HR documents.
@@ -53,7 +53,7 @@ export async function GET(request: Request) {
     return privateResponse({ ...data,
       pendingSubmissions: (deliveryResult.data ?? []).map(row => {
         const task = one(row.task);
-        return { id: row.id, taskId: task.id, title: task.title, client: task.client_name, employeeName: data.employees.find(e => e.id === task.assignee_id)?.full_name ?? (task.assignee_admin_id ? "مدير الشركة" : "غير مسندة"), createdAt: row.created_at };
+        return { id: row.id, taskId: task.id, title: task.title, client: task.client_name, employeeName: [...data.employees.filter(e => e.id === task.assignee_id || task.co_assignee_ids.includes(e.id)).map(e => e.full_name), ...(task.assignee_admin_id ? ["مدير الشركة"] : [])].join("، ") || "غير مسندة", createdAt: row.created_at };
       }),
       pendingRequests: [
         ...(requestResult.data ?? []).map(row => ({ id: row.id, title: row.title, employeeName: one(row.employee).full_name, createdAt: row.created_at, type: "requests" })),

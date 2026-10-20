@@ -17,7 +17,7 @@ export async function attachmentTask(
   const { data: task, error } = await actor.db
     .from("wf_tasks")
     .select(
-      "id,assignee_id,archived_at,column:wf_task_columns!inner(kind),board:wf_boards!inner(archived_at)",
+      "id,assignee_id,co_assignee_ids,archived_at,column:wf_task_columns!inner(kind),board:wf_boards!inner(archived_at)",
     )
     .eq("id", id)
     .maybeSingle()
@@ -25,6 +25,7 @@ export async function attachmentTask(
       {
         id: string;
         assignee_id: string | null;
+        co_assignee_ids: string[];
         archived_at: string | null;
         column: { kind: string };
         board: { archived_at: string | null };
@@ -38,7 +39,7 @@ export async function attachmentTask(
     !task.board.archived_at &&
     !["review", "done"].includes(task.column.kind);
   const owner =
-    actor.role === "admin" || actor.employee?.id === task.assignee_id;
+    actor.role === "admin" || actor.employee?.id === task.assignee_id || task.co_assignee_ids.includes(actor.employee?.id ?? "");
   if (write && !owner)
     throw new WorkforceError("يمكنك الإرفاق على مهامك فقط", 403);
   return { task, canUpload: owner && editable, editable };

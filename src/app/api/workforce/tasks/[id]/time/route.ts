@@ -14,7 +14,7 @@ export async function GET(
     const task = await actor.db
       .from("wf_tasks")
       .select(
-        "id,assignee_id,estimate_minutes,archived_at,board:wf_boards!inner(archived_at)",
+        "id,assignee_id,co_assignee_ids,estimate_minutes,archived_at,board:wf_boards!inner(archived_at)",
       )
       .eq("id", id)
       .maybeSingle();
@@ -57,7 +57,7 @@ export async function GET(
     const canRecord =
       !!actor.employee &&
       active &&
-      task.data.assignee_id === actor.employee.id;
+      (task.data.assignee_id === actor.employee.id || task.data.co_assignee_ids.includes(actor.employee.id));
     let query = actor.db
       .from("wf_task_time_entries")
       .select(

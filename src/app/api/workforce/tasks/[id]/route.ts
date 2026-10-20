@@ -70,9 +70,9 @@ export async function GET(
       },
       latestSubmission: submissionResult.data,
       checklist: checklistResult.data || [],
-      assigneeName: assignee.data?.full_name ?? null,
+      assigneeName: [assignee.data?.full_name, ...(task.co_assignee_ids?.length ? (await service.from("wf_employees").select("full_name").in("id", task.co_assignee_ids)).data?.map(row => row.full_name) ?? [] : [])].filter(Boolean).join("، ") || null,
       canWork:
-        actor.role === "admin" || task.assignee_id === actor.employee?.id,
+        actor.role === "admin" || task.assignee_id === actor.employee?.id || (task.co_assignee_ids ?? []).includes(actor.employee?.id ?? ""),
       canEdit:
         actor.canManageTasks ||
         (task.assignment_origin === "self" &&

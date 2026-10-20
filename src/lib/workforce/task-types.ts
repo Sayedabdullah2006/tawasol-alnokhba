@@ -39,6 +39,7 @@ export type WorkTask = {
   description: string;
   completion_criteria: string;
   assignee_id: string | null;
+  co_assignee_ids?: string[];
   assignee_admin_id?: string | null;
   canEdit?: boolean;
   assignment_origin: "admin" | "self";

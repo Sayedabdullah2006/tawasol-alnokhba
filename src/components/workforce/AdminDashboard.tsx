@@ -10,6 +10,8 @@ import TaskDetail from "./TaskDetail";
 import MonthlyPayroll from "./MonthlyPayroll";
 import RequestCenter from "./RequestCenter";
 import DashboardJourneys from "./DashboardJourneys";
+import DashboardLiveStatus from "./DashboardLiveStatus";
+import ProgressOrbit from "./ProgressOrbit";
 
 const count = (value: number) => value.toLocaleString("en-US");
 const percent = (part: number, total: number) => total ? `${count(Math.round(part * 100 / total))}%` : "—";
@@ -24,6 +26,7 @@ const box = "min-w-0 rounded-3xl border p-5 shadow-[0_8px_28px_-18px_rgba(16,43,
 const arrow = <span aria-hidden="true">←</span>;
 const shortDate = (value: string) => new Date(value).toLocaleDateString("ar-SA", { calendar: "gregory", timeZone: "Asia/Riyadh", day: "numeric", month: "short" });
 export default function AdminDashboard({ userId }: { userId: string }) {
+  const [staffView, setStaffView] = useState<"all" | "attention" | "review">("all");
   const params = useSearchParams(), pathname = usePathname();
   const [data, setData] = useState<AdminWorkDashboard | null>(null);
   const [error, setError] = useState("");
@@ -43,7 +46,8 @@ export default function AdminDashboard({ userId }: { userId: string }) {
   useEffect(() => {
     const refresh = () => setRevision(n => n + 1);
     window.addEventListener("workforce-data-changed", refresh);
-    return () => window.removeEventListener("workforce-data-changed", refresh);
+    window.addEventListener("workforce-dashboard-tick", refresh);
+    return () => { window.removeEventListener("workforce-data-changed", refresh); window.removeEventListener("workforce-dashboard-tick", refresh); };
   }, []);
   useEffect(() => { pendingQuery.current = query; }, [query]);
   useEffect(() => {
@@ -76,23 +80,23 @@ export default function AdminDashboard({ userId }: { userId: string }) {
   return <div className="mx-auto w-full min-w-0 max-w-screen-2xl space-y-6 p-4 md:p-6 lg:p-8" data-admin-dashboard>
     {confirmation}
     <header className="flex flex-wrap items-center justify-between gap-4"><div><h1 className="text-2xl font-black text-dark">لوحة إدارة الفريق</h1>{data && <p className="mt-2 text-xs text-muted">آخر تحديث {new Date(data.generated_at).toLocaleTimeString("ar-SA", { timeZone: "Asia/Riyadh", hour: "2-digit", minute: "2-digit" })}</p>}</div><div className="flex flex-wrap gap-2"><Button disabled={disabled} onClick={() => workspace.current?.createTask()}>＋ إسناد مهمة</Button><Button variant="outline" onClick={changed} disabled={loading}>{loading ? "جارٍ التحديث…" : "تحديث"}</Button></div></header>
+    <DashboardLiveStatus admin />
     <Notice message={error} error />
     <section aria-label="ملخص أداء الفريق" aria-busy={loading} className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
       {metrics.map(item => <button key={item.key} type="button" disabled={disabled} onClick={() => metricFilter(item.key)} className={`group rounded-2xl border p-4 text-right transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-default disabled:opacity-60 motion-reduce:transform-none ${item.color}`}><span className="text-xs font-bold sm:text-sm">{item.label}</span><span className="mt-4 flex items-end justify-between"><strong className="text-3xl font-black tabular-nums">{data ? count(data.totals[item.key]) : "—"}</strong><span aria-hidden className="opacity-40">↗</span></span></button>)}
       <button type="button" disabled={disabled} onClick={() => openRequests()} className="group rounded-2xl border border-violet-200 bg-violet-50 p-4 text-right text-violet-950 transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-default disabled:opacity-60 motion-reduce:transform-none"><span className="text-xs font-bold sm:text-sm">طلبات معلقة</span><span className="mt-4 flex items-end justify-between"><strong className="text-3xl font-black tabular-nums">{data ? count(data.pendingRequestCount) : "—"}</strong><span aria-hidden className="opacity-40">↗</span></span></button>
     </section>
-    <section aria-labelledby="staff-performance" className="space-y-4"><h2 id="staff-performance" className="text-lg font-black text-dark">أداء الموظفات</h2>
+    <section aria-labelledby="staff-performance" className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><h2 id="staff-performance" className="text-lg font-black text-dark">نبض الفريق</h2><div role="group" aria-label="تصفية أداء الموظفات" className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white/80 p-1">{([{ id: "all", title: "الفريق" }, { id: "attention", title: "تحتاج متابعة" }, { id: "review", title: "للاعتماد" }] as const).map(tab => <button key={tab.id} type="button" aria-pressed={staffView === tab.id} onClick={() => setStaffView(tab.id)} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${staffView === tab.id ? "bg-[#102b57] text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"}`}>{tab.title}</button>)}</div></div>
       <div className="grid gap-4 md:grid-cols-2" data-staff-cards>
         {!data && loading && [0,1].map(n => <div key={n} role="status" aria-label="جارٍ تحميل أداء الموظفات" className="h-64 animate-pulse rounded-3xl border border-white bg-white/70 motion-reduce:animate-none" />)}
-        {data?.employees.map((employee, i) => <article key={employee.id} className={`${box} ${i % 2 ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/70 text-emerald-950" : "border-sky-200 bg-gradient-to-br from-sky-50 to-blue-100/80 text-sky-950"}`} data-staff-card={employee.id}>
+        {data?.employees.filter(employee => staffView === "all" || (staffView === "attention" ? employee.metrics.overdue > 0 || employee.metrics.blocked > 0 : employee.metrics.pending > 0)).map((employee, i) => <article key={employee.id} className={`${box} ${i % 2 ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/70 text-emerald-950" : "border-sky-200 bg-gradient-to-br from-sky-50 to-blue-100/80 text-sky-950"}`} data-staff-card={employee.id}>
           <div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/80 text-xl font-black">{employee.full_name.trim().slice(0,1)}</span><div className="min-w-0"><h3 className="font-black">{employee.full_name}</h3><p className="mt-1 text-xs opacity-75">{employee.job_title || "دون مسمى"} · {STATUS_LABELS[employee.status]}</p></div></div><span className="shrink-0 rounded-full bg-white/70 px-3 py-1.5 text-xs font-bold">{count(employee.metrics.assigned)} مسندة</span></div>
           <div className="my-5 grid grid-cols-3 gap-2">{metrics.filter(m => ["completed", "overdue", "pending"].includes(m.key)).map(m => <button key={m.key} type="button" disabled={disabled} onClick={() => metricFilter(m.key, employee.id)} className="rounded-xl border border-white/80 bg-white/60 p-3 text-right hover:bg-white disabled:opacity-60"><span className="block text-xs">{m.label}</span><strong className={`mt-2 block text-xl font-black tabular-nums ${m.key === "overdue" && employee.metrics.overdue ? "text-rose-700" : ""}`}>{count(employee.metrics[m.key])}</strong></button>)}</div>
-          <div className="mb-2 flex justify-between gap-2 text-xs"><span>نسبة الإنجاز</span><strong>{percent(employee.metrics.completed, employee.metrics.assigned)}</strong></div><progress aria-label={`نسبة إنجاز ${employee.full_name}`} max={Math.max(1,employee.metrics.assigned)} value={employee.metrics.completed} className={`block h-2 w-full overflow-hidden rounded-full ${i % 2 ? "accent-emerald-600" : "accent-sky-600"}`} />
-          <p className="mt-3 text-xs opacity-75">الالتزام بالموعد <strong>{percent(employee.metrics.on_time, employee.metrics.dated_completed)}</strong></p>
+          <div className="flex items-center gap-5 rounded-2xl border border-white/80 bg-white/45 p-3"><ProgressOrbit value={employee.metrics.assigned ? employee.metrics.completed * 100 / employee.metrics.assigned : 0} label={`نسبة إنجاز ${employee.full_name}`} detail="الإنجاز" className={i % 2 ? "text-emerald-600" : "text-sky-600"} /><div className="space-y-3 text-xs"><p>الالتزام بالموعد <strong className="mt-1 block text-lg">{percent(employee.metrics.on_time, employee.metrics.dated_completed)}</strong></p><p className={employee.metrics.blocked ? "font-bold text-amber-800" : "opacity-75"}>{employee.metrics.blocked ? `${count(employee.metrics.blocked)} مهام متوقفة` : "لا توجد عوائق مسجلة"}</p></div></div>
           <div className="mt-5 flex flex-wrap gap-2 border-t border-current/10 pt-4"><Button size="sm" disabled={disabled || employee.status !== "active"} onClick={() => workspace.current?.createTask(employee.id)}>إسناد مهمة</Button><Button size="sm" variant="outline" disabled={disabled} onClick={() => metricFilter("assigned",employee.id)}>عرض مهامها</Button><Button size="sm" variant="ghost" disabled={disabled} onClick={() => { setSelectedPayroll(employee.id); scrollToWork(); }}>الراتب والحوافز</Button></div>
         </article>)}
       </div>
-      {data && !data.employees.length && <p className={`${box} bg-white text-sm text-muted`}>لا توجد موظفات ضمن التصفية الحالية</p>}
+      {data && !data.employees.some(employee => staffView === "all" || (staffView === "attention" ? employee.metrics.overdue > 0 || employee.metrics.blocked > 0 : employee.metrics.pending > 0)) && <p className={`${box} bg-white text-sm text-muted`}>لا توجد حالات ضمن هذه التصفية</p>}
       {!!data?.unassigned?.assigned && <p className="inline-block rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-950">{count(data.unassigned.assigned)} مهام غير مسندة</p>}
     </section>
     <div className="grid items-stretch gap-4 md:grid-cols-2" data-admin-queues>

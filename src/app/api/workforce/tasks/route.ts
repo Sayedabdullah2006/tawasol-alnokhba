@@ -43,7 +43,7 @@ export async function GET(request: Request) {
         .range(from, to);
       if (scope && actor.employee) {
         if (scope === "assigned")
-          query = query.eq("assignee_id", actor.employee.id);
+          query = query.or(executionScope(actor.employee.id));
         else {
           query = query
             .eq("my_membership.employee_id", actor.employee.id)
@@ -75,7 +75,7 @@ export async function GET(request: Request) {
           query =
             field === "assignee_id" && value.startsWith("admin:")
               ? query.eq("assignee_admin_id", uuid(value.slice(6)))
-              : query.eq(field, uuid(value));
+              : field === "assignee_id" ? query.or(executionScope(uuid(value))) : query.eq(field, uuid(value));
       }
       const priority = params.get("priority");
       if (priority) {
@@ -152,7 +152,7 @@ export async function GET(request: Request) {
         : undefined;
     const service = await createServiceRoleClient();
     const ids = [
-      ...new Set((data ?? []).map((task) => task.assignee_id).filter(Boolean)),
+      ...new Set((data ?? []).flatMap((task) => [task.assignee_id, ...(task.co_assignee_ids ?? [])]).filter(Boolean)),
     ];
     const boardIds = [...new Set(data.map((task) => task.board_id))];
     const adminIds = [
@@ -189,13 +189,15 @@ export async function GET(request: Request) {
     return privateResponse({
       tasks: (data ?? []).map((task) => ({
         ...task,
-        assigneeName:
+        assigneeName: [
           (task.assignee_admin_id
             ? adminNameMap.get(task.assignee_admin_id)
-            : nameMap.get(task.assignee_id)) ?? null,
+            : nameMap.get(task.assignee_id)),
+          ...(task.co_assignee_ids ?? []).map((id: string) => nameMap.get(id)),
+        ].filter(Boolean).join("، ") || null,
         canEdit: actor.canManageTasks,
         canWork:
-          actor.role === "admin" || task.assignee_id === actor.employee?.id,
+          actor.role === "admin" || task.assignee_id === actor.employee?.id || (task.co_assignee_ids ?? []).includes(actor.employee?.id ?? ""),
       })),
       columns: columns.data || [],
       laneCounts,

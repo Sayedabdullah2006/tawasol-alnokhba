@@ -1,6 +1,7 @@
 import "server-only";
 import type { WorkforceActor } from "./server";
 import { WorkforceError } from "./validation";
+import { executionScope } from "./task-scope";
 
 export async function employeeDashboard(
   actor: WorkforceActor,
@@ -22,7 +23,7 @@ export async function employeeDashboard(
         "id,title,client_name,description,completion_criteria,due_at,estimate_minutes,blocked_reason,column:wf_task_columns!inner(kind),board:wf_boards!inner(archived_at)",
         { count: "exact" },
       )
-      .eq("assignee_id", employee.id)
+      .or(executionScope(employee.id))
       .is("archived_at", null)
       .is("board.archived_at", null);
   const taskCount = () =>
@@ -32,7 +33,7 @@ export async function employeeDashboard(
         "id,column:wf_task_columns!inner(kind),board:wf_boards!inner(archived_at)",
         { count: "exact", head: true },
       )
-      .eq("assignee_id", employee.id)
+      .or(executionScope(employee.id))
       .is("archived_at", null)
       .is("board.archived_at", null);
   const [
