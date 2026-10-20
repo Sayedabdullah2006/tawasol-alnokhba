@@ -8,6 +8,7 @@ import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import TurnstileWidget from '@/components/ui/TurnstileWidget'
 import { turnstileEnabled } from '@/lib/turnstile'
+import { beginPortalVisit } from '@/lib/portal-wallpaper'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -31,6 +32,7 @@ export default function LoginPage() {
   const registerHref = nextParam ? `/auth/register?next=${encodeURIComponent(nextParam)}` : '/auth/register'
 
   const finishLogin = async (userId: string) => {
+    beginPortalVisit()
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).single()
     const nextParam = new URLSearchParams(window.location.search).get('next')
     const safeNext = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : null

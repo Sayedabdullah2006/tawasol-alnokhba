@@ -121,13 +121,15 @@ function FormSection({
   children: ReactNode
 }) {
   return (
-    <div className={cn(
+    <div data-request-section data-complete={complete} data-open={open} className={cn(
       'bg-card rounded-2xl border-2 overflow-hidden transition-all',
       complete ? 'border-green/40' : 'border-border',
     )}>
       <button
         type="button"
         onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={`request-section-${index}`}
         className="w-full flex items-center gap-3 px-5 py-4 text-right hover:bg-muted/5 transition-colors"
       >
         <div className={cn(
@@ -143,7 +145,7 @@ function FormSection({
         <span className="text-muted text-xs flex-shrink-0">{open ? '▲' : '▼'}</span>
       </button>
       {open && (
-        <div className="px-5 pb-5 pt-2 border-t border-border wizard-enter">
+        <div id={`request-section-${index}`} className="px-5 pb-5 pt-2 border-t border-border wizard-enter">
           {children}
         </div>
       )}
@@ -783,7 +785,7 @@ export default function RequestWizard() {
     const canSelectExtras = requestType === 'single' && selectedPackage === 'basic' && estimatedTotal != null
 
     return (
-      <div className="min-h-screen pb-8">
+      <div className="request-screen min-h-screen pb-8">
         <div className="max-w-2xl mx-auto w-full px-4 py-6">
           <button
             type="button"
@@ -962,7 +964,7 @@ export default function RequestWizard() {
 
   // ── العرض ───────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen pb-36 lg:pb-10">
+    <div className="request-screen min-h-screen pb-36 lg:pb-10">
       <div className="max-w-6xl mx-auto w-full px-4 pt-6">
         <div className="relative max-w-3xl mx-auto text-center mb-5">
           {membershipMode && membershipAvailable != null && (
@@ -981,7 +983,7 @@ export default function RequestWizard() {
             <span className="text-xs font-bold text-dark">{progressDone} من {progressSteps.length} مكتمل</span>
             <span className="text-xs font-black text-green">{progressPct}%</span>
           </div>
-          <div className="h-2 rounded-full bg-muted/15 overflow-hidden">
+          <div role="progressbar" aria-label="اكتمال بيانات الطلب" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPct} className="request-progress h-2 rounded-full bg-muted/15 overflow-hidden">
             <div
               className="h-full rounded-full bg-gradient-to-l from-green to-green/70 transition-all duration-500 ease-out"
               style={{ width: `${progressPct}%` }}
@@ -1017,6 +1019,7 @@ export default function RequestWizard() {
                         type="button"
                         key={o.id}
                         onClick={() => selectRequestType(o.id)}
+                        aria-pressed={active}
                         className={cn(
                           'rounded-2xl border-2 p-4 text-center transition-all active:scale-[0.98]',
                           active ? 'border-green bg-green/5 ring-2 ring-green/20' : 'border-border bg-white hover:border-green/40',
@@ -1044,6 +1047,7 @@ export default function RequestWizard() {
                         type="button"
                         key={o.id}
                         onClick={() => selectClientType(o.id)}
+                        aria-pressed={active}
                         className={cn(
                           'flex items-center gap-2 rounded-xl border-2 px-3 py-2.5 text-sm font-bold transition-all active:scale-[0.98]',
                           active ? 'border-green bg-green/5 text-dark ring-2 ring-green/20' : 'border-border bg-white text-muted hover:border-green/40',
@@ -1424,7 +1428,7 @@ export default function RequestWizard() {
         </div>
         </main>
 
-        {!membershipPortalMode && <aside className="hidden lg:block sticky top-6">
+        {!membershipPortalMode && <aside className="hidden lg:block sticky top-28">
           {membershipMode ? (
             <div className="overflow-hidden rounded-lg border border-gold/40 bg-dark p-6 text-white shadow-xl">
               <p className="text-xs font-bold text-gold">طلب ضمن العضوية</p>

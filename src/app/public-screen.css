@@ -1,0 +1,90 @@
+/* One screen identity for discovery, checkout and the signed-in portals. */
+.public-screen { --glass-shadow: 0 20px 60px #0004; }
+.public-screen .portal-wallpaper { background-image: linear-gradient(180deg,#06112270,#061122a8 60%,#061122ed),var(--portal-wallpaper,url('/portal/nukhba-night.webp')); }
+.public-screen.portal-high-contrast .portal-wallpaper { background-image: linear-gradient(#061122f5,#061122f5),var(--portal-wallpaper,url('/portal/nukhba-night.webp')); }
+.public-screen main { position: relative; }
+.public-screen .site-header { border-radius: 22px; border-color: #9bb7d436; background: #091b30ed; box-shadow: 0 12px 44px #0004; }
+.public-screen .site-header nav > a { min-height: 44px; padding-inline: 20px; border-radius: 14px; color: #d6e2f2; }
+.public-screen .site-header nav > a[aria-current="page"] { background: #ddbd7b; color: #10213a; font-weight: 800; }
+.public-screen .site-header nav > a[aria-current="page"] span { color: inherit; }
+.public-screen .site-header nav > a.bg-green { color: #10213a; font-weight: 800; }
+.public-screen .glass-panel { border-radius: 24px; border-color: #9cb7d635; background: linear-gradient(135deg,#142d47ed,#0a1b30eb); box-shadow: 0 18px 50px #0003; }
+.public-screen .glass-panel-dark { border-radius: 26px; border-color: #cfb47766; background: linear-gradient(125deg,#1a3550f0,#081a2ef5); }
+.public-screen :is(.bg-white\/55,.bg-white\/65,.bg-white\/75,.bg-white\/85) { background-color: #142e47; }
+.public-screen :is(.text-cream,[class*="text-cream/"]) { color: #cbd8eb; }
+.public-screen :is(h1,h2,h3,h4).text-cream { color: #fff7e5; }
+.public-screen .bg-dark { background-color: #0c2038; color: #eef4ff; }
+.public-screen [class*="from-dark"] { background-image: linear-gradient(125deg,#153450e8,#071628ee); }
+.public-screen .site-footer { padding: 32px 16px 20px; }
+.public-screen .site-footer > div { max-width: 1248px; border-radius: 28px; background: #081a2ee8; }
+.public-screen .site-footer :is(h3,h4) { color: #fff7e5; }
+.public-screen .site-footer a:hover { color: #edcb86; }
+.public-screen :is(input,textarea,select) { box-shadow: inset 0 1px 3px #0002; transition: border-color .2s,box-shadow .2s; }
+.public-screen :is(input,textarea,select):focus { border-color: #e2bf77; box-shadow: 0 0 0 3px #e2bf771c; }
+.public-screen :is(button,a).bg-green { border-radius: 13px; box-shadow: 0 6px 22px #d7b66e1c; }
+.public-screen :is(button,a):active { transform: translateY(1px); }
+.public-screen :is(article,section,div).bg-card { border-radius: 22px; }
+.public-screen :is([class~="border-green"],[class~="border-green/20"],[class~="border-green/30"],[class~="border-green/40"],[class~="border-green/50"]) { border-color: #cfb47780; }
+.public-screen main > .bg-cream { background: transparent; }
+.public-screen .screen-home > section { max-width: 1280px; }
+.screen-home .screen-hero { border-radius: 32px; border-color: #cfb47780; min-height: 560px; box-shadow: 0 24px 70px #0005,inset 0 0 0 1px #e2bf770d; }
+.screen-hero > img { opacity: .82; }
+.screen-hero-shade { background: linear-gradient(90deg,#07182c08,#091b30d6 46%,#091b30fa 69%),linear-gradient(0deg,#07182c80,transparent 50%); }
+.screen-hero h1 { color: #fff7e8; line-height: 1.4; text-wrap: balance; }
+.screen-hero p { color: #c1d0e4; }
+.screen-home .screen-hero :is(a,span).bg-white\/65 { background: #25415a80; }
+.screen-home .screen-stat { position: relative; overflow: hidden; border: 1px solid #99b4d333; border-radius: 22px; background: linear-gradient(135deg,#193951e8,#0b2037ed); box-shadow: 0 10px 30px #0002; }
+.screen-home .screen-stat:nth-child(2) { background: linear-gradient(135deg,#153e43eb,#10283bea); }
+.screen-home .screen-stat:nth-child(3) { background: linear-gradient(135deg,#343451e8,#17213aea); }
+.screen-home .screen-stat:nth-child(4) { background: linear-gradient(135deg,#413823e8,#1d2837ea); }
+.screen-stat::after { content: ''; position: absolute; width: 100px; height: 100px; left: -32px; bottom: -54px; border: 16px solid #d8b875; border-radius: 50%; opacity: .08; pointer-events: none; }
+.screen-stat > p:first-child { font-size: clamp(28px,3vw,38px); color: #f1d49d; font-variant-numeric: tabular-nums; }
+.screen-home .screen-feature { border-radius: 30px; border-color: #cfb47750; }
+.screen-feature-shade { background: linear-gradient(90deg,#07182c10,#0a1d33de 45%,#0a1d33fc 72%); }
+.screen-home .screen-tile { position: relative; border-radius: 24px; min-height: 220px; padding: 26px; }
+.screen-tile > span { border: 1px solid #d3b16a40; border-radius: 15px; background: #d2ad6a14; color: #eaca8b; }
+.screen-home :is(.screen-tile,.screen-stat) { transition: transform .22s,border-color .22s,box-shadow .22s; }
+.screen-home :is(.screen-tile,.screen-stat):hover { transform: translateY(-4px); border-color: #d8b8758c; box-shadow: 0 18px 45px #0005; }
+.screen-home blockquote { padding: 16px 20px; border-radius: 0 14px 14px 0; background: #0b203780; }
+.screen-home details { border-color: #adc4df26; }
+.screen-home summary { min-height: 44px; }
+.screen-home details[open] summary { color: #eaca8b; }
+.request-screen { padding-top: 12px; }
+.request-screen h1 { font-size: clamp(28px,3vw,40px); color: #fff7e5; }
+.request-screen [data-request-section] { border-width: 1px; border-radius: 24px; box-shadow: 0 12px 32px #0002; }
+.request-screen [data-request-section] > button { padding-block: 22px; }
+.request-screen [data-request-section][data-open="true"] { border-color: #d7b67490; box-shadow: 0 0 0 1px #d7b67416,0 16px 40px #0003; }
+.request-screen [data-request-section][data-complete="true"] > button > div:first-child { background: #17473e; color: #b9f1d9; box-shadow: 0 0 0 1px #70c3a14d; }
+.request-screen [data-request-section][data-open="true"] > button > div:first-child { background: #d8b875; color: #10213a; }
+.request-screen .request-progress { height: 8px; background: #8ca8c82b; }
+.request-screen .request-progress > div { background: linear-gradient(90deg,#ad8848,#efd39b); box-shadow: 0 0 14px #dfbd7755; }
+.request-screen button[aria-pressed="true"] { border-color: #e2bf77; background-color: #80652e30; box-shadow: inset 0 0 0 1px #e2bf7744; }
+.request-screen aside > * { border-radius: 24px; }
+.request-screen :is(button,a)[class*="border-green"]:hover { border-color: #f1d49d; }
+/* Brand actions must stay readable on gold, including membership checkout. */
+.portal-screen :is(.bg-gold,[class*="!bg-gold"]) { color: #10213a !important; }
+.portal-screen :is([class~="bg-[#f7f9fd]"],[class~="bg-[#edf8f6]"]) { background-color: #102740; }
+.portal-screen :is([class~="bg-dark/40"],[class~="bg-dark/50"],[class~="bg-dark/55"],[class~="bg-dark/60"]) { background-color: #020b18c9; }
+.portal-screen :is(.portal-launcher,.portal-request-card,[data-task-card],[data-staff-card],.portal-toolbar button) { transition: transform .2s,border-color .2s,box-shadow .2s,background-color .2s; }
+.portal-screen :is(.portal-launcher,.portal-request-card,[data-task-card]):focus-within { border-color: #e2bf77; box-shadow: 0 0 0 2px #e2bf772e; }
+.portal-screen .portal-request-card:hover { transform: translateY(-3px); box-shadow: 0 16px 40px #0004; }
+.portal-screen :is([data-task-lane],dialog,[role="dialog"]) { scrollbar-width: thin; scrollbar-color: #9b8150 #0b2039; }
+.portal-screen summary { min-height: 36px; }
+.portal-screen summary:focus-visible { border-radius: 8px; }
+@media(max-width:767px) {
+  .public-screen .site-header { border-radius: 18px; }
+  .screen-home .screen-hero { min-height: 620px; border-radius: 25px; }
+  .screen-hero-shade { background: linear-gradient(180deg,#081b3010,#091b30ef 43%,#091b30fc 68%); }
+  .screen-feature-shade { background: linear-gradient(180deg,#081b3010,#0a1d33ef 45%,#0a1d33fc 75%); }
+  .screen-home .screen-tile { min-height: auto; padding: 22px; }
+  .public-screen .site-footer { padding-inline: 10px; padding-bottom: 64px; }
+  .request-screen [data-request-section] > button { padding: 18px 16px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .portal-screen *, .portal-screen *::before,.portal-screen *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .portal-screen :is(.portal-request-card,.screen-tile,.screen-stat):hover { transform: none; }
+}
+@media print {
+  .public-screen .site-header,.public-screen .site-footer { display: none; }
+  .public-screen .glass-panel { background: white; box-shadow: none; color: black; }
+}

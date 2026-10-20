@@ -14,10 +14,10 @@ export default function InventorStorePage() {
   return (
     <div className="relative overflow-hidden pb-10">
       <section className="mx-auto max-w-6xl px-4 pb-5 pt-8 md:pt-12">
-        <div className="glass-panel relative min-h-[540px] overflow-hidden rounded-lg md:min-h-[460px]">
+        <div className="screen-feature glass-panel relative min-h-[540px] overflow-hidden rounded-lg md:min-h-[460px]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/inventor-store-hero.webp" alt="مخترع يطوّر نموذجاً عملياً في استديو هندسي" className="absolute inset-0 h-full w-full object-cover object-[32%_center] md:object-center" />
-          <div className="absolute inset-0 bg-[linear-gradient(to_left,rgba(247,250,253,.99)_0%,rgba(247,250,253,.94)_32%,rgba(247,250,253,.64)_53%,rgba(247,250,253,.08)_78%)] max-md:bg-[linear-gradient(to_bottom,rgba(247,250,253,.04)_0%,rgba(247,250,253,.38)_38%,rgba(247,250,253,.96)_62%,rgba(247,250,253,.99)_100%)]" />
+          <div className="screen-feature-shade absolute inset-0" />
           <div className="relative z-10 flex min-h-[540px] items-end p-6 sm:p-8 md:min-h-[460px] md:items-center md:p-10 lg:p-12">
             <div className="w-full max-w-[33rem] md:ml-auto md:pr-3 lg:pr-6">
               <div className="mb-4 flex flex-wrap items-center gap-2">

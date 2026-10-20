@@ -38,11 +38,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
     return <PortalScreen area={pathname.startsWith("/admin") ? "admin" : "client"}><Header /><main className="flex min-w-0 flex-1 flex-col pt-[84px]">{children}</main><footer className="px-5 pb-16 pt-8 text-center text-xs text-muted">تواصل النخبة · اترك أثرًا دائمًا</footer></PortalScreen>;
   }
   return (
-    <>
+    <PortalScreen area="public">
       <Header />
-      <main className="min-w-0 flex-1 flex flex-col pt-[84px]">{children}</main>
+      <main id="site-main" className="min-w-0 flex-1 flex flex-col pt-[84px]">{children}</main>
       <Footer />
       <DiscountPopup />
-    </>
+    </PortalScreen>
   );
 }

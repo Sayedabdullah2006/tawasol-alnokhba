@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import ClientNameFixed from '@/components/ui/ClientNameFixed'
@@ -21,6 +21,7 @@ interface UserInfo {
 
 export default function Header() {
   const router = useRouter()
+  const pathname = usePathname()
   const supabase = createClient()
   const [menuOpen, setMenuOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -85,7 +86,7 @@ export default function Header() {
 
   return (
     <>
-    <header className="glass-panel fixed inset-x-3 top-3 z-50 w-auto rounded-lg">
+    <header className="site-header glass-panel fixed inset-x-3 top-3 z-50 w-auto rounded-lg">
       <div className="mx-auto flex h-[68px] items-center justify-between px-4 sm:px-5">
         <Link href="/" className="flex items-center" aria-label="تواصل النخبة">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -102,7 +103,7 @@ export default function Header() {
         {/* Desktop nav */}
         <nav className="hidden items-center gap-2 md:flex">
           {visibleNavLinks.map(l => (
-            <Link key={l.href} href={l.href} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-dark/80 transition-colors hover:bg-white/60 hover:text-green">
+            <Link key={l.href} href={l.href} aria-current={(l.href === '/' ? pathname === '/' : pathname.startsWith(l.href.replace('/start', ''))) ? 'page' : undefined} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-dark/80 transition-colors hover:bg-white/60 hover:text-green">
               <span>{l.label}</span>
               {l.badge && <span className="rounded-full bg-gold/15 px-1.5 py-0.5 text-[9px] font-black text-dark">{l.badge}</span>}
             </Link>
@@ -195,6 +196,8 @@ export default function Header() {
           onClick={() => setMenuOpen(!menuOpen)}
           className="cursor-pointer rounded-lg p-2 text-dark transition-colors hover:bg-white/60 md:hidden"
           aria-label="القائمة"
+          aria-expanded={menuOpen}
+          aria-controls="site-mobile-menu"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             {menuOpen ? (
@@ -209,7 +212,7 @@ export default function Header() {
 
       {/* Mobile menu — outside <header> so backdrop-blur doesn't trap fixed positioning */}
       {menuOpen && (
-        <div className="md:hidden fixed inset-x-0 top-[5.5rem] bottom-0 z-50 mx-3 flex flex-col overflow-hidden rounded-lg border border-white/70 bg-card/95 shadow-2xl backdrop-blur-xl"
+        <div id="site-mobile-menu" className="md:hidden fixed inset-x-0 top-[5.5rem] bottom-0 z-50 mx-3 flex flex-col overflow-hidden rounded-lg border border-white/70 bg-card/95 shadow-2xl backdrop-blur-xl"
           onClick={() => setMenuOpen(false)}>
           <nav className="flex-1 overflow-y-auto px-4 pt-2 pb-6"
             onClick={e => e.stopPropagation()}>

@@ -1,0 +1,7 @@
+{
+  "tool": "Built-in image_gen (imagegen skill)",
+  "assets": [
+    {"path":"public/portal/nukhba-dunes.webp","prompt":"Premium photorealistic cinematic 16:9 landscape wallpaper for a Saudi dark navy and muted gold dashboard. Empty Arabian desert dunes at blue hour, gold light along sand ridges, deep navy sky. No people, buildings, text, logos, watermark or UI. Calm central/right negative space for translucent Arabic cards. Full bleed."},
+    {"path":"public/portal/nukhba-coast.webp","prompt":"Premium photorealistic cinematic 16:9 landscape wallpaper for a Saudi dark navy and muted gold dashboard. Red Sea inspired rocky shoreline from above, deep blue/teal water, warm sunset rim. No people, boats, buildings, text, logos, watermark or UI. Calm darker central/right water for translucent cards. Full bleed."}
+  ]
+}
