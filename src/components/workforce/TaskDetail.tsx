@@ -282,9 +282,13 @@ export default function TaskDetail({
         {data.canEdit && (
           <Button
             type="button"
-            disabled={busy || !!taskEditReason(task)}
-            title={taskEditReason(task) || undefined}
+            disabled={busy || (!!taskEditReason(task) && !(reviewing && data.canAssign && !frozen))}
+            title={reviewing && data.canAssign && !frozen ? undefined : taskEditReason(task) || undefined}
             onClick={() => {
+              if (reviewing && data.canAssign && !frozen) {
+                show("submit");
+                return;
+              }
               const next = taskForm(task);
               setForm(next);
               setOriginal(JSON.stringify(next));
@@ -292,7 +296,7 @@ export default function TaskDetail({
               setEditing(true);
             }}
           >
-            {data.canAssign ? "تعديل وإعادة الإسناد" : "تعديل المهمة"}
+            {reviewing && data.canAssign ? "تعديل الإسناد" : data.canAssign ? "تعديل وإعادة الإسناد" : "تعديل المهمة"}
           </Button>
         )}
         {data.canArchive && !board.board.archived_at && !reviewing && (
