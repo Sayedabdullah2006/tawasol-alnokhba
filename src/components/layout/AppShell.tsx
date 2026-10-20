@@ -6,6 +6,7 @@ import Header from "./Header";
 import Footer from "./Footer";
 import DiscountPopup from "@/components/ui/DiscountPopup";
 import WorkforceHeader from "@/components/workforce/WorkforceHeader";
+import PortalScreen from "./PortalScreen";
 
 /** Internal workspaces never mount customer navigation, marketing or promotions. */
 export default function AppShell({ children }: { children: ReactNode }) {
@@ -18,7 +19,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   if (employee || workforceAdmin) {
     return (
-      <>
+      <PortalScreen area={employee ? "employee" : "team"}>
         <WorkforceHeader admin={workforceAdmin} />
         <main
           id="workspace-main"
@@ -29,10 +30,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <footer className="px-5 pb-24 pt-6 text-center text-xs text-muted md:pb-6">
           تواصل النخبة · {employee ? "بوابة الموظف" : "إدارة فريق العمل"}
         </footer>
-      </>
+      </PortalScreen>
     );
   }
 
+  if (pathname === "/dashboard" || pathname.startsWith("/dashboard/") || pathname === "/admin" || pathname.startsWith("/admin/")) {
+    return <PortalScreen area={pathname.startsWith("/admin") ? "admin" : "client"}><Header /><main className="flex min-w-0 flex-1 flex-col pt-[84px]">{children}</main><footer className="px-5 pb-16 pt-8 text-center text-xs text-muted">تواصل النخبة · اترك أثرًا دائمًا</footer></PortalScreen>;
+  }
   return (
     <>
       <Header />

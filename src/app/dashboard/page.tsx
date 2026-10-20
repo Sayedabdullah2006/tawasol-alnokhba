@@ -8,13 +8,17 @@ import EmptyState from '@/components/ui/EmptyState'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Link from 'next/link'
 import type { PublishRequest } from '@/types/publish-request'
+import PortalIntro from '@/components/layout/PortalIntro'
+import { isActionRequiredForClient, isFinalStatus } from '@/lib/status-labels'
+import type { RequestStatus } from '@/lib/constants'
 
 export default function DashboardPage() {
   const router = useRouter()
-  const supabase = createClient()
+  const [supabase] = useState(createClient)
   const [loading, setLoading] = useState(true)
   const [userName, setUserName] = useState('')
   const [requests, setRequests] = useState<PublishRequest[]>([])
+  const [view, setView] = useState<'all' | 'action' | 'active' | 'done'>('all')
 
   useEffect(() => {
     const load = async () => {
@@ -42,17 +46,15 @@ export default function DashboardPage() {
   }, [router, supabase])
 
   if (loading) return <LoadingSpinner size="lg" />
+  const matches = (request: PublishRequest, tab: typeof view) => tab === 'all' || (tab === 'action' ? isActionRequiredForClient(request.status as RequestStatus) : tab === 'done' ? request.status === 'completed' : !isFinalStatus(request.status as RequestStatus))
+  const visible = requests.filter(request => matches(request, view))
 
   return (
-    <div className="mx-auto w-full max-w-6xl p-4 md:p-6">
-      <section className="glass-panel mb-5 flex flex-wrap items-end justify-between gap-4 rounded-lg p-5 sm:p-6">
-        <div>
-          <p className="text-xs font-bold text-gold">مساحة العميل</p>
-          <h1 className="mt-1 text-2xl font-black text-dark sm:text-3xl">مرحباً، {userName}</h1>
-          <p className="mt-2 text-sm text-muted">تابع طلباتك واعتمد المحتوى في مكان واحد.</p>
-        </div>
-        <Link href="/request/start" className="rounded-lg bg-green px-5 py-3 text-sm font-bold text-white shadow-md shadow-green/20 transition hover:bg-green/90">+ تقديم طلب جديد</Link>
-      </section>
+    <div className="mx-auto w-full max-w-screen-2xl space-y-6">
+      <PortalIntro title={`مرحبًا، ${userName}`} eyebrow="مساحتك في النخبة">
+        <Link href="/request/start" className="portal-primary rounded-xl px-5 py-3 text-sm font-bold">＋ طلب جديد</Link>
+      </PortalIntro>
+      {!!requests.length && <nav aria-label="تصفية طلباتي" className="portal-toolbar flex flex-wrap gap-2">{([{ id: 'all', label: 'كل الطلبات' }, { id: 'action', label: 'بانتظارك' }, { id: 'active', label: 'الطلبات الجارية' }, { id: 'done', label: 'المكتملة' }] as const).map(tab => <button key={tab.id} type="button" aria-pressed={view === tab.id} onClick={() => setView(tab.id)}>{tab.label}<span className="mr-2 opacity-65">{requests.filter(request => matches(request, tab.id)).length}</span></button>)}</nav>}
 
       {requests.length === 0 ? (
         <EmptyState
@@ -62,8 +64,9 @@ export default function DashboardPage() {
           actionHref="/request/start"
         />
       ) : (
-        <div className="grid gap-3">
-          {requests.map(r => <RequestCard key={r.id} request={r} />)}
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {visible.map(r => <RequestCard key={r.id} request={r} />)}
+          {!visible.length && <p className="portal-panel col-span-full rounded-2xl border p-8 text-center text-sm text-muted">لا توجد طلبات في هذه القائمة</p>}
         </div>
       )}
     </div>

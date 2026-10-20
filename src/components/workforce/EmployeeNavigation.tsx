@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { employeeModules } from "@/lib/workforce/navigation";
+import PortalIcon from "@/components/layout/PortalIcon";
 export default function EmployeeNavigation() {
   const pathname = usePathname();
   const [open, setOpen] = useState<string | null>(null);
@@ -20,7 +21,7 @@ export default function EmployeeNavigation() {
   return (
     <nav
       aria-label="أقسام بوابة الموظف"
-      className="relative z-30 w-full border-b border-border bg-white p-4 md:px-8"
+      className="portal-dock relative z-30 w-full"
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           setOpen(null);
@@ -45,7 +46,8 @@ export default function EmployeeNavigation() {
           const active = screens.some(
             (s) => pathname === s.path || pathname.startsWith(s.path + "/"),
           );
-          const style = `flex min-h-12 items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-colors ${active ? "bg-dark text-white" : "text-dark hover:bg-slate-100"}`;
+          const style = "portal-launcher";
+          const icon = module.key === "work" ? "tasks" : module.key;
           return screens.length === 1 ? (
             <li key={module.key}>
               <Link
@@ -54,6 +56,7 @@ export default function EmployeeNavigation() {
                 aria-current={active ? "page" : undefined}
                 onClick={() => setOpen(null)}
               >
+                <PortalIcon name={icon} />
                 {module.title}
               </Link>
             </li>
@@ -76,6 +79,7 @@ export default function EmployeeNavigation() {
                 type="button"
                 className={style}
                 aria-expanded={open === module.key}
+                data-active={active}
                 aria-controls={`employee-menu-${module.key}`}
                 onClick={() => setOpen(open === module.key ? null : module.key)}
                 onKeyDown={(event) => {
@@ -91,6 +95,7 @@ export default function EmployeeNavigation() {
                   }
                 }}
               >
+                <PortalIcon name={icon} />
                 {module.title}
                 <span
                   aria-hidden="true"
@@ -104,7 +109,7 @@ export default function EmployeeNavigation() {
                   id={`employee-menu-${module.key}`}
                   className="absolute inset-x-3 top-full pt-2 lg:inset-x-auto lg:right-0 lg:min-w-64"
                 >
-                  <div className="max-h-[65dvh] overflow-y-auto rounded-2xl border border-border bg-white p-2 shadow-xl">
+                  <div className="portal-submenu max-h-[65dvh] overflow-y-auto rounded-2xl border border-border bg-white p-2 shadow-xl">
                     {screens.map((screen) => (
                       <Link
                         key={screen.path}

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Cairo } from 'next/font/google'
 import './globals.css'
+import './portal.css'
 import { ToastProvider } from '@/components/ui/Toast'
 import AppShell from '@/components/layout/AppShell'
 

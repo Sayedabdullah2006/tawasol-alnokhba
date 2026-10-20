@@ -87,4 +87,3 @@ begin
 end $$;
 rollback;
 select 'PASS: private task isolation, shared visibility, shared move/comment/file/delivery, admin-only approval, no notifications; rolled back' as result;
-

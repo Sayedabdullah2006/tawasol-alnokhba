@@ -9,7 +9,7 @@ export default function DashboardLiveStatus({ admin = false }: { admin?: boolean
   const [updated, setUpdated] = useState("");
   useEffect(() => {
     const refresh = () => {
-      if (document.visibilityState !== "visible" || hasUnsavedWorkforceChanges() || document.querySelector('[role="dialog"]')) return;
+      if (document.visibilityState !== "visible" || hasUnsavedWorkforceChanges() || document.querySelector('dialog[open],[role="dialog"]')) return;
       if (admin) window.dispatchEvent(new Event("workforce-dashboard-tick"));
       else startTransition(() => router.refresh());
     };

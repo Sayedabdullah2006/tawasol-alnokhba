@@ -659,6 +659,3 @@ left join public.wf_employees e on e.id=assignment.employee_id left join public.
  update public.wf_notification_delivery_settings set last_run_at=now() where id;
  return jsonb_build_object('created',added);
 end $function$;
-
-
-

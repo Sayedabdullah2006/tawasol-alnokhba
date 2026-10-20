@@ -35,7 +35,7 @@ export default function WorkforceHeader({ admin }: { admin: boolean }) {
   }
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40 border-b border-border bg-white/95 shadow-sm backdrop-blur">
+    <header className="portal-topbar fixed inset-x-0 top-0 z-40 border-b border-border bg-white/95 shadow-sm backdrop-blur">
       <a
         href="#workspace-main"
         className="sr-only focus:not-sr-only focus:block focus:p-3"

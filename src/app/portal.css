@@ -1,0 +1,118 @@
+/* Nukhba Screen: scoped to signed-in workspaces; public pages keep their identity. */
+body:has(.portal-screen) { background: #061122; color: #f3f5fb; }
+body:has(.portal-screen)::before { display: none; }
+.portal-screen {
+  --dark: #edf3ff; --foreground: #edf3ff; --cream: #0b1d34; --background: #061122;
+  --card: rgba(15, 34, 58, .87); --border: rgba(175, 198, 230, .18); --muted: #aabbd1;
+  --green: #244c81; --light: #89b6ef; --gold: #e2bf77;
+  position: relative; isolation: isolate; display: flex; flex: 1; flex-direction: column; min-height: 100dvh;
+  color: var(--foreground); color-scheme: dark;
+}
+.portal-wallpaper { position: fixed; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(180deg, rgba(3, 12, 26, .2), rgba(3, 12, 26, .22) 38%, rgba(3, 12, 26, .8)), url('/portal/nukhba-night.webp') center / cover no-repeat; }
+.portal-wallpaper::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 90% 0%, rgba(53, 102, 166, .16), transparent 65%); }
+.portal-screen ::selection { background: #e2bf77; color: #061122; }
+.portal-screen :focus-visible { outline: 2px solid #edcc8b; outline-offset: 4px; }
+.portal-screen .glass-panel, .portal-screen .portal-panel { background: rgba(12, 29, 50, .88); border-color: var(--border); box-shadow: 0 12px 36px #0003; backdrop-filter: blur(18px); }
+.portal-screen .portal-panel { border-radius: 24px; }
+.portal-screen .portal-topbar { background: rgba(5, 17, 34, .91); border-color: var(--border); backdrop-filter: blur(20px); box-shadow: 0 6px 32px #0002; }
+.portal-topbar img { border-radius: 10px; background: #fff; padding: 4px; }
+.portal-screen header img[src="/logo.png"] { border-radius: 10px; background: #fff; padding: 4px; }
+.portal-contrast-toggle { position: fixed; bottom: 18px; left: 18px; z-index: 35; display: flex; align-items: center; gap: 8px; min-height: 42px; border: 1px solid #c9a96166; border-radius: 30px; background: #09182cec; padding: 8px 15px; color: #e2bf77; font-size: 12px; backdrop-filter: blur(15px); }
+.portal-high-contrast .portal-wallpaper { background-image: linear-gradient(#061122f5, #061122f5), url('/portal/nukhba-night.webp'); }
+.portal-high-contrast .portal-panel, .portal-high-contrast .glass-panel { background: #0c2039; }
+.portal-intro { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 28px; padding: 20px 4px 28px; }
+.portal-eyebrow { display: flex; align-items: center; gap: 9px; color: #e2bf77; font-size: 12px; font-weight: 800; letter-spacing: .02em; }
+.portal-eyebrow > span { width: 6px; height: 6px; border-radius: 50%; background: #e2bf77; box-shadow: 0 0 16px #e2bf7799; }
+.portal-intro h1 { max-width: 40rem; margin-top: 13px; font-size: clamp(28px, 3.3vw, 46px); font-weight: 900; line-height: 1.5; color: #fff8e9; }
+.portal-intro-detail { margin-top: 9px; color: #b5c5db; font-size: 14px; }
+.portal-intro-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 20px; }
+.portal-time { min-width: 200px; text-align: left; padding-inline-start: 28px; border-inline-start: 1px solid #c9a96144; }
+.portal-time time { display: block; font-size: clamp(38px, 4.6vw, 64px); font-weight: 600; line-height: 1.3; color: #fff4d9; font-variant-numeric: tabular-nums; }
+.portal-time > p { margin-top: 7px; color: #bfcee1; font-size: 12px; }
+.portal-fullscreen { display: inline-block; margin-top: 13px; padding: 4px 0; color: #e2bf77; font-size: 11px; }
+.portal-screen .portal-dock { position: relative; z-index: 30; margin: 18px auto 0; width: calc(100% - 32px); border: 1px solid #b7c9e629; border-radius: 24px; background: linear-gradient(115deg, #122943d9, #0a1a30e8); box-shadow: 0 14px 40px #0002; padding: 10px; backdrop-filter: blur(18px); }
+.portal-dock .portal-launcher { display: flex; min-height: 68px; align-items: center; justify-content: center; gap: 10px; border: 1px solid transparent; border-radius: 17px; padding: 12px 16px; color: #c9d8eb; font-size: 12px; font-weight: 800; transition: background .2s, transform .2s, border-color .2s; }
+.portal-icon { width: 23px; height: 23px; flex-shrink: 0; color: #e2bf77; }
+.portal-dock .portal-launcher:hover, .portal-dock .portal-launcher[aria-expanded="true"] { transform: translateY(-2px); background: #36547c55; color: #fff; border-color: #cfb47766; }
+.portal-dock .portal-launcher[aria-current="page"], .portal-dock .portal-launcher[data-active="true"] { background: linear-gradient(135deg, #d9b770, #f0d59b); color: #101c2c; border-color: #f7dfac; box-shadow: 0 5px 20px #d6b36b22; }
+.portal-launcher[aria-current="page"] .portal-icon, .portal-launcher[data-active="true"] .portal-icon { color: #253349; }
+.portal-screen .portal-submenu { border-color: #44617e; background: #0b2039 !important; box-shadow: 0 20px 55px #0008; }
+.portal-screen .portal-submenu a:hover { background: #244467; }
+.portal-screen .portal-submenu a[aria-current="page"] { background: #d6b570; color: #10203a; }
+
+/* Existing functional components inherit the screen palette, including dialogs. */
+.portal-screen :is(.bg-white, .bg-white\/95, .bg-white\/90, .bg-white\/80, .bg-white\/70, .bg-white\/60, .bg-white\/50, .bg-white\/45, .bg-slate-50, .bg-slate-100, .bg-gray-50, .bg-gray-100) { background-color: rgba(16, 37, 62, .9); }
+.portal-screen :is(.text-slate-950,.text-slate-900,.text-slate-800,.text-slate-700,.text-gray-950,.text-gray-900,.text-gray-800,.text-gray-700) { color: #e1ebf8; }
+.portal-screen :is(.text-slate-600,.text-slate-500,.text-gray-600,.text-gray-500) { color: #adbed5; }
+.portal-screen :is(.border-slate-300,.border-slate-200,.border-slate-100,.border-gray-200,.border-white\/80,.border-white\/60) { border-color: #8da9cb33; }
+.portal-screen :is(.text-blue-950,.text-blue-900,.text-blue-800,.text-blue-700,.text-sky-950,.text-sky-900,.text-sky-800,.text-sky-700,.text-indigo-950,.text-indigo-900) { color: #b4d8ff; }
+.portal-screen :is(.text-sky-600,.text-sky-700,.text-blue-600) { color: #83c7ff; }
+.portal-screen .text-emerald-600 { color: #91dfbf; }
+.portal-screen :is(a,button)[class~="text-[#102b57]"] { background: #e2bf77; color: #102b57; }
+.portal-screen :is(section,div)[class~="text-[#102b57]"] { color: #edf3ff; }
+.portal-screen :is(.text-emerald-950,.text-emerald-900,.text-emerald-800,.text-emerald-700,.text-teal-950,.text-teal-900) { color: #9ce4c8; }
+.portal-screen :is(.text-rose-950,.text-rose-900,.text-rose-800,.text-rose-700,.text-red-800,.text-red-700) { color: #ffb5bd; }
+.portal-screen :is(.text-amber-950,.text-amber-900,.text-amber-800,.text-amber-700,.text-orange-700,.text-yellow-700) { color: #f3d493; }
+.portal-screen :is(.text-violet-950,.text-violet-900,.text-violet-800,.text-violet-700,.text-purple-700) { color: #dbc4ff; }
+.portal-screen :is(.bg-blue-50,.bg-blue-100,.bg-sky-50,.bg-sky-100,.bg-indigo-50,.bg-indigo-50\/60) { background-color: #173451; }
+.portal-screen :is(.bg-emerald-50,.bg-emerald-100,.bg-teal-50,.bg-green-50) { background-color: #103a36; }
+.portal-screen :is(.bg-rose-50,.bg-red-50,.bg-rose-100) { background-color: #472b3a; }
+.portal-screen :is(.bg-amber-50,.bg-orange-50,.bg-yellow-50) { background-color: #423824; }
+.portal-screen :is(.bg-amber-50\/70,.bg-amber-50\/80) { background-color: #423824; }
+.portal-screen :is(.bg-emerald-50\/70,.bg-emerald-50\/80) { background-color: #103a36; }
+.portal-screen :is(.bg-cyan-50,.bg-cyan-100) { background-color: #153d48; }
+.portal-screen :is(.text-cyan-700,.text-green-800,.text-green-700) { color: #9ce4d6; }
+.portal-screen :is(.bg-violet-50,.bg-violet-100,.bg-fuchsia-50) { background-color: #302746; }
+.portal-screen :is(.border-blue-200,.border-sky-200,.border-indigo-100) { border-color: #6397d144; }
+.portal-screen :is(.border-emerald-200,.border-teal-200) { border-color: #6fc5a744; }
+.portal-screen :is(.border-amber-200,.border-orange-200,.border-yellow-200) { border-color: #e2bf7744; }
+.portal-screen :is(.border-violet-200,.border-fuchsia-200) { border-color: #b292df44; }
+.portal-screen :is(.border-rose-200,.border-red-200) { border-color: #d78b9d44; }
+.portal-screen .bg-dark { background-color: #dfbe79; color: #10213a; }
+.portal-screen .text-green { color: #e2bf77; }
+.portal-screen :is(button.bg-green,a.bg-green,.portal-primary) { background: linear-gradient(135deg, #dfbd77, #f0d59c); color: #10213a; border-color: #e8c987; font-weight: 800; }
+.portal-screen :is(button.bg-green,a.bg-green,.portal-primary):hover { filter: brightness(1.08); }
+.portal-screen :is(input:not([type="checkbox"]):not([type="radio"]),textarea,select) { color-scheme: dark; background-color: #0b2039; border-color: #6580a34d; color: #f3f7ff; }
+.portal-screen input::placeholder, .portal-screen textarea::placeholder { color: #97abc5; }
+.portal-screen option { background: #0b2039; color: #f3f7ff; }
+.portal-screen dialog { background: #0b1f37; border-color: #c9a96166; box-shadow: 0 30px 100px #000a; color: #f3f7ff; }
+.portal-screen dialog::backdrop { background: #000a; backdrop-filter: blur(7px); }
+.portal-screen :is(.hover\:bg-white:hover,.hover\:bg-white\/80:hover,.hover\:bg-white\/70:hover,.hover\:bg-white\/60:hover,.hover\:bg-slate-100:hover,.hover\:bg-slate-50:hover) { background-color: #234361; }
+.portal-screen table { border-color: #6580a333; }
+.portal-screen th { color: #e2bf77; }
+.portal-screen th, .portal-screen td { border-color: #6580a333; }
+.portal-screen :is([data-dashboard-panels] > section,[data-staff-card],[data-admin-queues] > section) { background: linear-gradient(135deg, #193452c9, #0a1b30eb); border-color: #7594bd40; color: #e8f0fc; backdrop-filter: blur(14px); box-shadow: 0 16px 38px #0003; }
+.portal-screen [data-staff-card] { position: relative; overflow: hidden; }
+.portal-screen [data-staff-card]::before { content: ''; position: absolute; inset-inline: 24px; top: 0; height: 2px; background: linear-gradient(90deg, transparent, #dfbe79, transparent); }
+.portal-screen [data-staff-card]:hover { border-color: #d2b47188; }
+.portal-screen [data-dashboard-panels] > section[aria-label="مساحة مهامي"] { background: linear-gradient(140deg, #1e426adb, #122647ed); border-color: #b0d0ff55; }
+.portal-screen [data-dashboard-panels] > section[aria-label="الحضور والإجازات"] { background: linear-gradient(140deg, #1a4a55d9, #0a2634ed); }
+.portal-screen [data-dashboard-panels] > section[aria-label="مستحقاتي الخاصة"] { background: linear-gradient(140deg, #244d43d9, #102f2aed); }
+.portal-screen [data-dashboard-panels] > section[aria-label="طلباتي"] { background: linear-gradient(140deg, #3d3557d9, #211e36ed); }
+.portal-screen nav[aria-label="ملخص مهامي"] > a, .portal-screen section[aria-label="ملخص أداء الفريق"] > button { position: relative; overflow: hidden; border-color: #a6c5ea33; background: #10253ce0; backdrop-filter: blur(12px); }
+.portal-screen nav[aria-label="ملخص مهامي"] > a::after, .portal-screen section[aria-label="ملخص أداء الفريق"] > button::after { content: ''; position: absolute; width: 70px; height: 70px; left: -18px; bottom: -22px; border: 12px solid currentColor; border-radius: 50%; opacity: .07; pointer-events: none; }
+.portal-screen [data-admin-dashboard] #admin-work { background: #091c32e8; border-color: #8da9cb33; }
+.portal-screen [data-task-lane] { background: #0b1f36e8; }
+.portal-screen [data-task-card] { background: #17324c; border-color: #8da9cb33; }
+.portal-screen [data-task-card]:hover { border-color: #e2bf7799; box-shadow: 0 8px 24px #0004; }
+.portal-screen [data-date-range-picker] { background: #102b45; border-color: #7c9fc34d; }
+.portal-screen [data-date-range-picker] :is(legend,h3) { color: #e2bf77; }
+.portal-screen .portal-request-card { border-radius: 24px; border-color: #8da9cb33; background: linear-gradient(140deg,#152d46e8,#0b1e34ed); }
+.portal-screen .portal-request-card:hover { border-color: #d5b57099; }
+.portal-screen .portal-toolbar { border: 1px solid #8da9cb33; background: #0a1c32da; border-radius: 18px; padding: 8px; }
+.portal-screen .portal-toolbar button { padding: 10px 18px; border-radius: 12px; font-size: 12px; font-weight: 800; color: #b8cce4; }
+.portal-screen .portal-toolbar button[aria-pressed="true"] { background: #daba78; color: #0e2037; }
+@media(min-width: 1100px) { .portal-dock .portal-launcher { flex-direction: column; gap: 9px; min-width: 103px; } .portal-screen .portal-dock { padding: 12px; } }
+@media(max-width: 640px) {
+  .portal-intro { gap: 18px; padding-block: 8px 18px; }
+  .portal-time { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; width: 100%; padding: 0; border: 0; }
+  .portal-time time { font-size: 29px; }
+  .portal-time > p { margin: 0; font-size: 11px; }
+  .portal-fullscreen { margin: 0; }
+  .portal-screen .portal-dock { width: calc(100% - 20px); border-radius: 18px; padding: 7px; }
+  .portal-dock .portal-launcher { min-height: 46px; font-size: 11px; padding: 9px 11px; border-radius: 12px; gap: 7px; }
+  .portal-icon { width: 19px; height: 19px; }
+  .portal-contrast-toggle { bottom: 12px; left: 10px; min-height: 36px; padding: 6px 10px; }
+}
+@media(prefers-reduced-motion:reduce) { .portal-screen *, .portal-screen *::before, .portal-screen *::after { scroll-behavior: auto !important; transition-duration: 0s !important; animation: none !important; } }
+@media print { .portal-wallpaper,.portal-contrast-toggle,.portal-dock,.portal-topbar,.portal-time { display: none !important; } .portal-screen { color-scheme: light; background: white; color: black; } }

@@ -1,5 +1,4 @@
-import Sidebar from '@/components/layout/Sidebar'
-import BottomNav from '@/components/layout/BottomNav'
+import ClientPortalNavigation from '@/components/layout/ClientPortalNavigation'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 
@@ -65,33 +64,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     { href: '/dashboard/profile', label: 'الملف الشخصي', icon: '👤' },
   ] : standardDashboardNav
 
-  const mobileNav = membership ? [
-    { href: '/dashboard/membership', label: 'عضويتي', icon: '★' },
-    ...(membership.status === 'active'
-      ? [
-          { href: `/dashboard/membership/request?membership=${membership.id}`, label: 'طلب من الرصيد', icon: '＋' },
-          { href: '/dashboard/membership/topup', label: 'تعزيز الرصيد', icon: '⊕' },
-        ]
-      : []),
-    { href: '/dashboard/membership/magazine', label: 'مجلتي', icon: '▣' },
-    { href: '/dashboard', label: 'طلباتي', icon: '📋' },
-    { href: '/request?direct=1', label: 'طلب مباشر', icon: '↗' },
-    { href: '/dashboard/profile', label: 'حسابي', icon: '👤' },
-  ] : standardDashboardNav
-
   return (
-    <div className="flex flex-1 w-full min-h-0">
-      <Sidebar
-        items={membershipNav}
-        title={membership?.membership_plans?.name_ar ?? 'لوحة التحكم'}
-        membershipPlanId={membership?.plan_id ?? membership?.membership_plans?.id}
-      />
-      <div className="flex-1 pb-20 md:pb-0 min-w-0 overflow-hidden">
-        <div className="h-full w-full p-4 md:p-6 overflow-auto">
-          {children}
-        </div>
-      </div>
-      <BottomNav items={mobileNav} />
+    <div className="mx-auto flex w-full max-w-screen-2xl flex-1 flex-col">
+      <ClientPortalNavigation items={membershipNav} />
+      <div className="min-w-0 flex-1 p-4 md:p-6 lg:p-8">{children}</div>
     </div>
   )
 }

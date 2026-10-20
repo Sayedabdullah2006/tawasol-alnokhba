@@ -43,7 +43,7 @@ export default function RequestCard({ request: r }: Props) {
   }
 
   return (
-    <article className="glass-panel rounded-lg p-4 transition-all hover:-translate-y-0.5 hover:shadow-lg sm:p-5" dir="rtl">
+    <article className="portal-request-card glass-panel rounded-lg p-4 transition-all hover:-translate-y-0.5 hover:shadow-lg sm:p-5" dir="rtl">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-sm font-bold text-dark">{generateRequestNumber(r.request_number)}</span>
           <StatusBadge status={effectiveStatus} userRole="client" />

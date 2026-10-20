@@ -12,6 +12,7 @@ import RequestCenter from "./RequestCenter";
 import DashboardJourneys from "./DashboardJourneys";
 import DashboardLiveStatus from "./DashboardLiveStatus";
 import ProgressOrbit from "./ProgressOrbit";
+import PortalIntro from "@/components/layout/PortalIntro";
 
 const count = (value: number) => value.toLocaleString("en-US");
 const percent = (part: number, total: number) => total ? `${count(Math.round(part * 100 / total))}%` : "—";
@@ -79,8 +80,9 @@ export default function AdminDashboard({ userId }: { userId: string }) {
   const disabled = loading || !data || detailOpen;
   return <div className="mx-auto w-full min-w-0 max-w-screen-2xl space-y-6 p-4 md:p-6 lg:p-8" data-admin-dashboard>
     {confirmation}
-    <header className="flex flex-wrap items-center justify-between gap-4"><div><h1 className="text-2xl font-black text-dark">لوحة إدارة الفريق</h1>{data && <p className="mt-2 text-xs text-muted">آخر تحديث {new Date(data.generated_at).toLocaleTimeString("ar-SA", { timeZone: "Asia/Riyadh", hour: "2-digit", minute: "2-digit" })}</p>}</div><div className="flex flex-wrap gap-2"><Button disabled={disabled} onClick={() => workspace.current?.createTask()}>＋ إسناد مهمة</Button><Button variant="outline" onClick={changed} disabled={loading}>{loading ? "جارٍ التحديث…" : "تحديث"}</Button></div></header>
-    <DashboardLiveStatus admin />
+    <PortalIntro title="فريقك، في الصورة" eyebrow="إدارة فريق النخبة" detail={data ? `آخر تحديث ${new Date(data.generated_at).toLocaleTimeString("ar-SA", { timeZone: "Asia/Riyadh", hour: "2-digit", minute: "2-digit" })}` : undefined}>
+      <Button disabled={disabled} onClick={() => workspace.current?.createTask()}>＋ إسناد مهمة</Button><Button variant="outline" onClick={changed} disabled={loading}>{loading ? "جارٍ التحديث…" : "تحديث"}</Button><DashboardLiveStatus admin />
+    </PortalIntro>
     <Notice message={error} error />
     <section aria-label="ملخص أداء الفريق" aria-busy={loading} className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
       {metrics.map(item => <button key={item.key} type="button" disabled={disabled} onClick={() => metricFilter(item.key)} className={`group rounded-2xl border p-4 text-right transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-default disabled:opacity-60 motion-reduce:transform-none ${item.color}`}><span className="text-xs font-bold sm:text-sm">{item.label}</span><span className="mt-4 flex items-end justify-between"><strong className="text-3xl font-black tabular-nums">{data ? count(data.totals[item.key]) : "—"}</strong><span aria-hidden className="opacity-40">↗</span></span></button>)}

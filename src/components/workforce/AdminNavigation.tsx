@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import PortalIcon from "@/components/layout/PortalIcon";
 const links = [
   ["/admin/workforce", "الأداء والمهام"],
   ["/admin/workforce/employees", "الموظفات"],
@@ -16,9 +17,9 @@ export default function AdminNavigation() {
   return (
     <nav
       aria-label="أقسام إدارة الفريق المستقلة"
-      className="mx-auto flex w-full max-w-screen-2xl flex-wrap gap-2 border-b border-border bg-white p-4 md:px-8"
+      className="portal-dock mx-auto flex w-full max-w-screen-2xl flex-wrap gap-2"
     >
-      {links.map(([href, label]) => (
+      {links.map(([href, label], index) => (
         <Link
           key={href}
           href={href}
@@ -28,8 +29,9 @@ export default function AdminNavigation() {
               ? "page"
               : undefined
           }
-          className={`rounded-xl px-4 py-3 text-sm font-bold ${pathname === href ? "bg-dark text-white" : "hover:bg-slate-100"}`}
+          className="portal-launcher flex-1"
         >
+          <PortalIcon name={["tasks","people","profile","attendance","finance","requests","knowledge","notifications"][index]} />
           {label}
         </Link>
       ))}
