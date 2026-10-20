@@ -375,7 +375,7 @@ export default function TaskDetail({
           <Panel title="آخر تسليم" tone="sky">
             {submission ? <div className="space-y-4 text-sm leading-7">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className={`rounded-full px-3 py-1 text-xs font-bold ${submission.status === "approved" ? "bg-emerald-100 text-emerald-800" : submission.status === "changes" ? "bg-amber-100 text-amber-900" : "bg-violet-100 text-violet-900"}`}>
+                <span className="rounded-full border border-current px-3 py-1 text-xs font-bold">
                   {{pending: "بانتظار المراجعة", approved: "معتمد", changes: "أعيد للتعديل"}[submission.status]}
                 </span>
                 <span className="text-xs text-muted">المحاولة {submission.submission_number} · {workDate(submission.created_at)}</span>
@@ -385,13 +385,6 @@ export default function TaskDetail({
             </div> : <p className="text-sm text-muted">لم يُرسل تسليم بعد</p>}
           </Panel>
           <div className="space-y-4">
-            <Panel title="ملاحظات المراجعة" tone="amber">
-              {review?.decision_reason ? <div className="space-y-2 text-sm leading-7">
-                <p className="text-xs font-bold">{review.status === "approved" ? "اعتماد" : "طلب تعديل"} · المحاولة {review.submission_number}</p>
-                <p className="max-h-64 overflow-auto whitespace-pre-wrap break-words">{review.decision_reason}</p>
-                <p className="text-xs text-muted">{workDate(review.decided_at)}</p>
-              </div> : <p className="text-sm text-muted">{submission?.status === "pending" ? "لم يصدر قرار بعد" : "لا توجد ملاحظات"}</p>}
-            </Panel>
             <Panel title="الإجراء التالي" tone="emerald">
               <p className="text-sm font-bold">{nextAction.label}</p>
               {nextAction.action && <Button className="mt-4" disabled={busy} onClick={() => {
@@ -400,6 +393,14 @@ export default function TaskDetail({
                 } else { pendingWorkflowFocus.current = true; show("submit"); setFocusWorkflow(n => n + 1); }
               }}>{nextAction.button}</Button>}
             </Panel>
+            <Panel title="ملاحظات المراجعة" tone="amber">
+              {review?.decision_reason ? <div className="space-y-2 text-sm leading-7">
+                <p className="text-xs font-bold">{review.status === "approved" ? "اعتماد" : "طلب تعديل"} · المحاولة {review.submission_number}</p>
+                <p className="max-h-64 overflow-auto whitespace-pre-wrap break-words">{review.decision_reason}</p>
+                <p className="text-xs text-muted">{workDate(review.decided_at)}</p>
+              </div> : <p className="text-sm text-muted">{submission?.status === "pending" ? "لم يصدر قرار بعد" : "لا توجد ملاحظات"}</p>}
+            </Panel>
+
           </div>
         </section>
       )}
