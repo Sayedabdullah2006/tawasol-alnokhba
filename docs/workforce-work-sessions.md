@@ -16,7 +16,7 @@ Implemented locally on 23 October 2026. **Not deployed; production schema and em
 - Task submission/review, reassignment, archive and board/column archive stop affected task periods. Attendance remains open without an active task until a next task/activity or check-out.
 - Approved attendance corrections clip or archive linked task-time periods and append revisions. Managed task times cannot be edited through the manual time endpoint. Corrections under the new policy cannot exceed 17:00 or move a managed period to another day.
 - Closed historical attendance keeps its original rules. An open legacy session can be checked out before beginning the first new-policy session; historical periods are not silently reclassified.
-- Dashboards, Excel and weekly reports use credited attendance ranges, subtracting excess breaks and merging overlaps. Financial/payroll calculations and employee job data are not changed by this feature.
+- Dashboards, Excel and weekly reports use credited attendance ranges, subtracting excess breaks and merging overlaps. Automatic payroll settlement is specified separately in `workforce-attendance-payroll.md`; employee job data is unchanged.
 
 ## Local verification
 

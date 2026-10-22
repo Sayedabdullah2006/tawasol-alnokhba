@@ -306,7 +306,8 @@ export default function MonthlyPayroll({
         (sum, item) => sum + moneyCents(item.amount),
         BigInt(0),
       );
-      preview = deducted <= gross ? fromCents(gross - deducted) : null;
+      const attendance=moneyCents(data?.statement?.attendance_amount??"0");
+      preview = deducted <= gross ? fromCents(gross-deducted-(attendance>gross-deducted?gross-deducted:attendance)) : null;
     } catch {
       preview = null;
     }
@@ -392,7 +393,7 @@ export default function MonthlyPayroll({
             </p>
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
               {[
-                ["الصافي المتوقع", expected],
+                ["الراتب المستحق", expected],
                 ["المعتمد", approved],
                 ["المصروف المسجل", paid],
                 ["المتبقي من المعتمد", remaining],
@@ -475,7 +476,7 @@ export default function MonthlyPayroll({
                         )}
                       </div>
                     ))}
-                    {!!statement?.deductions.length && (
+                    {(!!statement?.deductions.length||Number(statement?.attendance_amount??0)>0) && statement && (
                       <section className="rounded-xl border p-3">
                         <p className="font-bold">الحسومات</p>
                         <p>
@@ -497,6 +498,7 @@ export default function MonthlyPayroll({
                             </strong>
                           </div>
                         ))}
+                        {Number(statement.attendance_amount??0)>0&&<div className="mt-2 flex flex-wrap justify-between gap-2"><span>تسوية ساعات الحضور · {Math.floor((statement.attendance_details?.missing_seconds??0)/3600)} س {Math.floor((statement.attendance_details?.missing_seconds??0)%3600/60)} د</span><strong>− {money(statement.attendance_amount??"0")}</strong></div>}
                         <p className="mt-2 font-bold">
                           مجموع الحسومات: {money(statement.deductions_amount)}
                         </p>

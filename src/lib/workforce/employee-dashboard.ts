@@ -5,6 +5,7 @@ import { executionScope } from "./task-scope";
 import { summarizeAttendance } from "./attendance-summary";
 import { attendanceMonthSessions } from "./attendance-server";
 import {ATTENDANCE_COLUMNS} from "./attendance";
+import {attendancePayrollSnapshot} from "./payroll-server";
 
 export async function employeeDashboard(
   actor: WorkforceActor,
@@ -101,12 +102,7 @@ export async function employeeDashboard(
       .order("created_at", { ascending: false })
       .order("id")
       .limit(2),
-    actor.db
-      .from("wf_monthly_payroll")
-      .select("month,status,total_amount,paid_amount")
-      .eq("employee_id", employee.id)
-      .eq("month", month)
-      .maybeSingle(),
+    attendancePayrollSnapshot(actor,employee.id,month).then(value=>({data:value.statement,error:null})),
     actor.db
       .from("wf_leave_entitlements")
       .select("days")

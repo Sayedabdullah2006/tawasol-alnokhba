@@ -6,6 +6,7 @@ import { employeeDashboard } from "@/lib/workforce/employee-dashboard";
 import DashboardJourneys from "./DashboardJourneys";
 import EmployeeFocus from "./EmployeeFocus";
 import AttendanceProgressCard from "./AttendanceProgressCard";
+import PayrollCard from "./PayrollCard";
 
 type IconName = "tasks" | "clock" | "check" | "review" | "calendar" | "wallet" | "request" | "profile";
 const paths: Record<IconName, ReactNode> = {
@@ -24,7 +25,6 @@ function Icon({ name, className = "h-5 w-5" }: { name: IconName; className?: str
 const card = "flex min-w-0 flex-col rounded-3xl border p-5 shadow-[0_8px_28px_-18px_rgba(16,43,87,0.3)] transition-shadow duration-300 hover:shadow-lg sm:p-6";
 const footer = "mt-5 flex items-center justify-between gap-2 border-t border-current/10 pt-4 text-sm font-bold hover:underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4";
 const requestState: Record<string, string> = { pending: "بانتظار القرار", approved: "معتمد", rejected: "مرفوض", cancelled: "ملغى" };
-const money = (value: number | string) => Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 function CardTitle({ title, icon, children }: { title: string; icon: IconName; children?: ReactNode }) {
   return <div className="mb-5 flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-current/5"><Icon name={icon} /></span><h2 className="text-base font-black sm:text-lg">{title}</h2></div>{children}</div>;
 }
@@ -47,15 +47,11 @@ function EmployeeDashboardView({ data }: { data: Awaited<ReturnType<typeof emplo
     <nav className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="ملخص مهامي">
       {statistics.map(s => <Link key={s.label} href={s.href} className={`group rounded-2xl border p-4 transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 motion-reduce:transform-none sm:p-5 ${s.color}`}><div className="flex items-center justify-between gap-2"><span className="text-xs font-bold sm:text-sm">{s.label}</span><Icon name={s.icon} /></div><div className="mt-4 flex items-end justify-between"><span className="text-3xl font-black tabular-nums">{s.value.toLocaleString("en-US")}</span><span aria-hidden="true" className="opacity-40 transition group-hover:opacity-100">↗</span></div></Link>)}
     </nav>
-    <div className="grid items-stretch gap-4 md:grid-cols-2 lg:grid-cols-3" data-dashboard-panels>
+    <div className="grid items-stretch gap-4 md:grid-cols-2 lg:grid-cols-4" data-dashboard-panels>
       <EmployeeFocus today={tasks.today} upcoming={tasks.upcoming} todayCount={tasks.todayCount} upcomingCount={tasks.upcomingCount} />
       <AttendanceProgressCard summary={attendance.summary} open={attendance.open} leaveDays={data.leave.available} />
 
-      <section className={`${card} border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/80 text-emerald-950`} aria-label="مستحقاتي الخاصة">
-        <CardTitle title="مستحقاتي" icon="wallet" />
-        <div className="flex-1"><div className="flex flex-wrap items-center justify-between gap-2 text-xs"><span>{new Date(`${data.month}T12:00:00+03:00`).toLocaleDateString("ar-SA", { calendar: "gregory", month: "long", year: "numeric" })}</span>{payroll && <span className="rounded-full bg-white/70 px-3 py-1 font-bold">{payroll.status === "draft" ? "مسودة" : "معتمد"}</span>}</div>{payroll ? <><p className="mt-5 text-xs font-bold text-emerald-800">الصافي</p><p className="mt-1 flex flex-wrap items-baseline gap-2"><strong className="text-3xl font-black tabular-nums">{money(payroll.total_amount)}</strong><span className="text-sm">ر.س</span></p><div className="mt-5 flex flex-wrap justify-between gap-2 text-sm"><span>المصروف</span><strong>{money(payroll.paid_amount)} ر.س</strong></div></> : <p className="py-8 text-sm">لا يوجد كشف لهذا الشهر</p>}</div>
-        <Link href="/employee/finance/overview" className={footer}><span>عرض كشف المستحقات</span><span aria-hidden>←</span></Link>
-      </section>
+      <PayrollCard initial={payroll} month={data.month} employeeId={data.employee.id}/>
       <section className={`${card} border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-100/60 text-violet-950`} aria-label="طلباتي">
         <CardTitle title="طلباتي" icon="request"><span className="rounded-full bg-white/70 px-3 py-1.5 text-xs font-bold">{data.requests.pending} معلقة</span></CardTitle>
         <div className="flex-1">{data.requests.latest.length ? <div className="space-y-2">{data.requests.latest.map(request => <Link key={request.id} href={`/employee/requests/history?request=${request.id}`} className="flex items-center justify-between gap-3 rounded-xl border border-violet-200/60 bg-white/60 p-3 hover:bg-white"><p className="text-sm font-bold">{request.title}</p><span className="shrink-0 text-xs text-violet-700">{requestState[request.status]}</span></Link>)}</div> : <p className="flex min-h-24 items-center text-sm text-violet-800">لا توجد طلبات سابقة</p>}<Link href="/employee/requests/general" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-violet-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-800"><span aria-hidden>＋</span>طلب جديد</Link></div>

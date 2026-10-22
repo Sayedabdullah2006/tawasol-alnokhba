@@ -16,6 +16,7 @@ import {
   payrollMonth,
 } from "@/lib/workforce/payroll";
 import { textField, uuid, WorkforceError } from "@/lib/workforce/validation";
+import {attendancePayrollSnapshot} from "@/lib/workforce/payroll-server";
 type Context = { params: Promise<{ id: string }> };
 export async function GET(request: Request, context: Context) {
   try {
@@ -32,7 +33,11 @@ export async function GET(request: Request, context: Context) {
         .eq("employee_id", id).order("month", { ascending: false }).order("id")
         .range((page - 1) * 20, page * 20 - 1);
       if (result.error) throw result.error;
-      return privateResponse({ rows: result.data, count: result.count, page });
+      const rows=await Promise.all((result.data??[]).map(async row=>{
+        const snapshot=await attendancePayrollSnapshot(actor,id,row.month);
+        return snapshot.statement?{id:row.id,month:row.month,status:snapshot.statement.status,total_amount:snapshot.statement.total_amount,paid_amount:snapshot.statement.paid_amount}:row;
+      }));
+      return privateResponse({ rows, count: result.count, page });
     }
     const month = payrollMonth(params.get("month"));
     const end = new Date(`${month}T12:00:00Z`);
@@ -44,12 +49,7 @@ export async function GET(request: Request, context: Context) {
         .select("id,full_name,start_date")
         .eq("id", id)
         .maybeSingle(),
-      actor.db
-        .from("wf_monthly_payroll")
-        .select("*")
-        .eq("employee_id", id)
-        .eq("month", month)
-        .maybeSingle(),
+      attendancePayrollSnapshot(actor,id,month).then(value=>({data:value.statement,error:null,attendance:value.attendance})),
       actor.db
         .from("wf_compensation_versions")
         .select("basic_salary,allowances,effective_from")
@@ -115,6 +115,7 @@ export async function GET(request: Request, context: Context) {
           }
         : null,
       defaults,
+      attendance: statement.attendance,
       payments: payments.data?.map((row) => ({
         ...row,
         amount: String(row.amount),

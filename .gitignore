@@ -51,6 +51,7 @@ supabase/.branches/
 # local tooling
 .codegraph/
 .workforce-test/
+.preview/
 
 # Generated from the pinned pdfjs-dist dependency before dev/build.
 /public/vendor/pdfjs/

@@ -1,4 +1,5 @@
 import { dateField, textField, uuid, WorkforceError } from "./validation";
+import type {AttendanceSettlement} from "./payroll-attendance";
 export type PayrollItem = {
   title: string;
   mode: "fixed" | "percent";
@@ -33,8 +34,11 @@ export type PayrollStatement = PayrollInput & {
   deductions_amount: string;
   paid_amount: string;
   approved_at: string | null;
+  attendance_amount?: string;
+  attendance_details?: AttendanceSettlement;
 };
 export type PayrollData = {
+  attendance?: AttendanceSettlement;
   employee: { id: string; full_name: string; start_date: string };
   month: string;
   statement: PayrollStatement | null;
@@ -54,7 +58,7 @@ export type PayrollData = {
   events_count: number;
 };
 export const payrollStatus = {
-  draft: "متوقع — لم يعتمد بعد",
+  draft: "غير معتمد",
   approved: "معتمد",
   paid: "مصروف بالكامل",
 };
