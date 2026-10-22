@@ -10,6 +10,7 @@ import { uuid, textField, WorkforceError } from "@/lib/workforce/validation";
 import { workPage, privateResponse } from "@/lib/workforce/task-server";
 import { attendanceMonthSessions } from "@/lib/workforce/attendance-server";
 import { DEFAULT_WORKDAYS, summarizeAttendance } from "@/lib/workforce/attendance-summary";
+import {ATTENDANCE_COLUMNS} from "@/lib/workforce/attendance";
 export async function GET(request: Request) {
   try {
     const actor = await workforceActor(),
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
     if (!exists.data) throw new WorkforceError("الموظفة غير متاحة", 404);
     let sessions = actor.db
       .from("wf_attendance_sessions")
-      .select("*", { count: "exact" })
+      .select(ATTENDANCE_COLUMNS, { count: "exact" })
       .eq("employee_id", id)
       .order("checked_in", { ascending: false })
       .order("id")
@@ -58,7 +59,7 @@ export async function GET(request: Request) {
         sessions,
         actor.db
           .from("wf_attendance_sessions")
-          .select("*")
+          .select(ATTENDANCE_COLUMNS)
           .eq("employee_id", id)
           .is("checked_out", null)
           .maybeSingle(),
@@ -129,31 +130,7 @@ export async function GET(request: Request) {
     return apiError(e);
   }
 }
-export async function POST(request: Request) {
-  try {
-    assertMutation(request);
-    const actor = await workforceActor(),
-      body = await request.json();
-    if (!actor.employee)
-      throw new WorkforceError("تسجيل الحضور للموظفة فقط", 403);
-    if (!["in", "out"].includes(body.command))
-      throw new WorkforceError("إجراء غير صحيح");
-    if (
-      Object.keys(body).some((key) => !["command", "request_key"].includes(key))
-    )
-      throw new WorkforceError("وقت الحضور يحدده النظام");
-    const service = await createServiceRoleClient(),
-      result = await service.rpc("wf_clock_attendance", {
-        p_actor: actor.user.id,
-        p_command: body.command,
-        p_key: uuid(body.request_key),
-      });
-    if (result.error) throw result.error;
-    return Response.json(result.data);
-  } catch (e) {
-    return apiError(e);
-  }
-}
+export { POST } from "../work-session/route";
 export async function PATCH(request: Request) {
   try {
     assertMutation(request);
@@ -187,6 +164,7 @@ export async function PATCH(request: Request) {
         body.ends_at <= body.starts_at)
     )
       throw new WorkforceError("ساعات الدوام غير صحيحة");
+    if(scheduleMode === "fixed" && body.ends_at>"17:00") throw new WorkforceError("نهاية الدوام القصوى الخامسة مساءً");
     if (
       !Number.isInteger(body.year) ||
       body.year < 2020 ||

@@ -4,6 +4,7 @@ import { WorkforceError } from "./validation";
 import { executionScope } from "./task-scope";
 import { summarizeAttendance } from "./attendance-summary";
 import { attendanceMonthSessions } from "./attendance-server";
+import {ATTENDANCE_COLUMNS} from "./attendance";
 
 export async function employeeDashboard(
   actor: WorkforceActor,
@@ -79,7 +80,7 @@ export async function employeeDashboard(
     attendanceMonthSessions(actor.db, employee.id, employee.start_date, month.slice(0, 7)),
     actor.db
       .from("wf_attendance_sessions")
-      .select("checked_in,business_date")
+      .select(ATTENDANCE_COLUMNS)
       .eq("employee_id", employee.id)
       .is("checked_out", null)
       .maybeSingle(),

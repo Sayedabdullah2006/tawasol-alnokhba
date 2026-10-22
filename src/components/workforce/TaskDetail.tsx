@@ -14,6 +14,7 @@ import TaskChecklist from "./TaskChecklist";
 import TaskHistory from "./TaskHistory";
 import TaskComments from "./TaskComments";
 import TaskTime from "./TaskTime";
+import { WorkStartButton } from "./WorkSessionProvider";
 import TaskAttachments from "./TaskAttachments";
 import { taskEditReason } from "./TaskEditAction";
 import { taskNextAction } from "@/lib/workforce/task-next-action";
@@ -288,6 +289,7 @@ export default function TaskDetail({
           {board.board.archived_at && <span>· لوحة مؤرشفة</span>}
         </div>
         <h1 className="break-words text-2xl font-black">{task.title}</h1>
+        {data.canWork && !frozen && !reviewing && !done && <WorkStartButton taskId={task.id} />}
         <p className="text-sm">المسؤول: {data.assigneeName || "لم يسند بعد"}</p>
       </header>
       <Notice message={error} error />

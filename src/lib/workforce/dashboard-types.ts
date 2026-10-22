@@ -1,5 +1,5 @@
-import type { AttendanceSummary } from "./attendance-summary";
-export type TeamAttendance = { summary: AttendanceSummary; todaySummary: AttendanceSummary; open: { checked_in: string } | null };
+import type { AttendanceSummary, AttendancePeriod } from "./attendance-summary";
+export type TeamAttendance = { summary: AttendanceSummary; todaySummary: AttendanceSummary; open: AttendancePeriod | null; active?:{title:string;kind:string;starts_at:string}|null };
 export type WorkMetrics = {
   assigned: number;
   completed: number;

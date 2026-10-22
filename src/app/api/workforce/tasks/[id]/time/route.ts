@@ -61,7 +61,7 @@ export async function GET(
     let query = actor.db
       .from("wf_task_time_entries")
       .select(
-        "id,version,employee_id,starts_at,ends_at,note,archived_at,employee:wf_employees(full_name)",
+        "id,version,employee_id,starts_at,ends_at,note,archived_at,attendance_segment_id,employee:wf_employees(full_name)",
         { count: "exact" },
       )
       .eq("task_id", id)
@@ -85,15 +85,15 @@ export async function GET(
           (Array.isArray(employee) ? employee[0] : employee)?.full_name ??
           "موظف",
         canEdit:
-          canRecord && employee_id === actor.employee?.id && !row.archived_at,
+          canRecord && !row.attendance_segment_id && employee_id === actor.employee?.id && !row.archived_at,
         canArchive:
-          active &&
+          active && !row.attendance_segment_id &&
           (actor.role === "admin" ||
             (canRecord && employee_id === actor.employee?.id)),
       })),
       summary: summary.data,
       admin: actor.role === "admin",
-      canRecord,
+      canRecord: false,
       estimateMinutes: task.data.estimate_minutes,
       archived: search.get("archived") === "true",
       count: result.count ?? 0,

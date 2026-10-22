@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import { WORKDAYS, type AttendanceData } from "@/lib/workforce/attendance";
-import { attendanceDuration, liveAttendance } from "@/lib/workforce/attendance-summary";
+import { attendanceDuration, liveAttendance, workedSeconds, attendanceEnd } from "@/lib/workforce/attendance-summary";
+import {CLOSE_REASONS} from "@/lib/workforce/work-session";
 import { REQUEST_KINDS } from "@/lib/workforce/requests";
 import { api, controlClass, Field, Notice, useUnsavedChanges } from "./shared";
 const clock = (date: string | null) =>
@@ -49,9 +50,9 @@ export default function AttendanceHub({
   const [loadedKey, setLoadedKey] = useState("");
   const queryKey = `${employee}:${year}:${page}:${revision}`,
     loading = loadedKey !== queryKey;
-  const retry = useRef({ command: "", key: "" }),
-    lock = useRef(false);
+
   const warning = useUnsavedChanges(editing);
+  const lock = useRef(false);
   useEffect(() => {
     const refresh = () => {
       if (!editing && !busy) setRevision((n) => n + 1);
@@ -97,28 +98,6 @@ export default function AttendanceHub({
       });
     return () => abort.abort();
   }, [admin, employee, year, page, revision, queryKey]);
-  async function punch(command: string) {
-    if (lock.current) return;
-    lock.current = true;
-    setBusy(true);
-    setError("");
-    if (retry.current.command !== command)
-      retry.current = { command, key: crypto.randomUUID() };
-    try {
-      await api("/api/workforce/attendance", {
-        method: "POST",
-        body: JSON.stringify({ command, request_key: retry.current.key }),
-      });
-      retry.current = { command: "", key: "" };
-      setMessage(command === "in" ? "تم تسجيل الحضور" : "تم تسجيل الانصراف");
-      setRevision((n) => n + 1);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      lock.current = false;
-      setBusy(false);
-    }
-  }
   return (
     <div className="mx-auto w-full min-w-0 max-w-5xl space-y-5 p-4 md:p-6">
       {warning}
@@ -211,7 +190,7 @@ export default function AttendanceHub({
                 <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-white p-5">
                   <div>
                     <h2 className="font-black">
-                      {data.open ? "الحضور مسجل" : "غير مسجلة حاليًا"}
+                      {attendance?.isPresent ? data.open?.break_started_at?"في استراحة":"الحضور مسجل" : "غير مسجلة حاليًا"}
                     </h2>
                     {data.open && (
                       <p className="mt-2 text-sm text-muted">
@@ -223,13 +202,6 @@ export default function AttendanceHub({
                   </div>
                   {!admin && (
                     <div className="flex flex-wrap gap-3">
-                      <Button
-                        loading={busy}
-                        disabled={loading}
-                        onClick={() => void punch(data.open ? "out" : "in")}
-                      >
-                        {data.open ? "تسجيل الانصراف" : "تسجيل الحضور"}
-                      </Button>
                       <Link
                         className="rounded-xl border px-4 py-3 text-sm font-bold"
                         href="/employee/requests/attendance-correction"
@@ -257,15 +229,13 @@ export default function AttendanceHub({
                         <tr key={row.id} className="border-t">
                           <td className="p-4">{row.business_date}</td>
                           <td className="p-4">{clock(row.checked_in)}</td>
-                          <td className="p-4">{clock(row.checked_out)}</td>
+                          <td className="p-4">{clock(row.checked_out || (row.policy_version===1 && attendanceEnd(row,tick||Date.parse(data.summary.asOf))<(tick||Date.parse(data.summary.asOf))?new Date(attendanceEnd(row,tick||Date.parse(data.summary.asOf))).toISOString():null))}</td>
                           <td className="p-4">
-                            {row.checked_out
-                              ? attendanceDuration((Date.parse(row.checked_out) - Date.parse(row.checked_in)) / 60000)
-                              : "—"}
+                            {attendanceDuration(workedSeconds([row],0,Infinity,tick||Date.parse(data.summary.asOf))/60)}
                           </td>
                           <td className="p-4">
-                            {!row.checked_out
-                              ? "حضور مفتوح"
+                            {row.close_reason ? CLOSE_REASONS[row.close_reason] : !row.checked_out
+                              ? row.policy_version===1 && attendanceEnd(row,tick||Date.parse(data.summary.asOf))<(tick||Date.parse(data.summary.asOf)) ? "انصراف تلقائي" : "حضور مفتوح"
                               : row.source === "correction"
                                 ? "تم التصحيح"
                                 : "مكتمل"}

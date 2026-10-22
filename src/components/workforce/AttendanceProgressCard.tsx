@@ -3,15 +3,19 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { attendanceDuration, liveAttendance, type AttendanceSummary } from "@/lib/workforce/attendance-summary";
 import ProgressOrbit from "./ProgressOrbit";
+import {useWorkSession} from "./WorkSessionProvider";
+import type {AttendancePeriod} from "@/lib/workforce/attendance-summary";
 
 export default function AttendanceProgressCard({ summary, open, leaveDays }: {
-  summary: AttendanceSummary; open: { checked_in: string } | null; leaveDays: number;
+  summary: AttendanceSummary; open: AttendancePeriod | null; leaveDays: number;
 }) {
+  const work=useWorkSession();
+  open=work?.data?work.data.session:open;
   const [tick, setTick] = useState(0);
   useEffect(() => { const timer = setInterval(() => setTick(Date.now()), 30000); return () => clearInterval(timer); }, []);
-  const live = liveAttendance(summary, open, tick);
+  const live = liveAttendance(summary, open, tick?tick+(work?.clockOffset??0):0);
   const beforeStart = summary.today < summary.startsOn;
-  const status = beforeStart ? "قبل المباشرة" : live.needsCorrection ? "يحتاج تصحيح الحضور" : open ? "الدوام جارٍ" : live.todayMinutes ? "تم الانصراف" : live.dayOff ? "يوم إجازة" : "لم يبدأ الدوام";
+  const status = beforeStart ? "قبل المباشرة" : live.needsCorrection ? "يحتاج تصحيح الحضور" : live.isPresent ? open?.break_started_at?"في استراحة":"الدوام جارٍ" : live.todayMinutes ? "تم الانصراف" : live.dayOff ? "يوم إجازة" : "لم يبدأ الدوام";
   const progress = live.targetMinutes ? live.workedMinutes / live.targetMinutes * 100 : 0;
   const dayProgress = live.dailyMinutes ? Math.min(100, live.todayMinutes / live.dailyMinutes * 100) : 0;
   const date = (value: string) => new Date(`${value}T12:00:00+03:00`).toLocaleDateString("ar-SA", {calendar:"gregory", day:"numeric", month:"short"});
@@ -30,12 +34,12 @@ export default function AttendanceProgressCard({ summary, open, leaveDays }: {
     </div>
     {!!live.extraMinutes && <p className="mt-3 text-sm font-bold text-emerald-700">إضافي: {attendanceDuration(live.extraMinutes)}</p>}
     <div className="attendance-stat my-4 rounded-2xl border border-sky-200/40 bg-white/40 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-black">اليوم</h3><span className={`inline-flex items-center gap-2 rounded-full px-2 py-1 text-[11px] font-bold ${open && !live.needsCorrection ? "bg-emerald-100 text-emerald-900" : "bg-sky-100 text-sky-900"}`}>{open && !live.needsCorrection && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}{status}</span></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-black">اليوم</h3><span className={`inline-flex items-center gap-2 rounded-full px-2 py-1 text-[11px] font-bold ${live.isPresent ? "bg-emerald-100 text-emerald-900" : "bg-sky-100 text-sky-900"}`}>{live.isPresent && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}{status}</span></div>
       <p className="mt-3 flex flex-wrap items-baseline justify-between gap-2"><strong className="text-xl tabular-nums" data-today-worked>{attendanceDuration(live.todayMinutes)}</strong><span className="text-xs opacity-75">{live.dayOff ? "يوم إجازة" : `من ${attendanceDuration(live.dailyMinutes)}`}</span></p>
       {!live.dayOff && <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-sky-200/30" role="meter" aria-label="إنجاز ساعات اليوم" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(dayProgress)}><div className="h-full rounded-full bg-sky-500 transition-all" style={{width:`${dayProgress}%`}} /></div>}
       {!!live.todayPeriods && <p className="mt-2 text-[11px] opacity-70">فترات الحضور: {live.todayPeriods}</p>}
     </div>
     <div className="mt-auto flex items-center justify-between text-xs opacity-75"><span>رصيد الإجازة</span><strong>{leaveDays} يوم</strong></div>
-    <Link href={live.needsCorrection ? "/employee/requests/attendance-correction" : "/employee/attendance/overview"} className="mt-4 flex items-center justify-between gap-2 border-t border-current/10 pt-4 text-sm font-black hover:underline"><span>{live.needsCorrection ? "طلب تصحيح الحضور" : open ? "تسجيل الانصراف" : "الحضور والانصراف"}</span><span aria-hidden>←</span></Link>
+    <Link href={live.needsCorrection ? "/employee/requests/attendance-correction" : "/employee/attendance/overview"} className="mt-4 flex items-center justify-between gap-2 border-t border-current/10 pt-4 text-sm font-black hover:underline"><span>{live.needsCorrection ? "طلب تصحيح الحضور" : live.isPresent ? "تسجيل الانصراف" : "الحضور والانصراف"}</span><span aria-hidden>←</span></Link>
   </section>;
 }

@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { monthBounds, type AttendancePeriod, type AttendanceSummary } from "./attendance-summary";
+import { monthBounds, attendanceEnd, workedSeconds, type AttendancePeriod, type AttendanceSummary } from "./attendance-summary";
 
 export type AttendanceExportEmployee = {
   full_name: string; job_title: string; start_date: string;
@@ -12,8 +12,8 @@ export function attendanceExportPeriods(periods: AttendancePeriod[], summary: At
   let previousEnd = from;
   return [...periods].sort((a, b) => a.checked_in.localeCompare(b.checked_in)).map(period => {
     const start = Date.parse(period.checked_in);
-    const end = Math.min(period.checked_out ? Date.parse(period.checked_out) : start + 86400000, until);
-    const seconds = Math.max(0, end - Math.max(start, from, previousEnd)) / 1000;
+    const end = Math.min(attendanceEnd(period,Date.parse(summary.asOf)), until);
+    const seconds = workedSeconds([period],Math.max(start,from,previousEnd),until,Date.parse(summary.asOf));
     previousEnd = Math.max(previousEnd, end);
     return { ...period, seconds };
   });
@@ -41,7 +41,9 @@ export async function attendanceWorkbook(month: string, employees: AttendanceExp
     const row=summary.addRow([employee.full_name,employee.job_title,employee.start_date,s.startsOn>s.endsOn?"—":s.startsOn,s.workdayCount,s.targetMinutes/1440,s.workedMinutes/1440,s.remainingMinutes/1440,s.extraMinutes/1440]);
     for(let column=6;column<=9;column++) row.getCell(column).numFmt='[h]:mm';
     for(const period of attendanceExportPeriods(employee.periods,s)) {
-      const row=periods.addRow([employee.full_name,stamp(period.checked_in),period.checked_out?stamp(period.checked_out):"—",period.seconds/86400,period.checked_out?"منصرفة":Date.parse(s.asOf)>Date.parse(period.checked_in)+86400000?"يحتاج تصحيحًا":"فترة مفتوحة"]);
+      const effectiveEnd=attendanceEnd(period,Date.parse(s.asOf));
+      const automatic=!period.checked_out && period.policy_version===1 && effectiveEnd<Date.parse(s.asOf);
+      const row=periods.addRow([employee.full_name,stamp(period.checked_in),period.checked_out?stamp(period.checked_out):automatic?stamp(new Date(effectiveEnd).toISOString()):"—",period.seconds/86400,period.checked_out?"منصرفة":automatic?"انصراف تلقائي":Date.parse(s.asOf)>Date.parse(period.checked_in)+86400000?"يحتاج تصحيحًا":"فترة مفتوحة"]);
       row.getCell(4).numFmt='[h]:mm:ss';
     }
   }

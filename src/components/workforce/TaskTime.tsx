@@ -30,7 +30,7 @@ type TimePage = {
   page: number;
   archived: boolean;
   entries: Entry[];
-  summary: { seconds: number; entries: number; running: number };
+  summary: { seconds: number; entries: number; running: number; active?:number };
   admin: boolean;
   canRecord: boolean;
   estimateMinutes: number | null;
@@ -169,6 +169,11 @@ export default function TaskTime({
   const unsaved = useUnsavedChanges(dirty);
   const { confirm, confirmation } = useConfirm();
   useEffect(() => {
+    const refresh=()=>{if(!editing&&!busy)setReload(n=>n+1);};
+    window.addEventListener("workforce-data-changed",refresh);
+    return()=>window.removeEventListener("workforce-data-changed",refresh);
+  },[editing,busy]);
+  useEffect(() => {
     const abort = new AbortController();
     api<TimePage>(
       `/api/workforce/tasks/${taskId}/time?page=${page}&archived=${archived}`,
@@ -253,12 +258,7 @@ export default function TaskTime({
               : {minutes(data.summary.seconds)} دقيقة · {data.summary.entries}{" "}
               سجل نشط
             </p>
-            <p className="text-sm text-muted">
-              الإجمالي يشمل كل الصفحات ويستبعد الأرشيف.{" "}
-              {data.admin
-                ? `التقدير للمهمة كاملة: ${data.estimateMinutes ?? "غير محدد"}${data.estimateMinutes === null ? "" : " دقيقة"}.`
-                : "ترى فتراتك فقط؛ المدير يرى سجلات المنفذين. التقدير في تفاصيل التكليف يخص المهمة كاملة."}
-            </p>
+            {!!data.summary.active && <p className="text-xs font-bold text-emerald-700">المؤقت جارٍ</p>}
             {data.summary.running > 0 && (
               <p>يوجد مؤقت سابق مفتوح؛ لا يدخل في الإجمالي حتى توثيق نهايته.</p>
             )}

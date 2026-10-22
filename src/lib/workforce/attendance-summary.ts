@@ -1,7 +1,10 @@
 export const DEFAULT_WORKDAYS = [0, 1, 2, 3, 4, 6];
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
-export type AttendancePeriod = { checked_in: string; checked_out: string | null };
+export type AttendancePeriod = { checked_in: string; checked_out: string | null;
+  policy_version?: number; cutoff_at?: string | null; last_seen_at?: string | null;
+  next_confirmation_at?: string | null; break_started_at?: string | null; break_paid_until?: string | null;
+  unpaid_periods?: {start:string;end:string}[] };
 export type AttendanceSummary = ReturnType<typeof summarizeAttendance>;
 
 export function riyadhDate(now: Date) {
@@ -18,12 +21,32 @@ export function monthBounds(month: string) {
 const midnight = (date: string) => Date.parse(`${date}T00:00:00+03:00`);
 
 /** Merge corrections/overlaps, clip overnight shifts, and round only the daily/monthly total. */
-function workedSeconds(periods: AttendancePeriod[], from: number, until: number, now: number) {
-  const ranges = periods.map(period => {
-    const start = Date.parse(period.checked_in);
-    const end = period.checked_out ? Date.parse(period.checked_out) : Math.min(now, start + DAY);
-    return [Math.max(start, from), Math.min(end, until, now)];
-  }).filter(([start, end]) => Number.isFinite(start) && Number.isFinite(end) && end > start)
+export function attendanceEnd(period: AttendancePeriod, now: number) {
+  const start = Date.parse(period.checked_in);
+  if (period.checked_out) return Math.min(now,Date.parse(period.checked_out));
+  let end = Math.min(now,start+DAY);
+  if (period.policy_version === 1) {
+    end=Math.min(end,Date.parse(period.cutoff_at!));
+    const seen=Math.max(Date.parse(period.last_seen_at!),period.break_paid_until?Date.parse(period.break_paid_until):0);
+    if(now>=seen+5*MINUTE) end=Math.min(end,seen);
+    const confirmation=Date.parse(period.next_confirmation_at!);
+    if(!period.break_started_at && now>=confirmation+5*MINUTE) end=Math.min(end,confirmation);
+  }
+  return end;
+}
+export function attendanceRanges(period: AttendancePeriod, now: number): number[][] {
+  let ranges=[[Date.parse(period.checked_in),attendanceEnd(period,now)]];
+  const exclusions=[...(period.unpaid_periods??[])];
+  if(period.break_started_at && period.break_paid_until) exclusions.push({start:period.break_paid_until,end:new Date(now).toISOString()});
+  for(const exclusion of exclusions) {
+    const lo=Date.parse(exclusion.start),hi=Date.parse(exclusion.end);
+    ranges=ranges.flatMap(([a,b])=>hi<=a||lo>=b?[[a,b]]:[[a,Math.min(b,lo)],[Math.max(a,hi),b]]).filter(([a,b])=>b>a);
+  }
+  return ranges;
+}
+export function workedSeconds(periods: AttendancePeriod[], from: number, until: number, now: number) {
+  const ranges = periods.flatMap(period => attendanceRanges(period,now).map(([start,end])=>[Math.max(start,from),Math.min(end,until,now)]))
+    .filter(([start, end]) => Number.isFinite(start) && Number.isFinite(end) && end > start)
     .sort((a, b) => a[0] - b[0]);
   let total = 0, previousEnd = from;
   for (const [start, end] of ranges) {
@@ -54,7 +77,7 @@ export function summarizeAttendance({ periods, startDate, month, now, dailyMinut
     extraMinutes: Math.max(0, workedMinutes - targetMinutes),
     monthlySeconds, todaySeconds, todayMinutes,
     todayPeriods: periods.filter(period => {
-      const start = Date.parse(period.checked_in), end = period.checked_out ? Date.parse(period.checked_out) : Math.min(now.getTime(), start + DAY);
+      const start = Date.parse(period.checked_in), end = attendanceEnd(period,now.getTime());
       return end > Math.max(from, dayStart) && start < Math.min(until, dayStart + DAY, now.getTime());
     }).length,
     dayOff: !workdays.includes(new Date(`${today}T12:00:00Z`).getUTCDay()),
@@ -62,17 +85,18 @@ export function summarizeAttendance({ periods, startDate, month, now, dailyMinut
 }
 
 /** Advance only a running session; never count the gaps between check-out and the next check-in. */
-export function liveAttendance(summary: AttendanceSummary, open: { checked_in: string } | null, now: number) {
+export function liveAttendance(summary: AttendanceSummary, open: (Omit<AttendancePeriod,'checked_out'> & {checked_out?:string|null}) | null, now: number) {
   const asOf = Date.parse(summary.asOf), tick = Math.max(asOf, now);
-  const end = open ? Math.min(tick, Date.parse(open.checked_in) + DAY) : asOf;
   const bounds = monthBounds(summary.month);
-  const delta = (from: number, until: number) => open ? Math.max(0, Math.min(end, until) - Math.max(asOf, Date.parse(open.checked_in), from)) / 1000 : 0;
+  const period=open?{...open,checked_out:open.checked_out??null}:null;
+  const delta = (from: number, until: number) => period ? workedSeconds([period],from,until,tick)-workedSeconds([period],from,until,asOf) : 0;
   const workedMinutes = Math.floor((summary.monthlySeconds + delta(midnight(summary.startsOn), midnight(bounds.next))) / 60);
   const todayMinutes = Math.floor((summary.todaySeconds + delta(Math.max(midnight(summary.startsOn), midnight(summary.today)), midnight(summary.today) + DAY)) / 60);
   return { ...summary, workedMinutes, todayMinutes,
     remainingMinutes: Math.max(0, summary.targetMinutes - workedMinutes),
     extraMinutes: Math.max(0, workedMinutes - summary.targetMinutes),
-    needsCorrection: !!open && tick > Date.parse(open.checked_in) + DAY,
+    needsCorrection: !!open && open.policy_version!==1 && tick > Date.parse(open.checked_in) + DAY,
+    isPresent: !!period && !period.checked_out && attendanceEnd(period,tick)>=tick,
   };
 }
 

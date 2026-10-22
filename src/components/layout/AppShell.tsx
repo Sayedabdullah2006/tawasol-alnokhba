@@ -7,6 +7,7 @@ import Footer from "./Footer";
 import DiscountPopup from "@/components/ui/DiscountPopup";
 import WorkforceHeader from "@/components/workforce/WorkforceHeader";
 import PortalScreen from "./PortalScreen";
+import WorkSessionProvider, { WorkSessionBar } from "@/components/workforce/WorkSessionProvider";
 
 /** Internal workspaces never mount customer navigation, marketing or promotions. */
 export default function AppShell({ children }: { children: ReactNode }) {
@@ -25,7 +26,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           id="workspace-main"
           className="flex min-w-0 flex-1 flex-col pt-[132px] sm:pt-24"
         >
-          {children}
+          {employee ? <WorkSessionProvider><WorkSessionBar />{children}</WorkSessionProvider> : children}
         </main>
         <footer className="px-5 pb-24 pt-6 text-center text-xs text-muted md:pb-6">
           تواصل النخبة · {employee ? "بوابة الموظف" : "إدارة فريق العمل"}
