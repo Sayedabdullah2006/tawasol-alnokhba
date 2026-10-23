@@ -10,6 +10,7 @@ create trigger wf_attendance_notices after insert or update on wf_attendance_ses
  const n=await readFile(new URL('../supabase/migrations/20261022234236_workforce_notification_clarity.sql',import.meta.url),'utf8');const first=n.indexOf('create or replace function workforce_private.notify_employee_request()');await db.exec(n.slice(first,n.indexOf('create or replace function workforce_private.notify_task_attachment()',first)));
  await db.exec('create trigger wf_employee_request_notifications after insert or update on wf_employee_requests for each row execute function workforce_private.notify_employee_request();');
  await db.exec(await readFile(new URL('../supabase/migrations/20261023193901_approved_missing_work_hours.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../supabase/migrations/20261023195108_missing_hours_fractional_gaps.sql',import.meta.url),'utf8'));
  await db.exec("set role service_role;set test.clock='2026-10-25T12:00:00+03:00';");return db;}
 async function submit(db,employee=ids.en,day='2026-10-24',minutes=120){const id=crypto.randomUUID();await db.query("insert into wf_employee_requests(id,employee_id,kind,status,title,work_day,missing_minutes) values($1,$2,'missing-hours','pending','تسجيل ساعات مفقودة',$3,$4)",[id,employee,day,minutes]);return id;}
 const decide=(db,id,actor=ids.admin,status='approved')=>db.query('select wf_decide_employee_request($1,$2,1,$3,$4)',[id,actor,status,'تمت مراجعة ساعات العمل']);
@@ -74,5 +75,14 @@ test('paid payroll is immutable, invalid quantities are rejected in SQL, and lea
  const approved=await submit(db);await decide(db,approved);
  const leave=crypto.randomUUID();await db.query("insert into wf_employee_requests(id,employee_id,kind,status,leave_type,starts_at,ends_at) values($1,$2,'leave','pending','unpaid','2026-10-24T00:00:00+03:00','2026-10-24T23:59:00+03:00')",[leave,ids.en]);await assert.rejects(()=>decide(db,leave),/ساعات مفقودة معتمدة/);
  assert.equal(summarize(await sessions(db)).workedMinutes,120);
+ }finally{await db.close()}
+});
+
+test('subsecond gaps preserve exactly the requested seconds without overlapping genuine punches',async()=>{
+ const db=await setup();try{
+ await actual(db,ids.en,'2026-10-24T09:00:01+03:00','2026-10-24T13:00:00+03:00');await actual(db,ids.en,'2026-10-24T13:59:59.7+03:00','2026-10-24T16:00:00+03:00');
+ const id=await submit(db);await decide(db,id);const rows=await sessions(db),manual=rows.filter(x=>x.credit_request_id===id);
+ assert.equal(manual.reduce((n,x)=>n+(Date.parse(x.checked_out)-Date.parse(x.checked_in))/1000,0),7200);
+ for(const c of manual)for(const a of rows.filter(x=>!x.credit_request_id))assert.ok(Date.parse(c.checked_out)<=Date.parse(a.checked_in)||Date.parse(c.checked_in)>=Date.parse(a.checked_out));
  }finally{await db.close()}
 });
