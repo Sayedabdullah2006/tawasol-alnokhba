@@ -76,7 +76,7 @@ export function WorkSessionBar(){
  if(!data)return <div className="mx-4 mb-4 rounded-2xl border border-white/15 p-4 text-sm" role={error?"alert":"status"}>{error||"جارٍ تحميل الدوام…"}</div>;
  const now=Math.max(Date.parse(data.now),tick?tick+state.clockOffset:0),session=data.session,segment=data.active;
  const afterHours=new Date(now).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Asia/Riyadh"})>="17:00";
- const holiday=paidHolidayAt(now),dayOff=isFriday(now)||!!holiday,onBreak=!!session?.break_started_at;
+ const holiday=data.paidHoliday??paidHolidayAt(now),dayOff=isFriday(now)||!!holiday,onBreak=!!session?.break_started_at;
  const due=!dayOff&&data.canControl!==false&&!!session?.next_confirmation_at && !onBreak && now>=Date.parse(session.next_confirmation_at);
  const remaining=onBreak?Math.max(0,(Date.parse(session!.break_paid_until!)-now)/60000):Math.max(0,30-data.breakUsedSeconds/60);
  const action="rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-bold transition hover:bg-white/20 disabled:opacity-40";

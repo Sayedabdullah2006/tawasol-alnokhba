@@ -4,7 +4,7 @@ import type { WorkforceActor } from "./server";
 import { WorkforceError } from "./validation";
 import { executionScope } from "./task-scope";
 import { summarizeAttendance } from "./attendance-summary";
-import { attendanceMonthSessions } from "./attendance-server";
+import { attendanceMonthSessions, attendanceCalendarDays } from "./attendance-server";
 import {ATTENDANCE_COLUMNS} from "./attendance";
 import {employeeLeaveBalance} from "./summary-server";
 import {attendancePayrollSnapshot} from "./payroll-server";
@@ -58,6 +58,7 @@ export async function employeeDashboard(
     documents,
     notifications,
     performance,
+    paidCalendarDays,
   ] = await Promise.all([
     tasks()
       .not("column.kind", "in", "(done,review)")
@@ -117,6 +118,7 @@ export async function employeeDashboard(
       .eq("recipient_id", actor.user.id)
       .is("read_at", null),
     employeePerformance(actor,employee.id,month.slice(0,7),now),
+    attendanceCalendarDays(actor.db,[month.slice(0,7)]),
   ]);
   for (const result of [
     todayTasks,
@@ -150,7 +152,7 @@ export async function employeeDashboard(
   };
   const attendanceSummary = summarizeAttendance({ periods: attendance.data || [], startDate: employee.start_date,
     month: month.slice(0, 7), now, dailyMinutes: settings.data?.daily_minutes ?? 480,
-    workdays: settings.data?.workdays });
+    workdays: settings.data?.workdays, paidCalendarDays });
   return {
     performance,
     canViewTeamSummaries:employee.can_view_team_summaries===true,

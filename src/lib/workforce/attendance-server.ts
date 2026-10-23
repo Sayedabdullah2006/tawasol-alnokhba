@@ -13,16 +13,17 @@ export function attendanceMonth(value: string | null, now = new Date()) {
 
 export async function employeeMonthAttendance(db: WorkforceActor["db"], employeeId: string, startDate: string, month: string, now: Date) {
   const currentMonth = riyadhDate(now).slice(0, 7);
-  const [periods, currentPeriods, settings, open, active] = await Promise.all([
+  const [periods, currentPeriods, settings, open, active, paidCalendarDays] = await Promise.all([
     attendanceMonthSessions(db, employeeId, startDate, month),
     month === currentMonth ? Promise.resolve(null) : attendanceMonthSessions(db, employeeId, startDate, currentMonth),
     db.from("wf_attendance_settings").select("daily_minutes,workdays").eq("employee_id", employeeId).maybeSingle(),
     db.from("wf_attendance_sessions").select(ATTENDANCE_COLUMNS).eq("employee_id", employeeId).is("checked_out", null).maybeSingle(),
     db.from("wf_work_segments").select("title,kind,starts_at").eq("employee_id",employeeId).is("ends_at",null).maybeSingle(),
+    attendanceCalendarDays(db,[month,currentMonth]),
   ]);
   for (const result of [periods, currentPeriods, settings, open, active]) if (result?.error) throw result.error;
   const summarize = (data: AttendancePeriod[], selected: string) => summarizeAttendance({ periods: data, startDate, month: selected, now,
-    dailyMinutes: settings.data?.daily_minutes ?? 480, workdays: settings.data?.workdays });
+    dailyMinutes: settings.data?.daily_minutes ?? 480, workdays: settings.data?.workdays, paidCalendarDays });
   const summary = summarize(periods.data, month);
   return { summary, todaySummary: currentPeriods ? summarize(currentPeriods.data, currentMonth) : summary, open: open.data, periods: periods.data, active:active.data };
 }
@@ -42,4 +43,15 @@ export async function attendanceMonthSessions(db: WorkforceActor["db"], employee
     data.push(...page.data);
     if (page.data.length < 500) return { data, error: null };
   }
+}
+
+/** Read calendar exceptions once for the requested months; RLS remains enforced. */
+export async function attendanceCalendarDays(db:WorkforceActor["db"],months:string[]) {
+ const selected=[...new Set(months)].sort(),first=monthBounds(selected[0]).first,next=monthBounds(selected.at(-1)!).next;
+ const days:{day:string;title:string}[]=[];
+ for(let from=0;;from+=500){
+  const result=await db.from("wf_paid_calendar_days").select("day,title").gte("day",first).lt("day",next).order("day").range(from,from+499);
+  if(result.error)throw result.error;
+  days.push(...result.data);if(result.data.length<500)return days;
+ }
 }

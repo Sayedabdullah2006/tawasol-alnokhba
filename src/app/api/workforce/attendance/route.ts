@@ -8,7 +8,7 @@ import {
 } from "@/lib/workforce/server";
 import { uuid, textField, WorkforceError } from "@/lib/workforce/validation";
 import { workPage, privateResponse } from "@/lib/workforce/task-server";
-import { attendanceMonthSessions } from "@/lib/workforce/attendance-server";
+import { attendanceMonthSessions, attendanceCalendarDays } from "@/lib/workforce/attendance-server";
 import { DEFAULT_WORKDAYS, summarizeAttendance } from "@/lib/workforce/attendance-summary";
 import {employeeLeaveBalance} from "@/lib/workforce/summary-server";
 import {ATTENDANCE_COLUMNS} from "@/lib/workforce/attendance";
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
           ).toISOString().slice(0, 10) + "T00:00:00+03:00",
         );
     } else sessions = sessions.gte("business_date", `${year}-01-01`).lte("business_date", `${year}-12-31`);
-    const [records, open, settings, entitlement, movements, approved, monthSessions] =
+    const [records, open, settings, entitlement, movements, approved, monthSessions, paidCalendarDays] =
       await Promise.all([
         sessions,
         actor.db
@@ -91,6 +91,7 @@ export async function GET(request: Request) {
           .order("starts_at", { ascending: false })
           .limit(100),
         attendanceMonthSessions(actor.db, id, exists.data.start_date, today.slice(0, 7)),
+        attendanceCalendarDays(actor.db,[today.slice(0,7)]),
       ]);
     for (const result of [
       records,
@@ -122,7 +123,7 @@ export async function GET(request: Request) {
       today,
       summary: summarizeAttendance({ periods: monthSessions.data, startDate: exists.data.start_date,
         month: today.slice(0, 7), now: new Date(), dailyMinutes: settings.data?.daily_minutes ?? 480,
-        workdays: settings.data?.workdays }),
+        workdays: settings.data?.workdays, paidCalendarDays }),
     });
   } catch (e) {
     return apiError(e);
