@@ -8,6 +8,8 @@ import { privateResponse, workPage } from "@/lib/workforce/task-server";
 import { requestTestRun } from "@/lib/workforce/test-mode";
 import { uuid, WorkforceError } from "@/lib/workforce/validation";
 import { defaultPreferences, journeySections } from "@/lib/workforce/journeys";
+import { companyPolicyFolderIds } from "@/lib/workforce/company-policy-files";
+import type { JourneyData } from "@/lib/workforce/journeys";
 export async function GET(request: Request) {
   try {
     const actor = await workforceActor(),
@@ -54,6 +56,28 @@ export async function GET(request: Request) {
       query = query.eq("employee_id", uuid(params.get("employee")));
     const status = params.get("status");
     if (status) query = query.eq("status", status);
+    const policyFiles: NonNullable<JourneyData["policyFiles"]> = [];
+    // Share the repository's files instead of maintaining a second PDF copy.
+    // Keep real documents out of isolated test journeys and off draft filters.
+    if (kind === "policy" && !run && page === 1 && (!status || status === "published")) {
+      const folders = await actor.db.from("wf_knowledge_folders")
+        .select("id,parent_id,name,system_key").is("deleted_at", null);
+      if (folders.error) throw folders.error;
+      const folderIds = companyPolicyFolderIds(folders.data || []);
+      if (folderIds.length) {
+        for (let offset = 0; ;) {
+          const files = await actor.db.from("wf_knowledge_files")
+            .select("id,title,filename,updated_at", { count: "exact" })
+            .in("folder_id", folderIds).is("deleted_at", null)
+            .order("updated_at", { ascending: false }).order("id")
+            .range(offset, offset + 999);
+          if (files.error) throw files.error;
+          policyFiles.push(...files.data);
+          offset += files.data.length;
+          if (!files.data.length || (files.count !== null && offset >= files.count)) break;
+        }
+      }
+    }
     const rows = await query;
     if (rows.error) throw rows.error;
     const ids = (rows.data || []).map((r) => r.id),
@@ -104,6 +128,7 @@ export async function GET(request: Request) {
       if (result.error) throw result.error;
     return privateResponse({
       items: rows.data,
+      policyFiles,
       events: events.data,
       receipts: receipts.data,
       employees: staff.data,

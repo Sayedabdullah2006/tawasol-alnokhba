@@ -465,6 +465,16 @@ export default function EmployeeJourneys({
             <p role="status">جارٍ التحميل…</p>
           ) : (
             <div className="grid items-start gap-4 lg:grid-cols-2">
+              {section === "policy" && data?.policyFiles?.map((file) => (
+                <article key={`file-${file.id}`} className={`min-w-0 rounded-2xl border p-5 shadow-sm ${colors.policy}`}>
+                  <h2 className="font-black text-dark">{file.title}</h2>
+                  <time className="mt-2 block text-xs text-muted">آخر تحديث: {date(file.updated_at)}</time>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <a className="rounded-lg bg-dark px-4 py-2 text-sm font-bold text-white" href={`/api/workforce/knowledge/${file.id}?preview=true`} target="_blank" rel="noopener noreferrer">فتح الملف</a>
+                    <a className="rounded-lg border bg-white px-4 py-2 text-sm font-bold text-dark" href={`/api/workforce/knowledge/${file.id}`}>تحميل</a>
+                  </div>
+                </article>
+              ))}
               {data?.items.map((row) => (
                 <article
                   key={row.id}
@@ -736,7 +746,7 @@ export default function EmployeeJourneys({
               ))}
             </div>
           )}
-          {!loading && !data?.items.length && (
+          {!loading && !data?.items.length && !data?.policyFiles?.length && (
             <p className="rounded-2xl border bg-white p-6 text-sm text-muted">
               لا توجد سجلات
             </p>

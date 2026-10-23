@@ -84,6 +84,12 @@ export type JourneyEvent = {
   created_at: string;
 };
 export type JourneyData = {
+  policyFiles?: {
+    id: string;
+    title: string;
+    filename: string;
+    updated_at: string;
+  }[];
   items: JourneyItem[];
   events: JourneyEvent[];
   receipts: { item_id: string; user_id: string; acknowledged_at: string }[];
