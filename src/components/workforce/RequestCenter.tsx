@@ -8,6 +8,7 @@ import {
   REQUEST_STATUS,
   datedRequest,
   moneyRequest,
+  requestAttachmentHref,
   type EmployeeRequest,
   type RequestFile,
 } from "@/lib/workforce/requests";
@@ -24,6 +25,7 @@ import {
 } from "./shared";
 import ProfileApprovals from "./ProfileApprovals";
 import PdfAttachmentPreview from "./PdfAttachmentPreview";
+import OvertimePeriod,{localRequestTime} from "./OvertimePeriod";
 const initialForm = (kind = "general") => ({
   kind,
   title: "",
@@ -42,6 +44,8 @@ export default function RequestCenter({
   initialRequest = "",
   embedded = false,
   onChanged,
+  transport = api,
+  attachmentHref = requestAttachmentHref,
 }: {
   admin?: boolean;
   initialKind?: string;
@@ -50,6 +54,8 @@ export default function RequestCenter({
   initialRequest?: string;
   embedded?: boolean;
   onChanged?: () => void;
+  transport?:typeof api;
+  attachmentHref?:typeof requestAttachmentHref;
 }) {
   const focused = initialTab === "profile" ? "" : initialRequest;
   const Heading = embedded ? "h2" : "h1";
@@ -79,6 +85,7 @@ export default function RequestCenter({
   const requestKey = `${page}:${status}:${revision}:${focusOnly}:${focused}`;
   const loading = loadedKey !== requestKey;
   const [attendance, setAttendance] = useState<AttendanceData | null>(null);
+  const [overtimePeriods,setOvertimePeriods]=useState<Record<string,{starts_at:string;ends_at:string}>>({});
   useEffect(() => {
     const refresh = () => {
       setRevision((n) => n + 1);
@@ -89,13 +96,13 @@ export default function RequestCenter({
   useEffect(() => {
     if (form.kind !== "attendance-correction" || admin) return;
     const abort = new AbortController();
-    api<AttendanceData>("/api/workforce/attendance", { signal: abort.signal })
+    transport<AttendanceData>("/api/workforce/attendance", { signal: abort.signal })
       .then(setAttendance)
       .catch((e) => {
         if (e.name !== "AbortError") setError(e.message);
       });
     return () => abort.abort();
-  }, [form.kind, admin]);
+  }, [form.kind, admin,transport]);
   const requestFiles = useRef<HTMLInputElement>(null);
   const key = useRef(crypto.randomUUID()),
     lock = useRef(false);
@@ -109,7 +116,7 @@ export default function RequestCenter({
     const params = new URLSearchParams({ page: String(page) });
     if (status && !focusOnly) params.set("status", status);
     if (focusOnly) params.set("request", focused);
-    api<{ requests: EmployeeRequest[]; count: number }>(
+    transport<{ requests: EmployeeRequest[]; count: number }>(
       `/api/workforce/requests?${params}`,
       { signal: abort.signal },
     )
@@ -127,7 +134,7 @@ export default function RequestCenter({
         }
       });
     return () => abort.abort();
-  }, [page, status, revision, focusOnly, focused, requestKey]);
+  }, [page, status, revision, focusOnly, focused, requestKey,transport]);
   async function decide(row: EmployeeRequest, decision: string) {
     if (lock.current) return;
     if (decision === "cancelled" && !(await confirm("إلغاء هذا الطلب؟")))
@@ -136,13 +143,14 @@ export default function RequestCenter({
     setBusy(true);
     setError("");
     try {
-      await api("/api/workforce/requests", {
+      await transport("/api/workforce/requests", {
         method: "PATCH",
         body: JSON.stringify({
           id: row.id,
           version: row.version,
           decision,
           reason: reasons[row.id],
+          ...(row.kind==='overtime'&&decision==='approved'?{starts_at:`${overtimePeriods[row.id]?.starts_at??localRequestTime(row.starts_at)}:00+03:00`,ends_at:`${overtimePeriods[row.id]?.ends_at??localRequestTime(row.ends_at)}:00+03:00`}:{}),
         }),
       });
       setReasons((current) => {
@@ -153,6 +161,7 @@ export default function RequestCenter({
       setMessage("تم حفظ القرار");
       setRevision((n) => n + 1);
       onChanged?.();
+      window.dispatchEvent(new Event("workforce-data-changed"));
       window.dispatchEvent(new Event("workforce-notifications"));
     } catch (e) {
       setError((e as Error).message);
@@ -275,7 +284,7 @@ export default function RequestCenter({
           </div>
         ) : (
           <div
-            className={`grid items-start gap-4 ${focusOnly ? "" : "md:grid-cols-2"}`}
+            className={`grid items-start gap-4 ${focusOnly || rows.length===1 ? "" : "md:grid-cols-2"}`}
           >
             {rows.map((row) => (
               <article
@@ -322,11 +331,13 @@ export default function RequestCenter({
                         })}
                     </span>
                   )}
-                  {row.amount && (
+                  {row.amount && !(admin&&row.status==="pending"&&row.kind==="overtime") && (
                     <strong className="text-dark">
                       {Number(row.amount).toLocaleString("ar-SA")} ر.س
                     </strong>
                   )}
+                  {row.overtime_details&&!(admin&&row.status==="pending")&&<span>{Number(row.overtime_details.hours).toLocaleString('ar-SA')} ساعة · {Number(row.overtime_details.hourly_rate).toLocaleString('ar-SA',{maximumFractionDigits:4})} ر.س/ساعة</span>}
+                  {row.expense_details&&<span className="font-bold text-emerald-600">أُضيف إلى مستحقات {new Date(`${row.expense_details.payroll_month}T12:00:00+03:00`).toLocaleDateString('ar-SA',{calendar:'gregory',month:'long',year:'numeric'})}</span>}
                 </div>
                 {!!row.attachments.length && (
                   <ul className="space-y-2">
@@ -350,7 +361,7 @@ export default function RequestCenter({
                           )}
                           <a
                             className="font-bold"
-                            href={`/api/workforce/requests/${row.id}/attachments/${file.id}`}
+                            href={attachmentHref(row.id,file.id)}
                             download
                           >
                             تنزيل
@@ -382,6 +393,7 @@ export default function RequestCenter({
                           void decide(row, value);
                       }}
                     >
+                      {row.kind==='overtime'&&<OvertimePeriod quote={row.overtime_details} id={`overtime-${row.id}`} startsAt={overtimePeriods[row.id]?.starts_at??localRequestTime(row.starts_at)} endsAt={overtimePeriods[row.id]?.ends_at??localRequestTime(row.ends_at)} onChange={v=>setOvertimePeriods(p=>({...p,[row.id]:v}))}/>}
                       <Field id={`decision-${row.id}`} label="سبب القرار">
                         <textarea
                           id={`decision-${row.id}`}
@@ -458,6 +470,7 @@ export default function RequestCenter({
           className="space-y-4"
           onSubmit={async (e) => {
             e.preventDefault();
+            if(form.kind==='expenses'&&!files.length){setError('أرفق فاتورة المصروف');return;}
             if (lock.current) return;
             lock.current = true;
             setBusy(true);
@@ -471,7 +484,7 @@ export default function RequestCenter({
               }
               data.set("request_key", key.current);
               files.forEach((file) => data.append("files", file));
-              await api("/api/workforce/requests", {
+              await transport("/api/workforce/requests", {
                 method: "POST",
                 body: data,
               });
@@ -582,7 +595,8 @@ export default function RequestCenter({
               </select>
             </Field>
           )}
-          {datedRequest(form.kind) && (
+          {form.kind==='overtime'&&<OvertimePeriod startsAt={form.starts_at} endsAt={form.ends_at} onChange={v=>setForm(p=>({...p,...v}))}/>}
+          {datedRequest(form.kind) && form.kind!=='overtime' && (
             <div className="grid gap-3 sm:grid-cols-2">
               {[
                 ["starts_at", "من — الرياض"],
@@ -607,7 +621,7 @@ export default function RequestCenter({
             </div>
           )}
           {moneyRequest(form.kind) && (
-            <Field id="request-amount" label="المبلغ — ر.س">
+            <Field id="request-amount" label={form.kind==='expenses'?"قيمة المصروف — ر.س":"المبلغ — ر.س"}>
               <input
                 id="request-amount"
                 type="number"
@@ -637,7 +651,7 @@ export default function RequestCenter({
               }
             />
           </Field>
-          <Field id="request-files" label="المرفقات · 5 ملفات × 4 م.ب">
+          <Field id="request-files" label={form.kind==='expenses'?"الفاتورة والمرفقات · الفاتورة مطلوبة":"المرفقات · 5 ملفات × 4 م.ب"}>
             <input
               ref={requestFiles}
               id="request-files"
@@ -711,7 +725,7 @@ export default function RequestCenter({
         {preview &&
           (preview.file.mime_type === "application/pdf" ? (
             <PdfAttachmentPreview
-              url={`/api/workforce/requests/${preview.request}/attachments/${preview.file.id}?preview=true`}
+              url={attachmentHref(preview.request,preview.file.id,true)}
             />
           ) : (
             <Image
@@ -720,7 +734,7 @@ export default function RequestCenter({
               height={900}
               alt={preview.file.filename}
               className="max-h-[70vh] w-full object-contain"
-              src={`/api/workforce/requests/${preview.request}/attachments/${preview.file.id}?preview=true`}
+              src={attachmentHref(preview.request,preview.file.id,true)}
             />
           ))}
       </Dialog>

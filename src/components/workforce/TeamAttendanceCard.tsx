@@ -26,7 +26,7 @@ export default function TeamAttendanceCard({ employeeId, attendance, refreshKey 
   }, [expanded, employeeId, month, page, refreshKey, key]);
   const live = liveAttendance(attendance.summary, attendance.open, tick);
   const current = liveAttendance(attendance.todaySummary, attendance.open, tick);
-  const status = current.today < current.startsOn ? "قبل المباشرة" : current.needsCorrection ? "يحتاج تصحيح الحضور" : current.isPresent ? attendance.open?.break_started_at ? "في استراحة" : "حاضرة الآن" : current.todayPeriods ? "تم الانصراف" : current.dayOff ? "يوم إجازة" : "لم تسجل الحضور اليوم";
+  const status = current.today < current.startsOn ? "قبل المباشرة" : current.needsCorrection ? "يحتاج تصحيح الحضور" : current.isPresent ? attendance.open?.break_started_at ? "في استراحة" : "حاضرة الآن" : current.todayPeriods ? "تم الانصراف" : current.dayOff ? current.paidHoliday?`${current.paidHoliday} · مدفوعة`:"يوم إجازة" : "لم تسجل الحضور اليوم";
   const progress = live.targetMinutes ? Math.min(100, live.workedMinutes * 100 / live.targetMinutes) : 0;
   const detailsId = `attendance-periods-${employeeId}`;
   return <section className="attendance-stat mt-4 rounded-2xl border border-white/60 bg-white/45 p-4" aria-label="دوام الشهر" data-team-attendance={employeeId}>
@@ -35,6 +35,7 @@ export default function TeamAttendanceCard({ employeeId, attendance, refreshKey 
     <dl className="my-4 grid grid-cols-2 gap-3"><div><dt className="text-xs opacity-75">المنجز</dt><dd className="mt-1 text-lg font-black tabular-nums" data-team-worked>{attendanceDuration(live.workedMinutes)}</dd></div><div><dt className="text-xs opacity-75">المتبقي</dt><dd className="mt-1 text-lg font-black tabular-nums" data-team-remaining>{attendanceDuration(live.remainingMinutes)}</dd></div></dl>
     <div role="meter" aria-label="إنجاز ساعات الشهر" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)} className="h-1.5 overflow-hidden rounded-full bg-sky-200/30"><div className="h-full rounded-full bg-sky-500 transition-all" style={{width:`${progress}%`}} /></div>
     <div className="mt-2 flex flex-wrap justify-between gap-2 text-[11px] opacity-80"><span>المستهدف {attendanceDuration(live.targetMinutes)} · {live.workdayCount} يوم عمل</span><span>اليوم {attendanceDuration(current.todayMinutes)}</span></div>
+    {live.paidHolidayMinutes>0&&<p className="mt-3 text-xs font-bold">إجازات رسمية مدفوعة · {attendanceDuration(live.paidHolidayMinutes)}</p>}
     {!!live.extraMinutes && <p className="mt-2 text-xs font-bold">إضافي {attendanceDuration(live.extraMinutes)}</p>}
     <button type="button" className="mt-4 flex w-full items-center justify-between border-t border-current/10 pt-3 text-xs font-bold hover:underline" aria-expanded={expanded} aria-controls={detailsId} onClick={() => setExpanded(value => !value)}><span>فترات الحضور والانصراف</span><span aria-hidden>{expanded ? "−" : "＋"}</span></button>
     {expanded && <div id={detailsId} className="mt-3 space-y-3" aria-busy={loading}>

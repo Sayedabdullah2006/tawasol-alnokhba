@@ -53,6 +53,7 @@ const screen = (
       "requests/general",
       "requests/leave",
       "requests/permission",
+      "requests/overtime",
       "requests/remote-work",
       "requests/expenses",
       "requests/advance",
@@ -222,6 +223,7 @@ export const employeeModules: EmployeeModule[] = [
     adminArea: "صندوق الموافقات الموحد: مراجعة الطلب والقرار وأثره وسجله",
     screens: [
       screen("requests/general", "طلب إداري", "", [], undefined, true),
+      screen("requests/overtime", "طلب خارج دوام", "", ["finance/overview"], undefined, true),
       screen(
         "requests/history",
         "كل طلباتي",
@@ -250,8 +252,8 @@ export const employeeModules: EmployeeModule[] = [
       ),
       screen(
         "requests/expenses",
-        "طلب تعويض أو استرداد مصروف",
-        "المبلغ والسبب والفواتير والمشروع المرتبط اختياريًا، ثم الاعتماد والصرف.",
+        "تعويض مصروفات العمل",
+        "",
         ["work/projects", "finance/overview"],
       ),
       screen(

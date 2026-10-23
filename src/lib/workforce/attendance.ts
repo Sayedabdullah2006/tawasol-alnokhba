@@ -33,7 +33,7 @@ export type AttendanceData = {
     schedule_mode: "fixed" | "flexible";
     daily_minutes: number;
   };
-  leave: { year: number; granted: number; used: number; available: number };
+  leave: import("./leave").LeaveBalance;
   approved: {
     id: string;
     kind: string;

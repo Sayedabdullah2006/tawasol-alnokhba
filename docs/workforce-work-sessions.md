@@ -41,3 +41,8 @@ The preview and tests load the exact migration file. Only their isolated fixture
 5. Remove the development preview route before a later production release if it is no longer needed. It is already inaccessible under `NODE_ENV=production`.
 
 The application must not be deployed without the schema. Do not run this migration against production merely to show the preview.
+
+## Friday punch restriction (pending release)
+Apply `20261022231540_friday_attendance_guard.sql` after the pending attendance/payroll migrations. `wf_work_command` rejects employee `in` and `out` on Friday using authoritative Riyadh server time, before idempotency replay or any mutation. The attendance POST alias uses the same handler. Existing expiry/snapshot/cron logic may still close an overdue Thursday session at its Thursday deadline; historical records and admin correction workflows are preserved. The live bar disables both manual punch buttons and shows a short Friday label. Client clock/locale changes cannot bypass the database guard.
+
+`tests/workforce-friday.test.mjs` verifies Noor/Monwa, both punch directions, UTC/Riyadh midnight boundaries, retries and legacy sessions. Existing work-session and daily payroll tests pass against the new guard. Payroll rows now use compact single-line labels and non-wrapping numbers; visible rows were checked at 320px and 1280px without wrapping or horizontal overflow. No test notifications, emails or production writes were performed.

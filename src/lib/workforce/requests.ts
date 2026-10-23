@@ -1,8 +1,9 @@
 export const REQUEST_KINDS = {
   leave: "إجازة",
   permission: "استئذان",
+  overtime: "خارج دوام",
   "remote-work": "عمل عن بُعد",
-  expenses: "استرداد مصروف",
+  expenses: "تعويض مصروفات العمل",
   advance: "سلفة",
   letter: "خطاب أو شهادة",
   "payroll-review": "استفسار مالي",
@@ -16,11 +17,12 @@ export const REQUEST_STATUS = {
   cancelled: "ملغى",
 } as const;
 export const datedRequest = (kind: string) =>
-  ["leave", "permission", "remote-work", "attendance-correction"].includes(
+  ["leave", "permission", "overtime", "remote-work", "attendance-correction"].includes(
     kind,
   );
 export const moneyRequest = (kind: string) =>
   ["expenses", "advance"].includes(kind);
+export const requestAttachmentHref=(request:string,file:string,preview=false)=>`/api/workforce/requests/${request}/attachments/${file}${preview?'?preview=true':''}`;
 export type RequestFile = {
   id: string;
   filename: string;
@@ -45,4 +47,6 @@ export type EmployeeRequest = {
   decided_at: string | null;
   created_at: string;
   version: number;
+  overtime_details?:{hours:number;hourly_rate:string;actual_salary:string;basic_salary:string;work_day:string;payroll_month:string}|null;
+  expense_details?:{payroll_month:string;approved_at:string}|null;
 };

@@ -12,6 +12,7 @@ export type Employee = {
   job_title: string;
   responsibilities: string;
   can_manage_tasks: boolean;
+  can_view_team_summaries?: boolean;
   national_id?: string;
   birth_date?: string | null;
   qualification?: string;

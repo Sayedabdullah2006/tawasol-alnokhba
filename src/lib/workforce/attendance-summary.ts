@@ -1,3 +1,4 @@
+import {fixedPaidHoliday} from './calendar';
 export const DEFAULT_WORKDAYS = [0, 1, 2, 3, 4, 6];
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
@@ -62,9 +63,13 @@ export function summarizeAttendance({ periods, startDate, month, now, dailyMinut
   const bounds = monthBounds(month), today = riyadhDate(now);
   const startsOn = startDate > bounds.first ? startDate : bounds.first;
   const from = midnight(startsOn), until = midnight(bounds.next), dayStart = midnight(today);
-  let workdayCount = 0;
+  let workdayCount = 0,paidHolidayMinutes=0;
   for (let day = from; day < until; day += DAY) {
-    if (workdays.includes(new Date(day + 12 * 60 * MINUTE).getUTCDay())) workdayCount++;
+    if (workdays.includes(new Date(day + 12 * 60 * MINUTE).getUTCDay())) {
+      const date=new Date(day+12*60*MINUTE).toISOString().slice(0,10);
+      if(fixedPaidHoliday(date)){if(date<=today)paidHolidayMinutes+=dailyMinutes;}
+      else workdayCount++;
+    }
   }
   const monthlySeconds = workedSeconds(periods, from, until, now.getTime());
   const todaySeconds = workedSeconds(periods, Math.max(from, dayStart), Math.min(until, dayStart + DAY), now.getTime());
@@ -72,7 +77,7 @@ export function summarizeAttendance({ periods, startDate, month, now, dailyMinut
   const workedMinutes = Math.floor(monthlySeconds / 60), todayMinutes = Math.floor(todaySeconds / 60);
   return {
     month, today, asOf: now.toISOString(), startsOn, endsOn: bounds.last,
-    workdayCount, dailyMinutes, targetMinutes, workedMinutes,
+    workdayCount, dailyMinutes, targetMinutes, workedMinutes,paidHolidayMinutes,
     remainingMinutes: Math.max(0, targetMinutes - workedMinutes),
     extraMinutes: Math.max(0, workedMinutes - targetMinutes),
     monthlySeconds, todaySeconds, todayMinutes,
@@ -80,7 +85,8 @@ export function summarizeAttendance({ periods, startDate, month, now, dailyMinut
       const start = Date.parse(period.checked_in), end = attendanceEnd(period,now.getTime());
       return end > Math.max(from, dayStart) && start < Math.min(until, dayStart + DAY, now.getTime());
     }).length,
-    dayOff: !workdays.includes(new Date(`${today}T12:00:00Z`).getUTCDay()),
+    paidHoliday:fixedPaidHoliday(today),
+    dayOff: !!fixedPaidHoliday(today)||!workdays.includes(new Date(`${today}T12:00:00Z`).getUTCDay()),
   };
 }
 

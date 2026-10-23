@@ -34,12 +34,12 @@ export async function attendanceWorkbook(month: string, employees: AttendanceExp
     page.getRow(4).eachCell(cell => {cell.font={name:"Arial",bold:true,color:{argb:"FFFFFFFF"}};cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FF245978"}};});
     return page;
   }
-  const summary = sheet("ملخص الموظفات", ["الموظفة","المسمى الوظيفي","تاريخ المباشرة","بداية الاحتساب","أيام العمل","المستهدف","المنجز","المتبقي","الإضافي"], [30,28,18,18,16,18,18,18,18]);
+  const summary = sheet("ملخص الموظفات", ["الموظفة","المسمى الوظيفي","تاريخ المباشرة","بداية الاحتساب","أيام العمل","المستهدف","المنجز","المتبقي","الإضافي","إجازات رسمية مدفوعة"], [30,28,18,18,16,18,18,18,18,24]);
   const periods = sheet("فترات الحضور والانصراف", ["الموظفة","الحضور — الرياض","الانصراف — الرياض","المدة المحتسبة بالشهر","الحالة"], [30,26,26,26,24]);
   for (const employee of employees) {
     const s=employee.summary;
-    const row=summary.addRow([employee.full_name,employee.job_title,employee.start_date,s.startsOn>s.endsOn?"—":s.startsOn,s.workdayCount,s.targetMinutes/1440,s.workedMinutes/1440,s.remainingMinutes/1440,s.extraMinutes/1440]);
-    for(let column=6;column<=9;column++) row.getCell(column).numFmt='[h]:mm';
+    const row=summary.addRow([employee.full_name,employee.job_title,employee.start_date,s.startsOn>s.endsOn?"—":s.startsOn,s.workdayCount,s.targetMinutes/1440,s.workedMinutes/1440,s.remainingMinutes/1440,s.extraMinutes/1440,s.paidHolidayMinutes/1440]);
+    for(let column=6;column<=10;column++) row.getCell(column).numFmt='[h]:mm';
     for(const period of attendanceExportPeriods(employee.periods,s)) {
       const effectiveEnd=attendanceEnd(period,Date.parse(s.asOf));
       const automatic=!period.checked_out && period.policy_version===1 && effectiveEnd<Date.parse(s.asOf);

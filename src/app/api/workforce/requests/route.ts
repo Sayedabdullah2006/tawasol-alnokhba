@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     let query = actor.db
       .from("wf_employee_requests")
       .select(
-        "id,employee_id,kind,title,body,starts_at,ends_at,amount,attendance_session_id,leave_type,attachments,status,decision_reason,decided_at,created_at,version",
+        "id,employee_id,kind,title,body,starts_at,ends_at,amount,overtime_details,expense_details,attendance_session_id,leave_type,attachments,status,decision_reason,decided_at,created_at,version",
         { count: "exact" },
       )
       .order("created_at", { ascending: false })
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
     const form = await attachmentForm(request, 20 * 1024 * 1024),
       id = uuid(form.get("request_key")),
       kind = textField(form.get("kind"), "نوع الطلب", 1, 40);
-    if (testRun && kind !== "general")
+    if (testRun && !["general","overtime","expenses"].includes(kind))
       throw new WorkforceError("اختر طلبًا إداريًا أثناء الاختبار", 400);
     if (!Object.hasOwn(REQUEST_KINDS, kind))
       throw new WorkforceError("نوع طلب غير صحيح");
@@ -136,6 +136,7 @@ export async function POST(request: Request) {
     if (ends_at && (!starts_at || ends_at < starts_at))
       throw new WorkforceError("نهاية الفترة تسبق بدايتها");
     const rawAmount = form.get("amount");
+    if(kind==="overtime"&&rawAmount)throw new WorkforceError("قيمة خارج الدوام تُحسب تلقائيًا");
     let amount: string | null = null;
     if (rawAmount) {
       if (
@@ -153,6 +154,8 @@ export async function POST(request: Request) {
       .filter((file): file is File => file instanceof File && file.size > 0);
     if (files.length > 5) throw new WorkforceError("الحد الأقصى خمسة مرفقات");
     const checked = await Promise.all(files.map(validateAttachment));
+    if(kind==='expenses'&&!checked.some(file=>['application/pdf','image/png','image/jpeg','image/webp'].includes(file.mime)))
+      throw new WorkforceError("أرفق فاتورة المصروف بصيغة PDF أو صورة");
     const fingerprint = createHash("sha256")
       .update(
         JSON.stringify({
@@ -191,6 +194,7 @@ export async function POST(request: Request) {
         filename: file.filename,
         mime_type: file.mime,
         size_bytes: file.bytes.length,
+        sha256: file.sha256,
         object_path: `requests/${id}/${fileId}`,
       };
     });
@@ -258,7 +262,7 @@ export async function PATCH(request: Request) {
     const testRun = await requestTestRun(request, actor);
     const visible = await actor.db
       .from("wf_employee_requests")
-      .select("id,test_run_id")
+      .select("id,test_run_id,kind")
       .eq("id", id)
       .maybeSingle();
     if (visible.error) throw visible.error;
@@ -272,8 +276,35 @@ export async function PATCH(request: Request) {
       decision === "cancelled"
         ? "ألغت الموظفة الطلب"
         : textField(body.reason, "سبب القرار", 3, 2000);
-    const service = await createServiceRoleClient(),
-      result = await service.rpc("wf_decide_employee_request", {
+    const service = await createServiceRoleClient();
+    // Verify legacy invoice bytes from private storage before first approval.
+    // New uploads already carry a server-computed hash; never trust client hashes.
+    if(visible.data.kind==='expenses'&&decision==='approved'){
+      const legacy=await service.from('wf_employee_requests').select('attachments,status,version').eq('id',id).single();
+      if(legacy.error)throw legacy.error;
+      if(legacy.data.status!=='pending'||legacy.data.version!==body.version)throw new WorkforceError('تمت معالجة الطلب؛ حدّث القائمة',409);
+      const attachments=legacy.data.attachments as {id:string;filename:string;mime_type:string;size_bytes:number;object_path:string;sha256?:string}[];
+      if(attachments.some(file=>!file.sha256)){
+        for(const file of attachments){
+          if(file.sha256)continue;
+          if(!file.object_path.startsWith(`requests/${id}/`))throw new WorkforceError('الفاتورة غير متاحة',409);
+          const stored=await service.storage.from(ATTACHMENT_BUCKET).download(file.object_path);
+          if(stored.error||!stored.data)throw new WorkforceError('تعذر التحقق من الفاتورة',409);
+          file.sha256=createHash('sha256').update(Buffer.from(await stored.data.arrayBuffer())).digest('hex');
+        }
+        const verified=await service.from('wf_employee_requests').update({attachments}).eq('id',id).eq('status','pending').eq('version',body.version).select('id').maybeSingle();
+        if(verified.error)throw verified.error;
+        if(!verified.data)throw new WorkforceError('تغير الطلب؛ حدّث القائمة',409);
+      }
+    }
+    let result;
+    if(visible.data.kind==="overtime"&&decision==="approved"){
+      const period=(value:unknown)=>{
+        if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/.test(value)||!Number.isFinite(Date.parse(value)))throw new WorkforceError("فترة خارج الدوام غير صحيحة");
+        dateField(value.slice(0,10));return new Date(value).toISOString();
+      };
+      result=await service.rpc("wf_decide_overtime_request",{p_id:id,p_actor:actor.user.id,p_version:body.version,p_reason:reason,p_starts:period(body.starts_at),p_ends:period(body.ends_at)});
+    }else result = await service.rpc("wf_decide_employee_request", {
         p_id: id,
         p_actor: actor.user.id,
         p_version: body.version,

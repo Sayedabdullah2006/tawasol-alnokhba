@@ -351,7 +351,7 @@ export default function AttendanceHub({
                         ends_at: data.settings.ends_at.slice(0, 5),
                         schedule_mode: data.settings.schedule_mode,
                         daily_minutes: data.settings.daily_minutes,
-                        days: String(data.leave.granted),
+                        days: String(data.leave.current_year_opening??0),
                         reason: "",
                       });
                       setEditing(true);
@@ -443,7 +443,7 @@ export default function AttendanceHub({
                       ))}
                       <Field
                         id="leave-days"
-                        label={`استحقاق الإجازة ${year} — يوم`}
+                        label={`رصيد إجازة إضافي ${year} — يوم`}
                       >
                         <input
                           id="leave-days"

@@ -14,6 +14,7 @@ import {
 } from "@/lib/workforce/payroll";
 import { workDate } from "@/lib/workforce/task-types";
 import CompensationPanel from "./CompensationPanel";
+import ExpenseReimbursements from "./ExpenseReimbursements";
 import {
   api,
   controlClass,
@@ -177,7 +178,9 @@ export default function MonthlyPayroll({
       if (!busy && !dirty) setRevision((n) => n + 1);
     };
     window.addEventListener("workforce-data-changed", refresh);
-    return () => window.removeEventListener("workforce-data-changed", refresh);
+    window.addEventListener("focus", refresh);
+    const timer=setInterval(refresh,60000);
+    return () => {window.removeEventListener("workforce-data-changed", refresh);window.removeEventListener("focus", refresh);clearInterval(timer);};
   }, [busy, dirty]);
   useEffect(() => {
     const abort = new AbortController();
@@ -262,7 +265,7 @@ export default function MonthlyPayroll({
         task_id: item.task_id ?? "",
         reference: item.reference,
       })),
-      deductions: data.statement?.deductions ?? [],
+      deductions: (data.statement?.deductions ?? []).filter(item=>!item.reference.startsWith("auto:gosi:")),
       notes: data.statement?.notes ?? "",
       reason: "",
     };
@@ -300,14 +303,15 @@ export default function MonthlyPayroll({
     try {
       const gross = form.items.reduce(
         (sum, item) => sum + moneyCents(itemAmount(item)),
-        moneyCents(form.basic_amount) + moneyCents(form.allowances_amount),
+        moneyCents(form.basic_amount) + moneyCents(form.allowances_amount) + moneyCents(String(data?.statement?.overtime_amount??0)),
       );
       const deducted = form.deductions.reduce(
         (sum, item) => sum + moneyCents(item.amount),
         BigInt(0),
       );
       const attendance=moneyCents(data?.statement?.attendance_amount??"0");
-      preview = deducted <= gross ? fromCents(gross-deducted-(attendance>gross-deducted?gross-deducted:attendance)) : null;
+      const insurance=(data?.statement?.deductions??[]).filter(item=>item.reference.startsWith("auto:gosi:")).reduce((sum,item)=>sum+moneyCents(item.amount),BigInt(0));
+      preview = deducted+insurance <= gross ? fromCents(gross-deducted-insurance-(attendance>gross-deducted-insurance?gross-deducted-insurance:attendance)+moneyCents(String(data?.statement?.reimbursement_amount??0))) : null;
     } catch {
       preview = null;
     }
@@ -393,8 +397,8 @@ export default function MonthlyPayroll({
             </p>
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
               {[
-                ["الراتب المستحق", expected],
-                ["المعتمد", approved],
+                [statement?.daily_accrual&&!statement.daily_accrual.closed?"صافي المستحق حتى اليوم":"صافي المستحق", statement?.daily_accrual?.total_amount??expected],
+                ["المعتمد للشهر", approved],
                 ["المصروف المسجل", paid],
                 ["المتبقي من المعتمد", remaining],
               ].map(([label, value]) => (
@@ -453,7 +457,7 @@ export default function MonthlyPayroll({
                         )}
                       </strong>
                     </p>
-                    {statement?.items.map((item, index) => (
+                    <ExpenseReimbursements items={statement?.reimbursements??[]} admin={admin}/>{Number(statement?.overtime_amount??0)>0&&<p className="flex justify-between font-bold"><span>خارج دوام</span><span>+ {money(String(statement?.overtime_amount))}</span></p>}{statement?.items.map((item, index) => (
                       <div key={index} className="rounded-xl border p-3">
                         <p className="font-bold">
                           {item.title} — {money(item.amount ?? "0")}
@@ -673,7 +677,7 @@ export default function MonthlyPayroll({
                       إضافة حافز أو عمولة
                     </Button>
                     <section className="space-y-3 rounded-xl border p-4">
-                      <h3 className="font-bold">الحسومات</h3>
+                      <h3 className="font-bold">الاستقطاعات</h3>{statement?.deductions.filter(item=>item.reference.startsWith("auto:gosi:")).map(item=><p key={item.reference} className="flex justify-between gap-2 text-sm"><span>التأمينات آليًا</span><strong>{money(item.amount)}</strong></p>)}
                       {form.deductions.map((item, index) => (
                         <fieldset
                           key={index}

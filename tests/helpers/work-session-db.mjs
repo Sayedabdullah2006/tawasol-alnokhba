@@ -37,6 +37,7 @@ export async function createWorkDB(){
  const actors=await readFile(new URL('../../supabase/migrations/20260916202246_workforce_task_commands.sql',import.meta.url),'utf8');
  await db.exec(actors.slice(actors.indexOf('create function workforce_private.assert_task_actor'),actors.indexOf('create function workforce_private.command_retry')));
  await db.exec(await readFile(new URL('../../supabase/migrations/20261022213937_linked_work_sessions.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../../supabase/migrations/20261022231540_friday_attendance_guard.sql',import.meta.url),'utf8'));
  // Only this isolated test database accepts a simulated clock. The shipped migration never does.
  await db.exec(`create or replace function workforce_private.work_now() returns timestamptz language sql volatile as $$ select current_setting('test.clock')::timestamptz $$;
  insert into profiles values('${ids.noor}','employee'),('${ids.monwa}','employee'),('${ids.admin}','admin');

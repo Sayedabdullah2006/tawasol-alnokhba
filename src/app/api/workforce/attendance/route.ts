@@ -10,6 +10,7 @@ import { uuid, textField, WorkforceError } from "@/lib/workforce/validation";
 import { workPage, privateResponse } from "@/lib/workforce/task-server";
 import { attendanceMonthSessions } from "@/lib/workforce/attendance-server";
 import { DEFAULT_WORKDAYS, summarizeAttendance } from "@/lib/workforce/attendance-summary";
+import {employeeLeaveBalance} from "@/lib/workforce/summary-server";
 import {ATTENDANCE_COLUMNS} from "@/lib/workforce/attendance";
 export async function GET(request: Request) {
   try {
@@ -101,11 +102,8 @@ export async function GET(request: Request) {
       monthSessions,
     ])
       if (result.error && result.error.code !== "PGRST103") throw result.error;
-    const granted = Number(entitlement.data?.days || 0),
-      used = (movements.data || []).reduce(
-        (sum, row) => sum + Number(row.days),
-        0,
-      );
+    const leaveBalance=await employeeLeaveBalance(actor,id);
+    const granted=Number(entitlement.data?.days||0);
     return privateResponse({
       employee: exists.data,
       sessions: records.data || [],
@@ -119,7 +117,7 @@ export async function GET(request: Request) {
         schedule_mode: "fixed",
         daily_minutes: 480,
       },
-      leave: { year, granted, used, available: granted - used },
+      leave: {...leaveBalance,current_year_opening:granted},
       approved: approved.data || [],
       today,
       summary: summarizeAttendance({ periods: monthSessions.data, startDate: exists.data.start_date,

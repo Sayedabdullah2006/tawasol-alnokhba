@@ -3,7 +3,8 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "./shared";
-import type {WorkSnapshot,WorkCommand,WorkInput} from "@/lib/workforce/work-session";
+import {isFriday,type WorkSnapshot,type WorkCommand,type WorkInput} from "@/lib/workforce/work-session";
+import {paidHolidayAt} from '@/lib/workforce/calendar';
 import { CLOSE_REASONS } from "@/lib/workforce/work-session";
 import { attendanceDuration } from "@/lib/workforce/attendance-summary";
 
@@ -75,15 +76,15 @@ export function WorkSessionBar(){
  if(!data)return <div className="mx-4 mb-4 rounded-2xl border border-white/15 p-4 text-sm" role={error?"alert":"status"}>{error||"جارٍ تحميل الدوام…"}</div>;
  const now=Math.max(Date.parse(data.now),tick?tick+state.clockOffset:0),session=data.session,segment=data.active;
  const afterHours=new Date(now).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Asia/Riyadh"})>="17:00";
- const onBreak=!!session?.break_started_at;
- const due=data.canControl!==false&&!!session?.next_confirmation_at && !onBreak && now>=Date.parse(session.next_confirmation_at);
+ const holiday=paidHolidayAt(now),dayOff=isFriday(now)||!!holiday,onBreak=!!session?.break_started_at;
+ const due=!dayOff&&data.canControl!==false&&!!session?.next_confirmation_at && !onBreak && now>=Date.parse(session.next_confirmation_at);
  const remaining=onBreak?Math.max(0,(Date.parse(session!.break_paid_until!)-now)/60000):Math.max(0,30-data.breakUsedSeconds/60);
  const action="rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-bold transition hover:bg-white/20 disabled:opacity-40";
  return <section className="portal-panel mx-4 mb-5 rounded-3xl border border-white/15 bg-[#10243c]/95 p-4 shadow-xl sm:mx-6" aria-label="جلسة دوامي">
-  <div className="flex flex-wrap items-center justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2 text-xs font-bold"><span className={`h-2 w-2 rounded-full ${session?onBreak?"bg-amber-300":"bg-emerald-300":"bg-slate-400"}`}/>{session?onBreak?"في استراحة":"الدوام جارٍ":data.lastSession?.close_reason?CLOSE_REASONS[data.lastSession.close_reason]:"ابدئي يومك"}<span className="mr-2 opacity-60">النهاية 5 مساءً</span></div><p className="mt-2 truncate text-sm font-black">{session?segment?.title||"اختاري مهمتك التالية":"سجلي الحضور ثم اختاري المهمة"}</p></div>
-   <div className="flex flex-wrap gap-2">{!session?<button className={`${action} !bg-[#dcb969] !text-[#0c2039]`} disabled={busy||afterHours} onClick={()=>void command("in")}>{afterHours?"انتهى دوام اليوم":"تسجيل الحضور"}</button>:<>
-    {data.canControl===false?<span className="text-xs text-amber-200">التحكم من جهاز الدوام</span>:<><button className={action} disabled={busy} onClick={()=>void command(onBreak?"resume":"break")}>{onBreak?"استئناف العمل":"استراحة"}</button>
-    <button className={action} disabled={busy} onClick={()=>void command("out")}>تسجيل الانصراف</button>
+  <div className="flex flex-wrap items-center justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2 text-xs font-bold"><span className={`h-2 w-2 rounded-full ${session?onBreak?"bg-amber-300":"bg-emerald-300":"bg-slate-400"}`}/>{dayOff?(holiday?`${holiday} · إجازة مدفوعة`:"الجمعة إجازة"):session?onBreak?"في استراحة":"الدوام جارٍ":data.lastSession?.close_reason?CLOSE_REASONS[data.lastSession.close_reason]:"ابدئي يومك"}{!dayOff&&<span className="mr-2 opacity-60">النهاية 5 مساءً</span>}</div>{!dayOff&&<p className="mt-2 truncate text-sm font-black">{session?segment?.title||"اختاري مهمتك التالية":"سجلي الحضور ثم اختاري المهمة"}</p>}</div>
+   <div className="flex flex-wrap gap-2">{!session?<button className={`${action} !bg-[#dcb969] !text-[#0c2039]`} disabled={busy||afterHours||dayOff} onClick={()=>void command("in")}>{!dayOff&&afterHours?"انتهى دوام اليوم":"تسجيل الحضور"}</button>:<>
+    {data.canControl===false?<span className="text-xs text-amber-200">التحكم من جهاز الدوام</span>:<><button className={action} disabled={busy||dayOff} onClick={()=>void command(onBreak?"resume":"break")}>{onBreak?"استئناف العمل":"استراحة"}</button>
+    <button className={action} disabled={busy||dayOff} onClick={()=>void command("out")}>تسجيل الانصراف</button>
     <button className={action} aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}> {expanded?"طي":"المهمة والنشاط"} </button></>}
    </>}</div>
   </div>

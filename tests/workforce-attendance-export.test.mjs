@@ -32,3 +32,11 @@ test('month before joining has no target; open periods stop at export time or co
  const s=summarizeAttendance({periods,startDate:'2026-10-18',month:'2026-10',now});
  assert.equal(attendanceExportPeriods(periods,s)[0].seconds,86400);
 });
+
+test('paid official holiday is exported separately without a synthetic attendance row',async()=>{
+ const now=new Date('2026-09-24T12:00:00+03:00'),summary=summarizeAttendance({periods:[],startDate:'2026-09-01',month:'2026-09',now});
+ const bytes=await attendanceWorkbook('2026-09',[{full_name:'موظفة',job_title:'تنفيذية',start_date:'2026-09-01',summary,periods:[]}],now);
+ const book=new ExcelJS.Workbook();await book.xlsx.load(Buffer.from(bytes));const s=book.getWorksheet('ملخص الموظفات'),cell=s.getCell('J5');
+ const duration=cell.value instanceof Date?cell.value.getTime()/86400000+25569:cell.value;
+ assert.equal(s.getCell('J4').value,'إجازات رسمية مدفوعة');assert.ok(Math.abs(duration-8/24)<1e-8);assert.equal(book.getWorksheet('فترات الحضور والانصراف').rowCount,4);
+});

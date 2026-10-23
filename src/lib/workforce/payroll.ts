@@ -36,6 +36,11 @@ export type PayrollStatement = PayrollInput & {
   approved_at: string | null;
   attendance_amount?: string;
   attendance_details?: AttendanceSettlement;
+  insurance_details?:import("./payroll-attendance").PayrollCardData["insurance_details"];
+  daily_accrual?:import("./payroll-attendance").DailyPayrollAccrual;
+  overtime_amount?:string;
+  reimbursement_amount?:string;
+  reimbursements?:import("./payroll-attendance").ExpenseReimbursement[];
 };
 export type PayrollData = {
   attendance?: AttendanceSettlement;

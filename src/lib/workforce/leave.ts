@@ -1,0 +1,1 @@
+export type LeaveBalance={year:number;annual_days:number;monthly_days:number;accrued:number;opening:number;current_year_opening:number;granted:number;used:number;available:number;pending_days:number;pending_until:string;months:{month:string;days:number}[]};

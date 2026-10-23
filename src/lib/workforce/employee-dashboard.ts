@@ -5,6 +5,7 @@ import { executionScope } from "./task-scope";
 import { summarizeAttendance } from "./attendance-summary";
 import { attendanceMonthSessions } from "./attendance-server";
 import {ATTENDANCE_COLUMNS} from "./attendance";
+import {employeeLeaveBalance} from "./summary-server";
 import {attendancePayrollSnapshot} from "./payroll-server";
 
 export async function employeeDashboard(
@@ -16,7 +17,6 @@ export async function employeeDashboard(
   const employee = actor.employee;
   const today = now.toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
   const month = `${today.slice(0, 7)}-01`;
-  const year = Number(today.slice(0, 4));
   const tomorrow = new Date(
     Date.parse(`${today}T00:00:00+03:00`) + 86400000,
   ).toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
@@ -53,8 +53,7 @@ export async function employeeDashboard(
     pendingRequests,
     latestRequests,
     payroll,
-    entitlement,
-    movements,
+    leaveBalance,
     documents,
     notifications,
   ] = await Promise.all([
@@ -103,17 +102,7 @@ export async function employeeDashboard(
       .order("id")
       .limit(2),
     attendancePayrollSnapshot(actor,employee.id,month).then(value=>({data:value.statement,error:null})),
-    actor.db
-      .from("wf_leave_entitlements")
-      .select("days")
-      .eq("employee_id", employee.id)
-      .eq("year", year)
-      .maybeSingle(),
-    actor.db
-      .from("wf_leave_movements")
-      .select("days")
-      .eq("employee_id", employee.id)
-      .eq("year", year),
+    employeeLeaveBalance(actor,employee.id).then(data=>({data,error:null})),
     actor.db
       .from("wf_employee_documents")
       .select("id", { count: "exact", head: true })
@@ -139,8 +128,7 @@ export async function employeeDashboard(
     pendingRequests,
     latestRequests,
     payroll,
-    entitlement,
-    movements,
+    leaveBalance,
     documents,
     notifications,
   ])
@@ -161,6 +149,7 @@ export async function employeeDashboard(
     month: month.slice(0, 7), now, dailyMinutes: settings.data?.daily_minutes ?? 480,
     workdays: settings.data?.workdays });
   return {
+    canViewTeamSummaries:employee.can_view_team_summaries===true,
     employee: {
       id: employee.id,
       full_name: employee.full_name,
@@ -191,12 +180,7 @@ export async function employeeDashboard(
       latest: latestRequests.data || [],
     },
     payroll: payroll.data,
-    leave: {
-      year,
-      available:
-        Number(entitlement.data?.days || 0) -
-        (movements.data || []).reduce((sum, row) => sum + Number(row.days), 0),
-    },
+    leave: leaveBalance.data,
     documents: documents.count || 0,
     unread: notifications.count || 0,
   };

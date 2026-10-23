@@ -5,8 +5,7 @@ import { employeeDashboard } from "@/lib/workforce/employee-dashboard";
 
 import DashboardJourneys from "./DashboardJourneys";
 import EmployeeFocus from "./EmployeeFocus";
-import AttendanceProgressCard from "./AttendanceProgressCard";
-import PayrollCard from "./PayrollCard";
+import EmployeeWorkSummary from "./EmployeeWorkSummary";
 
 type IconName = "tasks" | "clock" | "check" | "review" | "calendar" | "wallet" | "request" | "profile";
 const paths: Record<IconName, ReactNode> = {
@@ -47,11 +46,9 @@ function EmployeeDashboardView({ data }: { data: Awaited<ReturnType<typeof emplo
     <nav className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="ملخص مهامي">
       {statistics.map(s => <Link key={s.label} href={s.href} className={`group rounded-2xl border p-4 transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 motion-reduce:transform-none sm:p-5 ${s.color}`}><div className="flex items-center justify-between gap-2"><span className="text-xs font-bold sm:text-sm">{s.label}</span><Icon name={s.icon} /></div><div className="mt-4 flex items-end justify-between"><span className="text-3xl font-black tabular-nums">{s.value.toLocaleString("en-US")}</span><span aria-hidden="true" className="opacity-40 transition group-hover:opacity-100">↗</span></div></Link>)}
     </nav>
-    <div className="grid items-stretch gap-4 md:grid-cols-2 lg:grid-cols-4" data-dashboard-panels>
+    <div className="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-4" data-dashboard-panels>
       <EmployeeFocus today={tasks.today} upcoming={tasks.upcoming} todayCount={tasks.todayCount} upcomingCount={tasks.upcomingCount} />
-      <AttendanceProgressCard summary={attendance.summary} open={attendance.open} leaveDays={data.leave.available} />
-
-      <PayrollCard initial={payroll} month={data.month} employeeId={data.employee.id}/>
+      <EmployeeWorkSummary key={data.employee.id} canViewTeam={data.canViewTeamSummaries} initial={{employee:data.employee,summary:attendance.summary,open:attendance.open,payroll,leave:data.leave}}/>
       <section className={`${card} border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-100/60 text-violet-950`} aria-label="طلباتي">
         <CardTitle title="طلباتي" icon="request"><span className="rounded-full bg-white/70 px-3 py-1.5 text-xs font-bold">{data.requests.pending} معلقة</span></CardTitle>
         <div className="flex-1">{data.requests.latest.length ? <div className="space-y-2">{data.requests.latest.map(request => <Link key={request.id} href={`/employee/requests/history?request=${request.id}`} className="flex items-center justify-between gap-3 rounded-xl border border-violet-200/60 bg-white/60 p-3 hover:bg-white"><p className="text-sm font-bold">{request.title}</p><span className="shrink-0 text-xs text-violet-700">{requestState[request.status]}</span></Link>)}</div> : <p className="flex min-h-24 items-center text-sm text-violet-800">لا توجد طلبات سابقة</p>}<Link href="/employee/requests/general" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-violet-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-800"><span aria-hidden>＋</span>طلب جديد</Link></div>
