@@ -1,3 +1,4 @@
+import { requireMedicalReport } from "@/lib/workforce/sick-leave";
 import { requestTestRun } from "@/lib/workforce/test-mode";
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -111,7 +112,7 @@ export async function POST(request: Request) {
       if (!record.data) throw new WorkforceError("سجل الحضور غير متاح", 404);
     }
     const leave_type = form.get("leave_type") || "paid";
-    if (!["paid", "unpaid"].includes(String(leave_type)))
+    if (!["paid", "unpaid", "sick"].includes(String(leave_type)))
       throw new WorkforceError("نوع الإجازة غير صحيح");
     const title = textField(form.get("title"), "العنوان", 3, 150),
       body = textField(form.get("body"), "التفاصيل", 3, 10000);
@@ -156,6 +157,7 @@ export async function POST(request: Request) {
     const checked = await Promise.all(files.map(validateAttachment));
     if(kind==='expenses'&&!checked.some(file=>['application/pdf','image/png','image/jpeg','image/webp'].includes(file.mime)))
       throw new WorkforceError("أرفق فاتورة المصروف بصيغة PDF أو صورة");
+    try { requireMedicalReport(kind,String(leave_type),checked); } catch (e) { throw new WorkforceError((e as Error).message); }
     const fingerprint = createHash("sha256")
       .update(
         JSON.stringify({

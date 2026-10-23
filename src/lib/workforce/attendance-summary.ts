@@ -57,17 +57,19 @@ export function workedSeconds(periods: AttendancePeriod[], from: number, until: 
   return total / 1000;
 }
 
-export function summarizeAttendance({ periods, startDate, month, now, dailyMinutes = 480, workdays = DEFAULT_WORKDAYS, paidCalendarDays = [] }: {
-  periods: AttendancePeriod[]; startDate: string; month: string; now: Date; dailyMinutes?: number; workdays?: number[]; paidCalendarDays?: PaidCalendarDay[];
+export function summarizeAttendance({ periods, startDate, month, now, dailyMinutes = 480, workdays = DEFAULT_WORKDAYS, paidCalendarDays = [], excusedDays = [] }: {
+  periods: AttendancePeriod[]; startDate: string; month: string; now: Date; dailyMinutes?: number; workdays?: number[]; paidCalendarDays?: PaidCalendarDay[]; excusedDays?: string[];
 }) {
   const bounds = monthBounds(month), today = riyadhDate(now);
   const startsOn = startDate > bounds.first ? startDate : bounds.first;
   const from = midnight(startsOn), until = midnight(bounds.next), dayStart = midnight(today);
-  let workdayCount = 0,paidHolidayMinutes=0;
+  let workdayCount = 0,paidHolidayMinutes=0,approvedLeaveMinutes=0;
+  const excused=new Set(excusedDays);
   for (let day = from; day < until; day += DAY) {
     if (workdays.includes(new Date(day + 12 * 60 * MINUTE).getUTCDay())) {
       const date=new Date(day+12*60*MINUTE).toISOString().slice(0,10);
       if(paidHoliday(date,paidCalendarDays)){if(date<=today)paidHolidayMinutes+=dailyMinutes;}
+      else if(excused.has(date)){if(date<=today)approvedLeaveMinutes+=dailyMinutes;}
       else workdayCount++;
     }
   }
@@ -77,7 +79,7 @@ export function summarizeAttendance({ periods, startDate, month, now, dailyMinut
   const workedMinutes = Math.floor(monthlySeconds / 60), todayMinutes = Math.floor(todaySeconds / 60);
   return {
     month, today, asOf: now.toISOString(), startsOn, endsOn: bounds.last,
-    workdayCount, dailyMinutes, targetMinutes, workedMinutes,paidHolidayMinutes,
+    workdayCount, dailyMinutes, targetMinutes, workedMinutes,paidHolidayMinutes,approvedLeaveMinutes,
     remainingMinutes: Math.max(0, targetMinutes - workedMinutes),
     extraMinutes: Math.max(0, workedMinutes - targetMinutes),
     monthlySeconds, todaySeconds, todayMinutes,

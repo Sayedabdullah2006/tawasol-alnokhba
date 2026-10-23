@@ -1,7 +1,14 @@
+import {fromCents,moneyCents} from './payroll';
+/** The sick wage adjustment is part of the existing total, never an extra deduction. */
+export function splitAttendanceAdjustment(total:string,sick:string="0") {
+ const all=moneyCents(total),requested=moneyCents(sick),medical=requested>all?all:requested;
+ return {hours:fromCents(all-medical),sick:fromCents(medical)};
+}
 export type AttendanceSettlement = {
  starts_on: string; through: string | null; required_seconds: number; credited_seconds: number;
  missing_seconds: number; days: number; hourly_rate: string | null; calculated_amount: string;
  applied_amount?: string; unapplied_amount?: string;
+ sick_leave?: {amount:string;days:{day:string;ordinal:number;pay_rate:number;amount:string;cycle_start:string;cycle_end:string}[]};
  missing_days: {day:string;required_seconds:number;credited_seconds:number;missing_seconds:number;hourly_rate:string}[];
 };
 export type DailyPayrollAccrual = {

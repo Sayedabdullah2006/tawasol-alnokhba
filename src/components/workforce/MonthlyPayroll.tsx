@@ -14,6 +14,7 @@ import {
 } from "@/lib/workforce/payroll";
 import { workDate } from "@/lib/workforce/task-types";
 import CompensationPanel from "./CompensationPanel";
+import {splitAttendanceAdjustment} from "@/lib/workforce/payroll-attendance";
 import ExpenseReimbursements from "./ExpenseReimbursements";
 import {
   api,
@@ -502,7 +503,7 @@ export default function MonthlyPayroll({
                             </strong>
                           </div>
                         ))}
-                        {Number(statement.attendance_amount??0)>0&&<div className="mt-2 flex flex-wrap justify-between gap-2"><span>تسوية ساعات الحضور · {Math.floor((statement.attendance_details?.missing_seconds??0)/3600)} س {Math.floor((statement.attendance_details?.missing_seconds??0)%3600/60)} د</span><strong>− {money(statement.attendance_amount??"0")}</strong></div>}
+                        {Number(statement.attendance_amount??0)>0&&(()=>{const adjustment=splitAttendanceAdjustment(statement.attendance_amount??"0",statement.attendance_details?.sick_leave?.amount??"0");return <>{Number(adjustment.hours)>0&&<div className="mt-2 flex flex-wrap justify-between gap-2"><span>تسوية ساعات الحضور</span><strong>− {money(adjustment.hours)}</strong></div>}{Number(adjustment.sick)>0&&<div className="mt-2 flex flex-wrap justify-between gap-2"><span>تسوية أجر المرضية</span><strong>− {money(adjustment.sick)}</strong></div>}</>})()}
                         <p className="mt-2 font-bold">
                           مجموع الحسومات: {money(statement.deductions_amount)}
                         </p>

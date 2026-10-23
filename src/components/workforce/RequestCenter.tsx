@@ -12,6 +12,7 @@ import {
   type EmployeeRequest,
   type RequestFile,
 } from "@/lib/workforce/requests";
+import { leaveTypeLabel, MEDICAL_REPORT_ACCEPT, MEDICAL_REPORT_MIMES } from "@/lib/workforce/sick-leave";
 import type { AttendanceData } from "@/lib/workforce/attendance";
 import { ATTACHMENT_ACCEPT } from "@/lib/workforce/attachments";
 import {
@@ -297,9 +298,7 @@ export default function RequestCenter({
                   <span className="text-xs text-muted">
                     {REQUEST_KINDS[row.kind]}
                     {row.kind === "leave"
-                      ? row.leave_type === "unpaid"
-                        ? " · بدون راتب"
-                        : " · سنوية"
+                      ? ` · ${leaveTypeLabel(row.leave_type)}`
                       : ""}
                     {admin ? ` · ${row.employeeName || ""}` : ""}
                   </span>
@@ -472,6 +471,7 @@ export default function RequestCenter({
           className="space-y-4"
           onSubmit={async (e) => {
             e.preventDefault();
+            if(form.kind==='leave'&&form.leave_type==='sick'&&!files.some(file=>MEDICAL_REPORT_MIMES.includes(file.type))){setError('أرفقي التقرير الطبي بصيغة PDF أو صورة');return;}
             if(form.kind==='expenses'&&!files.length){setError('أرفق فاتورة المصروف');return;}
             if (lock.current) return;
             lock.current = true;
@@ -559,6 +559,7 @@ export default function RequestCenter({
               >
                 <option value="paid">من الرصيد السنوي</option>
                 <option value="unpaid">بدون راتب</option>
+                <option value="sick">مرضية · بتقرير طبي</option>
               </select>
             </Field>
           )}
@@ -653,13 +654,13 @@ export default function RequestCenter({
               }
             />
           </Field>
-          <Field id="request-files" label={form.kind==='expenses'?"الفاتورة والمرفقات · الفاتورة مطلوبة":"المرفقات · 5 ملفات × 4 م.ب"}>
+          <Field id="request-files" label={form.kind==='leave'&&form.leave_type==='sick'?"التقرير الطبي · مطلوب":form.kind==='expenses'?"الفاتورة والمرفقات · الفاتورة مطلوبة":"المرفقات · 5 ملفات × 4 م.ب"}>
             <input
               ref={requestFiles}
               id="request-files"
               type="file"
               multiple
-              accept={ATTACHMENT_ACCEPT}
+              accept={form.kind==='leave'&&form.leave_type==='sick'?MEDICAL_REPORT_ACCEPT:ATTACHMENT_ACCEPT}
               className="sr-only"
               disabled={busy}
               onChange={(e) => {

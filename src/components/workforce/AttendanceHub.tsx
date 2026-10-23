@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import {leaveTypeLabel} from "@/lib/workforce/sick-leave";
 import UpcomingLeaveCard from "./UpcomingLeaveCard";
 import Button from "@/components/ui/Button";
 import { WORKDAYS, type AttendanceData } from "@/lib/workforce/attendance";
@@ -525,7 +526,7 @@ export default function AttendanceHub({
                               row.kind as keyof typeof REQUEST_KINDS
                             ]
                           }{" "}
-                          · {row.title}
+                          · {row.title}{row.kind==="leave"&&` · ${leaveTypeLabel(row.leave_type)}`}
                         </strong>
                         <p className="mt-2 text-xs text-muted">
                           {new Date(row.starts_at).toLocaleDateString("ar-SA", {

@@ -1,5 +1,5 @@
 import {fixedPaidHoliday,type PaidCalendarDay} from "./calendar";
-export type UpcomingLeave={id:string;title:string;starts_on:string;ends_on:string;paid:boolean;source:"holiday"|"request";ongoing:boolean};
+export type UpcomingLeave={id:string;title:string;starts_on:string;ends_on:string;paid:boolean;source:"holiday"|"request";ongoing:boolean;paymentLabel?:string};
 export type ApprovedLeaveRow={id:string;employee_id:string;title:string;kind:string;status:string;leave_type:string;starts_at:string|null;ends_at:string|null;test_run_id:string|null};
 const dayOf=(value:string)=>new Date(value).toLocaleDateString("en-CA",{timeZone:"Asia/Riyadh"});
 const addDays=(day:string,count:number)=>new Date(Date.parse(`${day}T12:00:00Z`)+count*86400000).toISOString().slice(0,10);
@@ -18,7 +18,7 @@ export function upcomingLeave({employeeId,startDate,today,calendar,requests}:{em
   if(q.employee_id!==employeeId||q.kind!=="leave"||q.status!=="approved"||q.test_run_id||!q.starts_at||!q.ends_at||seen.has(q.id))continue;
   if(!Number.isFinite(Date.parse(q.starts_at))||!Number.isFinite(Date.parse(q.ends_at)))continue;
   const starts=dayOf(q.starts_at),ends=dayOf(q.ends_at);if(ends<starts)continue;
-  seen.add(q.id);rows.push({id:`request:${q.id}`,title:q.title||"إجازة معتمدة",starts_on:starts,ends_on:ends,paid:q.leave_type==="paid",source:"request",ongoing:false});
+  seen.add(q.id);rows.push({id:`request:${q.id}`,title:q.title||"إجازة معتمدة",starts_on:starts,ends_on:ends,paid:q.leave_type==="paid",source:"request",ongoing:false,...(q.leave_type==="sick"?{paymentLabel:"مرضية · حسب الاستحقاق"}:{})});
  }
  return rows.filter(r=>r.ends_on>=cutoff).map(r=>({...r,ongoing:r.starts_on<=today&&r.ends_on>=today})).sort((a,b)=>a.starts_on.localeCompare(b.starts_on)||a.ends_on.localeCompare(b.ends_on)||a.id.localeCompare(b.id));
 }

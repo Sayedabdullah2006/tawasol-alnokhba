@@ -14,17 +14,18 @@ export function attendanceMonth(value: string | null, now = new Date()) {
 
 export async function employeeMonthAttendance(db: WorkforceActor["db"], employeeId: string, startDate: string, month: string, now: Date) {
   const currentMonth = riyadhDate(now).slice(0, 7);
-  const [periods, currentPeriods, settings, open, active, paidCalendarDays] = await Promise.all([
+  const [periods, currentPeriods, settings, open, active, paidCalendarDays, excusedDays] = await Promise.all([
     attendanceMonthSessions(db, employeeId, startDate, month),
     month === currentMonth ? Promise.resolve(null) : attendanceMonthSessions(db, employeeId, startDate, currentMonth),
     db.from("wf_attendance_settings").select("daily_minutes,workdays").eq("employee_id", employeeId).maybeSingle(),
     db.from("wf_attendance_sessions").select(ATTENDANCE_COLUMNS).eq("employee_id", employeeId).is("checked_out", null).maybeSingle(),
     db.from("wf_work_segments").select("title,kind,starts_at").eq("employee_id",employeeId).is("ends_at",null).maybeSingle(),
     attendanceCalendarDays(db,[month,currentMonth]),
+    attendanceExcusedDays(db,employeeId,[month,currentMonth]),
   ]);
   for (const result of [periods, currentPeriods, settings, open, active]) if (result?.error) throw result.error;
   const summarize = (data: AttendancePeriod[], selected: string) => summarizeAttendance({ periods: data, startDate, month: selected, now,
-    dailyMinutes: settings.data?.daily_minutes ?? 480, workdays: settings.data?.workdays, paidCalendarDays });
+    dailyMinutes: settings.data?.daily_minutes ?? 480, workdays: settings.data?.workdays, paidCalendarDays, excusedDays });
   const summary = summarize(periods.data, month);
   return { summary, todaySummary: currentPeriods ? summarize(currentPeriods.data, currentMonth) : summary, open: open.data, periods: periods.data, active:active.data };
 }
@@ -65,4 +66,16 @@ export async function employeeUpcomingLeave(db:WorkforceActor["db"],employeeId:s
   (async()=>{const rows:ApprovedLeaveRow[]=[];for(let offset=0;;offset+=500){const r=await db.from("wf_employee_requests").select("id,employee_id,title,kind,status,leave_type,starts_at,ends_at,test_run_id").eq("employee_id",employeeId).eq("kind","leave").eq("status","approved").is("test_run_id",null).gte("ends_at",`${today}T00:00:00+03:00`).order("starts_at").order("id").range(offset,offset+499);if(r.error)throw r.error;rows.push(...r.data);if(r.data.length<500)return rows;}})(),
  ]);
  return upcomingLeave({employeeId,startDate,today,calendar,requests});
+}
+
+/** Approved absence is excused from attendance targets, without creating worked hours. */
+export async function attendanceExcusedDays(db:WorkforceActor["db"],employeeId:string,months:string[]){
+ const selected=[...new Set(months)].sort(),first=monthBounds(selected[0]).first,next=monthBounds(selected.at(-1)!).next;
+ const days=new Set<string>();
+ for(let offset=0;;offset+=500){
+  const r=await db.from("wf_employee_requests").select("starts_at,ends_at").eq("employee_id",employeeId).eq("kind","leave").eq("status","approved").is("test_run_id",null).gte("ends_at",first+"T00:00:00+03:00").lt("starts_at",next+"T00:00:00+03:00").order("starts_at").order("id").range(offset,offset+499);
+  if(r.error)throw r.error;
+  for(const q of r.data){if(!q.starts_at||!q.ends_at)continue;const start=new Date(q.starts_at).toLocaleDateString("en-CA",{timeZone:"Asia/Riyadh"}),end=new Date(q.ends_at).toLocaleDateString("en-CA",{timeZone:"Asia/Riyadh"});for(let t=Date.parse((start>first?start:first)+"T12:00:00Z");t<Date.parse(next+"T12:00:00Z")&&new Date(t).toISOString().slice(0,10)<=end;t+=86400000)days.add(new Date(t).toISOString().slice(0,10));}
+  if(r.data.length<500)return [...days];
+ }
 }
