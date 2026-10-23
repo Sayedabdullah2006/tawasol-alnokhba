@@ -1,3 +1,4 @@
+import type {PerformanceSummary} from "./performance";
 import type { AttendanceSummary, AttendancePeriod } from "./attendance-summary";
 export type TeamAttendance = { summary: AttendanceSummary; todaySummary: AttendanceSummary; open: AttendancePeriod | null; active?:{title:string;kind:string;starts_at:string}|null };
 export type WorkMetrics = {
@@ -22,6 +23,7 @@ export type AdminWorkDashboard = {
     status: "active" | "suspended" | "ended";
     metrics: WorkMetrics;
     attendance: TeamAttendance;
+    performance: PerformanceSummary;
   }[];
   clients: string[];
   pendingSubmissions: { id: string; taskId: string; title: string; client: string; employeeName: string; createdAt: string }[];

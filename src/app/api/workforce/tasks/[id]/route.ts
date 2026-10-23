@@ -28,7 +28,7 @@ export async function GET(
       actor.db
         .from("wf_task_submissions")
         .select(
-          "id,summary,status,decision_reason,created_at,decided_at,submission_number",
+          "id,summary,status,decision_reason,created_at,decided_at,submission_number,revision_due_at",
         )
         .eq("task_id", id)
         .order("submission_number", { ascending: false })
@@ -59,7 +59,7 @@ export async function GET(
       if (result.error) throw result.error;
     const reviewResult = submissionResult.data?.status === "pending"
       ? await actor.db.from("wf_task_submissions")
-          .select("id,summary,status,decision_reason,created_at,decided_at,submission_number")
+          .select("id,summary,status,decision_reason,created_at,decided_at,submission_number,revision_due_at")
           .eq("task_id", id).not("decided_at", "is", null)
           .order("submission_number", { ascending: false }).limit(1).maybeSingle()
       : submissionResult;

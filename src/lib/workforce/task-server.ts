@@ -86,7 +86,9 @@ export async function workCommand(
       await requireTestTask(actor, testRun, id);
     }
     const { data, error } = await service.rpc(
-      testRun && scope === "task"
+      scope === "task" && command === "review"
+        ? "wf_evaluated_task_command"
+        : testRun && scope === "task"
         ? "wf_test_task_command"
         : `wf_${scope}_command`,
       {

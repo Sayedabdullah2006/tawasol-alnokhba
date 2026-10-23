@@ -19,7 +19,7 @@ export default async function Page({
   searchParams,
 }: {
   params: Promise<{ section: string[] }>;
-  searchParams: Promise<{ request?: string }>;
+  searchParams: Promise<{ request?: string; subject?:string }>;
 }) {
   const { section } = await params;
   const path = `/employee/${section.join("/")}`;
@@ -61,6 +61,7 @@ export default async function Page({
     return (
       <RequestCenter
         key={path}
+        initialTitle={section[1]==="general"?(await searchParams).subject:undefined}
         initialRequest={(await searchParams).request}
         startNew={!!section[1] && Object.hasOwn(REQUEST_KINDS, section[1])}
         initialKind={

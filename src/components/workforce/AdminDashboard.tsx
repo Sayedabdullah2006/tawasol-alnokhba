@@ -11,13 +11,12 @@ import MonthlyPayroll from "./MonthlyPayroll";
 import RequestCenter from "./RequestCenter";
 import DashboardJourneys from "./DashboardJourneys";
 import DashboardLiveStatus from "./DashboardLiveStatus";
-import ProgressOrbit from "./ProgressOrbit";
+import PerformanceCard from "./PerformanceCard";
 import PortalIntro from "@/components/layout/PortalIntro";
 import TeamAttendanceCard from "./TeamAttendanceCard";
 import { riyadhDate } from "@/lib/workforce/attendance-summary";
 
 const count = (value: number) => value.toLocaleString("en-US");
-const percent = (part: number, total: number) => total ? `${count(Math.round(part * 100 / total))}%` : "—";
 const metrics: { key: keyof WorkMetrics; label: string; color: string }[] = [
   { key: "assigned", label: "المهام المسندة", color: "border-blue-200 bg-blue-50 text-blue-950" },
   { key: "completed", label: "المنجزة", color: "border-emerald-200 bg-emerald-50 text-emerald-950" },
@@ -28,10 +27,10 @@ const metrics: { key: keyof WorkMetrics; label: string; color: string }[] = [
 const box = "min-w-0 rounded-3xl border p-5 shadow-[0_8px_28px_-18px_rgba(16,43,87,0.3)] sm:p-6";
 const arrow = <span aria-hidden="true">←</span>;
 const shortDate = (value: string) => new Date(value).toLocaleDateString("ar-SA", { calendar: "gregory", timeZone: "Asia/Riyadh", day: "numeric", month: "short" });
-export default function AdminDashboard({ userId }: { userId: string }) {
+export default function AdminDashboard({ userId, previewData }: { userId: string; previewData?:AdminWorkDashboard }) {
   const [staffView, setStaffView] = useState<"all" | "attention" | "review">("all");
   const params = useSearchParams(), pathname = usePathname();
-  const [data, setData] = useState<AdminWorkDashboard | null>(null);
+  const [data, setData] = useState<AdminWorkDashboard | null>(previewData??null);
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState(false);
   const attendanceMonth = params.get("attendance_month") || riyadhDate(new Date()).slice(0, 7);
@@ -47,7 +46,7 @@ export default function AdminDashboard({ userId }: { userId: string }) {
   const { confirm, confirmation } = useConfirm();
   const summaryParams = new URLSearchParams();
   for (const key of ["due_from", "due_to", "assignee_id", "client_name", "attendance_month"]) { const value = params.get(key); if (value) summaryParams.set(key, value); }
-  const summaryQuery = summaryParams.toString(), requestKey = `${summaryQuery}:${revision}`, loading = loadedKey !== requestKey, query = params.toString();
+  const summaryQuery = summaryParams.toString(), requestKey = `${summaryQuery}:${revision}`, loading = !previewData && loadedKey !== requestKey, query = params.toString();
   useEffect(() => {
     const refresh = () => setRevision(n => n + 1);
     window.addEventListener("workforce-data-changed", refresh);
@@ -56,12 +55,13 @@ export default function AdminDashboard({ userId }: { userId: string }) {
   }, []);
   useEffect(() => { pendingQuery.current = query; }, [query]);
   useEffect(() => {
+    if(previewData)return;
     const abort = new AbortController();
     api<AdminWorkDashboard>(`/api/workforce/dashboard?${summaryQuery}`, { signal: abort.signal })
       .then(result => { setData(result); setError(""); setLoadedKey(requestKey); })
       .catch(e => { if (e.name !== "AbortError") { setData(null); setError(e.message); setLoadedKey(requestKey); } });
     return () => abort.abort();
-  }, [summaryQuery, requestKey]);
+  }, [summaryQuery, requestKey,previewData]);
   const scrollToWork = () => document.getElementById("admin-work")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
   function filter(patch: Record<string, string>) {
     const next = new URLSearchParams(pendingQuery.current);
@@ -96,25 +96,25 @@ export default function AdminDashboard({ userId }: { userId: string }) {
     if (hasUnsavedWorkforceChanges() && !(await confirm("تجاهل التعديلات غير المحفوظة؟"))) return;
     setSelectedRequest(null);
   }
-  const disabled = loading || !data || detailOpen;
+  const disabled = !!previewData || loading || !data || detailOpen;
   return <div className="mx-auto w-full min-w-0 max-w-screen-2xl space-y-6 p-4 md:p-6 lg:p-8" data-admin-dashboard>
     {confirmation}
     <PortalIntro title="فريقك، في الصورة" eyebrow="إدارة فريق النخبة" detail={data ? `آخر تحديث ${new Date(data.generated_at).toLocaleTimeString("ar-SA", { timeZone: "Asia/Riyadh", hour: "2-digit", minute: "2-digit" })}` : undefined}>
-      <Button disabled={disabled} onClick={() => workspace.current?.createTask()}>＋ إسناد مهمة</Button><Button variant="outline" onClick={changed} disabled={loading}>{loading ? "جارٍ التحديث…" : "تحديث"}</Button><DashboardLiveStatus admin />
+      <Button disabled={disabled} onClick={() => workspace.current?.createTask()}>＋ إسناد مهمة</Button><Button variant="outline" onClick={changed} disabled={loading||!!previewData}>{loading ? "جارٍ التحديث…" : "تحديث"}</Button>{!previewData&&<DashboardLiveStatus admin />}
     </PortalIntro>
     <Notice message={error} error />
     <section aria-label="ملخص أداء الفريق" aria-busy={loading} className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
       {metrics.map(item => <button key={item.key} type="button" disabled={disabled} onClick={() => metricFilter(item.key)} className={`group rounded-2xl border p-4 text-right transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-default disabled:opacity-60 motion-reduce:transform-none ${item.color}`}><span className="text-xs font-bold sm:text-sm">{item.label}</span><span className="mt-4 flex items-end justify-between"><strong className="text-3xl font-black tabular-nums">{data ? count(data.totals[item.key]) : "—"}</strong><span aria-hidden className="opacity-40">↗</span></span></button>)}
       <button type="button" disabled={disabled} onClick={() => openRequests()} className="group rounded-2xl border border-violet-200 bg-violet-50 p-4 text-right text-violet-950 transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-default disabled:opacity-60 motion-reduce:transform-none"><span className="text-xs font-bold sm:text-sm">طلبات معلقة</span><span className="mt-4 flex items-end justify-between"><strong className="text-3xl font-black tabular-nums">{data ? count(data.pendingRequestCount) : "—"}</strong><span aria-hidden className="opacity-40">↗</span></span></button>
     </section>
-    <details aria-labelledby="staff-performance" className="space-y-4 rounded-3xl border border-border bg-white/60 p-4 sm:p-5"><summary className="cursor-pointer py-2 text-lg font-black"><h2 id="staff-performance" className="inline text-lg font-black text-dark">نبض الفريق</h2></summary><div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 text-xs font-bold">شهر الحضور<input type="month" aria-label="شهر الحضور" min="2020-01" max="2200-12" value={attendanceMonth} onChange={event => changeAttendanceMonth(event.target.value)} className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" /></label><Button size="sm" variant="outline" disabled={loading || !data || exporting} onClick={() => void exportAttendance()}>{exporting ? "جارٍ تجهيز التقرير…" : "تحميل تقرير Excel"}</Button></div><div role="group" aria-label="تصفية أداء الموظفات" className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white/80 p-1">{([{ id: "all", title: "الفريق" }, { id: "attention", title: "تحتاج متابعة" }, { id: "review", title: "للاعتماد" }] as const).map(tab => <button key={tab.id} type="button" aria-pressed={staffView === tab.id} onClick={() => setStaffView(tab.id)} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${staffView === tab.id ? "bg-[#102b57] text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"}`}>{tab.title}</button>)}</div></div>
+    <details aria-labelledby="staff-performance" className="space-y-4 rounded-3xl border border-border bg-white/60 p-4 sm:p-5"><summary className="cursor-pointer py-2 text-lg font-black"><h2 id="staff-performance" className="inline text-lg font-black text-dark">نبض الفريق</h2></summary><div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 text-xs font-bold">شهر المتابعة<input type="month" aria-label="شهر المتابعة" disabled={!!previewData} min="2020-01" max="2200-12" value={attendanceMonth} onChange={event => changeAttendanceMonth(event.target.value)} className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" /></label><Button size="sm" variant="outline" disabled={loading || !data || exporting||!!previewData} onClick={() => void exportAttendance()}>{exporting ? "جارٍ تجهيز التقرير…" : "تحميل تقرير Excel"}</Button></div><div role="group" aria-label="تصفية أداء الموظفات" className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white/80 p-1">{([{ id: "all", title: "الفريق" }, { id: "attention", title: "تحتاج متابعة" }, { id: "review", title: "للاعتماد" }] as const).map(tab => <button key={tab.id} type="button" aria-pressed={staffView === tab.id} onClick={() => setStaffView(tab.id)} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${staffView === tab.id ? "bg-[#102b57] text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"}`}>{tab.title}</button>)}</div></div>
       <div className="grid gap-4 md:grid-cols-2" data-staff-cards>
         {!data && loading && [0,1].map(n => <div key={n} role="status" aria-label="جارٍ تحميل أداء الموظفات" className="h-64 animate-pulse rounded-3xl border border-white bg-white/70 motion-reduce:animate-none" />)}
         {data?.employees.filter(employee => staffView === "all" || (staffView === "attention" ? employee.metrics.overdue > 0 || employee.metrics.blocked > 0 : employee.metrics.pending > 0)).map((employee, i) => <article key={employee.id} className={`${box} ${i % 2 ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/70 text-emerald-950" : "border-sky-200 bg-gradient-to-br from-sky-50 to-blue-100/80 text-sky-950"}`} data-staff-card={employee.id}>
           <div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/80 text-xl font-black">{employee.full_name.trim().slice(0,1)}</span><div className="min-w-0"><h3 className="font-black">{employee.full_name}</h3><p className="mt-1 text-xs opacity-75">{employee.job_title || "دون مسمى"} · {STATUS_LABELS[employee.status]}</p></div></div><span className="shrink-0 rounded-full bg-white/70 px-3 py-1.5 text-xs font-bold">{count(employee.metrics.assigned)} مسندة</span></div>
           <div className="my-5 grid grid-cols-3 gap-2">{metrics.filter(m => ["completed", "overdue", "pending"].includes(m.key)).map(m => <button key={m.key} type="button" disabled={disabled} onClick={() => metricFilter(m.key, employee.id)} className="rounded-xl border border-white/80 bg-white/60 p-3 text-right hover:bg-white disabled:opacity-60"><span className="block text-xs">{m.label}</span><strong className={`mt-2 block text-xl font-black tabular-nums ${m.key === "overdue" && employee.metrics.overdue ? "text-rose-700" : ""}`}>{count(employee.metrics[m.key])}</strong></button>)}</div>
-          <div className="flex items-center gap-5 rounded-2xl border border-white/80 bg-white/45 p-3"><ProgressOrbit value={employee.metrics.assigned ? employee.metrics.completed * 100 / employee.metrics.assigned : 0} label={`نسبة إنجاز ${employee.full_name}`} detail="الإنجاز" className={i % 2 ? "text-emerald-600" : "text-sky-600"} /><div className="space-y-3 text-xs"><p>الالتزام بالموعد <strong className="mt-1 block text-lg">{percent(employee.metrics.on_time, employee.metrics.dated_completed)}</strong></p><p className={employee.metrics.blocked ? "font-bold text-amber-800" : "opacity-75"}>{employee.metrics.blocked ? `${count(employee.metrics.blocked)} مهام متوقفة` : "لا توجد عوائق مسجلة"}</p></div></div>
-          <TeamAttendanceCard employeeId={employee.id} attendance={employee.attendance} refreshKey={data.generated_at} />
+          <PerformanceCard initial={employee.performance} employeeId={employee.id} admin embedded preview={!!previewData}/>
+          <TeamAttendanceCard employeeId={employee.id} attendance={employee.attendance} refreshKey={data.generated_at} preview={!!previewData}/>
           <div className="mt-5 flex flex-wrap gap-2 border-t border-current/10 pt-4"><Button size="sm" disabled={disabled || employee.status !== "active"} onClick={() => workspace.current?.createTask(employee.id)}>إسناد مهمة</Button><Button size="sm" variant="outline" disabled={disabled} onClick={() => metricFilter("assigned",employee.id)}>عرض مهامها</Button><Button size="sm" variant="ghost" disabled={disabled} onClick={() => { setSelectedPayroll(employee.id); scrollToWork(); }}>الراتب والحوافز</Button></div>
         </article>)}
       </div>
@@ -127,7 +127,7 @@ export default function AdminDashboard({ userId }: { userId: string }) {
     </div>
     <DashboardJourneys admin />
     <section id="admin-work" className="scroll-mt-32 rounded-3xl border border-border bg-white/80 p-4 sm:p-6" aria-label="إسناد المهام ومراجعة التسليمات">
-      {selectedPayroll ? <MonthlyPayroll key={selectedPayroll} employeeId={selectedPayroll} admin onClose={() => setSelectedPayroll(null)} /> : selectedTask ? <TaskDetail key={selectedTask} id={selectedTask} initialPanel={selectedPanel} admin onChanged={changed} onClose={() => setSelectedTask(null)} /> : selectedRequest ? <><div className="mb-5"><Button variant="outline" onClick={() => void closeRequests()}>العودة للمهام {arrow}</Button></div><RequestCenter key={`${selectedRequest.tab}:${selectedRequest.id ?? "all"}`} admin embedded initialTab={selectedRequest.tab} initialRequest={selectedRequest.id} onChanged={changed} /></> : <TaskWorkspace admin userId={userId} embedded actionsRef={workspace} refreshKey={revision} clients={data?.clients} onOpenTask={openTask} onChanged={changed} />}
+      {previewData?<div className="grid gap-3 md:grid-cols-2">{previewData.employees.map(e=><div className="rounded-2xl border border-border p-4" key={e.id}><h3 className="font-bold">مهام {e.full_name.split(" ")[0]}</h3>{e.performance.rows.map(r=><p className="mt-3 flex justify-between gap-3 text-sm" key={r.id}><span>{r.title}</span><span className="shrink-0 text-xs opacity-70">{r.status}</span></p>)}</div>)}</div>:selectedPayroll ? <MonthlyPayroll key={selectedPayroll} employeeId={selectedPayroll} admin onClose={() => setSelectedPayroll(null)} /> : selectedTask ? <TaskDetail key={selectedTask} id={selectedTask} initialPanel={selectedPanel} admin onChanged={changed} onClose={() => setSelectedTask(null)} /> : selectedRequest ? <><div className="mb-5"><Button variant="outline" onClick={() => void closeRequests()}>العودة للمهام {arrow}</Button></div><RequestCenter key={`${selectedRequest.tab}:${selectedRequest.id ?? "all"}`} admin embedded initialTab={selectedRequest.tab} initialRequest={selectedRequest.id} onChanged={changed} /></> : <TaskWorkspace admin userId={userId} embedded actionsRef={workspace} refreshKey={revision} clients={data?.clients} onOpenTask={openTask} onChanged={changed} />}
     </section>
   </div>;
 }

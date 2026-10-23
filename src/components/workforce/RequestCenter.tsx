@@ -39,6 +39,7 @@ const initialForm = (kind = "general") => ({
 export default function RequestCenter({
   admin = false,
   initialKind = "general",
+  initialTitle = "",
   startNew = false,
   initialTab = "requests",
   initialRequest = "",
@@ -49,6 +50,7 @@ export default function RequestCenter({
 }: {
   admin?: boolean;
   initialKind?: string;
+  initialTitle?: string;
   startNew?: boolean;
   initialTab?: string;
   initialRequest?: string;
@@ -75,7 +77,7 @@ export default function RequestCenter({
   const [profileVisited, setProfileVisited] = useState(
     initialTab === "profile",
   );
-  const [form, setForm] = useState(initialForm(initialKind)),
+  const [form, setForm] = useState({...initialForm(initialKind),...(initialTitle?{title:initialTitle.slice(0,150)}:{})}),
     [files, setFiles] = useState<File[]>([]),
     [reasons, setReasons] = useState<Record<string, string>>({}),
     [preview, setPreview] = useState<{

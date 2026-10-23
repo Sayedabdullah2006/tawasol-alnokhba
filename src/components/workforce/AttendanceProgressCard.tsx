@@ -7,9 +7,9 @@ import {useWorkSession} from "./WorkSessionProvider";
 import type {AttendancePeriod} from "@/lib/workforce/attendance-summary";
 import type {LeaveBalance} from "@/lib/workforce/leave";
 
-export default function AttendanceProgressCard({ summary, open, leaveDays,leave,linkedSession=true,readOnly=false,title="ساعات دوامي" }: {
+export default function AttendanceProgressCard({ summary, open, leaveDays,leave,linkedSession=true,readOnly=false,title="ساعات دوامي",compact=false }: {
   summary: AttendanceSummary; open: AttendancePeriod | null; leaveDays: number;
-  leave?:LeaveBalance;linkedSession?:boolean;readOnly?:boolean;title?:string;
+  leave?:LeaveBalance;linkedSession?:boolean;readOnly?:boolean;title?:string;compact?:boolean;
 }) {
   const work=useWorkSession();
   open=linkedSession&&work?.data?work.data.session:open;
@@ -36,14 +36,15 @@ export default function AttendanceProgressCard({ summary, open, leaveDays,leave,
     </div>
     {live.paidHolidayMinutes>0&&<p className="mt-3 text-xs font-bold">إجازات رسمية مدفوعة · {attendanceDuration(live.paidHolidayMinutes)}</p>}
     {!!live.extraMinutes && <p className="mt-3 text-sm font-bold text-emerald-700">إضافي: {attendanceDuration(live.extraMinutes)}</p>}
-    <div className="attendance-stat my-4 rounded-2xl border border-sky-200/40 bg-white/40 p-4">
+    <div className={`attendance-stat my-4 rounded-2xl border border-sky-200/40 bg-white/40 ${compact?"p-3":"p-4"}`}>
       <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-black">اليوم</h3><span className={`inline-flex items-center gap-2 rounded-full px-2 py-1 text-[11px] font-bold ${live.isPresent ? "bg-emerald-100 text-emerald-900" : "bg-sky-100 text-sky-900"}`}>{live.isPresent && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}{status}</span></div>
       <p className="mt-3 flex flex-wrap items-baseline justify-between gap-2"><strong className="text-xl tabular-nums" data-today-worked>{attendanceDuration(live.todayMinutes)}</strong><span className="text-xs opacity-75">{live.dayOff ? live.paidHoliday?`${live.paidHoliday} · مدفوعة`:"يوم إجازة" : `من ${attendanceDuration(live.dailyMinutes)}`}</span></p>
-      {!live.dayOff && <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-sky-200/30" role="meter" aria-label="إنجاز ساعات اليوم" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(dayProgress)}><div className="h-full rounded-full bg-sky-500 transition-all" style={{width:`${dayProgress}%`}} /></div>}
-      {!!live.todayPeriods && <p className="mt-2 text-[11px] opacity-70">فترات الحضور: {live.todayPeriods}</p>}
+      {!compact&&!live.dayOff && <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-sky-200/30" role="meter" aria-label="إنجاز ساعات اليوم" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(dayProgress)}><div className="h-full rounded-full bg-sky-500 transition-all" style={{width:`${dayProgress}%`}} /></div>}
+      {!compact&&!!live.todayPeriods && <p className="mt-2 text-[11px] opacity-70">فترات الحضور: {live.todayPeriods}</p>}
     </div>
     <div className="mt-auto flex items-center justify-between text-xs opacity-75"><span>رصيد الإجازة</span><strong>{leaveDays} يوم</strong></div>
-    {leave&&<div className="mt-3 space-y-2 border-t border-current/10 pt-3 text-xs"><p className="flex justify-between gap-2"><span>الاستحقاق</span><strong>{leave.monthly_days} يوم/شهر · {leave.annual_days} يوم/سنة</strong></p><p className="flex justify-between gap-2"><span>يضاف بنهاية {date(leave.pending_until)}</span><strong>{leave.pending_days} يوم</strong></p></div>}
+    {leave&&!compact&&<div className="mt-3 space-y-2 border-t border-current/10 pt-3 text-xs"><p className="flex justify-between gap-2"><span>الاستحقاق</span><strong>{leave.monthly_days} يوم/شهر · {leave.annual_days} يوم/سنة</strong></p><p className="flex justify-between gap-2"><span>يضاف بنهاية {date(leave.pending_until)}</span><strong>{leave.pending_days} يوم</strong></p></div>}
+    {leave&&compact&&<p title={`يضاف ${leave.pending_days} يوم بنهاية ${date(leave.pending_until)}`} className="mt-2 text-[11px] opacity-75">{leave.monthly_days} يوم/شهر · {leave.annual_days} يوم/سنة</p>}
     {!readOnly&&<Link href={live.needsCorrection ? "/employee/requests/attendance-correction" : "/employee/attendance/overview"} className="mt-4 flex items-center justify-between gap-2 border-t border-current/10 pt-4 text-sm font-black hover:underline"><span>{live.needsCorrection ? "طلب تصحيح الحضور" : live.isPresent ? "تسجيل الانصراف" : "الحضور والانصراف"}</span><span aria-hidden>←</span></Link>}
   </section>;
 }

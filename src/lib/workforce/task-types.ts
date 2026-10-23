@@ -62,6 +62,7 @@ export type BoardDetail = {
   canCreate: boolean;
 };
 export type TaskSubmission = {
+  revision_due_at?:string|null;
   id: string;
   summary: string;
   status: "pending" | "approved" | "changes";

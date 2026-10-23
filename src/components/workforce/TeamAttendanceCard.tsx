@@ -6,8 +6,8 @@ import { attendanceDuration, liveAttendance, attendanceEnd, workedSeconds } from
 import { api, Notice } from "./shared";
 
 const dateTime = (value: string) => new Date(value).toLocaleString("ar-SA", { calendar: "gregory", timeZone: "Asia/Riyadh", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-export default function TeamAttendanceCard({ employeeId, attendance, refreshKey }: {
-  employeeId: string; attendance: TeamAttendance; refreshKey: string;
+export default function TeamAttendanceCard({ employeeId, attendance, refreshKey,preview=false }: {
+  preview?:boolean; employeeId: string; attendance: TeamAttendance; refreshKey: string;
 }) {
   const [expanded, setExpanded] = useState(false), [page, setPage] = useState(1);
   const [data, setData] = useState<AttendanceData | null>(null), [error, setError] = useState("");
@@ -37,7 +37,7 @@ export default function TeamAttendanceCard({ employeeId, attendance, refreshKey 
     <div className="mt-2 flex flex-wrap justify-between gap-2 text-[11px] opacity-80"><span>المستهدف {attendanceDuration(live.targetMinutes)} · {live.workdayCount} يوم عمل</span><span>اليوم {attendanceDuration(current.todayMinutes)}</span></div>
     {live.paidHolidayMinutes>0&&<p className="mt-3 text-xs font-bold">إجازات رسمية مدفوعة · {attendanceDuration(live.paidHolidayMinutes)}</p>}
     {!!live.extraMinutes && <p className="mt-2 text-xs font-bold">إضافي {attendanceDuration(live.extraMinutes)}</p>}
-    <button type="button" className="mt-4 flex w-full items-center justify-between border-t border-current/10 pt-3 text-xs font-bold hover:underline" aria-expanded={expanded} aria-controls={detailsId} onClick={() => setExpanded(value => !value)}><span>فترات الحضور والانصراف</span><span aria-hidden>{expanded ? "−" : "＋"}</span></button>
+    <button type="button" className="mt-4 flex w-full items-center justify-between border-t border-current/10 pt-3 text-xs font-bold hover:underline" disabled={preview} aria-expanded={expanded} aria-controls={detailsId} onClick={() => setExpanded(value => !value)}><span>فترات الحضور والانصراف</span><span aria-hidden>{expanded ? "−" : "＋"}</span></button>
     {expanded && <div id={detailsId} className="mt-3 space-y-3" aria-busy={loading}>
       <Notice message={error} error />
       {error && <button type="button" onClick={() => setRetry(value => value + 1)} className="text-xs underline">إعادة المحاولة</button>}

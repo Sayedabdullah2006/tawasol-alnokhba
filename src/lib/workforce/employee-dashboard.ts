@@ -1,4 +1,5 @@
 import "server-only";
+import {employeePerformance} from "./performance-server";
 import type { WorkforceActor } from "./server";
 import { WorkforceError } from "./validation";
 import { executionScope } from "./task-scope";
@@ -56,6 +57,7 @@ export async function employeeDashboard(
     leaveBalance,
     documents,
     notifications,
+    performance,
   ] = await Promise.all([
     tasks()
       .not("column.kind", "in", "(done,review)")
@@ -114,6 +116,7 @@ export async function employeeDashboard(
       .select("id", { count: "exact", head: true })
       .eq("recipient_id", actor.user.id)
       .is("read_at", null),
+    employeePerformance(actor,employee.id,month.slice(0,7),now),
   ]);
   for (const result of [
     todayTasks,
@@ -149,6 +152,7 @@ export async function employeeDashboard(
     month: month.slice(0, 7), now, dailyMinutes: settings.data?.daily_minutes ?? 480,
     workdays: settings.data?.workdays });
   return {
+    performance,
     canViewTeamSummaries:employee.can_view_team_summaries===true,
     employee: {
       id: employee.id,

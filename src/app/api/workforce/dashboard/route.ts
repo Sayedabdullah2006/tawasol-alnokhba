@@ -1,3 +1,4 @@
+import {employeePerformance} from "@/lib/workforce/performance-server";
 import { apiError, requireAdmin, workforceActor } from "@/lib/workforce/server";
 import { privateResponse } from "@/lib/workforce/task-server";
 import {
@@ -56,7 +57,7 @@ export async function GET(request: Request) {
       if (record.error) throw record.error;
       const { periods: _periods, ...attendance } = await employeeMonthAttendance(actor.db, employee.id, record.data.start_date, month, now);
       void _periods;
-      return { ...employee, attendance };
+      return { ...employee, attendance, performance:await employeePerformance(actor,employee.id,month,now) };
     }));
     const one = <T,>(value: T | T[]) => Array.isArray(value) ? value[0] : value;
     return privateResponse({ ...data, employees,

@@ -131,3 +131,7 @@ body:has(.portal-screen)::before { display: none; }
 .portal-screen [data-dashboard-panels] > section[data-work-summary-card="payroll"] {
   background: linear-gradient(140deg, #244d43, #102f2a);
 }
+
+/* Performance uses the same stable TV surface without adding empty fixed-height tiles. */
+.portal-screen [data-dashboard-panels] > [data-performance-card], .portal-screen [data-staff-card] [data-performance-card] { background: linear-gradient(140deg, #35365b, #1b2540); border-color: #b9a6f344; color: #f3f0ff; backdrop-filter: none; }
+.portal-screen [data-performance-card] dialog { color: #f3f7ff; }

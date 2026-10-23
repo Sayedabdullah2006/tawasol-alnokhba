@@ -13,6 +13,7 @@ import TaskFields, { CoAssignees, EmployeePicker, taskForm, taskPayload } from "
 import TaskChecklist from "./TaskChecklist";
 import TaskHistory from "./TaskHistory";
 import TaskComments from "./TaskComments";
+import TaskPerformance,{ReviewClassification,type PerformanceMembers} from "./TaskPerformance";
 import TaskTime from "./TaskTime";
 import { WorkStartButton } from "./WorkSessionProvider";
 import TaskAttachments from "./TaskAttachments";
@@ -92,6 +93,9 @@ export default function TaskDetail({
     [],
   );
   const [reason, setReason] = useState("");
+  const [performanceInfo,setPerformanceInfo]=useState<PerformanceMembers|null>(null);
+  const [classification,setClassification]=useState({category:"",due:"",affected:[] as string[],incomplete:false});
+  useEffect(()=>{const abort=new AbortController();api<PerformanceMembers>(`/api/workforce/tasks/${id}/performance`,{signal:abort.signal}).then(setPerformanceInfo).catch(e=>{if(e.name!=="AbortError")setError("تعذر تحميل إعداد التقييم؛ حدّث الصفحة");});return()=>abort.abort();},[id,reload,data?.task.version]);
   const [reviewAssignment, setReviewAssignment] = useState<ReturnType<typeof taskForm> | null>(null);
   const [pendingReviewFiles, setPendingReviewFiles] = useState(false);
   const [block, setBlock] = useState("");
@@ -102,7 +106,7 @@ export default function TaskDetail({
       !!summary ||
       attachmentIds.length > 0 ||
       attachmentBusy ||
-      !!reason ||
+      !!reason || !!classification.category || !!classification.due ||
       !!reviewAssignment ||
       !!block,
   );
@@ -194,7 +198,7 @@ export default function TaskDetail({
       onChanged?.();
       window.dispatchEvent(new Event("workforce-notifications"));
       if (name === "delete") {
-        setReason(""); setSummary(""); setAttachmentIds([]); setReviewAssignment(null); setBlock("");
+        setReason(""); setClassification({category:"",due:"",affected:[],incomplete:false}); setSummary(""); setAttachmentIds([]); setReviewAssignment(null); setBlock("");
         if (onClose) onClose(); else router.replace(base);
         return true;
       }
@@ -203,8 +207,8 @@ export default function TaskDetail({
         setSummary("");
         setAttachmentIds([]);
       }
-      if (name === "review") setReason("");
-      if (name === "edit") setReviewAssignment(null);
+      if (name === "review") {setReason(""); setClassification({category:"",due:"",affected:[],incomplete:false});}
+      if (name === "edit") {setReviewAssignment(null);setClassification(c=>({...c,affected:[]}));}
       if (name === "block") setBlock("");
       setColumn("");
       setMessage(success);
@@ -399,7 +403,7 @@ export default function TaskDetail({
               {review?.decision_reason ? <div className="space-y-2 text-sm leading-7">
                 <p className="text-xs font-bold">{review.status === "approved" ? "اعتماد" : "طلب تعديل"} · المحاولة {review.submission_number}</p>
                 <p className="max-h-64 overflow-auto whitespace-pre-wrap break-words">{review.decision_reason}</p>
-                <p className="text-xs text-muted">{workDate(review.decided_at)}</p>
+                <p className="text-xs text-muted">{workDate(review.decided_at)}</p>{review.revision_due_at&&<p className="text-sm font-bold">إعادة التسليم: {workDate(review.revision_due_at)}</p>}
               </div> : <p className="text-sm text-muted">{submission?.status === "pending" ? "لم يصدر قرار بعد" : "لا توجد ملاحظات"}</p>}
             </Panel>
 
@@ -611,6 +615,7 @@ export default function TaskDetail({
                         onChange={(e) => setReason(e.target.value)}
                       />
                     </Field>
+                    <ReviewClassification members={performanceInfo?.members??[]} value={classification} onChange={setClassification}/>
                     <div className="flex flex-wrap gap-3">
                       <Button type="submit" loading={busy} disabled={pendingReviewFiles || !!reviewAssignment}>
                         اعتماد التسليم
@@ -618,11 +623,11 @@ export default function TaskDetail({
                       <Button
                         type="button"
                         variant="outline"
-                        disabled={busy || reason.trim().length < 3 || pendingReviewFiles || !!reviewAssignment}
+                        disabled={busy || reason.trim().length < 3 || !classification.category || !classification.due || (!!performanceInfo?.members.length && !classification.affected.length) || pendingReviewFiles || !!reviewAssignment}
                         onClick={() =>
                           command(
                             "review",
-                            { decision: "changes", reason },
+                            { decision: "changes", reason, category:classification.category, revision_due_at:classification.due?new Date(`${classification.due}+03:00`).toISOString():null, affected_employee_ids:classification.affected, incomplete:classification.incomplete },
                             "أعيدت المهمة للموظف مع سبب التعديل",
                           )
                         }
@@ -636,6 +641,7 @@ export default function TaskDetail({
             </section>
           )}
         </div>
+        {performanceInfo&&<TaskPerformance key={`${task.version}:${performanceInfo.members.map(m=>m.config?.configured_at??"").join(":")}`} taskId={id} version={task.version} state={task.column.kind} info={performanceInfo} onChanged={()=>setReload(n=>n+1)}/>}
         <details ref={blockers} className="rounded-2xl border border-border bg-white p-4">
           <summary className="cursor-pointer text-sm font-bold">
             الحالة والعوائق
