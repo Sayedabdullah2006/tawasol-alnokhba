@@ -6,7 +6,6 @@ import type { WorkforceActor } from "@/lib/workforce/server";
 import { employeeDashboard } from "@/lib/workforce/employee-dashboard";
 
 import DashboardJourneys from "./DashboardJourneys";
-import EmployeeFocus from "./EmployeeFocus";
 import PerformanceCard from "./PerformanceCard";
 import EmployeeWorkSummary from "./EmployeeWorkSummary";
 
@@ -50,10 +49,17 @@ export function EmployeeDashboardView({ data, preview=false }: {preview?:boolean
     <nav className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="ملخص مهامي">
       {statistics.map(s => <Link key={s.label} href={s.href} className={`group rounded-2xl border p-4 transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 motion-reduce:transform-none sm:p-5 ${s.color}`}><div className="flex items-center justify-between gap-2"><span className="text-xs font-bold sm:text-sm">{s.label}</span><Icon name={s.icon} /></div><div className="mt-4 flex items-end justify-between"><span className="text-3xl font-black tabular-nums">{s.value.toLocaleString("en-US")}</span><span aria-hidden="true" className="opacity-40 transition group-hover:opacity-100">↗</span></div></Link>)}
     </nav>
+    <nav aria-label="إجراءات سريعة" className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+      {([
+        ["ابدأ مهمة", "/employee/work/tasks?scope=assigned&open=true&sort=due", "tasks"],
+        ["تسليماتي", "/employee/work/deliveries", "review"],
+        ["الحضور والانصراف", "/employee/attendance/overview", "clock"],
+        ["طلب جديد", "/employee/requests/general", "request"],
+        ["مستحقاتي", "/employee/finance/overview", "wallet"],
+        ["مركز المعرفة", "/employee/knowledge", "profile"],
+      ] as const).map(([title, href, icon]) => <Link key={title} href={href} className="flex min-w-0 items-center gap-2 rounded-2xl border border-white/20 bg-[#102b57] px-3 py-3 text-xs font-bold text-white transition hover:bg-[#234d7b] focus-visible:outline-2 focus-visible:outline-offset-2"><Icon name={icon} className="h-4 w-4 shrink-0" /><span>{title}</span></Link>)}
+    </nav>
     <div className="space-y-4">
-      <div data-dashboard-panels>
-      <EmployeeFocus today={tasks.today} upcoming={tasks.upcoming} todayCount={tasks.todayCount} upcomingCount={tasks.upcomingCount} />
-      </div>
       <div className="grid items-stretch gap-4 md:grid-cols-2" data-dashboard-panels>
         <EmployeeWorkSummary compact key={data.employee.id} canViewTeam={data.canViewTeamSummaries} people={preview?[data.employee]:undefined} initial={{employee:data.employee,summary:attendance.summary,open:attendance.open,payroll,leave:data.leave}} preview={preview}/>
       </div>

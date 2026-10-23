@@ -3,17 +3,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import PortalIcon from "@/components/layout/PortalIcon";
 const links = [
-  ["/admin/workforce", "الأداء والمهام"],
+  ["/admin/workforce", "الأداء"],
+  ["/admin/workforce/tasks", "المهام"],
   ["/admin/workforce/employees", "الموظفات"],
   ["/admin/workforce/people", "شؤون الفريق"],
   ["/admin/workforce/attendance", "الحضور والإجازات"],
   ["/admin/workforce/payroll", "الرواتب والحوافز"],
   ["/admin/workforce/approvals", "طلبات الموظفات"],
   ["/admin/workforce/knowledge", "مركز المعرفة"],
-  ["/admin/workforce/notifications", "الإشعارات"],
 ];
-export default function AdminNavigation() {
-  const pathname = usePathname();
+export default function AdminNavigation({ activePath }: { activePath?: string } = {}) {
+  const currentPath = usePathname(), pathname = activePath ?? currentPath;
   return (
     <nav
       aria-label="أقسام إدارة الفريق المستقلة"
@@ -31,7 +31,7 @@ export default function AdminNavigation() {
           }
           className="portal-launcher flex-1"
         >
-          <PortalIcon name={["tasks","people","profile","attendance","finance","requests","knowledge","notifications"][index]} />
+          <PortalIcon name={["performance","tasks","people","profile","attendance","finance","requests","knowledge"][index]} />
           {label}
         </Link>
       ))}

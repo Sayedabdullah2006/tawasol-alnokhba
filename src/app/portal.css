@@ -123,13 +123,14 @@ body:has(.portal-screen)::before { display: none; }
 @media(max-width:639px) { .portal-screen .employee-dock .portal-launcher { min-height: 79px; gap: 7px; font-size: 11px; border-radius: 12px; } .employee-dock .portal-icon { width: 21px; height: 21px; } }
 
 /* Stable summary surfaces: backdrop-filter layers can smear adjacent live cards. */
-.portal-screen [data-dashboard-panels] > section[data-work-summary-card] {
+.portal-screen section[data-work-summary-card] {
   position: relative;
   min-width: 0;
   background: linear-gradient(140deg, #193452, #0a1b30);
 }
-.portal-screen [data-dashboard-panels] > section[data-work-summary-card="payroll"] {
+.portal-screen section[data-work-summary-card="payroll"] {
   background: linear-gradient(140deg, #244d43, #102f2a);
+  color: #e8f5ef;
 }
 
 /* Performance uses the same stable TV surface without adding empty fixed-height tiles. */

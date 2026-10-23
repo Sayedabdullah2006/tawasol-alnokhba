@@ -90,6 +90,17 @@ export default function TaskWorkspace({
     setTaskOpen(true);
   }, [newAssignee, newClient]);
   useImperativeHandle(actionsRef, () => ({ createTask }), [createTask]);
+  const createFromUrl = params.get("create") === "1";
+  const createHandled = useRef(false);
+  useEffect(() => {
+    if (!createFromUrl) { createHandled.current = false; return; }
+    if (createHandled.current) return;
+    createHandled.current = true;
+    createTask();
+    const next = new URLSearchParams(pendingQuery.current);
+    next.delete("create"); pendingQuery.current = next.toString();
+    window.history.replaceState(null, "", `${pathname}?${next}`);
+  }, [createFromUrl, createTask, pathname]);
   useEffect(() => {
     const refresh = (event: Event) => {
       const detail = (

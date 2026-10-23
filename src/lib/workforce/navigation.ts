@@ -74,7 +74,7 @@ export const employeeModules: EmployeeModule[] = [
   },
   {
     key: "work",
-    title: "مهامي",
+    title: "المهام",
     purpose: "إدارة أعمالك اليومية والمشاريع التي تشارك فيها.",
     adminArea: "إدارة العمل: اللوحات والتكليفات والمشاريع والتسليمات",
     screens: [
@@ -110,7 +110,7 @@ export const employeeModules: EmployeeModule[] = [
   },
   {
     key: "performance",
-    title: "الأهداف والأداء",
+    title: "الأداء",
     purpose: "متابعة ما تستهدفه ونتائجك المعتمدة وملاحظات تطويرك.",
     adminArea: "الأهداف والتقييم: تحديد الأهداف واعتماد النتائج والمراجعات",
     screens: [

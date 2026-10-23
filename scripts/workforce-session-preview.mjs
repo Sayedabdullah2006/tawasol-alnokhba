@@ -16,6 +16,7 @@ try{
  await currentDB.query("select set_config('test.clock',$1,false)",[capturedAt]);
  for(const employee of currentRecords){const employeeId=employee.key==='noor'?ids.en:ids.em;
   await currentDB.query('update wf_employees set full_name=$1,start_date=$2 where id=$3',[employee.full_name,employee.start_date,employeeId]);
+  if(employee.insurance_rate!=null)await currentDB.query('update wf_employee_insurance_settings set rate=$1 where employee_id=$2',[employee.insurance_rate,employeeId]);
   await currentDB.query('delete from wf_compensation_versions where employee_id=$1',[employeeId]);
   await currentDB.query('insert into wf_compensation_versions values($1,$2,$3,$4,1)',[employeeId,employee.salary.basic_salary,JSON.stringify(employee.salary.allowances),employee.salary.effective_from]);
   await currentDB.query('update wf_monthly_payroll set basic_amount=$1,allowances_amount=$2,gross_amount=$3,deductions=$4 where employee_id=$5',[employee.payroll.basic_amount,employee.payroll.allowances_amount,employee.payroll.gross_amount,JSON.stringify(employee.payroll.deductions),employeeId]);

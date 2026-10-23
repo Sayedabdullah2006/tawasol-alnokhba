@@ -4,8 +4,8 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { employeeModules } from "@/lib/workforce/navigation";
 import PortalIcon from "@/components/layout/PortalIcon";
-export default function EmployeeNavigation() {
-  const pathname = usePathname();
+export default function EmployeeNavigation({ activePath }: { activePath?: string } = {}) {
+  const currentPath = usePathname(), pathname = activePath ?? currentPath;
   const [open, setOpen] = useState<string | null>(null);
   if (pathname === "/employee/unavailable") return null;
   const modules = [
@@ -36,7 +36,7 @@ export default function EmployeeNavigation() {
         {modules.map((module) => {
           const screens = module.screens.filter((s) => s.available);
           if (!screens.length) return null;
-          if (module.key === "work") screens.unshift({ path: "/employee", title: "لوحتي", purpose: "", related: [], available: true });
+          if (module.key === "performance") screens.unshift({ path: "/employee", title: "لوحة الأداء", purpose: "", related: [], available: true });
           if (module.key === "profile") {
             const finance = employeeModules.find((m) => m.key === "finance");
             for (const path of ["payslips", "commissions", "advances"]) {
@@ -45,9 +45,9 @@ export default function EmployeeNavigation() {
             }
           }
           const active = screens.some(
-            (s) => pathname === s.path || pathname.startsWith(s.path + "/"),
+            (s) => pathname === s.path || (s.path !== "/employee" && pathname.startsWith(s.path + "/")),
           );
-          const moduleActive = module.key === "work" ? pathname === "/employee" || pathname.startsWith("/employee/work/") : active;
+          const moduleActive = module.key === "work" ? pathname.startsWith("/employee/work/") : active;
           const style = "portal-launcher";
           const icon = module.key === "work" ? "tasks" : module.key;
           return screens.length === 1 ? (

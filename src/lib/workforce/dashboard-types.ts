@@ -24,6 +24,7 @@ export type AdminWorkDashboard = {
     metrics: WorkMetrics;
     attendance: TeamAttendance;
     performance: PerformanceSummary;
+    previewPayroll?: import("./payroll-attendance").PayrollCardData | null;
   }[];
   clients: string[];
   pendingSubmissions: { id: string; taskId: string; title: string; client: string; employeeName: string; createdAt: string }[];
