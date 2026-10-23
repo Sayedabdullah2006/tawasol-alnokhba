@@ -5,7 +5,7 @@ import { WorkforceError } from "@/lib/workforce/validation";
 
 export async function POST(request: Request) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor();
     const { currentPassword, newPassword, nonce } = await request.json();
     if (typeof currentPassword !== "string" || currentPassword.length < 1 || currentPassword.length > 128 || typeof newPassword !== "string" || newPassword.length < 12 || newPassword.length > 128 || newPassword === currentPassword || (nonce && (typeof nonce !== "string" || !/^\d{6,10}$/.test(nonce)))) throw new WorkforceError("أدخل كلمة المرور الحالية وكلمة جديدة مختلفة من 12 حرفًا على الأقل");

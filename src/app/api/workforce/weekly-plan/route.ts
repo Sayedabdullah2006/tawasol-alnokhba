@@ -9,7 +9,7 @@ import { uuid, WorkforceError } from "@/lib/workforce/validation";
 
 export async function POST(request: Request) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor();
     if (!actor.canManageTasks)
       throw new WorkforceError("ليس لديك صلاحية إسناد المهام", 403);

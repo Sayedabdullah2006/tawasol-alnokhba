@@ -34,7 +34,7 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor();
     const id = uuid((await context.params).id);
     requireEmployeeAccess(actor, id);

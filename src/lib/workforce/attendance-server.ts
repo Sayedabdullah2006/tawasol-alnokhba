@@ -37,7 +37,7 @@ export async function attendanceMonthSessions(db: WorkforceActor["db"], employee
   const from = new Date(`${start}T00:00:00+03:00`).toISOString();
   const until = new Date(`${next}T00:00:00+03:00`).toISOString();
   for (let offset = 0; ; offset += 500) {
-    const page = await db.from("wf_attendance_sessions").select("checked_in,checked_out,policy_version,cutoff_at,last_seen_at,next_confirmation_at,break_started_at,break_paid_until,unpaid_periods,credit_request_id")
+    const page = await db.from("wf_attendance_sessions").select("checked_in,checked_out,policy_version,cutoff_at,last_seen_at,next_confirmation_at,break_started_at,break_paid_until,unpaid_periods,credit_request_id,overtime_request_id")
       .eq("employee_id", employeeId).lt("checked_in", until)
       .or(`checked_out.gte.${from},checked_out.is.null`)
       .order("checked_in").order("id").range(offset, offset + 499);

@@ -13,7 +13,7 @@ import {
 } from "@/lib/workforce/validation";
 export async function POST(request: Request) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor();
     if (Number(request.headers.get("content-length") ?? 0) > 11 * 1024 * 1024)
       throw new WorkforceError("الحد الأقصى للملف 10 ميجابايت", 413);

@@ -165,7 +165,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   let path: string | undefined, id: string | undefined;
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor(),
       form = await attachmentForm(request, MAX_KNOWLEDGE_BYTES);
     const notification = knowledgeNotificationOptions(form);
@@ -268,7 +268,7 @@ export async function POST(request: Request) {
 }
 export async function PATCH(request: Request) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor(),
       body = await request.json();
     if (

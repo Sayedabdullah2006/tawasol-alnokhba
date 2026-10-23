@@ -242,7 +242,7 @@ export default function AttendanceHub({
                             {attendanceDuration(workedSeconds([row],0,Infinity,tick||Date.parse(data.summary.asOf))/60)}
                           </td>
                           <td className="p-4">
-                            {row.credit_request_id?'طلب ساعات مفقودة':row.close_reason ? CLOSE_REASONS[row.close_reason] : !row.checked_out
+                            {row.overtime_request_id?'خارج دوام معتمد':row.credit_request_id?'طلب ساعات مفقودة':row.close_reason ? CLOSE_REASONS[row.close_reason] : !row.checked_out
                               ? row.policy_version===1 && attendanceEnd(row,tick||Date.parse(data.summary.asOf))<(tick||Date.parse(data.summary.asOf)) ? "انصراف تلقائي" : "حضور مفتوح"
                               : row.source === "correction"
                                 ? "تم التصحيح"

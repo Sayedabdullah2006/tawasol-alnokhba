@@ -55,7 +55,7 @@ export async function GET(request: Request) {
 }
 export async function POST(request: Request) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor();
     if (!actor.employee)
       throw new WorkforceError("هذا الإجراء خاص بالموظف", 403);
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
 }
 export async function PATCH(request: Request) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor();
     requireAdmin(actor);
     const body = await request.json();

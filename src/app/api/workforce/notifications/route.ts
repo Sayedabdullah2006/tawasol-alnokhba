@@ -56,7 +56,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor();
     const body = await request.json();
     if (

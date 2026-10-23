@@ -68,7 +68,7 @@ export async function GET(request: Request, context: Context) {
 }
 export async function POST(request: Request, context: Context) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor();
     requireAdmin(actor);
     const id = uuid((await context.params).id);

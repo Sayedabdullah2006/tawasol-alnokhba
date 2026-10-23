@@ -1,4 +1,6 @@
 import { requireMedicalReport } from "@/lib/workforce/sick-leave";
+import { OFF_DUTY_REQUESTS } from "@/lib/workforce/action-access";
+import { requireWorkingAttendance } from "@/lib/workforce/server";
 import { missingHoursInput } from "@/lib/workforce/missing-hours";
 import { requestTestRun } from "@/lib/workforce/test-mode";
 import { createHash, randomUUID } from "node:crypto";
@@ -87,7 +89,7 @@ export async function GET(request: Request) {
 }
 export async function POST(request: Request) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor();
     if (!actor.employee)
       throw new WorkforceError("هذا الإجراء للموظفة فقط", 403);
@@ -99,6 +101,7 @@ export async function POST(request: Request) {
       throw new WorkforceError("اختر طلبًا إداريًا أثناء الاختبار", 400);
     if (!Object.hasOwn(REQUEST_KINDS, kind))
       throw new WorkforceError("نوع طلب غير صحيح");
+    if (!OFF_DUTY_REQUESTS.has(kind)) await requireWorkingAttendance(actor);
     const credit=kind==='missing-hours'?missingHoursInput(form.get('work_day'),form.get('hours')):{work_day:null,missing_minutes:null};
     const attendance_session_id = form.get("attendance_session_id")
       ? uuid(form.get("attendance_session_id"))
@@ -254,7 +257,7 @@ export async function POST(request: Request) {
 }
 export async function PATCH(request: Request) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor(),
       body = await request.json(),
       id = uuid(body.id);
@@ -273,6 +276,7 @@ export async function PATCH(request: Request) {
       .maybeSingle();
     if (visible.error) throw visible.error;
     if (!visible.data) throw new WorkforceError("الطلب غير متاح", 404);
+    if (!OFF_DUTY_REQUESTS.has(visible.data.kind)) await requireWorkingAttendance(actor);
     if (testRun && visible.data.test_run_id !== testRun)
       throw new WorkforceError(
         "هذا الطلب حقيقي. اخرج من وضع الاختبار للتعديل عليه",

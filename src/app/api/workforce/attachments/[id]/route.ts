@@ -52,7 +52,7 @@ export async function GET(request: Request, context: Context) {
 }
 export async function PATCH(request: Request, context: Context) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor(),
       id = uuid((await context.params).id);
     const body = await request.json();

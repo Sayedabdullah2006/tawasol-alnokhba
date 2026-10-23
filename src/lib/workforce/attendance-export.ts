@@ -10,7 +10,7 @@ export function attendanceExportPeriods(periods: AttendancePeriod[], summary: At
   const bounds = monthBounds(summary.month), from = Date.parse(`${summary.startsOn}T00:00:00+03:00`);
   const until = Math.min(Date.parse(`${bounds.next}T00:00:00+03:00`), Date.parse(summary.asOf));
   let previousEnd = from;
-  return [...periods].sort((a, b) => a.checked_in.localeCompare(b.checked_in)).map(period => {
+  return periods.filter(p=>!p.overtime_request_id).sort((a, b) => a.checked_in.localeCompare(b.checked_in)).map(period => {
     const start = Date.parse(period.checked_in);
     const end = Math.min(attendanceEnd(period,Date.parse(summary.asOf)), until);
     const seconds = workedSeconds([period],Math.max(start,from,previousEnd),until,Date.parse(summary.asOf));

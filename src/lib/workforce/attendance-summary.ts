@@ -3,6 +3,7 @@ export const DEFAULT_WORKDAYS = [0, 1, 2, 3, 4, 6];
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
 export type AttendancePeriod = { checked_in: string; checked_out: string | null;
+  overtime_request_id?: string | null;
   credit_request_id?: string | null;
   policy_version?: number; cutoff_at?: string | null; last_seen_at?: string | null;
   next_confirmation_at?: string | null; break_started_at?: string | null; break_paid_until?: string | null;
@@ -37,6 +38,7 @@ export function attendanceEnd(period: AttendancePeriod, now: number) {
   return end;
 }
 export function attendanceRanges(period: AttendancePeriod, now: number): number[][] {
+  if (period.overtime_request_id) return [];
   let ranges=[[Date.parse(period.checked_in),attendanceEnd(period,now)]];
   const exclusions=[...(period.unpaid_periods??[])];
   if(period.break_started_at && period.break_paid_until) exclusions.push({start:period.break_paid_until,end:new Date(now).toISOString()});
@@ -86,7 +88,7 @@ export function summarizeAttendance({ periods, startDate, month, now, dailyMinut
     monthlySeconds, todaySeconds, todayMinutes,
     approvedMissingMinutes: Math.floor(workedSeconds(periods.filter(p=>!!p.credit_request_id),from,until,now.getTime())/60),
     todayPeriods: periods.filter(period => {
-      if(period.credit_request_id)return false;
+      if(period.credit_request_id || period.overtime_request_id)return false;
       const start = Date.parse(period.checked_in), end = attendanceEnd(period,now.getTime());
       return end > Math.max(from, dayStart) && start < Math.min(until, dayStart + DAY, now.getTime());
     }).length,

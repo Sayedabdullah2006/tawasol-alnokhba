@@ -11,7 +11,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor();
     const body = await request.json();
     if (!body || !["save", "issue", "revoke", "company"].includes(body.command) || !Number.isSafeInteger(body.version) || body.version < 0) throw new WorkforceError("تحقق من الطلب");

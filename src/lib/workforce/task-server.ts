@@ -42,7 +42,7 @@ export async function workCommand(
     | "time",
 ) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor();
     const body: unknown = await request.json();
     if (!body || typeof body !== "object" || Array.isArray(body))

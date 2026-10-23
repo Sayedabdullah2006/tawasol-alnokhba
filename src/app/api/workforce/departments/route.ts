@@ -8,7 +8,7 @@ import {
 import { textField } from "@/lib/workforce/validation";
 export async function POST(request: Request) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     requireAdmin(await workforceActor());
     const body = await request.json();
     const service = await createServiceRoleClient();

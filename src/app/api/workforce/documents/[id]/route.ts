@@ -41,7 +41,7 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor();
     requireAdmin(actor);
     const { archived } = await request.json();

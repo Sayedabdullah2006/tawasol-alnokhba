@@ -21,7 +21,7 @@ export async function GET() {
 }
 export async function POST(request: Request) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor(),
       body = await request.json(),
       jar = await cookies();

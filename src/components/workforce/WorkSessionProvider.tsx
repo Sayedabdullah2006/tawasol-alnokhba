@@ -7,6 +7,7 @@ import {isFriday,type WorkSnapshot,type WorkCommand,type WorkInput} from "@/lib/
 import {paidHolidayAt} from '@/lib/workforce/calendar';
 import { CLOSE_REASONS } from "@/lib/workforce/work-session";
 import { attendanceDuration } from "@/lib/workforce/attendance-summary";
+import { attendanceExemptPath, OFF_DUTY_REQUESTS } from "@/lib/workforce/action-access";
 
 type Transport={read:()=>Promise<WorkSnapshot>;write:(input:WorkInput)=>Promise<WorkSnapshot>};
 const transport:Transport={read:()=>api("/api/workforce/work-session"),write:input=>api("/api/workforce/work-session",{method:"POST",body:JSON.stringify(input)})};
@@ -16,6 +17,7 @@ export const useWorkSession=()=>useContext(Context);
 export default function WorkSessionProvider({children,adapter=transport}:{children:ReactNode;adapter?:Transport}) {
  const [data,setData]=useState<WorkSnapshot|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(""),[clockOffset,setClockOffset]=useState(0);
  const latest=useRef(data),lock=useRef(false),retry=useRef<{signature:string;input:WorkInput}|null>(null);
+ const [blocked,setBlocked]=useState("");
  const router=useRouter();
  const accept=useCallback((snapshot:WorkSnapshot)=>{setClockOffset(Date.parse(snapshot.now)-Date.now());latest.current=snapshot;setData(snapshot);},[]);
  const command=useCallback(async(command:WorkCommand,extra:{task_id?:string;title?:string}={})=>{
@@ -23,6 +25,7 @@ export default function WorkSessionProvider({children,adapter=transport}:{childr
   const signature=JSON.stringify({command,session:latest.current?.session?.id??null,...extra});
   if(retry.current?.signature!==signature) retry.current={signature,input:{command,request_key:crypto.randomUUID(),session_id:latest.current?.session?.id??null,...extra}};
   try {const result=await adapter.write(retry.current.input);accept(result);setError("");retry.current=null;
+   if(result.session&&!result.session.break_started_at&&result.canControl!==false) setBlocked("");
    if(command!=="heartbeat") {window.dispatchEvent(new Event("workforce-data-changed"));router.refresh();}
    else if(!result.session) {window.dispatchEvent(new Event("workforce-data-changed"));router.refresh();}
   } catch(e){
@@ -51,7 +54,24 @@ export default function WorkSessionProvider({children,adapter=transport}:{childr
   const timer=setTimeout(()=>void command("heartbeat"),Math.max(0,deadline-Date.parse(data.now))+50);
   return()=>clearTimeout(timer);
  },[data,command]);
- return <Context.Provider value={{data,busy,error,command,clockOffset}}>{children}</Context.Provider>;
+ useEffect(()=>{
+  const attempt=(raw:Event)=>{
+   const event=raw as CustomEvent<{url:string;options:RequestInit;message:string}>;
+   const path=new URL(event.detail.url,window.location.origin).pathname;
+   if(!path.startsWith("/api/workforce/"))return;
+   if(attendanceExemptPath(path)){
+    if(path!=="/api/workforce/requests"||event.detail.options.method?.toUpperCase()!=="POST")return;
+    const form=event.detail.options.body;
+    if(form instanceof FormData&&OFF_DUTY_REQUESTS.has(String(form.get("kind"))))return;
+   }
+   const d=latest.current,s=d?.session,now=Date.now()+clockOffset;
+   const message=!d?"جارٍ التحقق من الحضور":!s?"سجلي الحضور لبدء العمل":d.canControl===false?"إجراءات العمل متاحة من جهاز تسجيل الحضور فقط":now>=Date.parse(s.cutoff_at??"")?"انتهت جلسة الدوام؛ سجلي الحضور مجددًا":s.break_started_at?"استأنفي العمل لإنهاء الاستراحة":now>=Date.parse(s.next_confirmation_at??"")?"أكدي استمرار العمل أولًا":"";
+   if(message){event.preventDefault();event.detail.message=message;setBlocked(message);}
+  };
+  window.addEventListener("workforce-action-attempt",attempt);
+  return()=>window.removeEventListener("workforce-action-attempt",attempt);
+ },[clockOffset]);
+ return <Context.Provider value={{data,busy,error,command,clockOffset}}>{children}{blocked&&<WorkConfirmation titleId="work-action-title"><h2 id="work-action-title" className="text-xl font-black">{blocked}</h2><div className="mt-5 flex flex-wrap justify-center gap-3">{data?.canControl!==false&&<button type="button" disabled={busy} className="rounded-xl bg-[#dcb969] px-5 py-3 font-bold text-[#0c2039]" onClick={()=>void command(!data?.session?"in":data.session.break_started_at?"resume":"confirm")}>{!data?.session?"تسجيل الحضور":data.session.break_started_at?"استئناف العمل":"تأكيد الاستمرار"}</button>}<button type="button" className="rounded-xl border border-white/30 px-5 py-3" onClick={()=>setBlocked("")}>متابعة المشاهدة</button></div>{error&&<p role="alert" className="mt-3 text-rose-200">{error}</p>}</WorkConfirmation>}</Context.Provider>;
 }
 
 export function WorkStartButton({taskId}:{taskId:string}){
@@ -61,10 +81,10 @@ export function WorkStartButton({taskId}:{taskId:string}){
  return <button type="button" title={!state.data?.session?"سجلي الحضور أولًا":state.data.canControl===false?"التحكم من جهاز الدوام":state.data.session.break_started_at?"استأنفي العمل أولًا":undefined} disabled={state.busy||state.data?.canControl===false||!state.data?.session||!!state.data?.session?.break_started_at||active===true||!eligible} onClick={()=>void state.command("task",{task_id:taskId})} className="rounded-xl border border-amber-200/40 bg-amber-200/15 px-4 py-2 text-xs font-bold disabled:opacity-45">{active?"تعملين عليها الآن":"بدء العمل"}</button>;
 }
 
-function WorkConfirmation({children}:{children:ReactNode}) {
+function WorkConfirmation({children,titleId="work-confirm-title"}:{children:ReactNode;titleId?:string}) {
  const dialog=useRef<HTMLDialogElement>(null);
  useEffect(()=>{dialog.current?.showModal();},[]);
- return <dialog ref={dialog} aria-labelledby="work-confirm-title" onCancel={e=>e.preventDefault()} className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-md rounded-3xl border border-amber-200/40 bg-[#10243c] p-7 text-center text-white shadow-2xl backdrop:bg-black/75">{children}</dialog>;
+ return <dialog ref={dialog} aria-labelledby={titleId} onCancel={e=>e.preventDefault()} className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-md rounded-3xl border border-amber-200/40 bg-[#10243c] p-7 text-center text-white shadow-2xl backdrop:bg-black/75">{children}</dialog>;
 }
 
 export function WorkSessionBar(){
@@ -76,13 +96,14 @@ export function WorkSessionBar(){
  if(!data)return <div className="mx-4 mb-4 rounded-2xl border border-white/15 p-4 text-sm" role={error?"alert":"status"}>{error||"جارٍ تحميل الدوام…"}</div>;
  const now=Math.max(Date.parse(data.now),tick?tick+state.clockOffset:0),session=data.session,segment=data.active;
  const afterHours=new Date(now).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Asia/Riyadh"})>="17:00";
+ const approvedOvertime=!!data.overtimeWindow&&now<Date.parse(data.overtimeWindow.ends_at);
  const holiday=data.paidHoliday??paidHolidayAt(now),dayOff=isFriday(now)||!!holiday,onBreak=!!session?.break_started_at;
  const due=!dayOff&&data.canControl!==false&&!!session?.next_confirmation_at && !onBreak && now>=Date.parse(session.next_confirmation_at);
  const remaining=onBreak?Math.max(0,(Date.parse(session!.break_paid_until!)-now)/60000):Math.max(0,30-data.breakUsedSeconds/60);
  const action="rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-bold transition hover:bg-white/20 disabled:opacity-40";
  return <section className="portal-panel mx-4 mb-5 rounded-3xl border border-white/15 bg-[#10243c]/95 p-4 shadow-xl sm:mx-6" aria-label="جلسة دوامي">
-  <div className="flex flex-wrap items-center justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2 text-xs font-bold"><span className={`h-2 w-2 rounded-full ${session?onBreak?"bg-amber-300":"bg-emerald-300":"bg-slate-400"}`}/>{dayOff?(holiday?`${holiday} · إجازة مدفوعة`:"الجمعة إجازة"):session?onBreak?"في استراحة":"الدوام جارٍ":data.lastSession?.close_reason?CLOSE_REASONS[data.lastSession.close_reason]:"ابدئي يومك"}{!dayOff&&<span className="mr-2 opacity-60">النهاية 5 مساءً</span>}</div>{!dayOff&&<p className="mt-2 truncate text-sm font-black">{session?segment?.title||"اختاري مهمتك التالية":"سجلي الحضور ثم اختاري المهمة"}</p>}</div>
-   <div className="flex flex-wrap gap-2">{!session?<button className={`${action} !bg-[#dcb969] !text-[#0c2039]`} disabled={busy||afterHours||dayOff} onClick={()=>void command("in")}>{!dayOff&&afterHours?"انتهى دوام اليوم":"تسجيل الحضور"}</button>:<>
+  <div className="flex flex-wrap items-center justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2 text-xs font-bold"><span className={`h-2 w-2 rounded-full ${session?onBreak?"bg-amber-300":"bg-emerald-300":"bg-slate-400"}`}/>{dayOff?(holiday?`${holiday} · إجازة مدفوعة`:"الجمعة إجازة"):session?onBreak?"في استراحة":session.overtime_request_id?"خارج دوام معتمد":"الدوام جارٍ":data.lastSession?.close_reason?CLOSE_REASONS[data.lastSession.close_reason]:"خارج الدوام · للعرض فقط"}{!dayOff&&<span className="mr-2 opacity-60">{session?.overtime_request_id?"حتى نهاية الفترة المعتمدة":"النهاية 5 مساءً"}</span>}</div>{!dayOff&&<p className="mt-2 truncate text-sm font-black">{session?segment?.title||"اختاري مهمتك التالية":"سجلي الحضور ثم اختاري المهمة"}</p>}</div>
+   <div className="flex flex-wrap gap-2">{!session?<button className={`${action} !bg-[#dcb969] !text-[#0c2039]`} disabled={busy||(afterHours&&!approvedOvertime)||dayOff} onClick={()=>void command("in")}>{!dayOff&&afterHours&&!approvedOvertime?"انتهى دوام اليوم":approvedOvertime?"تسجيل حضور خارج الدوام":"تسجيل الحضور"}</button>:<>
     {data.canControl===false?<span className="text-xs text-amber-200">التحكم من جهاز الدوام</span>:<><button className={action} disabled={busy||dayOff} onClick={()=>void command(onBreak?"resume":"break")}>{onBreak?"استئناف العمل":"استراحة"}</button>
     <button className={action} disabled={busy||dayOff} onClick={()=>void command("out")}>تسجيل الانصراف</button>
     <button className={action} aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}> {expanded?"طي":"المهمة والنشاط"} </button></>}

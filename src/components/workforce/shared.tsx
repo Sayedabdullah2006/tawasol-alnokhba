@@ -109,6 +109,10 @@ export function Dialog({
   );
 }
 export async function api<T>(url: string, options?: RequestInit): Promise<T> {
+  if (typeof window !== "undefined" && options?.method && !["GET","HEAD"].includes(options.method.toUpperCase())) {
+    const attempt = new CustomEvent("workforce-action-attempt", {cancelable:true,detail:{url,options,message:""}});
+    if (!window.dispatchEvent(attempt)) throw new Error(attempt.detail.message || "سجلي الحضور لبدء العمل");
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30000);
   const forwardAbort = () => controller.abort();

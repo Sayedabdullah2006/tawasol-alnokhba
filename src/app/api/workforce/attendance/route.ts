@@ -135,7 +135,7 @@ export async function GET(request: Request) {
 export { POST } from "../work-session/route";
 export async function PATCH(request: Request) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor();
     requireAdmin(actor);
     const body = await request.json(),

@@ -4,6 +4,14 @@ import { workforceActor, assertMutation, apiError, createServiceRoleClient, requ
 import { privateResponse } from "@/lib/workforce/task-server";
 import { uuid, WorkforceError } from "@/lib/workforce/validation";
 
+async function overtimeWindow(actor: Awaited<ReturnType<typeof workforceActor>>) {
+  if (!actor.employee) return null;
+  const now = new Date().toISOString();
+  const result = await actor.db.from("wf_employee_requests").select("ends_at").eq("employee_id",actor.employee.id).eq("kind","overtime").eq("status","approved").is("test_run_id",null).lte("starts_at",now).gt("ends_at",now).order("starts_at").limit(1).maybeSingle();
+  if (result.error) throw result.error;
+  return result.data;
+}
+
 export async function GET(request: Request) {
   try {
     const actor=await workforceActor();
@@ -19,12 +27,12 @@ export async function GET(request: Request) {
       if(owner.error)throw owner.error;
       canControl=owner.data?.device_hash===createHash("sha256").update(device).digest("hex");
     }
-    return privateResponse({...result.data,canControl});
+    return privateResponse({...result.data,canControl,overtimeWindow:await overtimeWindow(actor)});
   } catch(error) { return apiError(error); }
 }
 export async function POST(request: Request) {
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor=await workforceActor();
     if(!actor.employee) throw new WorkforceError("تسجيل الدوام من حساب الموظفة فقط",403);
     const body=await request.json();
@@ -46,6 +54,6 @@ export async function POST(request: Request) {
       p_task:body.task_id?uuid(body.task_id):null,p_title:title,
     });
     if(result.error) throw result.error;
-    return privateResponse({...result.data,canControl:true});
+    return privateResponse({...result.data,canControl:true,overtimeWindow:await overtimeWindow(actor)});
   } catch(error) {return apiError(error);}
 }

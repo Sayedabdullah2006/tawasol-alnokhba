@@ -72,7 +72,7 @@ export async function POST(request: Request, context: Context) {
   let uploadedPath: string | undefined;
   let attachmentId: string | undefined;
   try {
-    assertMutation(request);
+    await assertMutation(request);
     const actor = await workforceActor(),
       taskId = uuid((await context.params).id);
     await requireTestTask(actor, await requestTestRun(request, actor), taskId);

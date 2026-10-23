@@ -10,7 +10,7 @@ const budgets=new Map<string,{until:number;count:number;busy:boolean}>();
 export async function POST(request:Request){
  let release:(()=>void)|undefined;
  try{
-  assertMutation(request);const actor=await workforceActor();
+  await assertMutation(request);const actor=await workforceActor();
   if(Number(request.headers.get('content-length')??0)>3000)throw new WorkforceError('عنوان المهمة طويل');
   const input=await request.json();
   if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>k!=='title'))throw new WorkforceError('أدخل عنوان المهمة فقط');

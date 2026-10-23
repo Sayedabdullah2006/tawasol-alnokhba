@@ -1,4 +1,7 @@
 import "server-only";
+import { cookies } from "next/headers";
+import { createHash } from "node:crypto";
+import { attendanceExemptPath, type ActionAccess } from "./action-access";
 import { cache } from "react";
 import { employeeRecords } from "./employee-records";
 import {
@@ -64,7 +67,7 @@ export function requireEmployeeAccess(
   if (actor.role !== "admin" && actor.employee?.id !== employeeId)
     throw new WorkforceError("الملف غير متاح", 404);
 }
-export function assertMutation(request: Request) {
+export async function assertMutation(request: Request) {
   const inTestMode =
     request.headers.has("x-workforce-test-run") ||
     /(?:^|;\s*)wf_test_run=/.test(request.headers.get("cookie") || "");
@@ -79,7 +82,10 @@ export function assertMutation(request: Request) {
       409,
     );
   const origin = request.headers.get("origin");
-  if (!origin) return;
+  if (!origin) {
+    await assertAttendanceMutation(request);
+    return;
+  }
   // Railway terminates TLS before Next. Validate against our configured public
   // origin rather than the internal request scheme or untrusted forwarded headers.
   const configured = process.env.NEXT_PUBLIC_SITE_URL;
@@ -91,6 +97,22 @@ export function assertMutation(request: Request) {
     origin === new URL(request.url).origin;
   if (origin !== expected && !development)
     throw new WorkforceError("مصدر الطلب غير مسموح", 403);
+  await assertAttendanceMutation(request);
+}
+async function assertAttendanceMutation(request: Request) {
+  if (!attendanceExemptPath(new URL(request.url).pathname))
+    await requireWorkingAttendance(await workforceActor());
+}
+export async function requireWorkingAttendance(actor: WorkforceActor) {
+  if (actor.role === "admin") return;
+  const service = await createServiceRoleClient();
+  const {data,error} = await service.rpc("wf_work_action_access", {p_actor:actor.user.id});
+  if (error) throw error;
+  const access = data as ActionAccess;
+  if (!access?.allowed) throw new WorkforceError(access?.reason || "سجلي الحضور لبدء العمل",409);
+  const device = (await cookies()).get("wf_work_device")?.value;
+  if (!device || !access.deviceHash || createHash("sha256").update(device).digest("hex") !== access.deviceHash)
+    throw new WorkforceError("إجراءات العمل متاحة من جهاز تسجيل الحضور فقط",409);
 }
 export function apiError(error: unknown) {
   if (error instanceof SyntaxError)
