@@ -70,7 +70,7 @@ export function assertMutation(request: Request) {
     /(?:^|;\s*)wf_test_run=/.test(request.headers.get("cookie") || "");
   if (
     inTestMode &&
-    !/^\/api\/workforce\/(?:test-mode|journeys|notifications|requests|tasks(?:\/[0-9a-f-]+\/(?:attachments|performance))?|checklist|comments|time|members|attachments\/[0-9a-f-]+)$/i.test(
+    !/^\/api\/workforce\/(?:test-mode|journeys|notifications|requests|tasks(?:\/suggest|\/[0-9a-f-]+\/(?:attachments|performance))?|checklist|comments|time|members|attachments\/[0-9a-f-]+)$/i.test(
       new URL(request.url).pathname,
     )
   )

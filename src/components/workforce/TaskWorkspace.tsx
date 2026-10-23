@@ -600,6 +600,7 @@ export default function TaskWorkspace({
           }}
         >
           <TaskFields
+            autoFill
             value={task}
             onChange={setTask}
             admin={admin}

@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, useRef } from "react";
 import { TASK_PRIORITIES, type WorkTask } from "@/lib/workforce/task-types";
 import { api, controlClass, Field, Notice } from "./shared";
 import DateRangePicker from "./DateRangePicker";
 import { dateField } from "@/lib/workforce/validation";
+import {applyTaskSuggestion,undoTaskSuggestion,type TaskSuggestion} from "@/lib/workforce/task-suggestion";
 import Button from "@/components/ui/Button";
 
 export type TaskForm = {
@@ -180,30 +181,47 @@ export default function TaskFields({
   onChange,
   admin,
   canAssign = admin,
+  autoFill = false,
+  suggest,
 }: {
   value: TaskForm;
   onChange: (value: TaskForm) => void;
   admin: boolean;
   canAssign?: boolean;
+  autoFill?: boolean;
+  suggest?: (title:string)=>Promise<TaskSuggestion>;
 }) {
+  const current=useRef(value),pending=useRef<AbortController|null>(null);
+  useEffect(()=>{current.current=value;},[value]);
+  const [filling,setFilling]=useState(false),[fillError,setFillError]=useState(""),[undo,setUndo]=useState<{before:TaskForm;after:TaskForm}|null>(null);
+  useEffect(()=>()=>pending.current?.abort(),[]);
+  async function fill(){
+    if(pending.current||value.title.trim().length<2)return;
+    const controller=new AbortController();pending.current=controller;const before=current.current;setFilling(true);setFillError("");
+    try{const result=suggest?await suggest(before.title):await api<TaskSuggestion>("/api/workforce/tasks/suggest",{method:"POST",body:JSON.stringify({title:before.title}),signal:controller.signal});if(controller.signal.aborted)return;const after=applyTaskSuggestion(current.current,before,result,canAssign);onChange(after);setUndo({before:current.current,after});}
+    catch(error){if(!controller.signal.aborted)setFillError((error as Error).message);}
+    finally{if(pending.current===controller)pending.current=null;if(!controller.signal.aborted)setFilling(false);}
+  }
   const change = (patch: Partial<TaskForm>) => onChange({ ...value, ...patch });
   return (
     <div className="space-y-4">
       <Field label="عنوان المهمة" id="task-title">
-        <input
+        <div className="relative"><input
           id="task-title"
           required
           minLength={2}
           maxLength={250}
-          className={controlClass}
+          className={`${controlClass} ${autoFill?"pl-14":""}`}
           value={value.title}
           onChange={(e) => change({ title: e.target.value })}
-        />
+        />{autoFill&&<button type="button" aria-label={filling?"جارٍ تعبئة المهمة":"تعبئة تلقائية بالذكاء الاصطناعي"} title="تعبئة تلقائية بالذكاء الاصطناعي" disabled={filling||value.title.trim().length<2} onClick={()=>void fill()} className="absolute left-2 top-2 flex h-9 w-9 items-center justify-center rounded-xl border border-amber-300/50 bg-amber-100 text-[#102b57] transition hover:bg-amber-200 disabled:cursor-default disabled:opacity-40"><svg aria-hidden="true" className={filling?"h-5 w-5 animate-spin":"h-5 w-5"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Z"/><path d="m20 2 .6 1.4L22 4l-1.4.6L20 6l-.6-1.4L18 4l1.4-.6L20 2Z"/></svg></button>}</div>
+        {fillError&&<Notice message={fillError} error/>}
+        {undo&&<div className="flex items-center justify-between text-xs"><span role="status">تمت تعبئة الحقول الفارغة</span><button type="button" className="font-bold underline" onClick={()=>{onChange(undoTaskSuggestion(current.current,undo.before,undo.after));setUndo(null);}}>تراجع</button></div>}
       </Field>
       <Field label="تفاصيل المهمة" id="task-description">
         <textarea
           id="task-description"
-          rows={2}
+          rows={autoFill&&value.description?3:2}
           maxLength={30000}
           className={controlClass}
           value={value.description}
@@ -213,7 +231,7 @@ export default function TaskFields({
       <Field label="المطلوب تسليمه" id="task-criteria">
         <textarea
           id="task-criteria"
-          rows={2}
+          rows={autoFill&&value.completion_criteria?4:2}
           maxLength={10000}
           className={controlClass}
           value={value.completion_criteria}
