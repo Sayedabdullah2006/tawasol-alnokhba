@@ -1,4 +1,5 @@
 import { requireMedicalReport } from "@/lib/workforce/sick-leave";
+import { missingHoursInput } from "@/lib/workforce/missing-hours";
 import { requestTestRun } from "@/lib/workforce/test-mode";
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
     let query = actor.db
       .from("wf_employee_requests")
       .select(
-        "id,employee_id,kind,title,body,starts_at,ends_at,amount,overtime_details,expense_details,attendance_session_id,leave_type,attachments,status,decision_reason,decided_at,created_at,version",
+        "id,employee_id,kind,title,body,starts_at,ends_at,work_day,missing_minutes,amount,overtime_details,expense_details,attendance_session_id,leave_type,attachments,status,decision_reason,decided_at,created_at,version",
         { count: "exact" },
       )
       .order("created_at", { ascending: false })
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
       throw new WorkforceError("اختر طلبًا إداريًا أثناء الاختبار", 400);
     if (!Object.hasOwn(REQUEST_KINDS, kind))
       throw new WorkforceError("نوع طلب غير صحيح");
+    const credit=kind==='missing-hours'?missingHoursInput(form.get('work_day'),form.get('hours')):{work_day:null,missing_minutes:null};
     const attendance_session_id = form.get("attendance_session_id")
       ? uuid(form.get("attendance_session_id"))
       : null;
@@ -162,6 +164,7 @@ export async function POST(request: Request) {
       .update(
         JSON.stringify({
           kind,
+          ...credit,
           attendance_session_id,
           leave_type,
           title,
@@ -228,6 +231,7 @@ export async function POST(request: Request) {
         test_run_id: testRun,
         kind,
         title,
+        ...credit,
         body,
         starts_at,
         ends_at,

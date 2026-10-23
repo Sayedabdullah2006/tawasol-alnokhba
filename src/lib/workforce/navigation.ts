@@ -58,6 +58,7 @@ const screen = (
       "requests/expenses",
       "requests/advance",
       "requests/attendance-correction",
+      "requests/missing-hours",
       "requests/letter",
       "requests/payroll-review",
     ].includes(path),
@@ -268,6 +269,7 @@ export const employeeModules: EmployeeModule[] = [
         "السجل المراد تصحيحه والقيمة المقترحة وسبب التعديل.",
         ["attendance/overview"],
       ),
+      screen("requests/missing-hours","تسجيل ساعات مفقودة","",["attendance/overview"]),
       screen(
         "requests/letter",
         "طلب خطاب أو شهادة",

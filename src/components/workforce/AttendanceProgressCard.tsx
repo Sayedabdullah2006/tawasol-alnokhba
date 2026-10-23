@@ -35,6 +35,7 @@ export default function AttendanceProgressCard({ summary, open, leaveDays,leave,
       <div className="attendance-stat rounded-2xl border border-sky-200/40 bg-white/40 p-3"><p className="text-xs opacity-75">المستهدف</p><strong className="mt-2 block text-lg tabular-nums">{attendanceDuration(live.targetMinutes)}</strong></div>
     </div>
     {live.paidHolidayMinutes>0&&<p className="mt-3 text-xs font-bold">إجازات رسمية مدفوعة · {attendanceDuration(live.paidHolidayMinutes)}</p>}
+    {live.approvedMissingMinutes>0&&<p className="mt-2 text-xs font-bold">منها ساعات مفقودة معتمدة · {attendanceDuration(live.approvedMissingMinutes)}</p>}
     {!!live.extraMinutes && <p className="mt-3 text-sm font-bold text-emerald-700">إضافي: {attendanceDuration(live.extraMinutes)}</p>}
     <div className={`attendance-stat my-4 rounded-2xl border border-sky-200/40 bg-white/40 ${compact?"p-3":"p-4"}`}>
       <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-black">اليوم</h3><span className={`inline-flex items-center gap-2 rounded-full px-2 py-1 text-[11px] font-bold ${live.isPresent ? "bg-emerald-100 text-emerald-900" : "bg-sky-100 text-sky-900"}`}>{live.isPresent && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}{status}</span></div>

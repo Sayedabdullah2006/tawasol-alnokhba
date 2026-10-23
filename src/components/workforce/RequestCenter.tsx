@@ -36,6 +36,8 @@ const initialForm = (kind = "general") => ({
   amount: "",
   leave_type: "paid",
   attendance_session_id: "",
+  work_day: "",
+  hours: "",
 });
 export default function RequestCenter({
   admin = false,
@@ -309,6 +311,7 @@ export default function RequestCenter({
                   </span>
                 </div>
                 <h2 className="font-black">{row.title}</h2>
+                {row.kind==='missing-hours'&&<p className="text-sm font-bold">{row.work_day} · {Number((row.missing_minutes??0)/60).toLocaleString('ar-SA')} ساعة</p>}
                 <p className="whitespace-pre-wrap break-words text-sm leading-7">
                   {row.body}
                 </p>
@@ -584,7 +587,7 @@ export default function RequestCenter({
                   )
                     ? [attendance.open]
                     : []),
-                  ...(attendance?.sessions || []),
+                  ...(attendance?.sessions || []).filter(row=>!row.credit_request_id),
                 ].map((row) => (
                   <option key={row.id} value={row.id}>
                     {row.business_date} ·{" "}
@@ -599,6 +602,10 @@ export default function RequestCenter({
             </Field>
           )}
           {form.kind==='overtime'&&<OvertimePeriod startsAt={form.starts_at} endsAt={form.ends_at} onChange={v=>setForm(p=>({...p,...v}))}/>}
+          {form.kind==='missing-hours'&&<div className="grid gap-3 sm:grid-cols-2">
+            <Field id="request-work-day" label="اليوم"><input id="request-work-day" type="date" required className={controlClass} value={form.work_day} onChange={e=>setForm(p=>({...p,work_day:e.target.value}))}/></Field>
+            <Field id="request-hours" label="عدد الساعات"><input id="request-hours" type="number" required min="0.25" max="8" step="0.25" className={controlClass} value={form.hours} onChange={e=>setForm(p=>({...p,hours:e.target.value}))}/></Field>
+          </div>}
           {datedRequest(form.kind) && form.kind!=='overtime' && (
             <div className="grid gap-3 sm:grid-cols-2">
               {[

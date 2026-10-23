@@ -3,6 +3,7 @@ export const DEFAULT_WORKDAYS = [0, 1, 2, 3, 4, 6];
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
 export type AttendancePeriod = { checked_in: string; checked_out: string | null;
+  credit_request_id?: string | null;
   policy_version?: number; cutoff_at?: string | null; last_seen_at?: string | null;
   next_confirmation_at?: string | null; break_started_at?: string | null; break_paid_until?: string | null;
   unpaid_periods?: {start:string;end:string}[] };
@@ -83,7 +84,9 @@ export function summarizeAttendance({ periods, startDate, month, now, dailyMinut
     remainingMinutes: Math.max(0, targetMinutes - workedMinutes),
     extraMinutes: Math.max(0, workedMinutes - targetMinutes),
     monthlySeconds, todaySeconds, todayMinutes,
+    approvedMissingMinutes: Math.floor(workedSeconds(periods.filter(p=>!!p.credit_request_id),from,until,now.getTime())/60),
     todayPeriods: periods.filter(period => {
+      if(period.credit_request_id)return false;
       const start = Date.parse(period.checked_in), end = attendanceEnd(period,now.getTime());
       return end > Math.max(from, dayStart) && start < Math.min(until, dayStart + DAY, now.getTime());
     }).length,

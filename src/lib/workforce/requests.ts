@@ -8,6 +8,7 @@ export const REQUEST_KINDS = {
   letter: "خطاب أو شهادة",
   "payroll-review": "استفسار مالي",
   "attendance-correction": "تصحيح حضور",
+  "missing-hours": "تسجيل ساعات مفقودة",
   general: "طلب إداري",
 } as const;
 export const REQUEST_STATUS = {
@@ -41,6 +42,8 @@ export type EmployeeRequest = {
   amount: string | null;
   attendance_session_id?: string | null;
   leave_type?: string;
+  work_day?: string | null;
+  missing_minutes?: number | null;
   attachments: RequestFile[];
   status: keyof typeof REQUEST_STATUS;
   decision_reason: string | null;

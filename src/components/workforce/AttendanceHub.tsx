@@ -215,6 +215,7 @@ export default function AttendanceHub({
                       >
                         تصحيح حضور
                       </Link>
+                      <Link className="rounded-xl border px-4 py-3 text-sm font-bold" href="/employee/requests/missing-hours">تسجيل ساعات مفقودة</Link>
                     </div>
                   )}
                 </section>
@@ -235,13 +236,13 @@ export default function AttendanceHub({
                       {data.sessions.map((row) => (
                         <tr key={row.id} className="border-t">
                           <td className="p-4">{row.business_date}</td>
-                          <td className="p-4">{clock(row.checked_in)}</td>
-                          <td className="p-4">{clock(row.checked_out || (row.policy_version===1 && attendanceEnd(row,tick||Date.parse(data.summary.asOf))<(tick||Date.parse(data.summary.asOf))?new Date(attendanceEnd(row,tick||Date.parse(data.summary.asOf))).toISOString():null))}</td>
+                          <td className="p-4">{row.credit_request_id?'ساعات معتمدة':clock(row.checked_in)}</td>
+                          <td className="p-4">{row.credit_request_id?'—':clock(row.checked_out || (row.policy_version===1 && attendanceEnd(row,tick||Date.parse(data.summary.asOf))<(tick||Date.parse(data.summary.asOf))?new Date(attendanceEnd(row,tick||Date.parse(data.summary.asOf))).toISOString():null))}</td>
                           <td className="p-4">
                             {attendanceDuration(workedSeconds([row],0,Infinity,tick||Date.parse(data.summary.asOf))/60)}
                           </td>
                           <td className="p-4">
-                            {row.close_reason ? CLOSE_REASONS[row.close_reason] : !row.checked_out
+                            {row.credit_request_id?'طلب ساعات مفقودة':row.close_reason ? CLOSE_REASONS[row.close_reason] : !row.checked_out
                               ? row.policy_version===1 && attendanceEnd(row,tick||Date.parse(data.summary.asOf))<(tick||Date.parse(data.summary.asOf)) ? "انصراف تلقائي" : "حضور مفتوح"
                               : row.source === "correction"
                                 ? "تم التصحيح"
