@@ -2,6 +2,7 @@ import "server-only";
 import type { WorkforceActor } from "./server";
 import { monthBounds, riyadhDate, summarizeAttendance, type AttendancePeriod } from "./attendance-summary";
 import { WorkforceError } from "./validation";
+import {upcomingLeave,type ApprovedLeaveRow} from "./upcoming-leave";
 import {ATTENDANCE_COLUMNS} from "./attendance";
 
 export function attendanceMonth(value: string | null, now = new Date()) {
@@ -54,4 +55,14 @@ export async function attendanceCalendarDays(db:WorkforceActor["db"],months:stri
   if(result.error)throw result.error;
   days.push(...result.data);if(result.data.length<500)return days;
  }
+}
+
+/** Read only: ownership and approval predicates apply before pagination. */
+export async function employeeUpcomingLeave(db:WorkforceActor["db"],employeeId:string,startDate:string,today:string){
+ const from=new Date(Date.parse(`${today}T12:00:00Z`)-31*86400000).toISOString().slice(0,10);
+ const [calendar,requests]=await Promise.all([
+  (async()=>{const rows:{day:string;title:string}[]=[];for(let offset=0;;offset+=500){const r=await db.from("wf_paid_calendar_days").select("day,title").gte("day",from).order("day").range(offset,offset+499);if(r.error)throw r.error;rows.push(...r.data);if(r.data.length<500)return rows;}})(),
+  (async()=>{const rows:ApprovedLeaveRow[]=[];for(let offset=0;;offset+=500){const r=await db.from("wf_employee_requests").select("id,employee_id,title,kind,status,leave_type,starts_at,ends_at,test_run_id").eq("employee_id",employeeId).eq("kind","leave").eq("status","approved").is("test_run_id",null).gte("ends_at",`${today}T00:00:00+03:00`).order("starts_at").order("id").range(offset,offset+499);if(r.error)throw r.error;rows.push(...r.data);if(r.data.length<500)return rows;}})(),
+ ]);
+ return upcomingLeave({employeeId,startDate,today,calendar,requests});
 }

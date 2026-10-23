@@ -42,6 +42,7 @@ export type AttendanceData = {
     ends_at: string;
     leave_type: string;
   }[];
+  upcomingLeave?: import("./upcoming-leave").UpcomingLeave[];
   today: string;
   summary: AttendanceSummary;
 };

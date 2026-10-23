@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import UpcomingLeaveCard from "./UpcomingLeaveCard";
 import Button from "@/components/ui/Button";
 import { WORKDAYS, type AttendanceData } from "@/lib/workforce/attendance";
 import { attendanceDuration, liveAttendance, workedSeconds, attendanceEnd } from "@/lib/workforce/attendance-summary";
@@ -47,6 +48,7 @@ export default function AttendanceHub({
   const [tick, setTick] = useState(0);
   useEffect(() => { const timer = setInterval(() => setTick(Date.now()), 30000); return () => clearInterval(timer); }, []);
   const attendance = data?.summary ? liveAttendance(data.summary, data.open, tick) : null;
+  const approvedHistory=data?.approved.filter(row=>row.kind!=="leave"||new Date(row.ends_at).toLocaleDateString("en-CA",{timeZone:"Asia/Riyadh"})<data.today)??[];
   const [loadedKey, setLoadedKey] = useState("");
   const queryKey = `${employee}:${year}:${page}:${revision}`,
     loading = loadedKey !== queryKey;
@@ -57,8 +59,11 @@ export default function AttendanceHub({
     const refresh = () => {
       if (!editing && !busy) setRevision((n) => n + 1);
     };
+    const poll=()=>{if(document.visibilityState==="visible")refresh();};
     window.addEventListener("workforce-data-changed", refresh);
-    return () => window.removeEventListener("workforce-data-changed", refresh);
+    window.addEventListener("focus",refresh);
+    const timer=setInterval(poll,60000);
+    return () => {window.removeEventListener("workforce-data-changed",refresh);window.removeEventListener("focus",refresh);clearInterval(timer);};
   }, [editing, busy]);
   useEffect(() => {
     if (!admin) return;
@@ -185,6 +190,7 @@ export default function AttendanceHub({
       ) : (
         data && (
           <>
+            <UpcomingLeaveCard items={data.upcomingLeave??[]} />
             {tab === "overview" && (
               <>
                 <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-white p-5">
@@ -501,10 +507,10 @@ export default function AttendanceHub({
                 <h2 className="mb-4 font-bold">
                   {tab === "schedule"
                     ? "الاستثناءات المعتمدة"
-                    : "الإجازات المعتمدة"}
+                    : "إجازات سابقة"}
                 </h2>
                 <div className="space-y-3">
-                  {data.approved
+                  {approvedHistory
                     .filter(
                       (row) => tab !== "leave-balances" || row.kind === "leave",
                     )
@@ -534,7 +540,7 @@ export default function AttendanceHub({
                         </p>
                       </div>
                     ))}
-                  {!data.approved.some(
+                  {!approvedHistory.some(
                     (row) => tab !== "leave-balances" || row.kind === "leave",
                   ) && (
                     <p className="text-sm text-muted">لا توجد طلبات معتمدة</p>
