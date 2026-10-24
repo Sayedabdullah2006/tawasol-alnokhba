@@ -36,6 +36,9 @@ export async function createMeetingsDB(){
  await db.exec(await migration('20261024210850_recurring_meeting_occurrences'));
  await db.exec('create table workforce_private.notification_email_routes(user_id uuid primary key,email text);grant select on workforce_private.notification_email_routes to service_role;');
  await db.exec(await migration('20261024212117_meeting_invitation_email_routes'));
+ await db.exec(await migration('20261024221618_meeting_invitee_permissions'));
+ // Production service_role cannot SELECT auth.users directly.
+ await db.exec('revoke select on auth.users from service_role;');
  await db.exec('grant select,insert,update,delete on all tables in schema public to service_role;set role service_role;');
  return db;
 }

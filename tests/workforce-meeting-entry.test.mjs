@@ -5,6 +5,16 @@ import {createMeetingsDB,meetingPresence,meetingCommand,meetingData,scheduled} f
 import {ids,command,device} from './helpers/work-session-db.mjs';
 import {renderWorkforceEmail} from '../supabase/functions/_shared/workforce-email.ts';
 const id='10000000-0000-4000-8000-000000000001';
+test('meeting invitees resolve with production auth permissions; anonymous and staff roles cannot call the private resolver',async()=>{
+ const db=await createMeetingsDB();try{
+  await assert.rejects(()=>db.query('select email from auth.users'));
+  const meeting=await scheduled(db,meetingData({participant_ids:[ids.noor]}));
+  const resolved=(await db.query('select workforce_private.meeting_invitee_emails($1,$2) v',[ids.admin,meeting])).rows[0].v;
+  assert.deepEqual(resolved,[ids.noor+'@example.com']);
+  await assert.rejects(()=>db.query('select workforce_private.meeting_invitee_emails($1,$2)',[ids.monwa,meeting]));
+  for(const role of ['anon','authenticated']){await db.exec('reset role;set role '+role);await assert.rejects(()=>db.query('select workforce_private.meeting_invitee_emails($1,$2)',[ids.admin,meeting]));}
+ }finally{await db.close();}
+});
 test('reminder email opens the meeting in the site and states the device requirement, without rendering a direct Meet action',()=>{
  for(const role of ['admin','employee']){const result=renderWorkforceEmail({email:'fixture@example.com',name:'مشاركة',kind:'meeting_reminder',title:'تذكير باجتماع قادم',body:'مراجعة الخطة',href:meetingPortalPath(id,role),createdAt:'2026-10-25T08:45:00+03:00'});
   assert.ok(result.text.includes('نفس جهاز ومتصفح تسجيل الحضور'));assert.ok(result.text.includes('فتح الاجتماع والانضمام من الموقع'));
@@ -17,7 +27,7 @@ test('director invitations use delivery email without changing login or staff ad
   const meeting=await scheduled(db);const p=await meetingCommand(db,meeting,1,'prepare');
   assert.ok(p.emails.includes('elitecnnct@gmail.com'));assert.ok(!p.emails.includes(ids.admin+'@example.com'));
   assert.ok(p.emails.includes(ids.noor+'@example.com'));assert.ok(p.emails.includes(ids.monwa+'@example.com'));
-  assert.equal((await db.query('select email from auth.users where id=$1',[ids.admin])).rows[0].email,ids.admin+'@example.com');
+  await assert.rejects(()=>db.query('select email from auth.users where id=$1',[ids.admin]));
   // Finish or fail the lease locally only; nothing is sent to a real provider.
   await meetingCommand(db,meeting,1,'fail',{lease:p.lease});
  }finally{await db.close();}
