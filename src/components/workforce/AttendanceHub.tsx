@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {leaveTypeLabel} from "@/lib/workforce/sick-leave";
 import UpcomingLeaveCard from "./UpcomingLeaveCard";
+import { WorkSessionBar } from "./WorkSessionProvider";
 import Button from "@/components/ui/Button";
 import { WORKDAYS, type AttendanceData } from "@/lib/workforce/attendance";
 import { attendanceDuration, liveAttendance, workedSeconds, attendanceEnd } from "@/lib/workforce/attendance-summary";
@@ -186,6 +187,7 @@ export default function AttendanceHub({
       )}
       <Notice message={error} error />
       <Notice message={message} />
+      {!admin && tab === "overview" && <WorkSessionBar embedded />}
       {loading && !data ? (
         <p role="status">جارٍ التحميل…</p>
       ) : (

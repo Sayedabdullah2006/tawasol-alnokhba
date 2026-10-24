@@ -92,7 +92,7 @@ function WorkConfirmation({children,titleId="work-confirm-title"}:{children:Reac
  return <dialog ref={dialog} aria-labelledby={titleId} onCancel={e=>e.preventDefault()} className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-md rounded-3xl border border-amber-200/40 bg-[#10243c] p-7 text-center text-white shadow-2xl backdrop:bg-black/75">{children}</dialog>;
 }
 
-export function WorkSessionBar(){
+export function WorkSessionBar({embedded=false}:{embedded?:boolean}={}){
  const state=useWorkSession();
  const [expanded,setExpanded]=useState(false),[task,setTask]=useState(""),[activity,setActivity]=useState(""),[tick,setTick]=useState(0);
  useEffect(()=>{const timer=setInterval(()=>setTick(Date.now()),1000);return()=>clearInterval(timer)},[]);
@@ -106,7 +106,7 @@ export function WorkSessionBar(){
  const due=!dayOff&&data.canControl!==false&&!!session?.next_confirmation_at && !onBreak && now>=Date.parse(session.next_confirmation_at);
  const remaining=onBreak?Math.max(0,(Date.parse(session!.break_paid_until!)-now)/60000):Math.max(0,30-data.breakUsedSeconds/60);
  const action="rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-bold transition hover:bg-white/20 disabled:opacity-40";
- return <section className="portal-panel mx-4 mb-5 rounded-3xl border border-white/15 bg-[#10243c]/95 p-4 shadow-xl sm:mx-6" aria-label="جلسة دوامي">
+ return <section className={`portal-panel rounded-3xl border border-white/15 bg-[#10243c]/95 p-4 shadow-xl ${embedded?"":"mx-4 mb-5 sm:mx-6"}`} aria-label="جلسة دوامي">
   <div className="flex flex-wrap items-center justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2 text-xs font-bold"><span className={`h-2 w-2 rounded-full ${session?onBreak?"bg-amber-300":"bg-emerald-300":"bg-slate-400"}`}/>{dayOff?(holiday?`${holiday} · إجازة مدفوعة`:"الجمعة إجازة"):session?onBreak?"في استراحة":session.overtime_request_id?"خارج دوام معتمد":"الدوام جارٍ":data.lastSession?.close_reason?data.lastSession.overtime_request_id&&data.lastSession.close_reason==="day_end"?"انتهت فترة خارج الدوام":CLOSE_REASONS[data.lastSession.close_reason]:"خارج الدوام · للعرض فقط"}{!dayOff&&<span className="mr-2 opacity-60">{session?.overtime_request_id||approvedOvertime?`حتى ${new Date(session?.cutoff_at??data.overtimeWindow!.ends_at).toLocaleTimeString("ar-SA",{timeZone:"Asia/Riyadh",hour:"2-digit",minute:"2-digit"})}`:"النهاية 5 مساءً"}</span>}</div>{!dayOff&&<p className="mt-2 truncate text-sm font-black">{session?segment?.title||"اختاري مهمتك التالية":"سجلي الحضور ثم اختاري المهمة"}</p>}</div>
    <div className="flex flex-wrap gap-2">{!session?<button className={`${action} !bg-[#dcb969] !text-[#0c2039]`} disabled={busy||(afterHours&&!approvedOvertime)||dayOff} onClick={()=>void command("in")}>{!dayOff&&afterHours&&!approvedOvertime?"انتهى دوام اليوم":approvedOvertime?"تسجيل حضور خارج الدوام":"تسجيل الحضور"}</button>:<>
     {data.canControl===false?<span className="text-xs text-amber-200">التحكم من جهاز الدوام</span>:<><button className={action} disabled={busy||dayOff} onClick={()=>void command(onBreak?"resume":"break")}>{onBreak?"استئناف العمل":"استراحة"}</button>

@@ -15,6 +15,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   if (pathname.startsWith("/card/")) return <>{children}</>;
   const employee =
     pathname === "/employee" || pathname.startsWith("/employee/");
+  const attendanceOverview = pathname === "/employee/attendance" || pathname === "/employee/attendance/overview";
   const workforceAdmin =
     pathname === "/admin/workforce" || pathname.startsWith("/admin/workforce/");
 
@@ -26,7 +27,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           id="workspace-main"
           className="flex min-w-0 flex-1 flex-col pt-[132px] sm:pt-24"
         >
-          {employee ? <WorkSessionProvider><WorkSessionBar />{children}</WorkSessionProvider> : children}
+          {employee ? <WorkSessionProvider>{!attendanceOverview && <WorkSessionBar />}{children}</WorkSessionProvider> : children}
         </main>
         <footer className="px-5 pb-24 pt-6 text-center text-xs text-muted md:pb-6">
           تواصل النخبة · {employee ? "بوابة الموظف" : "إدارة فريق العمل"}
