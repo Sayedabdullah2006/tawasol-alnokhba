@@ -34,6 +34,8 @@ export async function createMeetingsDB(){
  await db.exec(await migration('20261024061024_six_pm_attendance_cutoff'));
  await db.exec(await migration('20261024203340_workforce_meetings'));
  await db.exec(await migration('20261024210850_recurring_meeting_occurrences'));
+ await db.exec('create table workforce_private.notification_email_routes(user_id uuid primary key,email text);grant select on workforce_private.notification_email_routes to service_role;');
+ await db.exec(await migration('20261024212117_meeting_invitation_email_routes'));
  await db.exec('grant select,insert,update,delete on all tables in schema public to service_role;set role service_role;');
  return db;
 }

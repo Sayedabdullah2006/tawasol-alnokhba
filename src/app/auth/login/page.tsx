@@ -9,6 +9,7 @@ import Button from '@/components/ui/Button'
 import TurnstileWidget from '@/components/ui/TurnstileWidget'
 import { turnstileEnabled } from '@/lib/turnstile'
 import { beginPortalVisit } from '@/lib/portal-wallpaper'
+import { portalLoginDestination } from '@/lib/portal-login'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -35,8 +36,7 @@ export default function LoginPage() {
     beginPortalVisit()
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).single()
     const nextParam = new URLSearchParams(window.location.search).get('next')
-    const safeNext = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : null
-    router.push(profile?.role === 'admin' ? (safeNext?.startsWith('/admin') ? safeNext : '/admin') : profile?.role === 'employee' ? '/employee' : (safeNext ?? '/dashboard'))
+    router.push(portalLoginDestination(profile?.role,nextParam))
     router.refresh()
   }
 

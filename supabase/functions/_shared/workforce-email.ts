@@ -127,6 +127,7 @@ const nextAction: Record<string, string> = {
   attendance_missing_admin: "مراجعة حضور الموظفة أو طلبات إجازتها.",
   approval_reminder: "مراجعة العناصر المعلقة واتخاذ القرار.",
   welcome: "أهلًا بكِ في تواصل النخبة. ابدئي من لوحتكِ.",
+  meeting_reminder: "افتحي الاجتماع من الموقع، ثم انضمي من نفس جهاز ومتصفح تسجيل الحضور لتفعيل حماية جلسة الدوام.",
 };
 export function renderWorkforceEmail(mail: WorkforceMail) {
   if (mail.kind === "weekly_report" && !mail.weeklyReport) throw new Error("Weekly report snapshot missing");
@@ -157,6 +158,7 @@ export function renderWorkforceEmail(mail: WorkforceMail) {
   const admin = mail.href.startsWith("/admin/workforce");
   const label = ["employee_request", "profile_request"].includes(mail.kind)
     ? admin ? "مراجعة الطلب" : "عرض الطلب"
+    : mail.kind === "meeting_reminder" ? "فتح الاجتماع والانضمام من الموقع"
     : mail.kind.startsWith("attendance_") ? "عرض الحضور"
     : ["payroll", "compensation"].includes(mail.kind) ? "عرض المستحقات"
     : mail.kind === "knowledge_file" ? "فتح الملف في مركز المعرفة" : isTask

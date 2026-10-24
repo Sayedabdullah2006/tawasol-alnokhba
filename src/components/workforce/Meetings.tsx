@@ -30,7 +30,7 @@ export function MeetingCard({meeting:m,data,onChange,preview=false,onEdit,onSync
   {protectedMeeting&&<p className="rounded-xl bg-emerald-300/10 p-3 text-xs font-bold text-emerald-200">في اجتماع · الدوام محمي حتى {new Date(work!.data!.session!.meeting_until!).toLocaleTimeString('ar-SA',{timeZone:'Asia/Riyadh',hour:'2-digit',minute:'2-digit'})}</p>}
   <Notice message={error||m.sync_error||''} error/>
   <div className="mt-auto flex flex-wrap gap-2">
-   {m.status==='scheduled'&&participating&&<Button size="sm" disabled={preview||busy||!m.meet_url||!inWindow||work?.data?.canControl===false} title={!inWindow?'متاح خلال موعد الاجتماع':undefined} onClick={()=>void presence('join')}>الانضمام للاجتماع ↗</Button>}
+   {m.status==='scheduled'&&participating&&<Button size="sm" disabled={preview||busy||!m.meet_url||!inWindow||work?.data?.canControl===false} title={!inWindow?'متاح خلال موعد الاجتماع':work?.data?.canControl===false?'من نفس جهاز ومتصفح تسجيل الحضور':undefined} onClick={()=>void presence('join')}>الانضمام للاجتماع ↗</Button>}
    {protectedMeeting&&<Button size="sm" variant="outline" disabled={busy||preview} onClick={()=>void presence('leave')}>عدت للعمل</Button>}
    {onEdit&&m.status!=='cancelled'&&<Button size="sm" variant="outline" disabled={busy||preview} onClick={()=>onEdit(m)}>تعديل</Button>}
    {onSync&&m.status!=='cancelled'&&<>
@@ -39,6 +39,7 @@ export function MeetingCard({meeting:m,data,onChange,preview=false,onEdit,onSync
    </>}
    {onSeries&&m.series_id&&m.status!=='cancelled'&&<><Button size="sm" variant="outline" disabled={preview||busy} onClick={()=>onSeries(m,false)}>جدولة المواعيد غير المنشورة</Button><Button size="sm" variant="outline" disabled={preview||busy} onClick={()=>onSeries(m,true)}>إلغاء المواعيد القادمة</Button></>}
   </div>
+  {m.status==='scheduled'&&participating&&!data.isAdmin&&!protectedMeeting&&<p className="text-xs text-amber-200">الانضمام من نفس جهاز ومتصفح تسجيل الحضور يفعّل حماية الدوام أثناء الاجتماع.</p>}
   {m.sync_state==='syncing'&&<p role="status" className="text-xs text-amber-200">مزامنة Google جارية…</p>}
   {fallback&&<a href={fallback} target="_blank" rel="noreferrer" className="text-sm font-bold underline">فتح Google Meet ↗</a>}
  </article>;

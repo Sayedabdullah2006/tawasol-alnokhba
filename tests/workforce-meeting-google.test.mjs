@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {GoogleMeetingCalendar,googleMeetingId,meetLink,encryptMeetingSecret,decryptMeetingSecret} from '../src/lib/workforce/meeting-google.ts';
+import {GoogleMeetingCalendar,googleMeetingId,googleMeetingBody,meetLink,encryptMeetingSecret,decryptMeetingSecret} from '../src/lib/workforce/meeting-google.ts';
 const id='10000000-0000-4000-8000-000000000001',data={title:'جلسة مراجعة',description:'المخرجات',starts_at:'2026-10-25T09:00:00+03:00',ends_at:'2026-10-25T10:00:00+03:00',participant_ids:[],external_attendees:[],task_id:null,reminder_minutes:15};
 test('Google create, retry, edit and cancel use stable identity and one invitation per version',async()=>{
  let stored=null;const writes=[];
@@ -13,8 +13,16 @@ test('Google create, retry, edit and cancel use stable identity and one invitati
  assert.equal(meetLink(await api.publish(id,1,data,['A@example.com','a@example.com'])), 'https://meet.google.com/abc-defg-hij');
  await api.publish(id,1,data,['a@example.com']);assert.equal(writes.length,1);assert.equal(writes[0].body.attendees.length,1);
  assert.equal(writes[0].body.reminders.useDefault,false);assert.ok(writes[0].url.endsWith('sendUpdates=all'));
+ assert.equal(writes[0].body.source.url,`https://nukhba.media/meetings/${id}`);
+ assert.ok(writes[0].body.description.includes(`href="https://nukhba.media/meetings/${id}"`));
  await api.publish(id,2,{...data,title:'تحديث الجلسة'},['a@example.com']);assert.equal(writes[1].method,'PATCH');
  await api.cancel(googleMeetingId(id));assert.equal(writes[2].method,'DELETE');
+});
+test('invitation has a site-first entry and same-browser notice; task content cannot inject HTML',()=>{
+ const body=googleMeetingBody(id,1,{...data,description:'<img src=x onerror=alert(1)>\nتفاصيل'},[]);
+ assert.ok(body.description.includes('نفس جهاز ومتصفح تسجيل الحضور'));
+ assert.ok(body.description.indexOf('/meetings/')<body.description.indexOf('تفاصيل'));
+ assert.ok(!body.description.includes('<img'));assert.ok(body.description.includes('&lt;img'));
 });
 test('ambiguous successful create recovers without duplicate invitation; unsafe Meet URLs fail closed',async()=>{
  let stored=null,created=0;
