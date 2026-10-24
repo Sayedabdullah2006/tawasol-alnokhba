@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {GoogleMeetingCalendar,googleMeetingId,googleMeetingBody,meetLink,encryptMeetingSecret,decryptMeetingSecret} from '../src/lib/workforce/meeting-google.ts';
+import {GoogleMeetingCalendar,googleMeetingId,googleMeetingBody,meetingTokenFailure,meetLink,encryptMeetingSecret,decryptMeetingSecret} from '../src/lib/workforce/meeting-google.ts';
 const id='10000000-0000-4000-8000-000000000001',data={title:'جلسة مراجعة',description:'المخرجات',starts_at:'2026-10-25T09:00:00+03:00',ends_at:'2026-10-25T10:00:00+03:00',participant_ids:[],external_attendees:[],task_id:null,reminder_minutes:15};
 test('Google create, retry, edit and cancel use stable identity and one invitation per version',async()=>{
  let stored=null;const writes=[];
@@ -38,4 +38,12 @@ test('OAuth secrets are authenticated encrypted; wrong key or changed cipher can
  const key='a'.repeat(64),plain='fixture-refresh-token',cipher=encryptMeetingSecret(plain,key);
  assert.ok(!cipher.includes(plain));assert.equal(decryptMeetingSecret(cipher,key),plain);assert.notEqual(encryptMeetingSecret(plain,key),cipher);
  assert.throws(()=>decryptMeetingSecret(cipher,'b'.repeat(64)));assert.throws(()=>decryptMeetingSecret(cipher.replace('v1.','v2.'),key));
+});
+
+test('temporary Google failures never claim that consent expired; only specific OAuth failures request reconnect',()=>{
+ for(const failure of [new Error('timeout'),{code:'ECONNRESET'},{response:{status:503,data:{error:'server_error'}}},{response:{status:429,data:{}}}]){
+  const result=meetingTokenFailure(failure);assert.equal(result.status,503);assert.ok(result.message.includes('لا يلزم إعادة الربط'));assert.ok(!result.message.includes('انتهى ربط'));
+ }
+ const expired=meetingTokenFailure({response:{status:400,data:{error:'invalid_grant'}}});assert.equal(expired.status,409);assert.ok(expired.message.includes('أعيدي'));
+ const config=meetingTokenFailure({response:{status:401,data:{error:'invalid_client'}}});assert.ok(config.message.includes('إعدادات تطبيق'));assert.ok(!config.message.includes('انتهت صلاحيته'));
 });
