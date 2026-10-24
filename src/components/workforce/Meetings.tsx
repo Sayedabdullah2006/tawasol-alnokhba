@@ -7,7 +7,7 @@ import {meetingDay} from '@/lib/workforce/meeting-calendar';
 import {useWorkSession} from './WorkSessionProvider';
 export type MeetingsData={meetings:Meeting[];attendance?:MeetingAttendance[];people:MeetingPerson[];tasks:{id:string;title:string}[];canManage:boolean;isAdmin:boolean;userId:string;connection:MeetingConnection|null;schedulingReady?:boolean};
 function announce(){window.dispatchEvent(new Event('workforce-data-changed'));}
-export function MeetingCard({meeting:m,data,onChange,preview=false,onEdit,onSync,onSeries}: {meeting:Meeting;data:MeetingsData;onChange:()=>void;preview?:boolean;onEdit?:(m:Meeting)=>void;onSync?:(m:Meeting,cancel?:boolean)=>void;onSeries?:(m:Meeting,cancel:boolean)=>void}){
+export function MeetingCard({meeting:m,data,onChange,preview=false,compact=false,onEdit,onSync,onSeries}: {meeting:Meeting;data:MeetingsData;onChange:()=>void;preview?:boolean;compact?:boolean;onEdit?:(m:Meeting)=>void;onSync?:(m:Meeting,cancel?:boolean)=>void;onSeries?:(m:Meeting,cancel:boolean)=>void}){
  const work=useWorkSession(),[busy,setBusy]=useState(false),[error,setError]=useState(''),[fallback,setFallback]=useState(''),[now,setNow]=useState(()=>Date.now());
  useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),30000);return()=>clearInterval(timer);},[]);
  const participating=m.participant_ids.includes(data.userId),inWindow=now>=Date.parse(m.starts_at)&&now<Date.parse(m.ends_at),ongoing=m.status==='scheduled'&&inWindow;
@@ -22,15 +22,17 @@ export function MeetingCard({meeting:m,data,onChange,preview=false,onEdit,onSync
  return <article className={`portal-panel flex min-w-0 flex-col gap-4 rounded-3xl border p-5 ${ongoing?'border-emerald-300/50':'border-white/15'}`}>
   <header className="flex items-start justify-between gap-3"><h3 className="text-lg font-black">{m.title}</h3><span className={`shrink-0 rounded-full px-3 py-1 text-xs ${m.status==='cancelled'?'bg-rose-100 text-rose-900':ongoing?'bg-emerald-100 text-emerald-900':'bg-blue-50 text-blue-900'}`}>{m.status==='draft'?'مسودة':m.status==='cancelled'?'ملغى':ongoing?'جارٍ الآن':'مجدول'}</span></header>
   <p className="text-sm font-bold text-amber-200">{meetingDate(m.starts_at)} — {new Date(m.ends_at).toLocaleTimeString('ar-SA',{timeZone:'Asia/Riyadh',hour:'2-digit',minute:'2-digit'})}</p>
-  {m.description&&<p className="line-clamp-3 whitespace-pre-line text-sm opacity-80">{m.description}</p>}
+  {!compact&&m.description&&<p className="line-clamp-3 whitespace-pre-line text-sm opacity-80">{m.description}</p>}
+  {!compact&&<>
   <div className="flex flex-wrap gap-2 text-xs">{m.participant_ids.map(id=><span key={id} className="rounded-lg bg-white/10 px-2 py-1">{data.people.find(p=>p.id===id)?.full_name||'مشارك'}</span>)}{m.external_attendees.length>0&&<span className="rounded-lg bg-white/10 px-2 py-1">{m.external_attendees.length} مشارك خارجي</span>}</div>
   {m.task_id&&<Link href={`${data.isAdmin?'/admin/workforce/tasks/':'/employee/work/tasks/'}${m.task_id}`} className="text-xs font-bold text-amber-200">المهمة المرتبطة ←</Link>}
   {m.series_id&&<p className="text-xs font-bold text-violet-200">↻ اجتماع متكرر {m.series_frequency==='daily'?'يوميًا':m.series_frequency==='weekly'?'أسبوعيًا':'شهريًا'}</p>}
   {m.status==='scheduled'&&<details className="rounded-xl border border-white/15 p-3"><summary className="cursor-pointer text-sm font-bold">سجل الانضمام</summary><ul className="mt-3 space-y-2 text-xs">{m.participant_ids.map(id=>{const entry=data.attendance?.find(a=>a.meeting_id===m.id&&a.user_id===id);return <li key={id} className="flex flex-wrap justify-between gap-2"><span>{data.people.find(p=>p.id===id)?.full_name||'مشارك'}</span><span className={entry?'text-emerald-200':'text-amber-200'}>{meetingPresenceLabel(m,entry,now)}{entry&&` · ${new Date(entry.joined_at).toLocaleTimeString('ar-SA',{timeZone:'Asia/Riyadh',hour:'2-digit',minute:'2-digit'})}`}</span></li>;})}</ul></details>}
+  </>}
   {protectedMeeting&&<p className="rounded-xl bg-emerald-300/10 p-3 text-xs font-bold text-emerald-200">في اجتماع · الدوام محمي حتى {new Date(work!.data!.session!.meeting_until!).toLocaleTimeString('ar-SA',{timeZone:'Asia/Riyadh',hour:'2-digit',minute:'2-digit'})}</p>}
   <Notice message={error||m.sync_error||''} error/>
   <div className="mt-auto flex flex-wrap gap-2">
-   {m.status==='scheduled'&&participating&&<Button size="sm" disabled={preview||busy||!m.meet_url||!inWindow||work?.data?.canControl===false} title={!inWindow?'متاح خلال موعد الاجتماع':work?.data?.canControl===false?'من نفس جهاز ومتصفح تسجيل الحضور':undefined} onClick={()=>void presence('join')}>الانضمام للاجتماع ↗</Button>}
+   {m.status==='scheduled'&&participating&&<Button size="sm" className={compact?'w-full py-3 font-black disabled:opacity-80':undefined} disabled={preview||busy||!m.meet_url||!inWindow||work?.data?.canControl===false} title={!inWindow?'متاح خلال موعد الاجتماع':work?.data?.canControl===false?'من نفس جهاز ومتصفح تسجيل الحضور':undefined} onClick={()=>void presence('join')}>الانضمام للاجتماع ↗</Button>}
    {protectedMeeting&&<Button size="sm" variant="outline" disabled={busy||preview} onClick={()=>void presence('leave')}>عدت للعمل</Button>}
    {onEdit&&m.status!=='cancelled'&&<Button size="sm" variant="outline" disabled={busy||preview} onClick={()=>onEdit(m)}>تعديل</Button>}
    {onSync&&m.status!=='cancelled'&&<>
@@ -39,7 +41,7 @@ export function MeetingCard({meeting:m,data,onChange,preview=false,onEdit,onSync
    </>}
    {onSeries&&m.series_id&&m.status!=='cancelled'&&<><Button size="sm" variant="outline" disabled={preview||busy} onClick={()=>onSeries(m,false)}>جدولة المواعيد غير المنشورة</Button><Button size="sm" variant="outline" disabled={preview||busy} onClick={()=>onSeries(m,true)}>إلغاء المواعيد القادمة</Button></>}
   </div>
-  {m.status==='scheduled'&&participating&&!data.isAdmin&&!protectedMeeting&&<p className="text-xs text-amber-200">الانضمام من نفس جهاز ومتصفح تسجيل الحضور يفعّل حماية الدوام أثناء الاجتماع.</p>}
+  {!compact&&m.status==='scheduled'&&participating&&!data.isAdmin&&!protectedMeeting&&<p className="text-xs text-amber-200">الانضمام من نفس جهاز ومتصفح تسجيل الحضور يفعّل حماية الدوام أثناء الاجتماع.</p>}
   {m.sync_state==='syncing'&&<p role="status" className="text-xs text-amber-200">مزامنة Google جارية…</p>}
   {fallback&&<a href={fallback} target="_blank" rel="noreferrer" className="text-sm font-bold underline">فتح Google Meet ↗</a>}
  </article>;

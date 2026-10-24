@@ -47,6 +47,7 @@ export function EmployeeDashboardView({ data, preview=false }: {preview?:boolean
     { label: "مكتملة هذا الشهر", value: tasks.completedThisMonth, href: `/employee/work/tasks?scope=assigned&state=done&completed_from=${data.month}`, icon: "check", color: "border-emerald-200/70 bg-emerald-50 text-emerald-900" },
   ];
   return <div className="space-y-5" data-employee-dashboard={data.employee.id}>
+    {!preview&&<MeetingUpcoming compact/>}
     <nav className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="ملخص مهامي">
       {statistics.map(s => <Link key={s.label} href={s.href} className={`group rounded-2xl border p-4 transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 motion-reduce:transform-none sm:p-5 ${s.color}`}><div className="flex items-center justify-between gap-2"><span className="text-xs font-bold sm:text-sm">{s.label}</span><Icon name={s.icon} /></div><div className="mt-4 flex items-end justify-between"><span className="text-3xl font-black tabular-nums">{s.value.toLocaleString("en-US")}</span><span aria-hidden="true" className="opacity-40 transition group-hover:opacity-100">↗</span></div></Link>)}
     </nav>
@@ -83,7 +84,6 @@ export function EmployeeDashboardView({ data, preview=false }: {preview?:boolean
       </section>
       </div>
     </div>
-    {!preview&&<MeetingUpcoming/>}
     <DashboardJourneys />
   </div>;
 }
