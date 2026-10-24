@@ -33,6 +33,7 @@ export async function createMeetingsDB(){
  await db.exec(await migration('20261023205919_attendance_action_gate'));
  await db.exec(await migration('20261024061024_six_pm_attendance_cutoff'));
  await db.exec(await migration('20261024203340_workforce_meetings'));
+ await db.exec(await migration('20261024210525_recurring_meeting_occurrences'));
  await db.exec('grant select,insert,update,delete on all tables in schema public to service_role;set role service_role;');
  return db;
 }

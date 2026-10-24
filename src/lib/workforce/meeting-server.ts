@@ -4,7 +4,7 @@ import {createServiceRoleClient,type WorkforceActor} from './server';
 import {WorkforceError} from './validation';
 import {googleMeetingId,GoogleMeetingCalendar,MeetingGoogleError,encryptMeetingSecret,decryptMeetingSecret,meetLink,type GoogleConnection} from './meeting-google';
 import type {MeetingConnection,MeetingData} from './meetings';
-export const meetingColumns='id,title,description,starts_at,ends_at,task_id,participant_ids,external_attendees,reminder_minutes,created_by,status,meet_url,google_event_id,google_etag,proposed_data,sync_state,sync_error,version';
+export const meetingColumns='id,title,description,starts_at,ends_at,task_id,participant_ids,external_attendees,reminder_minutes,created_by,status,meet_url,google_event_id,google_etag,proposed_data,sync_state,sync_error,version,series_id,series_frequency';
 export function meetingOrigin(request:Request){const origin=new URL(request.url).origin;if(process.env.NODE_ENV==='development'&&['localhost','127.0.0.1'].includes(new URL(origin).hostname))return origin;return new URL(process.env.APP_BASE_URL||'https://nukhba.media').origin;}
 export const meetingCallback=(request:Request)=>`${meetingOrigin(request)}/api/workforce/meetings/google/callback`;
 export function meetingRoot(){const key=process.env.SUPABASE_SERVICE_ROLE_KEY;if(!key||key.length<32)throw new WorkforceError('إعداد حماية الربط غير متاح',503);return key;}

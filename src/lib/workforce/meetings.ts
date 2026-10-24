@@ -1,5 +1,7 @@
 export type MeetingData={title:string;description:string;starts_at:string;ends_at:string;task_id:string|null;participant_ids:string[];external_attendees:string[];reminder_minutes:number};
-export type Meeting=MeetingData&{id:string;created_by:string;status:'draft'|'scheduled'|'cancelled';meet_url:string|null;google_event_id:string|null;google_etag:string|null;proposed_data:MeetingData|null;sync_state:'idle'|'syncing'|'error';sync_error:string|null;version:number};
+export type Meeting=MeetingData&{id:string;created_by:string;status:'draft'|'scheduled'|'cancelled';meet_url:string|null;google_event_id:string|null;google_etag:string|null;proposed_data:MeetingData|null;sync_state:'idle'|'syncing'|'error';sync_error:string|null;version:number;series_id?:string|null;series_frequency?:'daily'|'weekly'|'monthly'|null};
+export type MeetingAttendance={meeting_id:string;user_id:string;joined_at:string;left_at:string|null};
+export function meetingPresenceLabel(meeting:Meeting,entry:MeetingAttendance|undefined,now:number){return entry?'سجّل الانضمام':now>=Date.parse(meeting.ends_at)?'لم يسجّل الانضمام':now>=Date.parse(meeting.starts_at)?'لم ينضم بعد':'بانتظار الموعد';}
 export type MeetingPerson={id:string;full_name:string};
 export type MeetingConnection={configured:boolean;connected:boolean;expectedEmail:string;organizerEmail:string|null;clientId?:string;redirectUri:string};
 export function validMeetURL(value:unknown):value is string{return typeof value==='string'&&/^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/.test(value);}
