@@ -49,7 +49,7 @@ export default function WorkSessionProvider({children,adapter=transport}:{childr
   if(!data?.session||data.canControl===false)return;
   const s=data.session;
   if(s.policy_version!==1)return;
-  const seen=Math.max(Date.parse(s.last_seen_at!),s.break_paid_until?Date.parse(s.break_paid_until):0);
+  const seen=Math.max(Date.parse(s.last_seen_at!),s.break_paid_until?Date.parse(s.break_paid_until):0,s.meeting_until?Math.min(Date.parse(s.meeting_until),Date.parse(s.cutoff_at!)):0);
   const deadline=Math.min(Date.parse(s.cutoff_at!),seen+300000,s.break_started_at?Infinity:Date.parse(s.next_confirmation_at!)+300000);
   const timer=setTimeout(()=>void command("heartbeat"),Math.max(0,deadline-Date.parse(data.now))+50);
   return()=>clearTimeout(timer);
@@ -83,7 +83,7 @@ export function WorkStartButton({taskId}:{taskId:string}){
  const state=useWorkSession();if(!state)return null;
  const active=state.data?.session && state.data.active?.task_id===taskId;
  const eligible=state.data?.tasks.some(task=>task.id===taskId);
- return <button type="button" title={!state.data?.session?"سجلي الحضور أولًا":state.data.canControl===false?"التحكم من جهاز الدوام":state.data.session.break_started_at?"استأنفي العمل أولًا":undefined} disabled={state.busy||state.data?.canControl===false||!state.data?.session||!!state.data?.session?.break_started_at||active===true||!eligible} onClick={()=>void state.command("task",{task_id:taskId})} className="rounded-xl border border-amber-200/40 bg-amber-200/15 px-4 py-2 text-xs font-bold disabled:opacity-45">{active?"تعملين عليها الآن":"بدء العمل"}</button>;
+ return <button type="button" title={!state.data?.session?"سجلي الحضور أولًا":state.data.canControl===false?"التحكم من جهاز الدوام":state.data.session.break_started_at?"استأنفي العمل أولًا":undefined} disabled={state.busy||state.data?.canControl===false||!state.data?.session||!!state.data?.session?.break_started_at||active===true||!eligible||!!state.data?.session?.meeting_until&&Date.parse(state.data.session.meeting_until)>Date.now()+state.clockOffset} onClick={()=>void state.command("task",{task_id:taskId})} className="rounded-xl border border-amber-200/40 bg-amber-200/15 px-4 py-2 text-xs font-bold disabled:opacity-45">{active?"تعملين عليها الآن":"بدء العمل"}</button>;
 }
 
 function WorkConfirmation({children,titleId="work-confirm-title"}:{children:ReactNode;titleId?:string}) {
@@ -103,20 +103,22 @@ export function WorkSessionBar({embedded=false}:{embedded?:boolean}={}){
  const afterHours=new Date(now).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Asia/Riyadh"})>=REGULAR_WORK_END;
  const approvedOvertime=!!data.overtimeWindow&&now<Date.parse(data.overtimeWindow.ends_at);
  const holiday=data.paidHoliday??paidHolidayAt(now),dayOff=isFriday(now)||!!holiday,onBreak=!!session?.break_started_at;
- const due=!dayOff&&data.canControl!==false&&!!session?.next_confirmation_at && !onBreak && now>=Date.parse(session.next_confirmation_at);
+ const inMeeting=!!session?.meeting_id&&Date.parse(session.meeting_until||'')>now;
+ const due=!inMeeting&&!dayOff&&data.canControl!==false&&!!session?.next_confirmation_at && !onBreak && now>=Date.parse(session.next_confirmation_at);
  const remaining=onBreak?Math.max(0,(Date.parse(session!.break_paid_until!)-now)/60000):Math.max(0,30-data.breakUsedSeconds/60);
  const action="rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-bold transition hover:bg-white/20 disabled:opacity-40";
  return <section className={`portal-panel rounded-3xl border border-white/15 bg-[#10243c]/95 p-4 shadow-xl ${embedded?"":"mx-4 mb-5 sm:mx-6"}`} aria-label="جلسة دوامي">
   <div className="flex flex-wrap items-center justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2 text-xs font-bold"><span className={`h-2 w-2 rounded-full ${session?onBreak?"bg-amber-300":"bg-emerald-300":"bg-slate-400"}`}/>{dayOff?(holiday?`${holiday} · إجازة مدفوعة`:"الجمعة إجازة"):session?onBreak?"في استراحة":session.overtime_request_id?"خارج دوام معتمد":"الدوام جارٍ":data.lastSession?.close_reason?data.lastSession.overtime_request_id&&data.lastSession.close_reason==="day_end"?"انتهت فترة خارج الدوام":CLOSE_REASONS[data.lastSession.close_reason]:"خارج الدوام · للعرض فقط"}{!dayOff&&<span className="mr-2 opacity-60">{session?.overtime_request_id||approvedOvertime?`حتى ${new Date(session?.cutoff_at??data.overtimeWindow!.ends_at).toLocaleTimeString("ar-SA",{timeZone:"Asia/Riyadh",hour:"2-digit",minute:"2-digit"})}`:"النهاية 6 مساءً"}</span>}</div>{!dayOff&&<p className="mt-2 truncate text-sm font-black">{session?segment?.title||"اختاري مهمتك التالية":"سجلي الحضور ثم اختاري المهمة"}</p>}</div>
    <div className="flex flex-wrap gap-2">{!session?<button className={`${action} !bg-[#dcb969] !text-[#0c2039]`} disabled={busy||(afterHours&&!approvedOvertime)||dayOff} onClick={()=>void command("in")}>{!dayOff&&afterHours&&!approvedOvertime?"انتهى دوام اليوم":approvedOvertime?"تسجيل حضور خارج الدوام":"تسجيل الحضور"}</button>:<>
-    {data.canControl===false?<span className="text-xs text-amber-200">التحكم من جهاز الدوام</span>:<><button className={action} disabled={busy||dayOff} onClick={()=>void command(onBreak?"resume":"break")}>{onBreak?"استئناف العمل":"استراحة"}</button>
+    {data.canControl===false?<span className="text-xs text-amber-200">التحكم من جهاز الدوام</span>:<><button className={action} disabled={busy||dayOff||inMeeting} onClick={()=>void command(onBreak?"resume":"break")}>{onBreak?"استئناف العمل":"استراحة"}</button>
     <button className={action} disabled={busy||dayOff} onClick={()=>void command("out")}>تسجيل الانصراف</button>
     <button className={action} aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}> {expanded?"طي":"المهمة والنشاط"} </button></>}
    </>}</div>
   </div>
+  {inMeeting&&<Link href="/employee/meetings" className="mt-3 inline-block rounded-xl bg-emerald-300/10 p-3 text-xs font-bold text-emerald-200">في اجتماع · العودة للعمل ←</Link>}
   {onBreak&&<div className="mt-3 flex flex-wrap justify-between gap-2 rounded-xl bg-amber-300/10 p-3 text-xs"><strong>{remaining>0?`المتبقي من الاستراحة المدفوعة ${Math.ceil(remaining)} دقيقة`:"انتهت الاستراحة المدفوعة · الوقت الإضافي غير محتسب"}</strong><span>اضغطي استئناف العمل عند العودة</span></div>}
-  {session&&!onBreak&&<p className="mt-2 text-[11px] opacity-65">{Date.parse(session.next_confirmation_at!)<Date.parse(session.cutoff_at!)?"تأكيد الاستمرار":"نهاية الدوام"} {new Date(session.next_confirmation_at!).toLocaleTimeString("ar-SA",{hour:"2-digit",minute:"2-digit",timeZone:"Asia/Riyadh"})}{segment&&` · فترة النشاط ${attendanceDuration(Math.max(0,(now-Date.parse(segment.starts_at))/60000))}`}</p>}
-  {data.canControl!==false&&(expanded||session&&(!segment||segment.kind==="unallocated"))&&!onBreak&&session&&<div className="mt-4 grid gap-3 border-t border-white/10 pt-4 lg:grid-cols-2">
+  {session&&!onBreak&&!inMeeting&&<p className="mt-2 text-[11px] opacity-65">{Date.parse(session.next_confirmation_at!)<Date.parse(session.cutoff_at!)?"تأكيد الاستمرار":"نهاية الدوام"} {new Date(session.next_confirmation_at!).toLocaleTimeString("ar-SA",{hour:"2-digit",minute:"2-digit",timeZone:"Asia/Riyadh"})}{segment&&` · فترة النشاط ${attendanceDuration(Math.max(0,(now-Date.parse(segment.starts_at))/60000))}`}</p>}
+  {!inMeeting&&data.canControl!==false&&(expanded||session&&(!segment||segment.kind==="unallocated"))&&!onBreak&&session&&<div className="mt-4 grid gap-3 border-t border-white/10 pt-4 lg:grid-cols-2">
     <div className="flex flex-wrap gap-2"><select aria-label="المهمة الحالية" value={task} onChange={e=>setTask(e.target.value)} className="min-w-0 flex-1 rounded-xl border border-white/20 bg-[#10243c] p-3 text-sm"><option value="">بماذا ستبدئين؟</option>{data.tasks.map(t=><option key={t.id} value={t.id}>{t.title}</option>)}</select><button className={action} disabled={busy||!task} onClick={()=>void command("task",{task_id:task})}>بدء العمل</button></div>
     <div className="flex flex-wrap gap-2"><input aria-label="عنوان النشاط الآخر" placeholder="اجتماع، اتصال عميل، عمل إداري" maxLength={200} value={activity} onChange={e=>setActivity(e.target.value)} className="min-w-0 flex-1 rounded-xl border border-white/20 bg-[#10243c] p-3 text-sm"/><button className={action} disabled={busy||activity.trim().length<3} onClick={()=>void command("activity",{title:activity})}>بدء نشاط آخر</button></div>
    </div>}

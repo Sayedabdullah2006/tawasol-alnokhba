@@ -307,6 +307,7 @@ export default function TaskDetail({
         >
           تحديث المهمة
         </Button>
+        {data.canAssign&&<Link href={`${admin?'/admin/workforce/meetings':'/employee/meetings'}?task_id=${task.id}`} className="rounded-xl border px-4 py-2 text-sm font-bold">جدولة اجتماع</Link>}
         {data.canEdit && (
           <Button
             type="button"

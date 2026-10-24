@@ -1,0 +1,8 @@
+export type MeetingData={title:string;description:string;starts_at:string;ends_at:string;task_id:string|null;participant_ids:string[];external_attendees:string[];reminder_minutes:number};
+export type Meeting=MeetingData&{id:string;created_by:string;status:'draft'|'scheduled'|'cancelled';meet_url:string|null;google_event_id:string|null;google_etag:string|null;proposed_data:MeetingData|null;sync_state:'idle'|'syncing'|'error';sync_error:string|null;version:number};
+export type MeetingPerson={id:string;full_name:string};
+export type MeetingConnection={configured:boolean;connected:boolean;expectedEmail:string;organizerEmail:string|null;clientId?:string;redirectUri:string};
+export function validMeetURL(value:unknown):value is string{return typeof value==='string'&&/^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/.test(value);}
+export function meetingDate(value:string){return new Date(value).toLocaleString('ar-SA',{calendar:'gregory',timeZone:'Asia/Riyadh',dateStyle:'medium',timeStyle:'short'});}
+export function localMeetingDate(value:string){return new Date(Date.parse(value)+3*3600000).toISOString().slice(0,16);}
+export function meetingDefaults():MeetingData {const start=new Date(Math.ceil((Date.now()+3600000)/1800000)*1800000);return {title:'',description:'',starts_at:start.toISOString(),ends_at:new Date(+start+3600000).toISOString(),task_id:null,participant_ids:[],external_attendees:[],reminder_minutes:15};}

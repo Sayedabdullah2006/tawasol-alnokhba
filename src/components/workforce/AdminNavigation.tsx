@@ -5,6 +5,7 @@ import PortalIcon from "@/components/layout/PortalIcon";
 const links = [
   ["/admin/workforce", "الأداء"],
   ["/admin/workforce/tasks", "المهام"],
+  ["/admin/workforce/meetings", "الاجتماعات"],
   ["/admin/workforce/employees", "الموظفات"],
   ["/admin/workforce/people", "شؤون الفريق"],
   ["/admin/workforce/attendance", "الحضور والإجازات"],
@@ -31,7 +32,7 @@ export default function AdminNavigation({ activePath }: { activePath?: string } 
           }
           className="portal-launcher flex-1"
         >
-          <PortalIcon name={["performance","tasks","people","profile","attendance","finance","requests","knowledge"][index]} />
+          <PortalIcon name={["performance","tasks","meetings","people","profile","attendance","finance","requests","knowledge"][index]} />
           {label}
         </Link>
       ))}

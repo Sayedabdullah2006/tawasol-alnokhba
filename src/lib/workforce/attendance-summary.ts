@@ -3,6 +3,7 @@ export const DEFAULT_WORKDAYS = [0, 1, 2, 3, 4, 6];
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
 export type AttendancePeriod = { checked_in: string; checked_out: string | null;
+  meeting_id?: string | null; meeting_until?: string | null;
   overtime_request_id?: string | null;
   credit_request_id?: string | null;
   policy_version?: number; cutoff_at?: string | null; last_seen_at?: string | null;
@@ -30,7 +31,7 @@ export function attendanceEnd(period: AttendancePeriod, now: number) {
   let end = Math.min(now,start+DAY);
   if (period.policy_version === 1) {
     end=Math.min(end,Date.parse(period.cutoff_at!));
-    const seen=Math.max(Date.parse(period.last_seen_at!),period.break_paid_until?Date.parse(period.break_paid_until):0);
+    const seen=Math.max(Date.parse(period.last_seen_at!),period.break_paid_until?Date.parse(period.break_paid_until):0,period.meeting_until?Math.min(Date.parse(period.meeting_until),Date.parse(period.cutoff_at!)):0);
     if(now>=seen+5*MINUTE) end=Math.min(end,seen);
     const confirmation=Date.parse(period.next_confirmation_at!);
     if(!period.break_started_at && now>=confirmation+5*MINUTE) end=Math.min(end,confirmation);

@@ -18,6 +18,7 @@ export default function EmployeeNavigation({ activePath }: { activePath?: string
       m.key === "knowledge",
     ),
   ];
+  modules.splice(3,0,{key:'meetings',title:'الاجتماعات',purpose:'',adminArea:'',screens:[{path:'/employee/meetings',title:'الاجتماعات',purpose:'',related:[],available:true}]});
   return (
     <nav
       aria-label="أقسام بوابة الموظف"
@@ -32,7 +33,7 @@ export default function EmployeeNavigation({ activePath }: { activePath?: string
         }
       }}
     >
-      <ul className="grid w-full grid-cols-3 gap-2 lg:grid-cols-6">
+      <ul className="grid w-full grid-cols-3 gap-2 lg:grid-cols-7">
         {modules.map((module) => {
           const screens = module.screens.filter((s) => s.available);
           if (!screens.length) return null;

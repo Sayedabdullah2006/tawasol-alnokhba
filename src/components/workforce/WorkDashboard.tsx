@@ -8,6 +8,7 @@ import { employeeDashboard } from "@/lib/workforce/employee-dashboard";
 import DashboardJourneys from "./DashboardJourneys";
 import PerformanceCard from "./PerformanceCard";
 import EmployeeWorkSummary from "./EmployeeWorkSummary";
+import MeetingUpcoming from './MeetingUpcoming';
 
 type IconName = "tasks" | "clock" | "check" | "review" | "calendar" | "wallet" | "request" | "profile";
 const paths: Record<IconName, ReactNode> = {
@@ -82,6 +83,7 @@ export function EmployeeDashboardView({ data, preview=false }: {preview?:boolean
       </section>
       </div>
     </div>
+    {!preview&&<MeetingUpcoming/>}
     <DashboardJourneys />
   </div>;
 }

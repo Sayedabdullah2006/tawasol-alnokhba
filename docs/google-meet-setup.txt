@@ -1,0 +1,29 @@
+إعداد اجتماعات تواصل النخبة
+الحساب المنظم: elitecnnct@gmail.com
+
+1. افتح https://console.cloud.google.com/ بهذا الحساب وأنشئ مشروعًا باسم «اجتماعات تواصل النخبة».
+2. من APIs & Services → Library فعّل Google Calendar API.
+3. في Google Auth Platform أكمل Branding وAudience وبيانات التواصل. اختر External للحساب الشخصي، وأضف elitecnnct@gmail.com ضمن Test users أثناء الإعداد.
+4. في Data Access أضف openid وemail والنطاق:
+   https://www.googleapis.com/auth/calendar.events.owned
+5. من Clients أنشئ OAuth client من نوع Web application.
+   Authorized redirect URI يجب أن يطابق حرفيًا:
+   https://nukhba.media/api/workforce/meetings/google/callback
+6. بعد نشر القسم: لوحة المدير → الاجتماعات → ربط Google.
+   أدخل Client ID وClient Secret في الحقول المخصصة، واحفظ ثم اضغط «ربط حساب Google» ووافق بالحساب المنظم أعلاه. لا تضع Client Secret في محادثة أو مستودع الكود.
+7. قبل التشغيل الدائم راجع Publishing status وانقل التطبيق من Testing إلى In production، وأكمل متطلبات التحقق التي تعرضها Google. وضع Testing مع صلاحيات التقويم قد يجعل refresh token ينتهي بعد سبعة أيام.
+
+الموظفتان لا تحتاجان ربط حساب Google الخاص بهما. المدير ونور ينشئان الاجتماعات من الموقع، ويظهر رابط الاجتماع للمشاركين فقط. الدعوة والتعديل والإلغاء عبر Google، والتنبيه قبل الموعد عبر نظام الإشعارات الموجود. لا ينشئ الربط أو حفظ المسودة دعوات بحد ذاته.
+
+حماية الحضور تبدأ عند الانضمام من الموقع في موعد الاجتماع ومن جهاز ومتصفح تسجيل الحضور. تنتهي عند نهاية الموعد أو «عدت للعمل»، وتبقى نهاية الدوام السادسة مساءً أو نهاية خارج الدوام المعتمد نافذة. هذه مشاركة مسجلة من الموقع وليست إثبات حضور آليًا من داخل Google Meet.
+
+حالة التنفيذ المحلية: مكتمل البناء والاختبارات المعزولة، ولم تُطبّق هجرة الاجتماعات على الإنتاج ولم يُربط Google بعد.
+قبل الإطلاق: تطبيق هجرة workforce_meetings ونشر الكود، ثم إعداد OAuth والموافقة يدويًا. لا تنفذ اختبارات دعوات فعلية أو أي مولد إشعارات على الإنتاج للتحقق.
+
+الاختبارات الآمنة:
+node --import ./tests/register-ts-imports.mjs --test tests/workforce-meetings.test.mjs tests/workforce-meeting-google.test.mjs
+تعتمد على PostgreSQL في الذاكرة وGoogle وهمي داخل الاختبارات، بلا بريد أو HTTP حقيقي وبلا بيانات اختبار إنتاجية.
+
+المراجع:
+https://developers.google.com/identity/protocols/oauth2/web-server
+https://developers.google.com/workspace/calendar/api/guides/create-events

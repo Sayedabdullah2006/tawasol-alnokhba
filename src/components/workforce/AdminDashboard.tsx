@@ -13,6 +13,7 @@ import PerformanceCard from "./PerformanceCard";
 import PortalIntro from "@/components/layout/PortalIntro";
 import TeamAttendanceCard from "./TeamAttendanceCard";
 import TeamPayrollCard from "./TeamPayrollCard";
+import MeetingUpcoming from './MeetingUpcoming';
 import { riyadhDate } from "@/lib/workforce/attendance-summary";
 
 const count = (value: number) => value.toLocaleString("en-US");
@@ -98,6 +99,7 @@ export default function AdminDashboard({ previewData }: { userId: string; previe
       <label className="flex items-center gap-3 text-sm font-bold">شهر المتابعة<input type="month" aria-label="شهر المتابعة" min="2020-01" max="2200-12" disabled={!!previewData || !!selectedPayroll} value={attendanceMonth} onChange={event => changeMonth(event.target.value)} className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" /></label>
       <Button size="sm" variant="outline" disabled={loading || !data || exporting || !!previewData} onClick={() => void exportAttendance()}>{exporting ? "جارٍ تجهيز التقرير…" : "تحميل تقرير الحضور Excel"}</Button>
     </div>
+    {!previewData&&<MeetingUpcoming admin/>}
     <details aria-labelledby="staff-performance" className="space-y-4 rounded-3xl border border-border bg-white/60 p-4 sm:p-5">
       <summary className="cursor-pointer py-2 text-lg font-black"><h2 id="staff-performance" className="inline text-lg font-black text-dark">نبض الفريق</h2></summary>
       <div role="group" aria-label="تصفية أداء الموظفات" className="flex flex-wrap gap-2">{([{ id: "all", title: "الفريق" }, { id: "attention", title: "تحتاج متابعة" }] as const).map(tab => <button key={tab.id} type="button" aria-pressed={staffView === tab.id} onClick={() => setStaffView(tab.id)} className={`rounded-xl border px-4 py-2 text-xs font-bold ${staffView === tab.id ? "bg-[#102b57] text-white" : "bg-white text-slate-700"}`}>{tab.title}</button>)}</div>

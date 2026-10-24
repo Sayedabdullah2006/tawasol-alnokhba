@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 const paths: Record<string, ReactNode> = {
+  meetings: <><rect x="2" y="5" width="14" height="14" rx="3"/><path d="m16 10 6-4v12l-6-4"/></>,
   profile: <><circle cx="12" cy="8" r="4" /><path d="M4 22v-2a8 8 0 0 1 16 0" /></>,
   tasks: <><rect x="4" y="4" width="16" height="17" rx="3" /><path d="M8 2v4m8-4v4M8 11h8m-8 5h5" /></>,
   attendance: <><circle cx="12" cy="12" r="9" /><path d="M12 6v6l4 2" /></>,
