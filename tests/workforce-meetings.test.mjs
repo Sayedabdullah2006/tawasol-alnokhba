@@ -92,3 +92,24 @@ test('abandoned or ambiguous Google attempts remain recoverable and cannot silen
   const ended=await meetingCommand(db,id,changed.version,'finish',{lease:cancel.lease});assert.equal(ended.status,'cancelled');
  }finally{await db.close();}
 });
+test('Noor schedules a task-linked meeting for Monwa and another employee; both can attend without management rights',async()=>{
+ const db=await createMeetingsDB();try{
+  const user=crypto.randomUUID(),employee=crypto.randomUUID();await db.exec('reset role');
+  await db.query("insert into profiles(id,role,full_name) values($1,'employee','موظفة إضافية')",[user]);
+  await db.query("insert into wf_employees(id,user_id,status,start_date,full_name) values($1,$2,'active','2026-10-01','موظفة إضافية')",[employee,user]);
+  await db.query("insert into auth.users(id,email,email_confirmed_at) values($1,'extra@example.com',now())",[user]);await db.exec('set role service_role');
+  await command(db,{command:'in'});await command(db,{command:'in'},ids.monwa);const extra=await command(db,{command:'in'},user);
+  const id=crypto.randomUUID(),data=meetingData({participant_ids:[ids.admin,ids.noor,ids.monwa,user]});
+  const saved=await meetingCommand(db,id,0,'save',data,ids.noor);assert.equal(saved.task_id,ids.shared);
+  const dir=(await db.query('select wf_meeting_directory($1) v',[ids.noor])).rows[0].v;assert.ok(dir.people.some(p=>p.id===user));
+  await db.exec("reset role;update workforce_private.google_meeting_connection set refresh_token_cipher='fixture';set role service_role;");
+  const p=await meetingCommand(db,id,1,'prepare',{},ids.noor);assert.ok(p.emails.includes('extra@example.com'));
+  await meetingCommand(db,id,1,'finish',{lease:p.lease,event_id:'fixture',meet_url:'https://meet.google.com/abc-defg-hij'},ids.noor);
+  for(const actor of [ids.monwa,user]){
+   await db.query("select set_config('request.jwt.claim.sub',$1,false)",[actor]);await db.exec('set role authenticated');assert.equal((await db.query('select count(*)::int n from wf_meetings where id=$1',[id])).rows[0].n,1);await db.exec('reset role;set role service_role');
+   await assert.rejects(()=>meetingCommand(db,id,1,'save',data,actor));await meetingPresence(db,id,'join',actor);
+  }
+  await clock(db,'11:30');const active=await snapshot(db,user);assert.equal(active.session.id,extra.session.id);
+  for(const actor of [ids.noor,ids.monwa,user])await assert.rejects(()=>db.query('select wf_meeting_google($1,$2,$3)',[actor,'configure',{client_id:'fixture.apps.googleusercontent.com',client_secret_cipher:'x'.repeat(50)}]));
+ }finally{await db.close();}
+});
