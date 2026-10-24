@@ -41,7 +41,7 @@ export default function AttendanceHub({
     [settings, setSettings] = useState({
       workdays: [0, 1, 2, 3, 4],
       starts_at: "09:00",
-      ends_at: "17:00",
+      ends_at: "18:00",
       schedule_mode: "fixed",
       daily_minutes: 480,
       days: "0",

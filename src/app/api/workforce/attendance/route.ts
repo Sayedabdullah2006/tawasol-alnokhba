@@ -116,7 +116,7 @@ export async function GET(request: Request) {
       settings: settings.data || {
         workdays: DEFAULT_WORKDAYS,
         starts_at: "09:00",
-        ends_at: "17:00",
+        ends_at: "18:00",
         schedule_mode: "fixed",
         daily_minutes: 480,
       },
@@ -166,7 +166,7 @@ export async function PATCH(request: Request) {
         body.ends_at <= body.starts_at)
     )
       throw new WorkforceError("ساعات الدوام غير صحيحة");
-    if(scheduleMode === "fixed" && body.ends_at>"17:00") throw new WorkforceError("نهاية الدوام القصوى الخامسة مساءً");
+    if(scheduleMode === "fixed" && body.ends_at>"18:00") throw new WorkforceError("نهاية الدوام القصوى السادسة مساءً");
     if (
       !Number.isInteger(body.year) ||
       body.year < 2020 ||
@@ -182,7 +182,7 @@ export async function PATCH(request: Request) {
         p_employee: id,
         p_workdays: [...new Set(body.workdays)],
         p_start: scheduleMode === "flexible" ? "09:00" : body.starts_at,
-        p_end: scheduleMode === "flexible" ? "17:00" : body.ends_at,
+        p_end: scheduleMode === "flexible" ? "18:00" : body.ends_at,
         p_mode: scheduleMode,
         p_minutes: dailyMinutes,
         p_year: body.year,
