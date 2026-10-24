@@ -9,6 +9,19 @@ async function setup(){
  for(const name of ['20261023022342_three_daily_work_confirmations','20261023205919_attendance_action_gate','20261024061024_six_pm_attendance_cutoff'])await db.exec(await readFile(new URL(`../supabase/migrations/${name}.sql`,import.meta.url),'utf8'));
  await db.exec('set role service_role');return db;
 }
+test('opening the reminder on another device cannot confirm or keep the session alive, but the original browser can confirm',async()=>{
+ const db=await setup();try{
+ for(const actor of [ids.noor,ids.monwa]){
+  await setTime(db,'12:59:00');const start=await command(db,{command:'in'},actor);const id=start.session.id;
+  await setTime(db,'13:00:00');
+  for(const name of ['confirm','heartbeat'])await assert.rejects(()=>command(db,{command:name,session_id:id,device:'b'.repeat(64)},actor),{code:'42501'});
+  let current=await snapshot(db,actor);assert.equal(current.session.last_seen_at,start.session.last_seen_at);assert.equal(current.session.next_confirmation_at,start.session.next_confirmation_at);
+  current=await command(db,{command:'confirm',session_id:id},actor);
+  assert.equal(new Date(current.session.next_confirmation_at).toISOString(),'2026-10-24T12:00:00.000Z');
+  await command(db,{command:'out',session_id:id},actor);
+ }
+ }finally{await db.close()}
+});
 test('background connection needs no clicks or task switching; delayed heartbeats below five minutes keep both employees present',async()=>{
  const db=await setup();try{
  for(const actor of [ids.noor,ids.monwa]){
