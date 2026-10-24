@@ -11,7 +11,7 @@ async function setup(){
  create function public.wf_comments_command(p_actor uuid,p_body text) returns void language plpgsql as $$begin return;end$$;
  alter table wf_attendance_settings add column if not exists schedule_mode text default 'flexible';
  `);
- for(const name of ['20261023022342_three_daily_work_confirmations','20261023205919_attendance_action_gate','20261024091000_six_pm_attendance_cutoff'])
+ for(const name of ['20261023022342_three_daily_work_confirmations','20261023205919_attendance_action_gate','20261024061024_six_pm_attendance_cutoff'])
   await db.exec(await readFile(new URL(`../supabase/migrations/${name}.sql`,import.meta.url),'utf8'));
  await db.exec('set role service_role');return db;
 }
