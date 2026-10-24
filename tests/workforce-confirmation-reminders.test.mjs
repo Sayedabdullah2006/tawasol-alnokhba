@@ -14,7 +14,8 @@ async function setup(){const db=await createNotificationDB();await db.exec(`
  `);
  const source=await readFile(new URL('../supabase/migrations/20261022213937_linked_work_sessions.sql',import.meta.url),'utf8');
  const start=source.indexOf('create function workforce_private.work_expiry('),end=source.indexOf('revoke all on function workforce_private.work_expiry',start);
- await db.exec(source.slice(start,end));await db.exec(await readFile(migration,'utf8'));return db;}
+ await db.exec(source.slice(start,end));await db.exec(await readFile(migration,'utf8'));
+ await db.exec(await readFile(new URL('../supabase/migrations/20261024092245_confirmation_same_browser_notice.sql',import.meta.url),'utf8'));return db;}
 const generate=async(db,time)=>{await db.query("select set_config('test.clock',$1,false)",[at(time)]);return (await db.query('select public.wf_generate_notification_reminders($1) v',[at(time)])).rows[0].v.created;};
 const claim=async db=>(await db.query('select public.wf_claim_notification_deliveries() v')).rows[0].v.deliveries;
 async function session(db,employee=ids.ne){const id=crypto.randomUUID();await db.query('insert into wf_attendance_sessions(id,employee_id) values($1,$2)',[id,employee]);return id;}
@@ -24,7 +25,10 @@ test('both employees get one inbox and branded mail reminder per due slot, with 
   await session(db);await session(db,ids.me);assert.equal(await generate(db,'10:59:00'),0);
   assert.equal(await generate(db,'11:00:00'),2);assert.equal(await generate(db,'11:00:30'),0);
   const mail=await claim(db);assert.equal(mail.length,2);assert.ok(mail.some(m=>m.email===ids.noor+'@example.com'));assert.ok(mail.some(m=>m.email===ids.monwa+'@example.com'));
-  for(const m of mail){const rendered=renderWorkforceEmail(m);assert.match(rendered.text,/أواصل العمل/);assert.match(rendered.text,/11:05/);assert.match(rendered.text,/انصراف تلقائي/);assert.ok(rendered.html.includes('/logo.png'));assert.equal(m.href,'/employee/attendance/overview');}
+  for(const m of mail){const rendered=renderWorkforceEmail(m);assert.match(rendered.text,/أواصل العمل/);assert.match(rendered.text,/11:05/);assert.match(rendered.text,/انصراف تلقائي/);assert.ok(rendered.html.includes('/logo.png'));assert.equal(m.href,'/employee/attendance/overview');
+   const notice='أكّدي من نفس جهاز ومتصفح تسجيل الحضور؛ فتح الرابط من الجوال لا يؤكد الجلسة ولا يجددها.';
+   assert.equal(rendered.text.split(notice).length-1,1);assert.equal(rendered.html.split(notice).length-1,1);
+  }
   assert.equal((await db.query("select count(*)::int n from wf_attendance_sessions where next_confirmation_at='2026-10-24T11:00:00+03:00'")).rows[0].n,2);
   for(const time of ['13:00:00','15:00:00']){
    await db.query('update wf_attendance_sessions set next_confirmation_at=$1,last_seen_at=$1',[at(time)]);
