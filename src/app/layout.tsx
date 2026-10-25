@@ -14,6 +14,9 @@ const cairo = Cairo({
 export const metadata: Metadata = {
   title: 'تواصل النخبة',
   description: 'منصة احترافية لنشر أخبارك وإنجازاتك عبر أبرز المؤثرين في السعودية',
+  verification: {
+    google: 'Zy9ZeKcOTOkvcRlpgGbgY3OW6XQi9R7lmq_zCNLJh8M',
+  },
 }
 
 export const viewport: Viewport = {

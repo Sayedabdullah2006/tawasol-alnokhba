@@ -2,7 +2,8 @@ export const metadata = {
   title: 'السياسات | تواصل النخبة',
 }
 
-const sections = [
+type PolicyItem = { head: string; body: string; href?: string; linkLabel?: string }
+const sections: { id: string; title: string; items: PolicyItem[] }[] = [
   {
     id: 'terms',
     title: 'شروط الاستخدام',
@@ -52,6 +53,36 @@ const sections = [
     ],
   },
   {
+    id: 'google-data',
+    title: 'خصوصية ربط Google Calendar والاجتماعات',
+    items: [
+      {
+        head: 'الخدمة والبيانات التي نصل إليها',
+        body: 'تطبيق «تواصل النخبة - الاجتماعات» يتيح للحساب المنظم المعتمد ربط Google Calendar لإنشاء اجتماعات Google Meet من الموقع وتعديلها وإلغائها. نتحقق من بريد حساب Google ومعرّفه، ونستخدم صلاحية calendar.events.owned لإدارة أحداث التقاويم التي يملكها الحساب. يستخدم التطبيق التقويم الرئيسي لإنشاء الاجتماعات المرتبطة بالموقع وقراءة حالتها وتحديثها؛ ولا يطلب صلاحية Gmail أو ملفات Google Drive.',
+      },
+      {
+        head: 'الغرض والمشاركة',
+        body: 'تُستخدم بيانات Google لتشغيل الاجتماعات فقط: المواعيد والعناوين والمحاور والمشاركون ورابط الانضمام. تُرسل تفاصيل الاجتماع وعناوين المشاركين المحددين إلى Google لإعداد الحدث والدعوات، وتظهر داخل الموقع للمستخدمين المخولين وفق صلاحياتهم. قد تعالج شركات الاستضافة وقاعدة البيانات والبريد البيانات اللازمة لتقديم هذه الوظائف وفق تعليماتنا. لا نبيع بيانات Google، ولا نستخدمها للإعلانات أو التسويق أو تدريب نماذج الذكاء الاصطناعي.',
+      },
+      {
+        head: 'التخزين والحماية',
+        body: 'نحفظ معرّف الحدث ورابط Google Meet وبيانات الاجتماع لمتابعة العمل، ونحفظ رمز تجديد تفويض Google مشفرًا على الخادم. بيانات التفويض غير متاحة للموظفين أو للعامة. يقتصر الوصول إلى بيانات الاجتماعات على ما يلزم لإدارة العمل بحسب الصلاحيات، أو لمعالجة دعم طلبه المستخدم أو متطلبات الأمان.',
+      },
+      {
+        head: 'إلغاء الوصول والاحتفاظ والحذف',
+        body: 'يمكن للحساب المنظم إلغاء وصول التطبيق من صفحة اتصالات حساب Google في أي وقت. إلغاء التفويض يوقف الوصول اللاحق ولا يحذف تلقائيًا أحداث التقويم السابقة أو سجلات الاجتماعات داخل الموقع. نحتفظ بسجلات الاجتماعات اللازمة لمتابعة العمل إلى حين طلب حذفها أو انتهاء الحاجة إليها. لطلب حذف بيانات الربط أو الاجتماعات، تواصل مع support@nukhba.media وحدد الحساب والبيانات المطلوبة؛ قد تُستثنى السجلات التي يلزم الاحتفاظ بها للوفاء بالتزامات نظامية، مع تقييد استخدامها لهذا الغرض.',
+        href: 'https://myaccount.google.com/connections',
+        linkLabel: 'إدارة اتصالات حساب Google',
+      },
+      {
+        head: 'الالتزام بسياسة Google والاستخدام المحدود',
+        body: 'يلتزم استخدام ونقل بيانات مستخدمي Google بسياسة بيانات المستخدم لخدمات Google API، بما فيها متطلبات الاستخدام المحدود. Our use and transfer of Google user data comply with the Google API Services User Data Policy, including its Limited Use requirements.',
+        href: 'https://developers.google.com/terms/api-services-user-data-policy',
+        linkLabel: 'Google API Services User Data Policy',
+      },
+    ],
+  },
+  {
     id: 'refund',
     title: 'سياسة الاسترجاع والإلغاء',
     items: [
@@ -93,6 +124,7 @@ export default function PoliciesPage() {
                       <div key={item.head}>
                         <h3 className="font-bold text-dark text-base mb-1">{item.head}</h3>
                         <p className="text-sm text-muted leading-relaxed">{item.body}</p>
+                        {item.href && <a href={item.href} className="mt-2 inline-block text-sm font-bold text-green underline underline-offset-4">{item.linkLabel}</a>}
                       </div>
                     ))}
                   </div>

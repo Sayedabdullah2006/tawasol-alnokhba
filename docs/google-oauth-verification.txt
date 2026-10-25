@@ -1,0 +1,59 @@
+Nukhba Meetings — Google OAuth verification preparation
+Updated: 2026-10-25 (Asia/Riyadh)
+
+Project: midyear-clone-512620-c0
+App name: تواصل النخبة - الاجتماعات
+Operator and organizer: Tawasol Al-Nokhba; elitecnnct@gmail.com
+Homepage: https://nukhba.media/meetings
+Privacy: https://nukhba.media/policies#google-data
+Terms: https://nukhba.media/policies#terms
+Support: support@nukhba.media
+
+Scope justification (for Google's data-access review)
+openid / email: Identify the Google organizer during explicit connection, verify
+the email address, and restrict the company integration to its approved organizer.
+
+https://www.googleapis.com/auth/calendar.events.owned:
+The application lets the company's authorized managers create, reschedule and
+cancel Google Calendar events with a unique Google Meet conference, select
+participants and associate the event with an internal task. The app reads an
+event it created to recover its Meet link and synchronize updates idempotently.
+Read-only access cannot create or change an event. Access to calendars owned by
+other users is unnecessary, so we use events.owned instead of calendar.events or
+the broader calendar scope. Operations target the organizer's primary calendar.
+
+User flow
+An administrator deliberately opens the Google connection settings. Google
+authorization requests only openid, email and calendar.events.owned. The callback
+checks the Google identity and required scope before storing an encrypted refresh
+token. The company organizer is shared by authorized managers; employees do not
+have to authorize personal calendars. Only invited/authorized users can view
+their meetings. Inviting, updating and cancelling genuine meetings can notify
+participants through Google. A separate app reminder links back to the site.
+
+Data handling
+We retain organizer email/Google subject, encrypted authorization data and the
+meeting identifiers, Meet URLs, schedule, description and selected participants
+needed for company meetings. Google data is not sold or used for advertising,
+marketing or AI training. Users can revoke Google access through their account
+connections and request deletion at support@nukhba.media. Revocation stops future
+access; it does not automatically erase prior events or work records. The public
+privacy policy explains storage, access, processors and deletion requests.
+
+Review evidence to prepare after branding is accepted
+- Record the real consent flow in English and show the app name and client ID.
+- Show how the three requested scopes support the actual meeting workflow.
+- Demonstrate create/read/update/cancel using a silent disposable appointment,
+  with no attendee invitations, app notifications or trial emails.
+- Do not expose client secrets, refresh/access tokens, staff finances, IDs or
+  unrelated meeting content in the recording.
+- Supply a real unlisted demonstration-video URL. A mockup is not evidence of a
+  completed Google authorization flow. Do not submit an absent or fabricated URL.
+- Review Google's final declarations before submission.
+
+Ownership preparation
+The homepage verification meta tag is tied to elitecnnct@gmail.com and the
+https://nukhba.media/ URL-prefix property. Keep the tag after ownership succeeds.
+Do not remove other owners' verification tokens. The previous branding check
+requested ownership verification and a 24-hour propagation period before retry.
+This document records preparation, not a claim of Google approval.
