@@ -398,7 +398,7 @@ export default function MonthlyPayroll({
             </p>
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
               {[
-                [statement?.daily_accrual&&!statement.daily_accrual.closed?"صافي المستحق حتى اليوم":"صافي المستحق", statement?.daily_accrual?.total_amount??expected],
+                ["صافي الراتب المستحق نهاية الشهر", expected],
                 ["المعتمد للشهر", approved],
                 ["المصروف المسجل", paid],
                 ["المتبقي من المعتمد", remaining],

@@ -1,6 +1,8 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment -- The same source is checked by Next TypeScript and Deno.
 // @ts-ignore Explicit extension is required by the deployed Deno module loader.
 import {performanceFacts,evaluatePerformance,weeklyTaskActivity,type PerformanceEvidence,type PerformanceSummary} from "./workforce-performance.ts";
+// @ts-ignore Deno deployment requires explicit extension.
+import {renderPayrollEmail, type PayrollEmail} from "./workforce-payroll-email.ts";
 export type WorkforceMail = {
   email: string;
   name: string;
@@ -15,6 +17,7 @@ export type WorkforceMail = {
   deliverable?: string | null;
   cc?: string[];
   weeklyReport?: WeeklyReport;
+  payrollReport?: PayrollEmail;
 };
 export type WeeklyReport = {
   performanceEvidence?:PerformanceEvidence[];performance?:PerformanceSummary;evidenceVersion?:2;
@@ -130,6 +133,10 @@ const nextAction: Record<string, string> = {
   meeting_reminder: "افتحي الاجتماع من الموقع، ثم انضمي من نفس جهاز ومتصفح تسجيل الحضور لتفعيل حماية جلسة الدوام.",
 };
 export function renderWorkforceEmail(mail: WorkforceMail) {
+  if (mail.kind === "monthly_payroll") {
+    if (!mail.payrollReport) throw new Error("Payroll report snapshot missing");
+    return renderPayrollEmail(mail.name,mail.payrollReport);
+  }
   if (mail.kind === "weekly_report" && !mail.weeklyReport) throw new Error("Weekly report snapshot missing");
   const weekly = mail.kind === "weekly_report" ? mail.weeklyReport : undefined;
   if (weekly) return renderWeeklyEmail(mail,weekly);
