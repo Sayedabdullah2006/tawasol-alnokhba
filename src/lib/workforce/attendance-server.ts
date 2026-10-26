@@ -32,6 +32,11 @@ export async function employeeMonthAttendance(db: WorkforceActor["db"], employee
 
 export async function attendanceMonthSessions(db: WorkforceActor["db"], employeeId: string, startDate: string, month: string) {
   const { first, next } = monthBounds(month), start = startDate > first ? startDate : first;
+  return attendanceRangeSessions(db,employeeId,start,next);
+}
+
+/** Fetch complete periods for displayed days, independently of the table's page boundary. */
+export async function attendanceRangeSessions(db: WorkforceActor["db"], employeeId: string, start: string, next: string) {
   const data: AttendancePeriod[] = [];
   if (start >= next) return { data, error: null };
   const from = new Date(`${start}T00:00:00+03:00`).toISOString();

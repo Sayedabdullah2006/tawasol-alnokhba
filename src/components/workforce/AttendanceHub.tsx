@@ -6,7 +6,7 @@ import UpcomingLeaveCard from "./UpcomingLeaveCard";
 import { WorkSessionBar } from "./WorkSessionProvider";
 import Button from "@/components/ui/Button";
 import { WORKDAYS, type AttendanceData } from "@/lib/workforce/attendance";
-import { attendanceDuration, liveAttendance, workedSeconds, attendanceEnd } from "@/lib/workforce/attendance-summary";
+import { attendanceDuration, attendanceDayProgress, liveAttendance, workedSeconds, attendanceEnd } from "@/lib/workforce/attendance-summary";
 import {CLOSE_REASONS} from "@/lib/workforce/work-session";
 import { REQUEST_KINDS } from "@/lib/workforce/requests";
 import { api, controlClass, Field, Notice, useUnsavedChanges } from "./shared";
@@ -208,6 +208,7 @@ export default function AttendanceHub({
                       </p>
                     )}
                     {attendance && <p className="mt-3 text-sm"><strong className="text-lg tabular-nums">{attendanceDuration(attendance.todayMinutes)}</strong><span className="mx-2 text-muted">اليوم · {attendance.todayPeriods} فترات حضور</span></p>}
+                    {attendance && !attendance.dayOff && attendance.today>=attendance.startsOn && <p className={`mt-2 text-sm font-bold ${attendance.todayMinutes>=attendance.dailyMinutes?"text-emerald-600":"text-muted"}`}>{attendance.todayMinutes>=attendance.dailyMinutes?"اكتملت ساعات اليوم":`المتبقي اليوم ${attendanceDuration(Math.max(0,attendance.dailyMinutes-attendance.todayMinutes))}`}</p>}
                   </div>
                   {!admin && (
                     <div className="flex flex-wrap gap-3">
@@ -222,10 +223,10 @@ export default function AttendanceHub({
                   )}
                 </section>
                 <div className="overflow-x-auto rounded-2xl border bg-white">
-                  <table className="w-full min-w-[620px] text-right text-sm">
+                  <table className="w-full min-w-[760px] text-right text-sm">
                     <thead className="bg-slate-50">
                       <tr>
-                        {["اليوم", "الحضور", "الانصراف", "المدة", "الحالة"].map(
+                        {["اليوم", "الحضور", "الانصراف", "مدة الفترة", "حالة الفترة", "ساعات اليوم"].map(
                           (label) => (
                             <th key={label} className="p-4">
                               {label}
@@ -235,7 +236,11 @@ export default function AttendanceHub({
                       </tr>
                     </thead>
                     <tbody>
-                      {data.sessions.map((row) => (
+                      {data.sessions.map((row,index) => {
+                        const progress = attendanceDayProgress(data.dayPeriods??data.sessions,row.business_date,tick||Date.parse(data.summary.asOf),data.settings.daily_minutes);
+                        const firstForDay=!row.overtime_request_id&&!data.sessions.slice(0,index).some(previous=>previous.business_date===row.business_date&&!previous.overtime_request_id);
+                        const workingDay=data.settings.workdays.includes(new Date(`${row.business_date}T12:00:00Z`).getUTCDay());
+                        return (
                         <tr key={row.id} className="border-t">
                           <td className="p-4">{row.business_date}</td>
                           <td className="p-4">{row.credit_request_id?'ساعات معتمدة':clock(row.checked_in)}</td>
@@ -244,18 +249,19 @@ export default function AttendanceHub({
                             {attendanceDuration(workedSeconds([row],0,Infinity,tick||Date.parse(data.summary.asOf))/60)}
                           </td>
                           <td className="p-4">
-                            {row.overtime_request_id?'خارج دوام معتمد':row.credit_request_id?'طلب ساعات مفقودة':row.close_reason ? CLOSE_REASONS[row.close_reason] : !row.checked_out
+                            {row.overtime_request_id?'خارج دوام معتمد':row.credit_request_id?'طلب ساعات مفقودة':row.close_reason ? row.close_reason==='manual'?'تم الانصراف':CLOSE_REASONS[row.close_reason] : !row.checked_out
                               ? row.policy_version===1 && attendanceEnd(row,tick||Date.parse(data.summary.asOf))<(tick||Date.parse(data.summary.asOf)) ? "انصراف تلقائي" : "حضور مفتوح"
                               : row.source === "correction"
                                 ? "تم التصحيح"
-                                : "مكتمل"}
+                                : "تم الانصراف"}
                           </td>
+                          <td className="p-4">{firstForDay&&<div className="space-y-1 whitespace-nowrap"><strong className="block tabular-nums">{attendanceDuration(progress.seconds/60)}</strong>{workingDay&&<span className={`inline-block rounded-full px-2 py-1 text-xs font-bold ${progress.complete?"bg-emerald-100 text-emerald-800":"bg-slate-100 text-slate-700"}`}>{progress.complete?"مكتمل":`متبقي ${attendanceDuration(progress.remainingMinutes)}`}</span>}</div>}</td>
                         </tr>
-                      ))}
+                      )})}
                       {!data.sessions.length && (
                         <tr>
                           <td
-                            colSpan={5}
+                            colSpan={6}
                             className="p-8 text-center text-muted"
                           >
                             لا توجد سجلات

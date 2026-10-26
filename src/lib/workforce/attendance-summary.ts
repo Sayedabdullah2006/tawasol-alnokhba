@@ -61,6 +61,13 @@ export function workedSeconds(periods: AttendancePeriod[], from: number, until: 
   return total / 1000;
 }
 
+/** Day completion is independent of how any individual attendance period ended. */
+export function attendanceDayProgress(periods: AttendancePeriod[], day: string, now: number, dailyMinutes = 480) {
+  const start = midnight(day), seconds = workedSeconds(periods, start, start + DAY, now);
+  return { seconds, complete: seconds >= dailyMinutes * 60,
+    remainingMinutes: Math.max(0, Math.ceil(dailyMinutes - seconds / 60)) };
+}
+
 export function summarizeAttendance({ periods, startDate, month, now, dailyMinutes = 480, workdays = DEFAULT_WORKDAYS, paidCalendarDays = [], excusedDays = [] }: {
   periods: AttendancePeriod[]; startDate: string; month: string; now: Date; dailyMinutes?: number; workdays?: number[]; paidCalendarDays?: PaidCalendarDay[]; excusedDays?: string[];
 }) {

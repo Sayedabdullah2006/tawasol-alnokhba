@@ -8,7 +8,7 @@ import {
 } from "@/lib/workforce/server";
 import { uuid, textField, WorkforceError } from "@/lib/workforce/validation";
 import { workPage, privateResponse } from "@/lib/workforce/task-server";
-import { attendanceMonthSessions, attendanceCalendarDays, employeeUpcomingLeave, attendanceExcusedDays } from "@/lib/workforce/attendance-server";
+import { attendanceMonthSessions, attendanceRangeSessions, attendanceCalendarDays, employeeUpcomingLeave, attendanceExcusedDays } from "@/lib/workforce/attendance-server";
 import { DEFAULT_WORKDAYS, summarizeAttendance } from "@/lib/workforce/attendance-summary";
 import {employeeLeaveBalance} from "@/lib/workforce/summary-server";
 import {ATTENDANCE_COLUMNS} from "@/lib/workforce/attendance";
@@ -106,10 +106,15 @@ export async function GET(request: Request) {
     ])
       if (result.error && result.error.code !== "PGRST103") throw result.error;
     const leaveBalance=await employeeLeaveBalance(actor,id);
+    const visibleDays = [...new Set((records.data || []).map(row => row.business_date))].sort();
+    const dayPeriods = visibleDays.length ? await attendanceRangeSessions(actor.db,id,visibleDays[0],
+      new Date(Date.parse(visibleDays.at(-1)!+"T00:00:00Z")+86400000).toISOString().slice(0,10)) : {data:[],error:null};
+    if(dayPeriods.error) throw dayPeriods.error;
     const granted=Number(entitlement.data?.days||0);
     return privateResponse({
       employee: exists.data,
       sessions: records.data || [],
+      dayPeriods: dayPeriods.data,
       count: records.count || 0,
       page,
       open: open.data,

@@ -23,6 +23,7 @@ export type AttendanceSession = AttendancePeriod & {
 export type AttendanceData = {
   employee: { id: string; full_name: string };
   sessions: AttendanceSession[];
+  dayPeriods?: AttendancePeriod[];
   count: number;
   page: number;
   open: AttendanceSession | null;
