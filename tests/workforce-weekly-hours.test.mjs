@@ -111,5 +111,6 @@ test('current daily accrual includes bank credit once; approved overtime remains
   assert.equal(first.total_amount,second.total_amount);assert.equal(first.attendance_details.weekly_compensation.applied_seconds,7200);
   assert.equal((await db.query('select count(*)::int n from wf_notifications')).rows[0].n,0);
   assert.equal((await db.query("select has_function_privilege('anon','public.wf_weekly_hours_snapshot(uuid,uuid,date)','execute') n")).rows[0].n,false);
+  assert.equal((await db.query("select provolatile from pg_proc where oid='public.wf_weekly_hours_snapshot(uuid,uuid,date)'::regprocedure")).rows[0].provolatile,'v');
  }finally{await db.close()}
 });
