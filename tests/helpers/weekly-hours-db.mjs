@@ -1,7 +1,7 @@
 import {readFile} from 'node:fs/promises';
 import {createExpenseDB} from './expense-db.mjs';
 import {ids} from './work-session-db.mjs';
-export const weeklyMigration=new URL('../../supabase/migrations/20261026180819_weekly_attendance_compensation.sql',import.meta.url);
+export const weeklyMigration=new URL('../../supabase/migrations/20261026183414_weekly_attendance_compensation.sql',import.meta.url);
 export async function createWeeklyDB({migration=true,baseline=null}={}){
  const db=await createExpenseDB();await db.exec(`reset role;
  alter table wf_attendance_sessions add column credit_request_id uuid,add column overtime_request_id uuid;
