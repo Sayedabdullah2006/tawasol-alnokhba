@@ -2,6 +2,8 @@ import {readFile} from 'node:fs/promises';
 import {createExpenseDB} from './expense-db.mjs';
 import {ids} from './work-session-db.mjs';
 export const weeklyMigration=new URL('../../supabase/migrations/20261026183414_weekly_attendance_compensation.sql',import.meta.url);
+export const stableWeeklyMigration=new URL('../../supabase/migrations/20261026183839_stable_weekly_payroll_snapshots.sql',import.meta.url);
+export async function applyWeeklyMigrations(db){await db.exec(await readFile(weeklyMigration,'utf8'));await db.exec(await readFile(stableWeeklyMigration,'utf8'));}
 export async function createWeeklyDB({migration=true,baseline=null}={}){
  const db=await createExpenseDB();await db.exec(`reset role;
  alter table wf_attendance_sessions add column credit_request_id uuid,add column overtime_request_id uuid;
@@ -19,7 +21,7 @@ export async function createWeeklyDB({migration=true,baseline=null}={}){
  b:=replace(f.prosrc,'today+time ''17:00''','today+workforce_private.employee_work_end(p.employee_id,today)');
  b:=replace(b,'workforce_private.regular_work_end(d)','workforce_private.employee_work_end(p_employee,d)');
  execute replace(pg_get_functiondef(f.oid),f.prosrc,b);end loop;end$$;`);
- if(migration)await db.exec(await readFile(weeklyMigration,'utf8'));
+ if(migration)await applyWeeklyMigrations(db);
  await db.exec(`set role service_role;set test.clock='2026-10-28T12:00:00+03:00';
  insert into wf_attendance_settings(employee_id,daily_minutes,workdays) values('${ids.en}',480,array[0,1,2,3,4,6]),('${ids.em}',480,array[0,1,2,3,4,6]);`);
  return db;

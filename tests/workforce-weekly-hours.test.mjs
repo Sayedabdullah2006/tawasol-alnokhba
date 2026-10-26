@@ -17,6 +17,10 @@ test('Noor and Monwa: same-week surplus offsets a short day once; payroll reduce
    assert.deepEqual(await weekly(db,actor,employee),value);
    const again=(await payrollSnapshot(db,actor,employee)).statement;
    assert.equal(again.total_amount,p.total_amount);assert.equal(again.attendance_amount,p.attendance_amount);
+   await setTime(db,'2026-10-28T12:01:00+03:00');
+   const later=(await payrollSnapshot(db,actor,employee)).statement;assert.equal(later.version,again.version);
+   assert.ok(!('as_of' in later.attendance_details.weekly_compensation));
+   await setTime(db,'2026-10-28T12:00:00+03:00');
   }
   assert.equal((await db.query('select count(*)::int n from wf_attendance_sessions')).rows[0].n,4);
   assert.equal((await db.query('select count(*)::int n from wf_notifications')).rows[0].n,0);

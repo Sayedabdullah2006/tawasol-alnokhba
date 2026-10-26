@@ -1,5 +1,5 @@
 import {readFile} from 'node:fs/promises';
-import {createWeeklyDB,weeklyMigration,setTime,addPeriod,weekly} from '../tests/helpers/weekly-hours-db.mjs';
+import {createWeeklyDB,applyWeeklyMigrations,setTime,addPeriod,weekly} from '../tests/helpers/weekly-hours-db.mjs';
 import {ids} from '../tests/helpers/work-session-db.mjs';
 import {payrollSnapshot} from '../tests/helpers/payroll-attendance-db.mjs';
 import {summarizeAttendance} from '../src/lib/workforce/attendance-summary.ts';
@@ -25,7 +25,7 @@ export async function currentWeeklyPreview(){
  }
  await db.exec('alter table wf_attendance_sessions enable trigger all;set role service_role');
  const before=[];for(const [actor,employee] of [[ids.noor,ids.en],[ids.monwa,ids.em]])before.push((await payrollSnapshot(db,actor,employee)).statement);
- await db.exec('reset role');await db.exec(await readFile(weeklyMigration,'utf8'));await db.exec('set role service_role');
+ await db.exec('reset role');await applyWeeklyMigrations(db);await db.exec('set role service_role');
  const result=[];
  for(const [index,[actor,employee]] of [[ids.noor,ids.en],[ids.monwa,ids.em]].entries()){
   const e=source.employees.find(e=>e.full_name.startsWith(employee===ids.en?'نور':'منوه'));
@@ -42,7 +42,7 @@ export async function illustrativeWeeklyPreview(){
  await db.exec("reset role;update workforce_private.payroll_attendance_policy set starts_on='2026-10-24';set role service_role");
  for(const employee of [ids.en,ids.em]){await addPeriod(db,employee,'2026-10-24','08:00:00','18:00:00');await addPeriod(db,employee,'2026-10-25','09:00:00','15:00:00');}
  const before=[];for(const [actor,employee] of [[ids.noor,ids.en],[ids.monwa,ids.em]])before.push((await payrollSnapshot(db,actor,employee)).statement);
- await db.exec('reset role');await db.exec(await readFile(weeklyMigration,'utf8'));await db.exec('set role service_role');
+ await db.exec('reset role');await applyWeeklyMigrations(db);await db.exec('set role service_role');
  const result=[];for(const [index,[actor,employee]] of [[ids.noor,ids.en],[ids.monwa,ids.em]].entries()){
   const value=await weekly(db,actor,employee),payroll=(await payrollSnapshot(db,actor,employee)).statement;
   const periods=(await db.query('select * from wf_attendance_sessions where employee_id=$1',[employee])).rows;
