@@ -36,6 +36,10 @@ assert.equal(reports[0].payrollReport.periodStart,'2026-10-20');assert.equal(rep
 const next=(await db.query("select * from workforce_private.monthly_payroll_mail_data('2026-11-28')")).rows.map(r=>r.monthly_payroll_mail_data.snapshot);
 assert.equal(next.find(r=>r.name==='الموظفة الثانية').payrollReport.gross,'6430.00');
 assert(next.every(r=>r.payrollReport.attendance==='25.00'&&r.payrollReport.source==='projection'));
+await db.exec('begin;delete from public.wf_monthly_payroll;');
+const partialProjection=(await db.query("select * from workforce_private.monthly_payroll_mail_data('2026-10-28')")).rows.map(r=>r.monthly_payroll_mail_data.snapshot);
+assert.equal(partialProjection.find(r=>r.name==='الموظفة الثانية').payrollReport.gross,'3000.67');
+await db.exec('rollback');
 for(const report of reports){const mail=renderWorkforceEmail(report);assert(mail.html.includes('dir="rtl"'));assert(mail.html.includes('صافي المستحق'));assert(!mail.html.includes('تم تحويل'));assert(!mail.html.includes('example.invalid'));assert(mail.text.replaceAll(',','').includes(report.payrollReport.net));}
 assert.throws(()=>renderWorkforceEmail({...reports[0],payrollReport:undefined}));
 assert.throws(()=>renderWorkforceEmail({...reports[0],payrollReport:{...reports[0].payrollReport,net:'0.00'}}));

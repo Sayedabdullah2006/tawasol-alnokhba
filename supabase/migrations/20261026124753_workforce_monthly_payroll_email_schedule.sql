@@ -26,7 +26,7 @@ begin
    with days as(select generate_series(period_start::timestamp,last_day::timestamp,interval '1 day')::date d),
    terms as(select c.basic_salary,c.allowances from days left join lateral
     (select c.basic_salary,c.allowances from public.wf_compensation_versions c where c.employee_id=e.id and c.effective_from<=days.d order by c.effective_from desc,c.revision desc limit 1) c on true)
-   select round(sum(basic_salary)/denominator,2),round(sum(coalesce((select sum((a->>'amount')::numeric) from jsonb_array_elements(terms.allowances) a),0))/denominator,2),count(*) filter(where basic_salary is null)
+   select round(sum(basic_salary)/denominator,2),round(sum(basic_salary+coalesce((select sum((a->>'amount')::numeric) from jsonb_array_elements(terms.allowances) a),0))/denominator,2)-round(sum(basic_salary)/denominator,2),count(*) filter(where basic_salary is null)
    into basic,allowances,missing from terms;
    if missing>0 then raise exception 'Salary settings missing for monthly report' using errcode='PT409';end if;
    insurance_detail:=workforce_private.insurance_payroll(e.id,first_day);
