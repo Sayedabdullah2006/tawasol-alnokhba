@@ -4,7 +4,8 @@ import {ids} from './work-session-db.mjs';
 export const weeklyMigration=new URL('../../supabase/migrations/20261026183414_weekly_attendance_compensation.sql',import.meta.url);
 export const stableWeeklyMigration=new URL('../../supabase/migrations/20261026183839_stable_weekly_payroll_snapshots.sql',import.meta.url);
 export const weeklyTransactionMigration=new URL('../../supabase/migrations/20261026184412_weekly_summary_authorization_transaction.sql',import.meta.url);
-export async function applyWeeklyMigrations(db){for(const migration of [weeklyMigration,stableWeeklyMigration,weeklyTransactionMigration])await db.exec(await readFile(migration,'utf8'));}
+export const weeklyOvertimeMigration=new URL('../../supabase/migrations/20261026185444_exclude_approved_overtime_from_weekly_credit.sql',import.meta.url);
+export async function applyWeeklyMigrations(db){for(const migration of [weeklyMigration,stableWeeklyMigration,weeklyTransactionMigration,weeklyOvertimeMigration])await db.exec(await readFile(migration,'utf8'));}
 export async function createWeeklyDB({migration=true,baseline=null}={}){
  const db=await createExpenseDB();await db.exec(`reset role;
  alter table wf_attendance_sessions add column credit_request_id uuid,add column overtime_request_id uuid;

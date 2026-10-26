@@ -114,3 +114,27 @@ test('current daily accrual includes bank credit once; approved overtime remains
   assert.equal((await db.query("select provolatile from pg_proc where oid='public.wf_weekly_hours_snapshot(uuid,uuid,date)'::regprocedure")).rows[0].provolatile,'v');
  }finally{await db.close()}
 });
+
+test('approved overtime overlapping a flexible regular clock cannot mint or consume weekly credit',async()=>{
+ const db=await createWeeklyDB();try{
+  await addPeriod(db,ids.en,'2026-10-26','12:00:00','22:00:00');await addPeriod(db,ids.en,'2026-10-27','09:00:00','15:00:00');
+  const before=await weekly(db);assert.equal(day(before,'2026-10-26').generated_seconds,7200);
+  const r=(await db.query("insert into wf_employee_requests(employee_id,kind,status,title,starts_at,ends_at) values($1,'overtime','pending','خارج دوام','2026-10-26T18:00:00+03:00','2026-10-26T20:00:00+03:00') returning id,version",[ids.en])).rows[0];
+  await db.query('select wf_decide_overtime_request($1,$2,$3,$4,$5,$6)',[r.id,ids.admin,r.version,'اعتماد ساعات إضافية','2026-10-26T18:00:00+03:00','2026-10-26T20:00:00+03:00']);
+  const after=await weekly(db);assert.equal(day(after,'2026-10-26').generated_seconds,0);assert.equal(day(after,'2026-10-26').attendance_seconds,28800);
+  assert.equal(after.applied_seconds,0);const p=(await payrollSnapshot(db)).statement;
+  assert.equal(Number(p.overtime_amount),66.92);assert.equal(p.attendance_details.weekly_compensation.applied_seconds,0);
+  assert.equal((await db.query('select count(*)::int n from wf_notifications')).rows[0].n,0);
+ }finally{await db.close()}
+});
+test('a paid bank allocation cannot later be reused as an overlapping overtime award',async()=>{
+ const db=await createWeeklyDB();try{
+  await addPeriod(db,ids.en,'2026-10-26','12:00:00','22:00:00');await addPeriod(db,ids.en,'2026-10-27','09:00:00','15:00:00');
+  const p=(await payrollSnapshot(db)).statement;
+  await db.query("update wf_monthly_payroll set status='paid',paid_amount=total_amount,approved_at=now(),approved_by=$2 where id=$1",[p.id,ids.admin]);
+  const r=(await db.query("insert into wf_employee_requests(employee_id,kind,status,title,starts_at,ends_at) values($1,'overtime','pending','خارج دوام','2026-10-26T18:00:00+03:00','2026-10-26T20:00:00+03:00') returning id,version",[ids.en])).rows[0];
+  await assert.rejects(()=>db.query('select wf_decide_overtime_request($1,$2,$3,$4,$5,$6)',[r.id,ids.admin,r.version,'اعتماد ساعات إضافية','2026-10-26T18:00:00+03:00','2026-10-26T20:00:00+03:00']),/كشف مصروف/);
+  assert.equal((await db.query('select status from wf_employee_requests where id=$1',[r.id])).rows[0].status,'pending');
+  assert.equal(Number((await payrollSnapshot(db)).statement.overtime_amount),0);
+ }finally{await db.close()}
+});
