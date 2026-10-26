@@ -9,7 +9,7 @@ export async function GET(request:Request){try{
  requireWorkSummaryAccess(actor,id);
  const db=await createServiceRoleClient();const employee=await db.from("wf_employees").select("id,full_name,start_date,status").eq("id",id).maybeSingle();
  if(employee.error)throw employee.error;if(!employee.data||actor.role!=="admin"&&id!==actor.employee?.id&&employee.data.status!=="active")throw new WorkforceError("الملخص غير متاح",404);
- const [attendance,payroll,leave]=await Promise.all([employeeMonthAttendance(db,id,employee.data.start_date,month,new Date()),attendancePayrollSnapshot(actor,id,`${month}-01`,true),employeeLeaveBalance(actor,id)]);
+ const [attendance,payroll,leave]=await Promise.all([employeeMonthAttendance(db,id,employee.data.start_date,month,new Date(),actor),attendancePayrollSnapshot(actor,id,`${month}-01`,true),employeeLeaveBalance(actor,id)]);
  const s=payroll.statement,a=attendance.open;
  return privateResponse({employee:{id,full_name:employee.data.full_name},summary:attendance.summary,
   open:a?{meeting_id:a.meeting_id,meeting_until:a.meeting_until,overtime_request_id:a.overtime_request_id,checked_in:a.checked_in,checked_out:a.checked_out,policy_version:a.policy_version,cutoff_at:a.cutoff_at,last_seen_at:a.last_seen_at,next_confirmation_at:a.next_confirmation_at,break_started_at:a.break_started_at,break_paid_until:a.break_paid_until,unpaid_periods:a.unpaid_periods}:null,

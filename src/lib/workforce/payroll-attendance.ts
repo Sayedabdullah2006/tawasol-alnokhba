@@ -5,6 +5,8 @@ export function splitAttendanceAdjustment(total:string,sick:string="0") {
  return {hours:fromCents(all-medical),sick:fromCents(medical)};
 }
 export type AttendanceSettlement = {
+ weekly_compensation?:import('./weekly-hours').WeeklyHours;
+ waived_amount?:string;waiver_reason?:string|null;
  starts_on: string; through: string | null; required_seconds: number; credited_seconds: number;
  missing_seconds: number; days: number; hourly_rate: string | null; calculated_amount: string;
  applied_amount?: string; unapplied_amount?: string;

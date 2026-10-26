@@ -34,13 +34,15 @@ export async function attendanceWorkbook(month: string, employees: AttendanceExp
     page.getRow(4).eachCell(cell => {cell.font={name:"Arial",bold:true,color:{argb:"FFFFFFFF"}};cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FF245978"}};});
     return page;
   }
-  const summary = sheet("ملخص الموظفات", ["الموظفة","المسمى الوظيفي","تاريخ المباشرة","بداية الاحتساب","أيام العمل","المستهدف","المنجز","المتبقي","الإضافي","إجازات رسمية مدفوعة"], [30,28,18,18,16,18,18,18,18,24]);
+  const summary = sheet("ملخص الموظفات", ["الموظفة","المسمى الوظيفي","تاريخ المباشرة","بداية الاحتساب","أيام العمل","المستهدف","المنجز","المتبقي","زيادة الحضور","إجازات رسمية مدفوعة","المحتسب لمستهدف الشهر","التعويض المستخدم"], [30,28,18,18,16,18,18,18,18,24,26,24]);
   const periods = sheet("فترات الحضور والانصراف", ["الموظفة","الحضور — الرياض","الانصراف — الرياض","المدة المحتسبة بالشهر","الحالة"], [30,26,26,26,24]);
   const credits=sheet("الساعات المفقودة المعتمدة",["الموظفة","اليوم","الساعات المعتمدة","مرجع الطلب"],[30,22,24,42]);
+  const balancing=sheet("تعويض الساعات الأسبوعي",["الموظفة","يوم الزيادة","اليوم المعوض","الساعات المستخدمة"],[30,22,22,24]);
   for (const employee of employees) {
     const s=employee.summary;
-    const row=summary.addRow([employee.full_name,employee.job_title,employee.start_date,s.startsOn>s.endsOn?"—":s.startsOn,s.workdayCount,s.targetMinutes/1440,s.workedMinutes/1440,s.remainingMinutes/1440,s.extraMinutes/1440,s.paidHolidayMinutes/1440]);
-    for(let column=6;column<=10;column++) row.getCell(column).numFmt='[h]:mm';
+    const row=summary.addRow([employee.full_name,employee.job_title,employee.start_date,s.startsOn>s.endsOn?"—":s.startsOn,s.workdayCount,s.targetMinutes/1440,s.workedMinutes/1440,s.remainingMinutes/1440,s.extraMinutes/1440,s.paidHolidayMinutes/1440,(s.creditedMinutes??s.workedMinutes)/1440,(s.weeklyCompensation?.applied_seconds??0)/86400]);
+    for(let column=6;column<=12;column++) row.getCell(column).numFmt='[h]:mm';
+    for(const transfer of s.weeklyCompensation?.transfers??[]){const r=balancing.addRow([employee.full_name,transfer.source_day,transfer.target_day,transfer.seconds/86400]);r.getCell(4).numFmt='[h]:mm:ss';}
     const approved=new Map<string,{day:string;seconds:number}>();
     for(const period of attendanceExportPeriods(employee.periods,s)) {
       if(period.credit_request_id){const previous=approved.get(period.credit_request_id);approved.set(period.credit_request_id,{day:new Date(period.checked_in).toLocaleDateString('en-CA',{timeZone:'Asia/Riyadh'}),seconds:(previous?.seconds??0)+period.seconds});continue;}
@@ -51,7 +53,7 @@ export async function attendanceWorkbook(month: string, employees: AttendanceExp
     }
     for(const [id,item] of approved){const row=credits.addRow([employee.full_name,item.day,item.seconds/86400,id]);row.getCell(3).numFmt='[h]:mm:ss';}
   }
-  for (const page of [summary,periods,credits]) {
+  for (const page of [summary,periods,credits,balancing]) {
     page.autoFilter={from:{row:4,column:1},to:{row:Math.max(4,page.rowCount),column:page.columnCount}};
     page.eachRow((row,index) => { row.alignment={vertical:"middle",horizontal:"right",wrapText:true};if(index>=5){row.height=28;row.eachCell(cell=>{cell.font={name:"Arial",size:11};if(index%2)cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFEEF5FA"}};});} });
   }

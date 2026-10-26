@@ -16,7 +16,7 @@ test('XLSX preserves numeric durations, Arabic layout, and names as literal stri
  const bytes=await attendanceWorkbook('2026-10',[{full_name:'=1+1',job_title:'موظفة',start_date:'2026-10-20',summary,periods}],now);
  assert.equal(Buffer.from(bytes).subarray(0,2).toString(),'PK');
  const book=new ExcelJS.Workbook();await book.xlsx.load(Buffer.from(bytes));
- assert.equal(book.worksheets.length,3);
+ assert.equal(book.worksheets.length,4);
  const sheet=book.getWorksheet('ملخص الموظفات'),detail=book.getWorksheet('فترات الحضور والانصراف');
  const duration=cell=>cell.value instanceof Date?cell.value.getTime()/86400000+25569:cell.value;
  assert.equal(sheet.getCell('A5').value,'=1+1');assert.ok(Math.abs(duration(sheet.getCell('F5'))-80/24)<1e-8);

@@ -55,7 +55,7 @@ export async function GET(request: Request) {
     const employees = await Promise.all(data.employees.map(async employee => {
       const record = await actor.db.from("wf_employees").select("start_date").eq("id", employee.id).single();
       if (record.error) throw record.error;
-      const { periods: _periods, ...attendance } = await employeeMonthAttendance(actor.db, employee.id, record.data.start_date, month, now);
+      const { periods: _periods, ...attendance } = await employeeMonthAttendance(actor.db, employee.id, record.data.start_date, month, now,actor);
       void _periods;
       return { ...employee, attendance, performance:await employeePerformance(actor,employee.id,month,now) };
     }));

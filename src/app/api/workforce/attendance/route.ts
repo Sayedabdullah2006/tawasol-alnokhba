@@ -12,6 +12,7 @@ import { attendanceMonthSessions, attendanceRangeSessions, attendanceCalendarDay
 import { DEFAULT_WORKDAYS, summarizeAttendance } from "@/lib/workforce/attendance-summary";
 import {employeeLeaveBalance} from "@/lib/workforce/summary-server";
 import {ATTENDANCE_COLUMNS} from "@/lib/workforce/attendance";
+import {employeeWeeklyHours} from '@/lib/workforce/weekly-hours-server';
 export async function GET(request: Request) {
   try {
     const actor = await workforceActor(),
@@ -105,7 +106,7 @@ export async function GET(request: Request) {
       monthSessions,
     ])
       if (result.error && result.error.code !== "PGRST103") throw result.error;
-    const leaveBalance=await employeeLeaveBalance(actor,id);
+    const [leaveBalance,weeklyCompensation]=await Promise.all([employeeLeaveBalance(actor,id),employeeWeeklyHours(actor,id,today.slice(0,7))]);
     const visibleDays = [...new Set((records.data || []).map(row => row.business_date))].sort();
     const dayPeriods = visibleDays.length ? await attendanceRangeSessions(actor.db,id,visibleDays[0],
       new Date(Date.parse(visibleDays.at(-1)!+"T00:00:00Z")+86400000).toISOString().slice(0,10)) : {data:[],error:null};
@@ -131,7 +132,7 @@ export async function GET(request: Request) {
       today,
       summary: summarizeAttendance({ periods: monthSessions.data, startDate: exists.data.start_date,
         month: today.slice(0, 7), now: new Date(), dailyMinutes: settings.data?.daily_minutes ?? 480,
-        workdays: settings.data?.workdays, paidCalendarDays, excusedDays }),
+        workdays: settings.data?.workdays, paidCalendarDays, excusedDays,weeklyCompensation }),
     });
   } catch (e) {
     return apiError(e);

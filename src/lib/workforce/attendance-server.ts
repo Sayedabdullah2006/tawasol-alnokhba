@@ -4,6 +4,7 @@ import { monthBounds, riyadhDate, summarizeAttendance, type AttendancePeriod } f
 import { WorkforceError } from "./validation";
 import {upcomingLeave,type ApprovedLeaveRow} from "./upcoming-leave";
 import {ATTENDANCE_COLUMNS} from "./attendance";
+import {employeeWeeklyHours} from './weekly-hours-server';
 
 export function attendanceMonth(value: string | null, now = new Date()) {
   const month = value ?? riyadhDate(now).slice(0, 7);
@@ -12,9 +13,9 @@ export function attendanceMonth(value: string | null, now = new Date()) {
   return month;
 }
 
-export async function employeeMonthAttendance(db: WorkforceActor["db"], employeeId: string, startDate: string, month: string, now: Date) {
+export async function employeeMonthAttendance(db: WorkforceActor["db"], employeeId: string, startDate: string, month: string, now: Date, actor:WorkforceActor) {
   const currentMonth = riyadhDate(now).slice(0, 7);
-  const [periods, currentPeriods, settings, open, active, paidCalendarDays, excusedDays] = await Promise.all([
+  const [periods, currentPeriods, settings, open, active, paidCalendarDays, excusedDays,weekly,currentWeekly] = await Promise.all([
     attendanceMonthSessions(db, employeeId, startDate, month),
     month === currentMonth ? Promise.resolve(null) : attendanceMonthSessions(db, employeeId, startDate, currentMonth),
     db.from("wf_attendance_settings").select("daily_minutes,workdays").eq("employee_id", employeeId).maybeSingle(),
@@ -22,10 +23,12 @@ export async function employeeMonthAttendance(db: WorkforceActor["db"], employee
     db.from("wf_work_segments").select("title,kind,starts_at").eq("employee_id",employeeId).is("ends_at",null).maybeSingle(),
     attendanceCalendarDays(db,[month,currentMonth]),
     attendanceExcusedDays(db,employeeId,[month,currentMonth]),
+    employeeWeeklyHours(actor,employeeId,month),
+    month===currentMonth?Promise.resolve(null):employeeWeeklyHours(actor,employeeId,currentMonth),
   ]);
   for (const result of [periods, currentPeriods, settings, open, active]) if (result?.error) throw result.error;
   const summarize = (data: AttendancePeriod[], selected: string) => summarizeAttendance({ periods: data, startDate, month: selected, now,
-    dailyMinutes: settings.data?.daily_minutes ?? 480, workdays: settings.data?.workdays, paidCalendarDays, excusedDays });
+    dailyMinutes: settings.data?.daily_minutes ?? 480, workdays: settings.data?.workdays, paidCalendarDays, excusedDays,weeklyCompensation:selected===month?weekly:currentWeekly??weekly });
   const summary = summarize(periods.data, month);
   return { summary, todaySummary: currentPeriods ? summarize(currentPeriods.data, currentMonth) : summary, open: open.data, periods: periods.data, active:active.data };
 }

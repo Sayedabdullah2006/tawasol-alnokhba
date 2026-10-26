@@ -12,7 +12,7 @@ export async function GET(request: Request) {
       const page = await actor.db.from("wf_employees").select("id,full_name,job_title,start_date").order("full_name").order("id").range(offset,offset+499);
       if(page.error)throw page.error;
       for(const employee of page.data){
-        const {summary,periods}=await employeeMonthAttendance(actor.db,employee.id,employee.start_date,month,now);
+        const {summary,periods}=await employeeMonthAttendance(actor.db,employee.id,employee.start_date,month,now,actor);
         employees.push({...employee,summary,periods});
       }
       if(page.data.length<500)break;

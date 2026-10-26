@@ -6,6 +6,7 @@ import ProgressOrbit from "./ProgressOrbit";
 import {useWorkSession} from "./WorkSessionProvider";
 import type {AttendancePeriod} from "@/lib/workforce/attendance-summary";
 import type {LeaveBalance} from "@/lib/workforce/leave";
+import WeeklyHoursBalance from './WeeklyHoursBalance';
 
 export default function AttendanceProgressCard({ summary, open, leaveDays,leave,linkedSession=true,readOnly=false,title="ساعات دوامي",compact=false }: {
   summary: AttendanceSummary; open: AttendancePeriod | null; leaveDays: number;
@@ -18,8 +19,8 @@ export default function AttendanceProgressCard({ summary, open, leaveDays,leave,
   const live = liveAttendance(summary, open, tick?tick+(linkedSession?work?.clockOffset??0:0):0);
   const beforeStart = summary.today < summary.startsOn;
   const status = beforeStart ? "قبل المباشرة" : live.needsCorrection ? "يحتاج تصحيح الحضور" : live.isPresent ? open?.break_started_at?"في استراحة":"الدوام جارٍ" : live.todayMinutes ? "تم الانصراف" : live.dayOff ? live.paidHoliday?`${live.paidHoliday} · مدفوعة`:"يوم إجازة" : "لم يبدأ الدوام";
-  const progress = live.targetMinutes ? live.workedMinutes / live.targetMinutes * 100 : 0;
-  const dayProgress = live.dailyMinutes ? Math.min(100, live.todayMinutes / live.dailyMinutes * 100) : 0;
+  const progress = live.targetMinutes ? (live.creditedMinutes??live.workedMinutes) / live.targetMinutes * 100 : 0;
+  const dayProgress = live.dailyMinutes ? Math.min(100, live.todayCreditedMinutes / live.dailyMinutes * 100) : 0;
   const date = (value: string) => new Date(`${value}T12:00:00+03:00`).toLocaleDateString("ar-SA", {calendar:"gregory", day:"numeric", month:"short"});
   return <section style={{backdropFilter:"none",WebkitBackdropFilter:"none"}} data-work-summary-card="attendance" className="portal-panel flex min-w-0 flex-col rounded-3xl border border-sky-200 bg-gradient-to-br from-sky-50 to-blue-100/80 p-5 text-sky-950 shadow-sm sm:p-6" aria-label="ساعات دوامي">
     <header className="flex items-center justify-between gap-3">
@@ -30,16 +31,19 @@ export default function AttendanceProgressCard({ summary, open, leaveDays,leave,
       <div className="min-w-0"><p className="text-xs font-bold opacity-75">المنجز هذا الشهر</p><p className="mt-2 text-2xl font-black tabular-nums sm:text-3xl" data-month-worked>{attendanceDuration(live.workedMinutes)}</p><p className="mt-2 text-xs opacity-75">{summary.startsOn > summary.endsOn ? `المباشرة ${date(summary.startsOn)}` : `${date(summary.startsOn)} — ${date(summary.endsOn)} · ${summary.workdayCount} يوم عمل`}</p></div>
       <ProgressOrbit value={progress} label="إنجاز ساعات الشهر" detail="من ساعات الشهر" />
     </div>
+    {live.weeklyCompensation?.enabled&&<p className="mt-3 flex flex-wrap justify-between gap-2 text-xs"><span>المحتسب لمستهدف الشهر</span><strong className="tabular-nums">{attendanceDuration(live.creditedMinutes??live.workedMinutes)}</strong></p>}
+    <WeeklyHoursBalance value={live.weeklyCompensation}/>
     <div className="grid grid-cols-2 gap-3">
       <div className="attendance-stat rounded-2xl border border-sky-200/40 bg-white/40 p-3"><p className="text-xs opacity-75">المتبقي للشهر</p><strong className="mt-2 block text-lg tabular-nums" data-month-remaining>{attendanceDuration(live.remainingMinutes)}</strong></div>
       <div className="attendance-stat rounded-2xl border border-sky-200/40 bg-white/40 p-3"><p className="text-xs opacity-75">المستهدف</p><strong className="mt-2 block text-lg tabular-nums">{attendanceDuration(live.targetMinutes)}</strong></div>
     </div>
     {live.paidHolidayMinutes>0&&<p className="mt-3 text-xs font-bold">إجازات رسمية مدفوعة · {attendanceDuration(live.paidHolidayMinutes)}</p>}
     {live.approvedMissingMinutes>0&&<p className="mt-2 text-xs font-bold">منها ساعات مفقودة معتمدة · {attendanceDuration(live.approvedMissingMinutes)}</p>}
-    {!!live.extraMinutes && <p className="mt-3 text-sm font-bold text-emerald-700">إضافي: {attendanceDuration(live.extraMinutes)}</p>}
+    {!!live.extraMinutes && <p className="mt-3 text-sm font-bold text-emerald-700">زيادة الحضور: {attendanceDuration(live.extraMinutes)}</p>}
     <div className={`attendance-stat my-4 rounded-2xl border border-sky-200/40 bg-white/40 ${compact?"p-3":"p-4"}`}>
       <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-black">اليوم</h3><span className={`inline-flex items-center gap-2 rounded-full px-2 py-1 text-[11px] font-bold ${live.isPresent ? "bg-emerald-100 text-emerald-900" : "bg-sky-100 text-sky-900"}`}>{live.isPresent && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}{status}</span></div>
       <p className="mt-3 flex flex-wrap items-baseline justify-between gap-2"><strong className="text-xl tabular-nums" data-today-worked>{attendanceDuration(live.todayMinutes)}</strong><span className="text-xs opacity-75">{live.dayOff ? live.paidHoliday?`${live.paidHoliday} · مدفوعة`:"يوم إجازة" : `من ${attendanceDuration(live.dailyMinutes)}`}</span></p>
+      {live.todayCompensationMinutes>0&&<p className="mt-2 text-xs font-bold text-emerald-600">تعويض {attendanceDuration(live.todayCompensationMinutes)}{live.todayCreditedMinutes>=live.dailyMinutes?' · مكتمل بالتعويض':''}</p>}
       {!compact&&!live.dayOff && <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-sky-200/30" role="meter" aria-label="إنجاز ساعات اليوم" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(dayProgress)}><div className="h-full rounded-full bg-sky-500 transition-all" style={{width:`${dayProgress}%`}} /></div>}
       {!compact&&!!live.todayPeriods && <p className="mt-2 text-[11px] opacity-70">فترات الحضور: {live.todayPeriods}</p>}
     </div>
