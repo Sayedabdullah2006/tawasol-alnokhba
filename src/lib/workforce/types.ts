@@ -12,6 +12,9 @@ export type Employee = {
   job_title: string;
   responsibilities: string;
   can_manage_tasks: boolean;
+  can_delete_tasks?: boolean;
+  allow_mobile_attendance?: boolean;
+  flexible_workday_from?: string | null;
   can_view_team_summaries?: boolean;
   national_id?: string;
   birth_date?: string | null;

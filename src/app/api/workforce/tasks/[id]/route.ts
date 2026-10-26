@@ -89,8 +89,9 @@ export async function GET(
           task.assignee_id === actor.employee?.id),
       canReview: canReviewTask(actor, task),
       canAssign: actor.canManageTasks,
+      canDelete: actor.role === "admin" || actor.canManageTasks && actor.employee?.can_delete_tasks === true,
       canArchive:
-        actor.role === "admin" ||
+        actor.role === "admin" || actor.canManageTasks && actor.employee?.can_delete_tasks === true ||
         (task.assignment_origin === "self" &&
           task.created_by === actor.user.id &&
           task.assignee_id === actor.employee?.id),

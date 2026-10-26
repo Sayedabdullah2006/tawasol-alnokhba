@@ -20,9 +20,9 @@ export async function GET(request: Request) {
     const service=await createServiceRoleClient();
     const result=await service.rpc("wf_work_snapshot",{p_actor:actor.user.id,p_employee:employee});
     if(result.error) throw result.error;
-    let canControl=!result.data.session || result.data.session.policy_version===0;
+    let canControl=actor.employee?.allow_mobile_attendance===true || !result.data.session || result.data.session.policy_version===0;
     const device=(await cookies()).get("wf_work_device")?.value;
-    if(result.data.session?.policy_version===1&&device){
+    if(!actor.employee?.allow_mobile_attendance&&result.data.session?.policy_version===1&&device){
       const owner=await actor.db.from("wf_attendance_sessions").select("device_hash").eq("id",result.data.session.id).eq("employee_id",employee).maybeSingle();
       if(owner.error)throw owner.error;
       canControl=owner.data?.device_hash===createHash("sha256").update(device).digest("hex");
@@ -40,10 +40,10 @@ export async function POST(request: Request) {
     const allowed=["in","out","task","activity","break","resume","confirm","heartbeat"];
     if(!allowed.includes(body.command)) throw new WorkforceError("إجراء غير صحيح");
     // A browser device restriction, not hardware attestation. The server owns session times.
-    if(body.command==="in" && /Android|iPhone|iPad|iPod|Mobile/i.test(request.headers.get("user-agent")??"")) throw new WorkforceError("سجلي الحضور من جهاز الكمبيوتر",403);
+    if(body.command==="in" && !actor.employee.allow_mobile_attendance && /Android|iPhone|iPad|iPod|Mobile/i.test(request.headers.get("user-agent")??"")) throw new WorkforceError("سجلي الحضور من جهاز الكمبيوتر",403);
     const jar=await cookies();
     let device=jar.get("wf_work_device")?.value;
-    if(!device && !["in","out"].includes(body.command)) throw new WorkforceError("افتحي الدوام من الجهاز الذي سجلتِ منه الحضور",403);
+    if(!device && !actor.employee.allow_mobile_attendance && !["in","out"].includes(body.command)) throw new WorkforceError("افتحي الدوام من الجهاز الذي سجلتِ منه الحضور",403);
     if(!device) { device=randomBytes(32).toString("hex");jar.set("wf_work_device",device,{httpOnly:true,secure:process.env.NODE_ENV==="production",sameSite:"lax",path:"/"}); }
     const title=body.title??"";
     if(typeof title!=="string" || title.length>200) throw new WorkforceError("عنوان النشاط غير صحيح");

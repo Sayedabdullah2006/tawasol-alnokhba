@@ -41,7 +41,7 @@ export function MeetingCard({meeting:m,data,onChange,preview=false,compact=false
    </>}
    {onSeries&&m.series_id&&m.status!=='cancelled'&&<><Button size="sm" variant="outline" disabled={preview||busy} onClick={()=>onSeries(m,false)}>جدولة المواعيد غير المنشورة</Button><Button size="sm" variant="outline" disabled={preview||busy} onClick={()=>onSeries(m,true)}>إلغاء المواعيد القادمة</Button></>}
   </div>
-  {!compact&&m.status==='scheduled'&&participating&&!data.isAdmin&&!protectedMeeting&&<p className="text-xs text-amber-200">الانضمام من نفس جهاز ومتصفح تسجيل الحضور يفعّل حماية الدوام أثناء الاجتماع.</p>}
+  {!compact&&m.status==='scheduled'&&participating&&!data.isAdmin&&!work?.data?.attendancePolicy?.anyDevice&&!protectedMeeting&&<p className="text-xs text-amber-200">الانضمام من نفس جهاز ومتصفح تسجيل الحضور يفعّل حماية الدوام أثناء الاجتماع.</p>}
   {m.sync_state==='syncing'&&<p role="status" className="text-xs text-amber-200">مزامنة Google جارية…</p>}
   {fallback&&<a href={fallback} target="_blank" rel="noreferrer" className="text-sm font-bold underline">فتح Google Meet ↗</a>}
  </article>;

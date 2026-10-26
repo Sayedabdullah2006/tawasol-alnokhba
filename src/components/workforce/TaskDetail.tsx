@@ -351,7 +351,7 @@ export default function TaskDetail({
             {task.archived_at ? "استعادة المهمة" : "أرشفة المهمة"}
           </Button>
         )}
-        {admin && <Button type="button" variant="outline" disabled={busy} onClick={async () => {
+        {(admin || data.canDelete) && <Button type="button" variant="outline" disabled={busy} onClick={async () => {
           if (await confirm("حذف هذه المهمة دون إرسال إشعارات أو بريد؟"))
             await command("delete", {}, "حُذفت المهمة");
         }}>حذف المهمة</Button>}

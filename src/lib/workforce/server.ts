@@ -110,6 +110,7 @@ export async function requireWorkingAttendance(actor: WorkforceActor) {
   if (error) throw error;
   const access = data as ActionAccess;
   if (!access?.allowed) throw new WorkforceError(access?.reason || "سجلي الحضور لبدء العمل",409);
+  if (actor.employee?.allow_mobile_attendance) return;
   const device = (await cookies()).get("wf_work_device")?.value;
   if (!device || !access.deviceHash || createHash("sha256").update(device).digest("hex") !== access.deviceHash)
     throw new WorkforceError("إجراءات العمل متاحة من جهاز تسجيل الحضور فقط",409);

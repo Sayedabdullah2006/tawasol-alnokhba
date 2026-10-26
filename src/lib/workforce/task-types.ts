@@ -80,6 +80,7 @@ export type TaskDetail = {
   canAssign: boolean;
   canArchive: boolean;
   canConfigureChecklist: boolean;
+  canDelete?: boolean;
   assigneeName: string | null;
   latestSubmission: TaskSubmission | null;
   latestReview?: TaskSubmission | null;
