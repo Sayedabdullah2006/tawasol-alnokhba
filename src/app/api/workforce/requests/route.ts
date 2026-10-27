@@ -1,5 +1,5 @@
 import { requireMedicalReport } from "@/lib/workforce/sick-leave";
-import { requireUnpaidLeaveAcknowledgment } from '@/lib/workforce/unpaid-leave';
+import { requireUnpaidLeaveAcknowledgment,unpaidLeaveDates } from '@/lib/workforce/unpaid-leave';
 import { OFF_DUTY_REQUESTS } from "@/lib/workforce/action-access";
 import { requireWorkingAttendance } from "@/lib/workforce/server";
 import { missingHoursInput } from "@/lib/workforce/missing-hours";
@@ -69,9 +69,14 @@ export async function GET(request: Request) {
             .in("id", ids)
         : { data: [], error: null };
     if (names.error) throw names.error;
+    const estimates=await Promise.all((data||[]).filter(row=>row.kind==='leave'&&row.leave_type==='unpaid').map(async row=>{
+      const quote=await service.rpc('wf_unpaid_leave_estimate',{p_actor:actor.user.id,p_request:row.id});
+      return {id:row.id,...(quote.error?{unpaid_estimate_error:'تعذر احتساب الخصم؛ راجع إعدادات الراتب'}:{unpaid_estimate:quote.data})};
+    }));
     return privateResponse({
       requests: (data || []).map(({ attachments, ...row }) => ({
         ...row,
+        ...estimates.find(estimate=>estimate.id===row.id),
         attachments: attachments.map((file: Record<string, unknown>) => ({
           id: file.id,
           filename: file.filename,
@@ -143,6 +148,10 @@ export async function POST(request: Request) {
       throw new WorkforceError("حدد بداية الفترة ونهايتها");
     if (ends_at && (!starts_at || ends_at < starts_at))
       throw new WorkforceError("نهاية الفترة تسبق بدايتها");
+    if(kind==='leave'&&leave_type==='unpaid'){
+      const quote=await (await createServiceRoleClient()).rpc('wf_unpaid_leave_estimate',{p_actor:actor.user.id,...unpaidLeaveDates(starts_at!,ends_at!)});
+      if(quote.error)throw quote.error;
+    }
     const rawAmount = form.get("amount");
     if(kind==="overtime"&&rawAmount)throw new WorkforceError("قيمة خارج الدوام تُحسب تلقائيًا");
     let amount: string | null = null;
@@ -273,7 +282,7 @@ export async function PATCH(request: Request) {
     const testRun = await requestTestRun(request, actor);
     const visible = await actor.db
       .from("wf_employee_requests")
-      .select("id,test_run_id,kind")
+      .select("id,test_run_id,kind,leave_type")
       .eq("id", id)
       .maybeSingle();
     if (visible.error) throw visible.error;
@@ -289,6 +298,9 @@ export async function PATCH(request: Request) {
         ? "ألغت الموظفة الطلب"
         : textField(body.reason, "سبب القرار", 3, 2000);
     const service = await createServiceRoleClient();
+    if(visible.data.kind==='leave'&&visible.data.leave_type==='unpaid'&&decision==='approved'){
+      const quote=await service.rpc('wf_unpaid_leave_estimate',{p_actor:actor.user.id,p_request:id});if(quote.error)throw quote.error;
+    }
     // Verify legacy invoice bytes from private storage before first approval.
     // New uploads already carry a server-computed hash; never trust client hashes.
     if(visible.data.kind==='expenses'&&decision==='approved'){

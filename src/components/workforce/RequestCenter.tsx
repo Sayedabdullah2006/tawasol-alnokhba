@@ -13,7 +13,7 @@ import {
   type RequestFile,
 } from "@/lib/workforce/requests";
 import { leaveTypeLabel, MEDICAL_REPORT_ACCEPT, MEDICAL_REPORT_MIMES } from "@/lib/workforce/sick-leave";
-import {UNPAID_LEAVE_NOTICE} from '@/lib/workforce/unpaid-leave';
+import {UNPAID_LEAVE_NOTICE,type UnpaidLeaveEstimate} from '@/lib/workforce/unpaid-leave';
 import type { AttendanceData } from "@/lib/workforce/attendance";
 import { ATTACHMENT_ACCEPT } from "@/lib/workforce/attachments";
 import {
@@ -40,6 +40,10 @@ const initialForm = (kind = "general") => ({
   work_day: "",
   hours: "",
 });
+function UnpaidLeaveSummary({estimate,error,loading=false}:{estimate?:UnpaidLeaveEstimate;error?:string;loading?:boolean}){
+ if(!estimate)return <p role={error?'alert':'status'} className="text-sm">{error||(loading?'جارٍ احتساب الخصم…':'حددي بداية الإجازة ونهايتها لعرض التقدير')}</p>;
+ return <dl aria-label="تقدير الإجازة غير المدفوعة" className="grid grid-cols-2 gap-3 rounded-xl border border-current/20 p-3 text-sm"><div><dt className="text-xs opacity-75">أيام التقويم</dt><dd className="mt-1 font-black tabular-nums">{estimate.calendar_days.toLocaleString('ar-SA')} يوم</dd></div><div><dt className="text-xs opacity-75">الخصم المتوقع</dt><dd className="mt-1 whitespace-nowrap font-black tabular-nums">{Number(estimate.amount).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2})} ر.س</dd></div></dl>;
+}
 export default function RequestCenter({
   admin = false,
   initialKind = "general",
@@ -94,6 +98,18 @@ export default function RequestCenter({
   const [unpaidAck,setUnpaidAck]=useState('');
   const unpaidLeave=form.kind==='leave'&&form.leave_type==='unpaid';
   const unpaidPeriod=[form.kind,form.leave_type,form.starts_at,form.ends_at].join(':');
+  const [unpaidQuote,setUnpaidQuote]=useState<{key:string;estimate?:UnpaidLeaveEstimate;error?:string}|null>(null);
+  const unpaidEstimate=unpaidQuote?.key===unpaidPeriod?unpaidQuote.estimate:undefined;
+  const unpaidError=unpaidQuote?.key===unpaidPeriod?unpaidQuote.error:undefined;
+  const unpaidAgreement=`${unpaidPeriod}:${unpaidEstimate?.amount??''}`;
+  useEffect(()=>{
+    if(!unpaidLeave||!open||!form.starts_at||!form.ends_at)return;
+    const controller=new AbortController();
+    const timer=setTimeout(()=>{void transport<{estimate:UnpaidLeaveEstimate}>('/api/workforce/requests/unpaid-estimate',{method:'POST',signal:controller.signal,body:JSON.stringify({starts_on:form.starts_at.slice(0,10),ends_on:form.ends_at.slice(0,10)})})
+      .then(result=>{if(!controller.signal.aborted)setUnpaidQuote({key:unpaidPeriod,estimate:result.estimate});})
+      .catch(e=>{if(!controller.signal.aborted)setUnpaidQuote({key:unpaidPeriod,error:e.message||'تعذر احتساب الخصم'});});},250);
+    return()=>{clearTimeout(timer);controller.abort();};
+  },[unpaidLeave,unpaidPeriod,open,form.starts_at,form.ends_at,transport]);
   const [overtimePeriods,setOvertimePeriods]=useState<Record<string,{starts_at:string;ends_at:string}>>({});
   useEffect(() => {
     const refresh = () => {
@@ -315,6 +331,7 @@ export default function RequestCenter({
                   </span>
                 </div>
                 <h2 className="font-black">{row.title}</h2>
+                {row.kind==='leave'&&row.leave_type==='unpaid'&&<UnpaidLeaveSummary estimate={row.unpaid_estimate} error={row.unpaid_estimate_error}/>}
                 {row.kind==='missing-hours'&&<p className="text-sm font-bold">{row.work_day} · {Number((row.missing_minutes??0)/60).toLocaleString('ar-SA')} ساعة</p>}
                 <p className="whitespace-pre-wrap break-words text-sm leading-7">
                   {row.body}
@@ -419,7 +436,7 @@ export default function RequestCenter({
                         />
                       </Field>
                       <div className="flex gap-3">
-                        <Button type="submit" value="approved" disabled={busy}>
+                        <Button type="submit" value="approved" disabled={busy||(row.kind==='leave'&&row.leave_type==='unpaid'&&!row.unpaid_estimate)}>
                           موافقة
                         </Button>
                         <Button
@@ -478,7 +495,8 @@ export default function RequestCenter({
           className="space-y-4"
           onSubmit={async (e) => {
             e.preventDefault();
-            if(unpaidLeave&&unpaidAck!==unpaidPeriod){setError('أكّدي اطلاعك على خصم فترة الإجازة غير المدفوعة');return;}
+            if(unpaidLeave&&!unpaidEstimate){setError(unpaidError||'انتظري احتساب الخصم قبل إرسال الطلب');return;}
+            if(unpaidLeave&&unpaidAck!==unpaidAgreement){setError('أكّدي اطلاعك على خصم فترة الإجازة غير المدفوعة');return;}
             if(form.kind==='leave'&&form.leave_type==='sick'&&!files.some(file=>MEDICAL_REPORT_MIMES.includes(file.type))){setError('أرفقي التقرير الطبي بصيغة PDF أو صورة');return;}
             if(form.kind==='expenses'&&!files.length){setError('أرفق فاتورة المصروف');return;}
             if (lock.current) return;
@@ -572,7 +590,7 @@ export default function RequestCenter({
               </select>
             </Field>
           )}
-          {unpaidLeave&&<div className="rounded-xl border border-amber-300/50 bg-amber-200/10 p-4 text-sm"><p id="unpaid-leave-notice" role="alert" className="font-bold text-amber-100">{UNPAID_LEAVE_NOTICE}</p><label className="mt-3 flex cursor-pointer items-start gap-2"><input type="checkbox" required aria-describedby="unpaid-leave-notice" className="mt-1" checked={unpaidAck===unpaidPeriod} onChange={e=>setUnpaidAck(e.target.checked?unpaidPeriod:'')}/><span>اطّلعت على هذه الشروط وأوافق عليها.</span></label></div>}
+          {unpaidLeave&&<div className="rounded-xl border border-amber-300/50 bg-amber-200/10 p-4 text-sm"><div className="mb-3"><UnpaidLeaveSummary estimate={unpaidEstimate} error={unpaidError} loading={!!form.starts_at&&!!form.ends_at&&!unpaidEstimate&&!unpaidError}/></div><p id="unpaid-leave-notice" role="alert" className="font-bold text-amber-100">{UNPAID_LEAVE_NOTICE}</p><label className="mt-3 flex cursor-pointer items-start gap-2"><input type="checkbox" required aria-describedby="unpaid-leave-notice" className="mt-1" disabled={!unpaidEstimate} checked={!!unpaidEstimate&&unpaidAck===unpaidAgreement} onChange={e=>setUnpaidAck(e.target.checked?unpaidAgreement:'')}/><span>اطّلعت على هذه الشروط وأوافق عليها.</span></label></div>}
           {form.kind === "attendance-correction" && (
             <Field id="request-session" label="السجل المطلوب تصحيحه">
               <select
@@ -729,7 +747,7 @@ export default function RequestCenter({
             </ul>
           )}
           <Notice message={error} error />
-          <Button type="submit" loading={busy}>
+          <Button type="submit" loading={busy} disabled={unpaidLeave&&!unpaidEstimate}>
             إرسال الطلب
           </Button>
         </form>

@@ -42,6 +42,8 @@ export type EmployeeRequest = {
   amount: string | null;
   attendance_session_id?: string | null;
   leave_type?: string;
+  unpaid_estimate?:import('./unpaid-leave').UnpaidLeaveEstimate;
+  unpaid_estimate_error?:string;
   work_day?: string | null;
   missing_minutes?: number | null;
   attachments: RequestFile[];
