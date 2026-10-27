@@ -99,3 +99,18 @@ test('staff invitation actions stay site-first; external invitation URLs are str
  const staff=renderWorkforceEmail({...base,kind:'meeting_event',href:`/employee/meetings?meeting=${id}`});assert.ok(staff.text.includes(`https://nukhba.media/employee/meetings?meeting=${id}`));assert.ok(!staff.html.includes('https://zoom.us/'));
  const guest=renderWorkforceEmail({...base,kind:'meeting_guest',href:'https://zoom.us.evil.test/j/81234567890'});assert.ok(!guest.html.includes('zoom.us.evil'));assert.ok(guest.text.includes('https://nukhba.media/meetings'));
 });
+
+
+test('a lost Zoom create response recovers by site UUID without a second POST',async()=>{
+ let stored=null,posts=0;
+ const api=new ZoomMeetings('fixture','elitecnnct@gmail.com',async(u,i={})=>{
+  const path=new URL(u).pathname;
+  if(path.endsWith('/settings'))return Response.json({in_meeting:{screen_sharing:true,who_can_share_screen:'all'}});
+  if(i.method==='POST'){posts++;stored={...ready,agenda:JSON.parse(i.body).agenda};throw new Error('lost response');}
+  if(i.method==='PATCH')return new Response(null,{status:204});
+  if(path.endsWith('/meetings'))return Response.json({meetings:stored?[stored]:[],next_page_token:''});
+  return Response.json(stored);
+ });
+ await assert.rejects(()=>api.publish(id,1,meetingData(),null,async()=>{}));
+ assert.equal((await api.publish(id,1,meetingData(),null,async()=>{})).join_url,url);assert.equal(posts,1);
+});
