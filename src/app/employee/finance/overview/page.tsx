@@ -1,4 +1,5 @@
 import MonthlyPayroll from "@/components/workforce/MonthlyPayroll";
+import EmployeeFinalSettlements from "@/components/workforce/EmployeeFinalSettlements";
 import { employeePageActor } from "@/lib/workforce/employee-page";
 import Link from "next/link";
 import { payrollMonth } from "@/lib/workforce/payroll";
@@ -14,6 +15,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
         <Link href="/employee/finance/commissions">العمولات والمكافآت ←</Link>
         <Link href="/employee/finance/advances">السلف والالتزامات ←</Link>
       </nav>
+      <EmployeeFinalSettlements />
       <MonthlyPayroll key={month || "current"} employeeId={employee.id} initialMonth={month} />
     </div>
   );
