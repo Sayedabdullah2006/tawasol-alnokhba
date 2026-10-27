@@ -18,6 +18,10 @@ export class ZoomMeetings {
  private async call(path:string,init:RequestInit={}){
   const response=await this.fetcher(`https://api.zoom.us/v2${path}`,{...init,cache:'no-store',signal:AbortSignal.timeout(20000),headers:{Authorization:`Bearer ${this.token}`,'Content-Type':'application/json',...init.headers}});
   if(response.status===404&&(!init.method||init.method==='DELETE'))return null;
+  if(!response.ok&&response.status===400){const error=await response.clone().json().catch(()=>({}));
+   if(error.code===3001&&(!init.method||init.method==='DELETE'))return null;
+   if(error.code===3002)throw new MeetingZoomError('الاجتماع جارٍ في Zoom؛ أنهِه من حساب المنظّم ثم أعد الإلغاء');
+  }
   if(!response.ok)throw new MeetingZoomError(response.status===401||response.status===403?'تعذر الوصول إلى Zoom؛ راجع تفعيل التطبيق وصلاحياته':response.status===429?'بلغ Zoom حد الطلبات مؤقتًا؛ أعد المحاولة لاحقًا':'تعذرت مزامنة Zoom؛ أعد المحاولة');
   return response.status===204?{}:await response.json();
  }

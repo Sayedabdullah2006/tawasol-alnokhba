@@ -125,3 +125,8 @@ test('Basic organizer cannot schedule beyond the real 40-minute limit',async()=>
  });
  await assert.rejects(()=>client.publish(id,1,meetingData(),null,async()=>{}),/40/);assert.equal(writes,0);
 });
+
+test('running meetings give a clear cancellation action; already deleted meetings are idempotent',async()=>{
+ const busy=new ZoomMeetings('fixture','elitecnnct@gmail.com',async()=>Response.json({code:3002},{status:400}));await assert.rejects(()=>busy.cancel(id,zoomId),/أنه/);
+ const deleted=new ZoomMeetings('fixture','elitecnnct@gmail.com',async()=>Response.json({code:3001},{status:400}));await deleted.cancel(id,zoomId);assert.equal(await deleted.read(zoomId),null);
+});
