@@ -2,7 +2,7 @@ import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {Resvg} from '@resvg/resvg-js';
 import {PDFDocument} from 'pdf-lib';
-import {remoteMinutes,type RemoteQuote,type RemoteSignature} from './remote-work';
+import {remoteMinutes,remoteReturnCommitment,type RemoteQuote,type RemoteSignature} from './remote-work';
 import {WorkforceError} from './validation';
 const esc=(s:unknown)=>String(s??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]!));
 // Explicit RTL embedding keeps punctuation and labels in reading order; isolate Latin identifiers.
@@ -44,7 +44,7 @@ export async function renderRemoteAgreement(q:RemoteQuote,signature:RemoteSignat
  paragraph('• مبالغ الأجر قبل التأمينات والتسويات النظامية؛ لا يشمل الإيقاف العمولات المكتسبة أو المصروفات المعتمدة أو الحقوق السابقة. وتبقى أيام الراحة والإجازات والعمل الإضافي وفق العقد والأنظمة.');
  paragraph('• تلتزم الموظفة بالحضور والانصراف وتأكيد الجلسة والمهام والسرية. يسري الاتفاق بتوقيعها واعتماد المدير قبل بدايته، دون أثر رجعي؛ وتعود الشروط السابقة تلقائيًا بعد نهايته. أي تمديد يتطلب اتفاقًا جديدًا.');
  heading('٥ · الإقرار والتوقيع');
- paragraph('أقر باطلاعي على الفترة والمهام والساعات والمبالغ أعلاه، وفهم أثرها المالي وموافقتي عليها بإرادتي. وتبقى أحكام عقد العمل سارية فيما لم يعدله هذا الاتفاق، بما يتوافق مع نظام العمل.');
+ paragraph('أقر باطلاعي على الفترة والمهام والساعات والمبالغ أعلاه، وفهم أثرها المالي وموافقتي عليها بإرادتي. '+remoteReturnCommitment+' وتبقى أحكام عقد العمل سارية فيما لم يعدله هذا الاتفاق، بما يتوافق مع نظام العمل.');
  if(y>1375)throw new WorkforceError('التفاصيل أطول من مساحة الاتفاق ذي الصفحة الواحدة؛ اختصري سبب الطلب والمهام والمكان مع إبقاء المعنى واضحًا.');
  const boxY=y;body+=`<rect x="610" y="${boxY}" width="520" height="130" rx="8" fill="#fafbfc" stroke="#c6d0dd"/><rect x="55" y="${boxY}" width="520" height="130" rx="8" fill="#fafbfc" stroke="#c6d0dd"/>`+text('توقيع الموظفة',1110,boxY+28,19,'#173958',true)+text('اعتماد المدير',555,boxY+28,19,'#173958',true);
  body+=signature.map(stroke=>`<path d="${stroke.map((pt,i)=>`${i?'L':'M'}${630+pt[0]*.47},${boxY+39+pt[1]*.19}`).join(' ')}" fill="none" stroke="#173958" stroke-width="2.2" stroke-linecap="round"/>`).join('');
