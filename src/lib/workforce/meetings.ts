@@ -10,4 +10,4 @@ export function validZoomURL(value:unknown):value is string{return typeof value=
 export function validMeetingURL(value:unknown):value is string{return validMeetURL(value)||validZoomURL(value);}
 export function meetingDate(value:string){return new Date(value).toLocaleString('ar-SA',{calendar:'gregory',timeZone:'Asia/Riyadh',dateStyle:'medium',timeStyle:'short'});}
 export function localMeetingDate(value:string){return new Date(Date.parse(value)+3*3600000).toISOString().slice(0,16);}
-export function meetingDefaults():MeetingData {const start=new Date(Math.ceil((Date.now()+3600000)/1800000)*1800000);return {title:'',description:'',starts_at:start.toISOString(),ends_at:new Date(+start+3600000).toISOString(),task_id:null,participant_ids:[],external_attendees:[],reminder_minutes:15};}
+export function meetingDefaults():MeetingData {const start=new Date(Math.ceil((Date.now()+3600000)/1800000)*1800000);return {title:'',description:'',starts_at:start.toISOString(),ends_at:new Date(+start+1800000).toISOString(),task_id:null,participant_ids:[],external_attendees:[],reminder_minutes:15};}

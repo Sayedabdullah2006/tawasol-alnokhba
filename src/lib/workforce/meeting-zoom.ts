@@ -13,6 +13,7 @@ export function zoomMeetingBody(id:string,version:number,data:MeetingData,origin
   settings:{join_before_host:true,jbh_time:0,waiting_room:false,meeting_authentication:false,use_pmi:false,host_video:false,participant_video:false,mute_upon_entry:true,auto_recording:'none',auto_start_meeting_summary:false,auto_start_ai_companion_questions:false,registrants_confirmation_email:false,registrants_email_notification:false,meeting_invitees:[],push_change_to_calendar:false,continuous_meeting_chat:{enable:false}}};
 }
 export class ZoomMeetings {
+ private hostType=2;
  constructor(private token:string,private host:string,private fetcher:typeof fetch=fetch,private origin='https://nukhba.media'){}
  private async call(path:string,init:RequestInit={}){
   const response=await this.fetcher(`https://api.zoom.us/v2${path}`,{...init,cache:'no-store',signal:AbortSignal.timeout(20000),headers:{Authorization:`Bearer ${this.token}`,'Content-Type':'application/json',...init.headers}});
@@ -27,6 +28,7 @@ export class ZoomMeetings {
   const client=new ZoomMeetings(result.access_token,credentials.hostEmail,fetcher,origin);
   const user=await client.call(`/users/${encodeURIComponent(credentials.hostEmail)}`);
   if(user?.email?.toLowerCase()!==credentials.hostEmail.toLowerCase()||user.status!=='active')throw new MeetingZoomError('اختر حساب Zoom المنظّم المعتمد والمفعّل');
+  client.hostType=user.type;
   return client;
  }
  async checkScreenSharing(){const settings=await this.call(`/users/${encodeURIComponent(this.host)}/settings`) as ZoomSettings|null;
@@ -44,6 +46,7 @@ export class ZoomMeetings {
   page=result.next_page_token;if(!page)return matches.length?await this.read(String(matches[0].id)):null;
  }throw new MeetingZoomError('تعذر إكمال التحقق من الاجتماعات السابقة');}
  async publish(id:string,version:number,data:MeetingData,existingId:string|null,checkpoint:(id:string)=>Promise<void>){
+  if(this.hostType===1&&Date.parse(data.ends_at)-Date.parse(data.starts_at)>40*60000)throw new MeetingZoomError('حساب Zoom الأساسي يسمح باجتماع حتى 40 دقيقة؛ قلّل المدة أو رقّ حساب المنظّم');
   await this.checkScreenSharing();
   let event=existingId?await this.read(existingId):await this.find(id);
   if(existingId&&!event)throw new MeetingZoomError('حُذف الاجتماع من Zoom؛ أنشئ اجتماعًا جديدًا');

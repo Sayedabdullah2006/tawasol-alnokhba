@@ -114,3 +114,14 @@ test('a lost Zoom create response recovers by site UUID without a second POST',a
  await assert.rejects(()=>api.publish(id,1,meetingData(),null,async()=>{}));
  assert.equal((await api.publish(id,1,meetingData(),null,async()=>{})).join_url,url);assert.equal(posts,1);
 });
+
+
+test('Basic organizer cannot schedule beyond the real 40-minute limit',async()=>{
+ let writes=0;
+ const client=await ZoomMeetings.connect({accountId:'fixture',clientId:'fixture',clientSecret:'fixture',hostEmail:'elitecnnct@gmail.com'},async(u,i={})=>{
+  if(String(u)==='https://zoom.us/oauth/token')return Response.json({access_token:'fixture'});
+  if(i.method&&i.method!=='GET')writes++;
+  return Response.json({email:'elitecnnct@gmail.com',status:'active',type:1});
+ });
+ await assert.rejects(()=>client.publish(id,1,meetingData(),null,async()=>{}),/40/);assert.equal(writes,0);
+});
