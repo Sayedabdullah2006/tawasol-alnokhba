@@ -47,7 +47,12 @@ export async function renderRemoteAgreement(q:RemoteQuote,signature:RemoteSignat
  paragraph('أقر باطلاعي على الفترة والمهام والساعات والمبالغ أعلاه، وفهم أثرها المالي وموافقتي عليها بإرادتي. '+remoteReturnCommitment+' وتبقى أحكام عقد العمل سارية فيما لم يعدله هذا الاتفاق، بما يتوافق مع نظام العمل.');
  if(y>1375)throw new WorkforceError('التفاصيل أطول من مساحة الاتفاق ذي الصفحة الواحدة؛ اختصري سبب الطلب والمهام والمكان مع إبقاء المعنى واضحًا.');
  const boxY=y;body+=`<rect x="610" y="${boxY}" width="520" height="130" rx="8" fill="#fafbfc" stroke="#c6d0dd"/><rect x="55" y="${boxY}" width="520" height="130" rx="8" fill="#fafbfc" stroke="#c6d0dd"/>`+text('توقيع الموظفة',1110,boxY+28,19,'#173958',true)+text('اعتماد المدير',555,boxY+28,19,'#173958',true);
- body+=signature.map(stroke=>`<path d="${stroke.map((pt,i)=>`${i?'L':'M'}${630+pt[0]*.47},${boxY+39+pt[1]*.19}`).join(' ')}" fill="none" stroke="#173958" stroke-width="2.2" stroke-linecap="round"/>`).join('');
+ if(signature.length){
+  const points=signature.flat(),xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),minX=Math.min(...xs),minY=Math.min(...ys),width=Math.max(1,Math.max(...xs)-minX),height=Math.max(1,Math.max(...ys)-minY);
+  // Fit the saved ink proportionally within the signature area, clear of the label and timestamp.
+  const scale=Math.min(470/width,57/height),left=630+(470-width*scale)/2,top=boxY+39+(57-height*scale)/2;
+  body+=signature.map(stroke=>`<path d="${stroke.map((pt,i)=>`${i?'L':'M'}${left+(pt[0]-minX)*scale},${top+(pt[1]-minY)*scale}`).join(' ')}" fill="none" stroke="#173958" stroke-width="2.2" stroke-linecap="round"/>`).join('');
+ }
  const signed=stamp?new Date(stamp).toLocaleString('ar-SA',{calendar:'gregory',timeZone:'Asia/Riyadh'}):'يوقّع إلكترونيًا من حساب الموظفة';
  body+=text(signed,1110,boxY+115,15)+text(decision?.status==='approved'?'معتمد إلكترونيًا':decision?.status==='rejected'?'مرفوض · غير نافذ':decision?.status==='cancelled'?'ملغى · غير نافذ':'بانتظار اعتماد المدير',555,boxY+72,20)+text(decision?.at?new Date(decision.at).toLocaleDateString('ar-SA',{calendar:'gregory',timeZone:'Asia/Riyadh'}):'لا يسري قبل الاعتماد',555,boxY+110,16);
  const header=`<defs><filter id="white-logo" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0"/></filter></defs><rect width="1190" height="1684" fill="#fff"/><rect width="1190" height="140" fill="#112b4d"/><image x="1015" y="19" width="115" height="103" filter="url(#white-logo)" href="${logo}"/>${text('اتفاق مؤقت للعمل عن بُعد',970,62,34,'#edcf8d',true)}${text('ملحق محدد المدة بعقد العمل · ساعات وأجر مخفضان',970,105,21,'#fff')}<path d="M55 151 H1135" stroke="#bb9650" stroke-width="3"/>`;
