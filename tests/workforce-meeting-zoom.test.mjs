@@ -8,13 +8,13 @@ import {ids,command,clock,snapshot,at} from './helpers/work-session-db.mjs';
 import {renderWorkforceEmail} from '../supabase/functions/_shared/workforce-email.ts';
 const id='10000000-0000-4000-8000-000000000001',zoomId='81234567890',url=`https://us06web.zoom.us/j/${zoomId}?pwd=exampleToken`;
 const migrate=()=>readFile(new URL('../supabase/migrations/20261027092037_zoom_meeting_provider.sql',import.meta.url),'utf8');
-const ready={id:zoomId,join_url:url,settings:{join_before_host:true,waiting_room:false,meeting_authentication:false}};
+const ready={id:zoomId,join_url:url,start_time:meetingData().starts_at,settings:{join_before_host:true,waiting_room:false,meeting_authentication:false}};
 async function setup(){const db=await createMeetingsDB();await db.exec('reset role;'+await migrate()+';set role service_role;');return db;}
 async function config(db,actor=ids.admin){return db.query('select wf_meeting_zoom($1,$2,$3)',[actor,'configure',{account_id:'account-fixture',client_id:'client-fixture',client_secret_cipher:'x'.repeat(60),organizer_email:'elitecnnct@gmail.com'}]);}
 async function publish(db,actor=ids.admin,data=meetingData()){await meetingCommand(db,id,0,'save',data,actor);const p=await meetingCommand(db,id,1,'prepare',{},actor);await db.query('select wf_meeting_zoom_checkpoint($1,$2,1,$3,$4)',[actor,id,p.lease,zoomId]);return meetingCommand(db,id,1,'finish',{lease:p.lease,meet_url:url},actor);}
 
 test('Zoom payload allows entry without host, excludes invitation recipients and automatic recording; unsafe URLs rejected',()=>{
- const body=zoomMeetingBody(id,1,meetingData());assert.equal(body.settings.join_before_host,true);assert.equal(body.settings.waiting_room,false);assert.equal(body.settings.meeting_authentication,false);assert.equal(body.settings.auto_recording,'none');assert.deepEqual(body.settings.meeting_invitees,[]);assert.equal(body.settings.push_change_to_calendar,false);assert.ok(body.agenda.startsWith(`https://nukhba.media/meetings/${id}`));assert.equal(body.duration,180);
+ const body=zoomMeetingBody(id,1,meetingData());assert.equal(body.settings.join_before_host,true);assert.equal(body.settings.waiting_room,false);assert.equal(body.settings.meeting_authentication,false);assert.equal(body.settings.auto_recording,'none');assert.deepEqual(body.settings.meeting_invitees,[]);assert.equal(body.settings.push_change_to_calendar,false);assert.ok(body.agenda.startsWith(`https://nukhba.media/meetings/${id}`));assert.equal(body.duration,180);assert.equal(body.start_time,'2026-10-24T09:00:00');assert.equal(body.timezone,'Asia/Riyadh');
  assert.ok(validMeetingURL(url));assert.ok(validMeetingURL('https://meet.google.com/abc-defg-hij'));
  for(const value of ['https://zoom.us.evil.test/j/81234567890','http://zoom.us/j/81234567890','https://zoom.us/s/81234567890?zak=host','https://evil.zoom.us.evil/j/81234567890','https://zoom.us/j/81234567890?pwd=a&zak=b'])assert.equal(validZoomURL(value),false);
  for(const settings of [{join_before_host:false,waiting_room:false},{join_before_host:true,waiting_room:true},{join_before_host:true,waiting_room:false,meeting_authentication:true}])assert.throws(()=>assertZoomEntry({...ready,settings}));
@@ -141,3 +141,5 @@ test('browser entry bypasses the Zoom app launcher and preserves the passcode; e
  }
  const cancelled=renderWorkforceEmail({kind:'meeting_event',email:'fixture@example.com',name:'عضو الفريق',title:'ألغي الاجتماع',href:'/employee/meetings?meeting='+id,createdAt:'2026-10-27T10:00:00Z'});assert.ok(!cancelled.text.includes('join=1'));
 });
+
+ test('Zoom readback rejects a shifted provider time instead of publishing an incorrect appointment',async()=>{const api=new ZoomMeetings('fixture','elitecnnct@gmail.com',async(u,i={})=>{if(new URL(u).pathname.endsWith('/settings'))return Response.json({in_meeting:{screen_sharing:true,who_can_share_screen:'all'}});if(i.method==='PATCH')return new Response(null,{status:204});return Response.json({...ready,start_time:'2026-10-24T03:00:00Z'});});await assert.rejects(()=>api.publish(id,1,meetingData(),zoomId,async()=>{}),/توقيت Zoom/);});

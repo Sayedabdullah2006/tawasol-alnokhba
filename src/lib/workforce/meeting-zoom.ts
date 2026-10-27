@@ -4,11 +4,11 @@ import {meetingEntryURL} from './meeting-entry';
 
 export class MeetingZoomError extends Error {}
 export type ZoomCredentials={accountId:string;clientId:string;clientSecret:string;hostEmail:string};
-export type ZoomEvent={id:number|string;join_url?:string;agenda?:string;settings?:{join_before_host?:boolean;waiting_room?:boolean;meeting_authentication?:boolean}};
+export type ZoomEvent={id:number|string;join_url?:string;agenda?:string;start_time?:string;settings?:{join_before_host?:boolean;waiting_room?:boolean;meeting_authentication?:boolean}};
 type ZoomSettings={in_meeting?:{screen_sharing?:boolean;who_can_share_screen?:string;screen_sharing_host_only?:boolean};schedule_meeting?:{join_before_host?:boolean};email_notification?:Record<string,boolean>};
 export function assertZoomEntry(event:ZoomEvent){if(!validZoomURL(event.join_url)||event.settings?.join_before_host!==true||event.settings.waiting_room!==false||event.settings.meeting_authentication===true)throw new MeetingZoomError('إعدادات Zoom تمنع الدخول دون المضيف؛ راجع غرفة الانتظار والدخول قبل المضيف');return event;}
 export function zoomMeetingBody(id:string,version:number,data:MeetingData,origin='https://nukhba.media'){
- return {topic:data.title,type:2,start_time:new Date(data.starts_at).toISOString(),duration:Math.ceil((Date.parse(data.ends_at)-Date.parse(data.starts_at))/60000),timezone:'Asia/Riyadh',
+ return {topic:data.title,type:2,start_time:new Date(Date.parse(data.starts_at)+3*3600000).toISOString().slice(0,19),duration:Math.ceil((Date.parse(data.ends_at)-Date.parse(data.starts_at))/60000),timezone:'Asia/Riyadh',
   agenda:`${meetingEntryURL(id,origin)}\nنسخة ${version}\n${data.description}`.slice(0,2000),password:randomBytes(8).toString('hex').slice(0,10),
   settings:{join_before_host:true,jbh_time:0,waiting_room:false,meeting_authentication:false,use_pmi:false,host_video:false,participant_video:false,mute_upon_entry:true,auto_recording:'none',auto_start_meeting_summary:false,auto_start_ai_companion_questions:false,registrants_confirmation_email:false,registrants_email_notification:false,meeting_invitees:[],push_change_to_calendar:false,continuous_meeting_chat:{enable:false}}};
 }
@@ -57,7 +57,7 @@ export class ZoomMeetings {
   const body=zoomMeetingBody(id,version,data,this.origin);
   if(event){await checkpoint(String(event.id));const {password,...update}=body;void password;await this.call(`/meetings/${event.id}`,{method:'PATCH',body:JSON.stringify(update)});}
   else {event=await this.call(`/users/${encodeURIComponent(this.host)}/meetings`,{method:'POST',body:JSON.stringify(body)}) as ZoomEvent;await checkpoint(String(event.id));}
-  const fresh=await this.read(String(event.id));if(!fresh)throw new MeetingZoomError('تعذر التحقق من رابط الاجتماع');return assertZoomEntry(fresh);
+  const fresh=await this.read(String(event.id));if(!fresh)throw new MeetingZoomError('تعذر التحقق من رابط الاجتماع');if(!fresh.start_time||!Number.isFinite(Date.parse(fresh.start_time))||Math.abs(Date.parse(fresh.start_time)-Date.parse(data.starts_at))>1000)throw new MeetingZoomError('توقيت Zoom لا يطابق موعد الموقع؛ أعد المزامنة');return assertZoomEntry(fresh);
  }
  async cancel(id:string,existingId:string|null){const event=existingId?{id:existingId}:await this.find(id);if(event)await this.call(`/meetings/${encodeURIComponent(String(event.id))}?schedule_for_reminder=false&cancel_meeting_reminder=false`,{method:'DELETE'});}
 }
