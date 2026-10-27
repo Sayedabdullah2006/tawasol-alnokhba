@@ -4,6 +4,7 @@ import {
   workforceMailCC,
   type WorkforceMail,
 } from "../_shared/workforce-email.ts";
+import {prepareMeetingCalendarMail} from '../_shared/workforce-meeting-calendar.ts';
 
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const db = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey, {
@@ -49,7 +50,8 @@ Deno.serve(async (req: Request) => {
         provider: string | null = null,
         error: string | null = null;
       try {
-        const email = renderWorkforceEmail(item.snapshot);
+        const prepared = await prepareMeetingCalendarMail(item.snapshot, serviceKey);
+        const email = renderWorkforceEmail(prepared.mail);
         const result = await fetch("https://api.resend.com/emails", {
           method: "POST",
           signal: AbortSignal.timeout(15000),
@@ -66,6 +68,7 @@ Deno.serve(async (req: Request) => {
             subject: email.subject,
             html: email.html,
             text: email.text,
+            attachments: prepared.attachments,
             headers: {
               "Auto-Submitted": "auto-generated",
               "X-Entity-Ref-ID": item.id,

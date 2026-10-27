@@ -1,8 +1,10 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment -- The same source is checked by Next TypeScript and Deno.
 // @ts-ignore Explicit extension is required by the deployed Deno module loader.
 import {performanceFacts,evaluatePerformance,weeklyTaskActivity,type PerformanceEvidence,type PerformanceSummary} from "./workforce-performance.ts";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- Deno deployment requires explicit extension.
 // @ts-ignore Deno deployment requires explicit extension.
 import {renderPayrollEmail, type PayrollEmail} from "./workforce-payroll-email.ts";
+import type {MeetingCalendarSnapshot} from './workforce-meeting-calendar.ts';
 export type WorkforceMail = {
   email: string;
   name: string;
@@ -18,6 +20,7 @@ export type WorkforceMail = {
   cc?: string[];
   weeklyReport?: WeeklyReport;
   payrollReport?: PayrollEmail;
+  meetingCalendar?: MeetingCalendarSnapshot;
 };
 export type WeeklyReport = {
   performanceEvidence?:PerformanceEvidence[];performance?:PerformanceSummary;evidenceVersion?:2;
@@ -143,8 +146,9 @@ export function renderWorkforceEmail(mail: WorkforceMail) {
   if (weekly) return renderWeeklyEmail(mail,weekly);
   const guestLink = mail.kind === "meeting_guest" && /^https:\/\/(?:[a-z0-9-]+\.)?zoom\.us\/j\/[0-9]{9,11}(?:\?pwd=[A-Za-z0-9._~-]+)?$/.test(mail.href);
   let browserGuestURL = mail.href;
+  const guestSiteLink=mail.kind==='meeting_guest'&&/^https:\/\/nukhba\.media\/meetings\/invite\/[0-9a-f-]{36}\?expires=\d{10}&token=[A-Za-z0-9_-]{43}$/i.test(mail.href);
   if(guestLink){const url=new URL(mail.href);url.pathname=`/wc/${url.pathname.split('/')[2]}/join`;url.searchParams.set('prefer','1');browserGuestURL=url.href;}
-  let href = guestLink ? browserGuestURL : mail.kind === "meeting_guest" ? site + "/meetings" : /^\/(employee|admin\/workforce)(\/|\?|$)/.test(mail.href)
+  let href = guestSiteLink ? mail.href : guestLink ? browserGuestURL : mail.kind === "meeting_guest" ? site + "/meetings" : /^\/(employee|admin\/workforce)(\/|\?|$)/.test(mail.href)
     ? site + mail.href
     : site + "/employee";
   const meetingMail=["meeting_reminder","meeting_event"].includes(mail.kind);
@@ -174,7 +178,7 @@ export function renderWorkforceEmail(mail: WorkforceMail) {
   const admin = mail.href.startsWith("/admin/workforce");
   const label = ["employee_request", "profile_request"].includes(mail.kind)
     ? admin ? "مراجعة الطلب" : "عرض الطلب"
-    : mail.kind === "meeting_guest" ? guestLink ? "الانضمام للاجتماع" : "تواصل النخبة"
+    : mail.kind === "meeting_guest" ? /ألغي|إلغاء/.test(mail.title) ? "تفاصيل الاجتماع" : guestLink||guestSiteLink ? "الانضمام للاجتماع" : "تواصل النخبة"
     : meetingMail ? /ألغي|إلغاء/.test(mail.title) ? "تفاصيل الاجتماع" : "الانضمام من المتصفح"
     : mail.kind.startsWith("attendance_") ? "عرض الحضور"
     : ["payroll", "compensation"].includes(mail.kind) ? "عرض المستحقات"
