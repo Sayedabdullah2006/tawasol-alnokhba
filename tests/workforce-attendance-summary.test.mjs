@@ -48,3 +48,9 @@ test('a forgotten open session stops at the 24-hour correction boundary',()=>{
  assert.equal(liveAttendance(result,open,new Date(at('2026-10-22','18:00')).getTime()).workedMinutes,24*60);
  assert.equal(liveAttendance(result,open,new Date(at('2026-10-22','18:00')).getTime()).needsCorrection,true);
 });
+test('employment ending caps monthly targets and live credit while keeping past attendance',()=>{
+ const summary=make({endDate:'2026-10-20',now:new Date(at('2026-10-22','12:00')),periods:[period('2026-10-20','09:00','17:00'),period('2026-10-21','09:00','17:00')]});
+ assert.equal(summary.targetMinutes,3*8*60);assert.equal(summary.workedMinutes,8*60);assert.equal(summary.employmentEnded,true);assert.equal(summary.dayOff,true);
+ const live=liveAttendance(summary,period('2026-10-22','09:00',null),Date.parse(at('2026-10-22','16:00')));assert.equal(live.workedMinutes,8*60);assert.equal(live.isPresent,false);
+ const later=make({endDate:'2026-10-20',month:'2026-11',now:new Date(at('2026-11-01','12:00'))});assert.equal(later.targetMinutes,0);assert.equal(later.remainingMinutes,0);
+});

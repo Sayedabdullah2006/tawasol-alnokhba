@@ -46,7 +46,7 @@ export async function GET(request: Request, context: Context) {
     const [employee, statement, terms] = await Promise.all([
       actor.db
         .from("wf_employees")
-        .select("id,full_name,start_date")
+        .select("id,full_name,start_date,employment_ends_on")
         .eq("id", id)
         .maybeSingle(),
       attendancePayrollSnapshot(actor,id,month).then(value=>({data:value.statement,error:null,attendance:value.attendance})),
@@ -114,7 +114,7 @@ export async function GET(request: Request, context: Context) {
             paid_amount: String(result.paid_amount),
           }
         : null,
-      defaults,
+      defaults: employee.data.employment_ends_on&&month>=employee.data.employment_ends_on.slice(0,7)+"-01" ? (result?{basic_amount:String(result.basic_amount),allowances_amount:String(result.allowances_amount),effective_from:employee.data.employment_ends_on}:null):defaults,
       attendance: statement.attendance,
       payments: payments.data?.map((row) => ({
         ...row,

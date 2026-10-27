@@ -15,7 +15,7 @@ export function attendanceMonth(value: string | null, now = new Date()) {
 
 export async function employeeMonthAttendance(db: WorkforceActor["db"], employeeId: string, startDate: string, month: string, now: Date, actor:WorkforceActor) {
   const currentMonth = riyadhDate(now).slice(0, 7);
-  const [periods, currentPeriods, settings, open, active, paidCalendarDays, excusedDays,weekly,currentWeekly] = await Promise.all([
+  const [periods, currentPeriods, settings, open, active, paidCalendarDays, excusedDays,weekly,currentWeekly,employment] = await Promise.all([
     attendanceMonthSessions(db, employeeId, startDate, month),
     month === currentMonth ? Promise.resolve(null) : attendanceMonthSessions(db, employeeId, startDate, currentMonth),
     db.from("wf_attendance_settings").select("daily_minutes,workdays").eq("employee_id", employeeId).maybeSingle(),
@@ -25,9 +25,10 @@ export async function employeeMonthAttendance(db: WorkforceActor["db"], employee
     attendanceExcusedDays(db,employeeId,[month,currentMonth]),
     employeeWeeklyHours(actor,employeeId,month),
     month===currentMonth?Promise.resolve(null):employeeWeeklyHours(actor,employeeId,currentMonth),
+    db.from("wf_employees").select("employment_ends_on").eq("id",employeeId).single(),
   ]);
-  for (const result of [periods, currentPeriods, settings, open, active]) if (result?.error) throw result.error;
-  const summarize = (data: AttendancePeriod[], selected: string) => summarizeAttendance({ periods: data, startDate, month: selected, now,
+  for (const result of [periods, currentPeriods, settings, open, active,employment]) if (result?.error) throw result.error;
+  const summarize = (data: AttendancePeriod[], selected: string) => summarizeAttendance({ periods: data, startDate,endDate:employment.data?.employment_ends_on, month: selected, now,
     dailyMinutes: settings.data?.daily_minutes ?? 480, workdays: settings.data?.workdays, paidCalendarDays, excusedDays,weeklyCompensation:selected===month?weekly:currentWeekly??weekly });
   const summary = summarize(periods.data, month);
   return { summary, todaySummary: currentPeriods ? summarize(currentPeriods.data, currentMonth) : summary, open: open.data, periods: periods.data, active:active.data };

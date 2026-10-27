@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     requireEmployeeAccess(actor, id);
     const exists = await actor.db
       .from("wf_employees")
-      .select("id,full_name,start_date")
+      .select("id,full_name,start_date,employment_ends_on")
       .eq("id", id)
       .maybeSingle();
     if (exists.error) throw exists.error;
@@ -130,7 +130,7 @@ export async function GET(request: Request) {
       approved: approved.data || [],
       upcomingLeave,
       today,
-      summary: summarizeAttendance({ periods: monthSessions.data, startDate: exists.data.start_date,
+      summary: summarizeAttendance({ periods: monthSessions.data, startDate: exists.data.start_date,endDate:exists.data.employment_ends_on,
         month: today.slice(0, 7), now: new Date(), dailyMinutes: settings.data?.daily_minutes ?? 480,
         workdays: settings.data?.workdays, paidCalendarDays, excusedDays,weeklyCompensation }),
     });

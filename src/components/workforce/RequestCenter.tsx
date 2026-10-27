@@ -25,6 +25,7 @@ import {
   useConfirm,
   useUnsavedChanges,
 } from "./shared";
+import FinalSettlementCard from "./FinalSettlementCard";
 import ProfileApprovals from "./ProfileApprovals";
 import PdfAttachmentPreview from "./PdfAttachmentPreview";
 import OvertimePeriod,{localRequestTime} from "./OvertimePeriod";
@@ -402,6 +403,7 @@ export default function RequestCenter({
                     ))}
                   </ul>
                 )}
+                {admin&&row.kind==='resignation'&&row.status==='approved'&&<FinalSettlementCard requestId={row.id} transport={transport}/>}
                 {row.decision_reason && (
                   <div className="rounded-xl bg-slate-50 p-3 text-sm">
                     <strong>قرار الإدارة</strong>

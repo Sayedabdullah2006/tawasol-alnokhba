@@ -22,6 +22,7 @@ export type Employee = {
   national_address?: string;
   contract_type: string;
   start_date: string;
+  employment_ends_on?:string|null;
   contract_end: string | null;
   status: EmployeeStatus;
   status_reason: string;

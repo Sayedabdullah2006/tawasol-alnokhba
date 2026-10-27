@@ -69,13 +69,14 @@ export function attendanceDayProgress(periods: AttendancePeriod[], day: string, 
     remainingMinutes: Math.max(0, Math.ceil(dailyMinutes - seconds / 60)) };
 }
 
-export function summarizeAttendance({ periods, startDate, month, now, dailyMinutes = 480, workdays = DEFAULT_WORKDAYS, paidCalendarDays = [], excusedDays = [], weeklyCompensation }: {
-  periods: AttendancePeriod[]; startDate: string; month: string; now: Date; dailyMinutes?: number; workdays?: number[]; paidCalendarDays?: PaidCalendarDay[]; excusedDays?: string[];
+export function summarizeAttendance({ periods, startDate, endDate, month, now, dailyMinutes = 480, workdays = DEFAULT_WORKDAYS, paidCalendarDays = [], excusedDays = [], weeklyCompensation }: {
+  periods: AttendancePeriod[]; startDate: string; endDate?: string|null; month: string; now: Date; dailyMinutes?: number; workdays?: number[]; paidCalendarDays?: PaidCalendarDay[]; excusedDays?: string[];
   weeklyCompensation?:WeeklyHours;
 }) {
   const bounds = monthBounds(month), today = riyadhDate(now);
   const startsOn = startDate > bounds.first ? startDate : bounds.first;
-  const from = midnight(startsOn), until = midnight(bounds.next), dayStart = midnight(today);
+  const endsOn=endDate&&endDate<bounds.last?endDate:bounds.last;
+  const from = midnight(startsOn), until = Math.min(midnight(bounds.next),midnight(endsOn)+DAY), dayStart = midnight(today);
   let workdayCount = 0,paidHolidayMinutes=0,approvedLeaveMinutes=0;
   const excused=new Set(excusedDays);
   for (let day = from; day < until; day += DAY) {
@@ -92,7 +93,7 @@ export function summarizeAttendance({ periods, startDate, month, now, dailyMinut
   const workedMinutes = Math.floor(monthlySeconds / 60), todayMinutes = Math.floor(todaySeconds / 60);
   const creditedMinutes = weeklyCompensation?.enabled ? Math.floor(((weeklyCompensation.credited_seconds??0)+workedSeconds(periods,from,Math.min(until,midnight(weeklyCompensation.starts_on!)),now.getTime()))/60) : workedMinutes;
   return {
-    month, today, asOf: now.toISOString(), startsOn, endsOn: bounds.last,
+    month, today, asOf: now.toISOString(), startsOn, endsOn, employmentEndsOn:endDate??null, employmentEnded:!!endDate&&today>endDate,
     workdayCount, dailyMinutes, targetMinutes, workedMinutes,creditedMinutes,weeklyCompensation,paidHolidayMinutes,approvedLeaveMinutes,
     remainingMinutes: Math.max(0, targetMinutes - creditedMinutes),
     extraMinutes: Math.max(0, workedMinutes - targetMinutes),
@@ -104,7 +105,7 @@ export function summarizeAttendance({ periods, startDate, month, now, dailyMinut
       return end > Math.max(from, dayStart) && start < Math.min(until, dayStart + DAY, now.getTime());
     }).length,
     paidHoliday:paidHoliday(today,paidCalendarDays),
-    dayOff: !!paidHoliday(today,paidCalendarDays)||!workdays.includes(new Date(`${today}T12:00:00Z`).getUTCDay()),
+    dayOff: (!!endDate&&today>endDate)||!!paidHoliday(today,paidCalendarDays)||!workdays.includes(new Date(`${today}T12:00:00Z`).getUTCDay()),
   };
 }
 
@@ -112,21 +113,22 @@ export function summarizeAttendance({ periods, startDate, month, now, dailyMinut
 export function liveAttendance(summary: AttendanceSummary, open: (Omit<AttendancePeriod,'checked_out'> & {checked_out?:string|null}) | null, now: number) {
   const asOf = Date.parse(summary.asOf), tick = Math.max(asOf, now);
   const bounds = monthBounds(summary.month);
+  const ended=!!summary.employmentEndsOn&&riyadhDate(new Date(tick))>summary.employmentEndsOn;
   const period=open?{...open,checked_out:open.checked_out??null}:null;
   const delta = (from: number, until: number) => period ? workedSeconds([period],from,until,tick)-workedSeconds([period],from,until,asOf) : 0;
-  const workedMinutes = Math.floor((summary.monthlySeconds + delta(midnight(summary.startsOn), midnight(bounds.next))) / 60);
-  const todayMinutes = Math.floor((summary.todaySeconds + delta(Math.max(midnight(summary.startsOn), midnight(summary.today)), midnight(summary.today) + DAY)) / 60);
+  const workedMinutes = Math.floor((summary.monthlySeconds + delta(midnight(summary.startsOn), Math.min(midnight(bounds.next),midnight(summary.endsOn)+DAY))) / 60);
+  const todayMinutes = Math.floor((summary.todaySeconds + delta(Math.max(midnight(summary.startsOn), midnight(summary.today)), Math.min(midnight(summary.today) + DAY,midnight(summary.endsOn)+DAY))) / 60);
   const weeklyDay=summary.weeklyCompensation?.days.find(d=>d.day===summary.today);
   const todayGrowth=Math.max(0,todayMinutes-summary.todayMinutes);
   const todayCreditedMinutes=weeklyDay?Math.min(summary.dailyMinutes,Math.floor((weeklyDay.base_credited_seconds+weeklyDay.applied_seconds)/60)+todayGrowth):Math.min(summary.dailyMinutes,todayMinutes);
   const todayCompensationMinutes=weeklyDay?Math.floor(Math.min(weeklyDay.applied_seconds,Math.max(0,summary.dailyMinutes*60-weeklyDay.base_credited_seconds-todayGrowth*60))/60):0;
   const countedDelta=weeklyDay?Math.min(Math.max(0,todayMinutes-summary.todayMinutes),Math.max(0,summary.dailyMinutes-(weeklyDay.base_credited_seconds+weeklyDay.applied_seconds)/60)):Math.max(0,workedMinutes-summary.workedMinutes);
   const creditedMinutes=summary.weeklyCompensation?.enabled?(summary.creditedMinutes??summary.workedMinutes)+Math.floor(countedDelta):workedMinutes;
-  return { ...summary, workedMinutes, todayMinutes,creditedMinutes,todayCreditedMinutes,todayCompensationMinutes,
+  return { ...summary, employmentEnded:ended,dayOff:ended||summary.dayOff,workedMinutes, todayMinutes,creditedMinutes,todayCreditedMinutes,todayCompensationMinutes,
     remainingMinutes: Math.max(0, summary.targetMinutes - creditedMinutes),
     extraMinutes: Math.max(0, workedMinutes - summary.targetMinutes),
     needsCorrection: !!open && open.policy_version!==1 && tick > Date.parse(open.checked_in) + DAY,
-    isPresent: !!period && !period.checked_out && attendanceEnd(period,tick)>=tick,
+    isPresent: !ended&&!!period && !period.checked_out && attendanceEnd(period,tick)>=tick,
   };
 }
 

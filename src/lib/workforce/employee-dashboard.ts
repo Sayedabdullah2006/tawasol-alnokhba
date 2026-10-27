@@ -154,7 +154,7 @@ export async function employeeDashboard(
         task.completion_criteria,
     };
   };
-  const attendanceSummary = summarizeAttendance({ periods: attendance.data || [], startDate: employee.start_date,
+  const attendanceSummary = summarizeAttendance({ periods: attendance.data || [], startDate: employee.start_date,endDate:employee.employment_ends_on,
     month: month.slice(0, 7), now, dailyMinutes: settings.data?.daily_minutes ?? 480,
     workdays: settings.data?.workdays, paidCalendarDays, excusedDays,weeklyCompensation });
   return {
