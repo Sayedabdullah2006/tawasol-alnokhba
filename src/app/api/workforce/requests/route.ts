@@ -1,4 +1,5 @@
 import { requireMedicalReport } from "@/lib/workforce/sick-leave";
+import { requireUnpaidLeaveAcknowledgment } from '@/lib/workforce/unpaid-leave';
 import { OFF_DUTY_REQUESTS } from "@/lib/workforce/action-access";
 import { requireWorkingAttendance } from "@/lib/workforce/server";
 import { missingHoursInput } from "@/lib/workforce/missing-hours";
@@ -119,6 +120,7 @@ export async function POST(request: Request) {
     const leave_type = form.get("leave_type") || "paid";
     if (!["paid", "unpaid", "sick"].includes(String(leave_type)))
       throw new WorkforceError("نوع الإجازة غير صحيح");
+    try { requireUnpaidLeaveAcknowledgment(kind,String(leave_type),form.get('unpaid_leave_ack')); } catch(e) { throw new WorkforceError((e as Error).message); }
     const title = textField(form.get("title"), "العنوان", 3, 150),
       body = textField(form.get("body"), "التفاصيل", 3, 10000);
     const date = (key: string) => {

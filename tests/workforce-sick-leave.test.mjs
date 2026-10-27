@@ -64,9 +64,9 @@ test('rejected/cancelled leave has no financial effect; approved absence is not 
 });
 
 test('sick and hour adjustments split an existing total without double charging or exceeding a capped balance',()=>{
- assert.deepEqual(splitAttendanceAdjustment('153.58','53.58'),{hours:'100.00',sick:'53.58'});
- assert.deepEqual(splitAttendanceAdjustment('20.00','53.58'),{hours:'0.00',sick:'20.00'});
- assert.deepEqual(splitAttendanceAdjustment('100.00'),{hours:'100.00',sick:'0.00'});
+ assert.deepEqual(splitAttendanceAdjustment('153.58','53.58'),{hours:'100.00',sick:'53.58',unpaid:'0.00'});
+ assert.deepEqual(splitAttendanceAdjustment('20.00','53.58'),{hours:'0.00',sick:'20.00',unpaid:'0.00'});
+ assert.deepEqual(splitAttendanceAdjustment('100.00'),{hours:'100.00',sick:'0.00',unpaid:'0.00'});
 });
 
 test('retroactive approval updates later sick bands; exhausted and paid periods are protected',async()=>{

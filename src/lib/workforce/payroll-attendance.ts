@@ -1,8 +1,9 @@
 import {fromCents,moneyCents} from './payroll';
 /** The sick wage adjustment is part of the existing total, never an extra deduction. */
-export function splitAttendanceAdjustment(total:string,sick:string="0") {
- const all=moneyCents(total),requested=moneyCents(sick),medical=requested>all?all:requested;
- return {hours:fromCents(all-medical),sick:fromCents(medical)};
+export function splitAttendanceAdjustment(total:string,sick:string="0",unpaid:string="0") {
+ const all=moneyCents(total),leave=moneyCents(unpaid)>all?all:moneyCents(unpaid),remaining=all-leave;
+ const medical=moneyCents(sick)>remaining?remaining:moneyCents(sick);
+ return {hours:fromCents(remaining-medical),sick:fromCents(medical),unpaid:fromCents(leave)};
 }
 export type AttendanceSettlement = {
  weekly_compensation?:import('./weekly-hours').WeeklyHours;
@@ -11,6 +12,7 @@ export type AttendanceSettlement = {
  missing_seconds: number; days: number; hourly_rate: string | null; calculated_amount: string;
  applied_amount?: string; unapplied_amount?: string;
  sick_leave?: {amount:string;days:{day:string;ordinal:number;pay_rate:number;amount:string;cycle_start:string;cycle_end:string}[]};
+ unpaid_leave?:{amount:string;days:{day:string;amount:string}[]};
  missing_days: {day:string;required_seconds:number;credited_seconds:number;missing_seconds:number;hourly_rate:string}[];
 };
 export type DailyPayrollAccrual = {

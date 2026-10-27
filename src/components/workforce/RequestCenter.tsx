@@ -13,6 +13,7 @@ import {
   type RequestFile,
 } from "@/lib/workforce/requests";
 import { leaveTypeLabel, MEDICAL_REPORT_ACCEPT, MEDICAL_REPORT_MIMES } from "@/lib/workforce/sick-leave";
+import {UNPAID_LEAVE_NOTICE} from '@/lib/workforce/unpaid-leave';
 import type { AttendanceData } from "@/lib/workforce/attendance";
 import { ATTACHMENT_ACCEPT } from "@/lib/workforce/attachments";
 import {
@@ -90,6 +91,9 @@ export default function RequestCenter({
   const requestKey = `${page}:${status}:${revision}:${focusOnly}:${focused}`;
   const loading = loadedKey !== requestKey;
   const [attendance, setAttendance] = useState<AttendanceData | null>(null);
+  const [unpaidAck,setUnpaidAck]=useState('');
+  const unpaidLeave=form.kind==='leave'&&form.leave_type==='unpaid';
+  const unpaidPeriod=[form.kind,form.leave_type,form.starts_at,form.ends_at].join(':');
   const [overtimePeriods,setOvertimePeriods]=useState<Record<string,{starts_at:string;ends_at:string}>>({});
   useEffect(() => {
     const refresh = () => {
@@ -182,7 +186,7 @@ export default function RequestCenter({
       !(await confirm("تجاهل الطلب غير المحفوظ؟"))
     )
       return;
-    setOpen(false);
+    setOpen(false);setUnpaidAck('');
   }
   return (
     <div
@@ -474,6 +478,7 @@ export default function RequestCenter({
           className="space-y-4"
           onSubmit={async (e) => {
             e.preventDefault();
+            if(unpaidLeave&&unpaidAck!==unpaidPeriod){setError('أكّدي اطلاعك على خصم فترة الإجازة غير المدفوعة');return;}
             if(form.kind==='leave'&&form.leave_type==='sick'&&!files.some(file=>MEDICAL_REPORT_MIMES.includes(file.type))){setError('أرفقي التقرير الطبي بصيغة PDF أو صورة');return;}
             if(form.kind==='expenses'&&!files.length){setError('أرفق فاتورة المصروف');return;}
             if (lock.current) return;
@@ -488,12 +493,13 @@ export default function RequestCenter({
                 else data.set(name, value);
               }
               data.set("request_key", key.current);
+              if(unpaidLeave)data.set('unpaid_leave_ack','true');
               files.forEach((file) => data.append("files", file));
               await transport("/api/workforce/requests", {
                 method: "POST",
                 body: data,
               });
-              setOpen(false);
+              setOpen(false);setUnpaidAck('');
               setForm(initialForm(initialKind));
               setFiles([]);
               setPage(1);
@@ -561,11 +567,12 @@ export default function RequestCenter({
                 }
               >
                 <option value="paid">من الرصيد السنوي</option>
-                <option value="unpaid">بدون راتب</option>
+                <option value="unpaid">استثنائية غير مدفوعة</option>
                 <option value="sick">مرضية · بتقرير طبي</option>
               </select>
             </Field>
           )}
+          {unpaidLeave&&<div className="rounded-xl border border-amber-300/50 bg-amber-200/10 p-4 text-sm"><p id="unpaid-leave-notice" role="alert" className="font-bold text-amber-100">{UNPAID_LEAVE_NOTICE}</p><label className="mt-3 flex cursor-pointer items-start gap-2"><input type="checkbox" required aria-describedby="unpaid-leave-notice" className="mt-1" checked={unpaidAck===unpaidPeriod} onChange={e=>setUnpaidAck(e.target.checked?unpaidPeriod:'')}/><span>اطّلعت على هذه الشروط وأوافق عليها.</span></label></div>}
           {form.kind === "attendance-correction" && (
             <Field id="request-session" label="السجل المطلوب تصحيحه">
               <select
@@ -612,17 +619,17 @@ export default function RequestCenter({
                 ["starts_at", "من — الرياض"],
                 ["ends_at", "إلى — الرياض"],
               ].map(([key, label]) => (
-                <Field key={key} id={`request-${key}`} label={label}>
+                <Field key={key} id={`request-${key}`} label={form.kind==='leave'?(key==='starts_at'?'تاريخ البداية':'تاريخ النهاية'):label}>
                   <input
                     id={`request-${key}`}
-                    type="datetime-local"
+                    type={form.kind==='leave'?'date':'datetime-local'}
                     required
                     className={controlClass}
-                    value={form[key as "starts_at" | "ends_at"]}
+                    value={form.kind==='leave'?form[key as "starts_at" | "ends_at"].slice(0,10):form[key as "starts_at" | "ends_at"]}
                     onChange={(e) =>
                       setForm((current) => ({
                         ...current,
-                        [key]: e.target.value,
+                        [key]: form.kind==='leave'&&e.target.value?`${e.target.value}T${key==='starts_at'?'00:00':'23:59'}`:e.target.value,
                       }))
                     }
                   />

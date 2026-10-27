@@ -503,7 +503,7 @@ export default function MonthlyPayroll({
                             </strong>
                           </div>
                         ))}
-                        {Number(statement.attendance_amount??0)>0&&(()=>{const adjustment=splitAttendanceAdjustment(statement.attendance_amount??"0",statement.attendance_details?.sick_leave?.amount??"0");return <>{Number(adjustment.hours)>0&&<div className="mt-2 flex flex-wrap justify-between gap-2"><span>تسوية ساعات الحضور</span><strong>− {money(adjustment.hours)}</strong></div>}{Number(adjustment.sick)>0&&<div className="mt-2 flex flex-wrap justify-between gap-2"><span>تسوية أجر المرضية</span><strong>− {money(adjustment.sick)}</strong></div>}</>})()}
+                        {Number(statement.attendance_amount??0)>0&&(()=>{const adjustment=splitAttendanceAdjustment(statement.attendance_amount??"0",statement.attendance_details?.sick_leave?.amount??"0",statement.attendance_details?.unpaid_leave?.amount??"0");return <>{Number(adjustment.hours)>0&&<div className="mt-2 flex flex-wrap justify-between gap-2"><span>تسوية ساعات الحضور</span><strong>− {money(adjustment.hours)}</strong></div>}{Number(adjustment.sick)>0&&<div className="mt-2 flex flex-wrap justify-between gap-2"><span>تسوية أجر المرضية</span><strong>− {money(adjustment.sick)}</strong></div>}{Number(adjustment.unpaid)>0&&<div className="mt-2 flex flex-wrap justify-between gap-2"><span>إجازة غير مدفوعة</span><strong>− {money(adjustment.unpaid)}</strong></div>}</>})()}
                         <p className="mt-2 font-bold">
                           مجموع الحسومات: {money(statement.deductions_amount)}
                         </p>

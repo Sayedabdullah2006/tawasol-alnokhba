@@ -19,7 +19,7 @@ export function renderPayrollEmail(name: string, p: PayrollEmail) {
     ["تاريخ المباشرة",date(p.startDate)],
     ["فترة الاستحقاق",`${date(p.periodStart)} — ${date(p.periodEnd)}`],
     ["المستحق عن الفترة",money(p.gross)],
-    ["خصم الحضور",money(p.attendance)],
+    ["تسوية الحضور والإجازات",money(p.attendance)],
     ["خصم التأمينات الاجتماعية",money(p.insurance)],
     ...(Number(p.otherDeductions)>0?[["استقطاعات أخرى",money(p.otherDeductions)]]:[]),
     ["صافي المستحق",money(p.net)],
