@@ -3,60 +3,54 @@ import path from 'node:path';
 import {Resvg} from '@resvg/resvg-js';
 import {PDFDocument} from 'pdf-lib';
 import {remoteMinutes,type RemoteQuote,type RemoteSignature} from './remote-work';
+import {WorkforceError} from './validation';
 const esc=(s:unknown)=>String(s??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]!));
 const text=(s:unknown,x:number,y:number,size=20,color='#183452',bold=false)=>`<text x="${x}" y="${y}" font-family="Noto Sans Arabic" font-size="${size}" font-weight="${bold?700:400}" text-anchor="end" fill="${color}">${esc(s)}</text>`;
 const date=(s:string)=>new Date(s+'T12:00:00+03:00').toLocaleDateString('ar-SA',{calendar:'gregory',year:'numeric',month:'long',day:'numeric'});
-const money=(s:string)=>`${Number(s).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2})} ريال`;
-function lines(s:string,max=93){const words=s.split(/\s+/),out:string[]=[];let line='';for(const word of words){if((line+' '+word).length>max&&line){out.push(line);line=word;}else line+=(line?' ':'')+word;}if(line)out.push(line);return out;}
+const money=(s:string)=>`${Number(s).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2})} ر.س`;
+function lines(s:string,max=108){const out:string[]=[];let line='';for(const word of s.split(/\s+/)){if((line+' '+word).length>max&&line){out.push(line);line=word;}else line+=(line?' ':'')+word;}if(line)out.push(line);return out;}
+/** A fixed, readable one-page agreement. Long input is rejected, never clipped or shrunk. */
 export async function renderRemoteAgreement(q:RemoteQuote,signature:RemoteSignature=[],stamp?:string,decision?:{status:string;at:string|null;reason:string|null},preview=false){
  const logo=`data:image/png;base64,${(await readFile(path.join(process.cwd(),'public/logo.png'))).toString('base64')}`;
- const pages:string[]=[];let y=205,body='';
- const header=(page:number)=>`<rect width="1190" height="1684" fill="#fff"/><rect width="1190" height="145" fill="#112b4d"/><image x="55" y="22" width="85" height="100" href="${logo}"/>${text('اتفاق مؤقت للعمل عن بُعد بساعات وأجر مخفضين',1130,66,31,'#edcf8d',true)}${text('تواصل النخبة · ملحق محدد المدة بعقد العمل',1130,109,20,'#fff')}<path d="M55 155 H1135" stroke="#bb9650" stroke-width="3"/>${text(`صفحة ${page} · ${q.ready?'نسخة للمراجعة والتوقيع':'معاينة غير قابلة للإصدار · بيانات ناقصة'}`,1130,1638,17,'#63758a')}${text(`مرجع النسخة: ${q.hash}`,1130,1665,14,'#63758a')}`;
- function flush(){pages.push(header(pages.length+1)+body+(preview?`<rect x="55" y="1555" width="1080" height="42" fill="#fff3cc"/>${text('معاينة معزولة فقط · الاتفاق والتوقيع غير نافذين · لا يغير بيانات الموظفة',1120,1584,18,'#855f16',true)}`:''));body='';y=205;}
- function line(s:string,size=20,bold=false){if(y>1540)flush();body+=text(s,1128,y,size,'#183452',bold);y+=35;}
- function paragraph(s:string){const rows=lines(s);if(y+rows.length*35>1540)flush();for(const v of rows)line(v);y+=8;}
- function heading(s:string){if(y>1360)flush();body+=`<rect x="55" y="${y-27}" width="1080" height="42" rx="6" fill="#eef2f7"/>`+text(s,1115,y,22,'#173958',true);y+=51;}
- function salaryTable(){
-  const rows=[['الراتب الأساسي',first.basic,first.basic],['بدل السكن',first.housing,first.housing],['بدل النقل',first.transport_allowance??'0','0'],['بدل المهام الإضافية الثابت',first.extra_allowance??'0','0']];
-  const rest=Number(first.agreed_monthly)-Number(first.basic)-Number(first.housing);if(rest>0)rows.push(['بدلات أخرى غير مشمولة',String(rest),String(rest)]);
-  rows.push(['إجمالي الراتب الثابت',first.original_monthly,first.agreed_monthly]);
-  if(y+55+rows.length*47>1530)flush();
-  body+=`<rect x="55" y="${y-28}" width="1080" height="48" rx="5" fill="#173958"/>`+text('البيان',1115,y,20,'#fff',true)+text('قبل الاتفاق · شهريًا',730,y,19,'#fff',true)+text('خلال الاتفاق · مكافئ شهري',370,y,19,'#fff',true);y+=47;
-  rows.forEach((r,i)=>{const total=i===rows.length-1;body+=`<rect x="55" y="${y-28}" width="1080" height="47" fill="${total?'#fff2ce':i%2?'#f3f6fa':'#fff'}"/><path d="M55 ${y+19} H1135" stroke="#d9e1eb"/>`+text(r[0],1115,y,19,'#173958',total)+text(money(r[1]),730,y,19,'#173958',total)+text(money(r[2]),370,y,19,'#173958',total);y+=47;});y+=18;
- }
- const company=q.company,first=q.days[0];
- heading('١ · بيانات الطرفين والعقد');
+ const first=q.days[0],company=q.company;let body='',y=184;
+ function heading(s:string){body+=`<rect x="55" y="${y-24}" width="1080" height="35" rx="6" fill="#eef2f7"/>`+text(s,1115,y,21,'#173958',true);y+=37;}
+ function paragraph(s:string,size=19){for(const row of lines(s)){body+=text(row,1125,y,size);y+=27;}y+=3;}
+ heading('١ · طرفا الاتفاق');
  paragraph(`${company?.legal_name??'بيانات المنشأة غير مكتملة'} · الرقم الوطني الموحد: ${company?.unified_number??'—'}`);
- paragraph(`عنوان المنشأة: ${company?.address??'—'} · الممثل: ${company?.representative??'—'}`);
- paragraph(`بريد المنشأة: ${company?.email??'—'} · الهاتف: ${company?.phone??'—'}`);
- paragraph(`الموظفة: ${q.employee.full_name} · الهوية/الإقامة: ${q.employee.national_id}`);
- paragraph(`المسمى: ${q.employee.job_title} · رقم عقد العمل: ${q.contract_number??'غير موثق بعد'}`);
- paragraph(`عنوان الموظفة: ${q.employee.address} · المدينة: ${q.employee.city}`);
- paragraph(`البريد: ${q.employee.email} · الجوال: ${q.employee.phone}`);
- heading('٢ · الفترة والعمل المتفق عليه');
- paragraph(`الفترة من ${date(q.starts_on)} إلى نهاية ${date(q.ends_on)}، وعددها ${q.calendar_days} يوم تقويم. العودة التلقائية للشروط السابقة بتاريخ ${date(q.returns_on)}.`);
- paragraph(`مكان العمل عن بُعد: ${q.location}. سبب الطلب: ${q.reason}`);
- paragraph(`ساعات العمل المطلوبة في أيام العمل: ${remoteMinutes(first.required_minutes)} بدلًا من ${remoteMinutes(first.regular_minutes)}، من الساعة ${q.starts_time.slice(0,5)} حتى ${first.ends_time.slice(0,5)} بتوقيت الرياض. تُقرب الساعات المطلوبة لأعلى دقيقة.`);
- paragraph(`المهام الأساسية خلال الفترة: ${q.duties}`);
- paragraph('تستمر أيام العمل والراحة وفق الجدول المعتمد. تلتزم الموظفة بالحضور والانصراف وتأكيد الجلسة وأداء المهام الأساسية والسرية. يتوقف تكليفها بالمهام الإضافية المقابلة للبدل الموقوف خلال الفترة.');
- heading('٣ · الأجر والأثر المالي');
- paragraph('يتفق الطرفان على إيقاف صرف بدل النقل وبدل المهام الإضافية الثابت بنسبة ١٠٠٪ خلال الفترة فقط، مقابل عدم الحاجة إلى التنقل وعدم التكليف بالمهام الإضافية المقابلة للبدل.');
- salaryTable();
- paragraph('يبقى الراتب الأساسي وبدل السكن دون تخفيض، وبمجموع لا يقل عن ٤٬٠٠٠ ريال شهريًا قبل الاستقطاعات النظامية.');
- paragraph(`إجمالي أجر الفترة قبل الاتفاق: ${money(q.original_amount)}. قيمة البدلات الموقوفة للفترة: ${money(q.adjustment_amount)}. أجر الفترة المتفق عليه قبل التأمينات والتسويات النظامية: ${money(q.agreed_amount)}.`);
- paragraph('تخفض الساعات بنسبة الانخفاض الفعلية في إجمالي الراتب الثابت، ولا يعامل الفرق المعتمد كغياب أو يحسب مرتين. تحسب أجزاء الشهر بأجره اليومي المعتمد؛ وللشهر الكامل لا يتجاوز إيقاف البدلات قيمتها الشهرية.');
- const denominators=[...new Set(q.days.map(v=>Math.round(Number(v.original_monthly)/Number(v.original))))];paragraph(denominators.length===1?`طريقة احتساب الفترة: الأجر الشهري والبدلات الشهرية ÷ ${denominators[0]} × عدد أيام التقويم المشمولة. قيمة الأجر والبدلات لكل يوم مثبتة في النسخة المعتمدة.`:'طريقة احتساب الفترة: مجموع الأجر اليومي والبدلات اليومية للأيام المشمولة بكل شهر؛ الشهر الكامل يساوي أجره الشهري، وشهر المباشرة الجزئي وفق القسمة على ٣٠.');
- paragraph('لا يشمل الإيقاف العمولات المكتسبة أو المصروفات المعتمدة أو الحقوق السابقة. التأمينات والإجازات والعمل الإضافي وبقية الحقوق وفق الأنظمة والعقد، ولا تتغير نسبتها تلقائيًا بموجب هذا الاتفاق.');
- heading('٤ · السريان والعودة');
- paragraph('يسري الاتفاق بعد توقيع الموظفة واعتماد المدير وقبل بداية الفترة فقط، ولا يطبق بأثر رجعي. تعود شروط الأجر والساعات والمكان السابقة تلقائيًا بعد نهايتها، دون تجديد ضمني. أي تمديد أو تغيير يحتاج اتفاقًا جديدًا وموافقة الطرفين.');
- heading('٥ · إقرار الموظفة');paragraph('أقر بأنني اطلعت على هذا الاتفاق والفترة والمهام والساعات والمبالغ الموضحة فيه، وفهمت أثره المالي، وأوافق عليه بإرادتي. كما أوافق على إيقاف بدل النقل وبدل المهام الإضافية الثابت وعدم تكليفي بالمهام الإضافية المقابلة له خلال الفترة المحددة فقط، وعلى العودة التلقائية للشروط السابقة.');paragraph('تبقى أحكام عقد العمل الأصلية سارية فيما لم يعدله هذا الاتفاق، بما يتوافق مع نظام العمل.');
- heading('٦ · التوقيع والاعتماد');
- if(y>1295)flush();
- body+=`<rect x="610" y="${y}" width="520" height="150" rx="8" fill="#fafbfc" stroke="#c6d0dd"/>`+text('توقيع الموظفة',1110,y+30,19,'#173958',true);
- const paths=signature.map(stroke=>`<path d="${stroke.map((pt,i)=>`${i?'L':'M'}${630+pt[0]*.47},${y+47+pt[1]*.28}`).join(' ')}" fill="none" stroke="#173958" stroke-width="2.2" stroke-linecap="round"/>`).join('');body+=paths;
- body+=`<rect x="55" y="${y}" width="520" height="150" rx="8" fill="#fafbfc" stroke="#c6d0dd"/>`+text('اعتماد المدير',555,y+30,19,'#173958',true)+text(decision?.status==='approved'?'معتمد إلكترونيًا من المدير':decision?.status==='rejected'?'رُفض الطلب · الاتفاق غير نافذ':decision?.status==='cancelled'?'أُلغي الطلب · الاتفاق غير نافذ':'بانتظار اعتماد المدير',555,y+79,20)+text(decision?.at?new Date(decision.at).toLocaleDateString('ar-SA',{calendar:'gregory',timeZone:'Asia/Riyadh'}):'لا يسري الاتفاق قبل الاعتماد',555,y+115,17);
- y+=182;paragraph(stamp?`وقّعت الموظفة من حسابها بتاريخ ${new Date(stamp).toLocaleString('ar-SA',{calendar:'gregory',timeZone:'Asia/Riyadh'})}.`:'نسخة للمراجعة؛ لا تتضمن توقيعًا نافذًا قبل إرسال الطلب.');
- flush();
- const pdf=await PDFDocument.create();for(const svg of pages){const png=new Resvg(`<svg xmlns="http://www.w3.org/2000/svg" width="1190" height="1684">${svg}</svg>`,{font:{fontFiles:[path.join(process.cwd(),'public/fonts/NotoSansArabic-Variable.ttf')],loadSystemFonts:false}}).render().asPng();const page=pdf.addPage([595.28,841.89]);page.drawImage(await pdf.embedPng(png),{x:0,y:0,width:595.28,height:841.89});}
- pdf.setTitle('اتفاق مؤقت للعمل عن بُعد - '+q.employee.full_name);pdf.setAuthor(q.company?.legal_name??'تواصل النخبة');return Buffer.from(await pdf.save());
+ paragraph(`الممثل: ${company?.representative??'—'} · العنوان: ${company?.address??'—'}`);
+ paragraph(`التواصل: ${company?.email??'—'} · ${company?.phone??'—'}`);
+ paragraph(`الموظفة: ${q.employee.full_name} · الهوية/الإقامة: ${q.employee.national_id} · عقد العمل: ${q.contract_number??'غير موثق'}`);
+ paragraph(`المسمى: ${q.employee.job_title} · العنوان: ${q.employee.city}، ${q.employee.address}`);
+ paragraph(`التواصل: ${q.employee.email} · ${q.employee.phone}`);
+ heading('٢ · مدة الاتفاق والعمل');
+ paragraph(`من ${date(q.starts_on)} إلى ${date(q.ends_on)} (${q.calendar_days} يوم تقويم) · العودة للشروط السابقة: ${date(q.returns_on)}.`);
+ paragraph(`المكان: ${q.location} · سبب الطلب: ${q.reason}`);
+ paragraph(`الدوام اليومي: ${remoteMinutes(first.required_minutes)} بدلًا من ${remoteMinutes(first.regular_minutes)} · ${q.starts_time.slice(0,5)} إلى ${first.ends_time.slice(0,5)} بتوقيت الرياض.`);
+ paragraph(`المهام الأساسية: ${q.duties}`);
+ heading('٣ · الأجر المتفق عليه');
+ const rows=[['الراتب الأساسي',first.basic,first.basic],['بدل السكن',first.housing,first.housing],['بدل النقل',first.transport_allowance??'0','0'],['بدل المهام الإضافية الثابت',first.extra_allowance??'0','0']];
+ const other=Number(first.agreed_monthly)-Number(first.basic)-Number(first.housing);if(other>0)rows.push(['بدلات أخرى غير مشمولة',String(other),String(other)]);
+ rows.push(['إجمالي الراتب الثابت',first.original_monthly,first.agreed_monthly]);
+ body+=`<rect x="55" y="${y-25}" width="1080" height="34" rx="5" fill="#173958"/>`+text('البيان',1115,y,19,'#fff',true)+text('قبل الاتفاق · شهريًا',725,y,18,'#fff',true)+text('خلال الاتفاق · مكافئ شهري',370,y,18,'#fff',true);y+=34;
+ for(const [i,r] of rows.entries()){const total=i===rows.length-1;body+=`<rect x="55" y="${y-25}" width="1080" height="34" fill="${total?'#fff2ce':i%2?'#f3f6fa':'#fff'}"/>`+text(r[0],1115,y,19,'#173958',total)+text(money(r[1]),725,y,19,'#173958',total)+text(money(r[2]),370,y,19,'#173958',total);y+=34;}y+=10;
+ const amounts=[['أجر الفترة قبل الاتفاق',q.original_amount],['البدلات الموقوفة للفترة',q.adjustment_amount],['أجر الفترة المتفق عليه',q.agreed_amount]];
+ amounts.forEach(([label,value],i)=>{const x=55+i*365;body+=`<rect x="${x}" y="${y-18}" width="350" height="76" rx="9" fill="${i===2?'#e8f3f1':'#f1f4f8'}"/>`+text(label,x+330,y+5,18,'#4a6178')+text(money(value),x+330,y+37,24,'#173958',true);});y+=83;
+ heading('٤ · شروط الاتفاق');
+ const denominators=[...new Set(q.days.map(v=>Math.round(Number(v.original_monthly)/Number(v.original))))];
+ paragraph('• يوقف بدلا النقل والمهام الإضافية الثابت بنسبة ١٠٠٪ للفترة فقط، مع وقف التنقل والمهام الإضافية المقابلة لهما. الأساسي والسكن محفوظان وبمجموع شهري لا يقل عن ٤٬٠٠٠ ريال.');
+ paragraph(`• تخفض الساعات بنسبة الانخفاض الفعلية في إجمالي الراتب وتقرب لأعلى دقيقة؛ الفرق المعتمد لا يعد غيابًا ولا يحتسب مرتين. ${denominators.length===1?`أجر الفترة = الأجر الشهري ÷ ${denominators[0]} × أيام التقويم المشمولة.`:'أجر الفترة هو مجموع الأجر اليومي المعتمد لكل شهر مشمول.'}`);
+ paragraph('• مبالغ الأجر قبل التأمينات والتسويات النظامية؛ لا يشمل الإيقاف العمولات المكتسبة أو المصروفات المعتمدة أو الحقوق السابقة. وتبقى أيام الراحة والإجازات والعمل الإضافي وفق العقد والأنظمة.');
+ paragraph('• تلتزم الموظفة بالحضور والانصراف وتأكيد الجلسة والمهام والسرية. يسري الاتفاق بتوقيعها واعتماد المدير قبل بدايته، دون أثر رجعي؛ وتعود الشروط السابقة تلقائيًا بعد نهايته. أي تمديد يتطلب اتفاقًا جديدًا.');
+ heading('٥ · الإقرار والتوقيع');
+ paragraph('أقر باطلاعي على الفترة والمهام والساعات والمبالغ أعلاه، وفهم أثرها المالي وموافقتي عليها بإرادتي. وتبقى أحكام عقد العمل سارية فيما لم يعدله هذا الاتفاق، بما يتوافق مع نظام العمل.');
+ if(y>1375)throw new WorkforceError('التفاصيل أطول من مساحة الاتفاق ذي الصفحة الواحدة؛ اختصري سبب الطلب والمهام والمكان مع إبقاء المعنى واضحًا.');
+ const boxY=y;body+=`<rect x="610" y="${boxY}" width="520" height="130" rx="8" fill="#fafbfc" stroke="#c6d0dd"/><rect x="55" y="${boxY}" width="520" height="130" rx="8" fill="#fafbfc" stroke="#c6d0dd"/>`+text('توقيع الموظفة',1110,boxY+28,19,'#173958',true)+text('اعتماد المدير',555,boxY+28,19,'#173958',true);
+ body+=signature.map(stroke=>`<path d="${stroke.map((pt,i)=>`${i?'L':'M'}${630+pt[0]*.47},${boxY+39+pt[1]*.19}`).join(' ')}" fill="none" stroke="#173958" stroke-width="2.2" stroke-linecap="round"/>`).join('');
+ const signed=stamp?new Date(stamp).toLocaleString('ar-SA',{calendar:'gregory',timeZone:'Asia/Riyadh'}):'يوقّع إلكترونيًا من حساب الموظفة';
+ body+=text(signed,1110,boxY+115,15)+text(decision?.status==='approved'?'معتمد إلكترونيًا':decision?.status==='rejected'?'مرفوض · غير نافذ':decision?.status==='cancelled'?'ملغى · غير نافذ':'بانتظار اعتماد المدير',555,boxY+72,20)+text(decision?.at?new Date(decision.at).toLocaleDateString('ar-SA',{calendar:'gregory',timeZone:'Asia/Riyadh'}):'لا يسري قبل الاعتماد',555,boxY+110,16);
+ const header=`<defs><filter id="white-logo" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0"/></filter></defs><rect width="1190" height="1684" fill="#fff"/><rect width="1190" height="140" fill="#112b4d"/><image x="60" y="19" width="115" height="103" filter="url(#white-logo)" href="${logo}"/>${text('اتفاق مؤقت للعمل عن بُعد',1130,62,34,'#edcf8d',true)}${text('ملحق محدد المدة بعقد العمل · ساعات وأجر مخفضان',1130,105,21,'#fff')}<path d="M55 151 H1135" stroke="#bb9650" stroke-width="3"/>`;
+ const footer=(preview?`<rect x="55" y="1550" width="1080" height="36" rx="5" fill="#fff3cc"/>${text('معاينة للمراجعة فقط · الاتفاق والتوقيع غير نافذين · لا تتغير البيانات الحقيقية',1120,1575,16,'#855f16',true)}`:'')+text(`مرجع النسخة: ${q.hash}`,1130,1620,14,'#63758a')+text(q.ready?'صفحة ١ من ١':'معاينة غير قابلة للإصدار · بيانات ناقصة',1130,1650,16,'#63758a');
+ const png=new Resvg(`<svg xmlns="http://www.w3.org/2000/svg" width="1190" height="1684">${header}${body}${footer}</svg>`,{font:{fontFiles:[path.join(process.cwd(),'public/fonts/NotoSansArabic-Variable.ttf')],loadSystemFonts:false}}).render().asPng();
+ const pdf=await PDFDocument.create(),page=pdf.addPage([595.28,841.89]);page.drawImage(await pdf.embedPng(png),{x:0,y:0,width:595.28,height:841.89});pdf.setTitle('اتفاق مؤقت للعمل عن بُعد - '+q.employee.full_name);pdf.setAuthor(company?.legal_name??'تواصل النخبة');return Buffer.from(await pdf.save());
 }
+
