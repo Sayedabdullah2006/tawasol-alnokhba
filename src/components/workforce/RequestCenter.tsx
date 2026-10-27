@@ -30,7 +30,7 @@ import PdfAttachmentPreview from "./PdfAttachmentPreview";
 import OvertimePeriod,{localRequestTime} from "./OvertimePeriod";
 const initialForm = (kind = "general") => ({
   kind,
-  title: "",
+  title: kind==='resignation'?"طلب استقالة":"",
   body: "",
   starts_at: "",
   ends_at: "",
@@ -95,6 +95,10 @@ export default function RequestCenter({
   const requestKey = `${page}:${status}:${revision}:${focusOnly}:${focused}`;
   const loading = loadedKey !== requestKey;
   const [attendance, setAttendance] = useState<AttendanceData | null>(null);
+  const [requestNow,setRequestNow]=useState(()=>Date.now());
+  useEffect(()=>{const timer=setInterval(()=>setRequestNow(Date.now()),60000);return()=>clearInterval(timer);},[]);
+  const [resignationAck,setResignationAck]=useState(false);
+  const [deferralDays,setDeferralDays]=useState<Record<string,string>>({});
   const [unpaidAck,setUnpaidAck]=useState('');
   const unpaidLeave=form.kind==='leave'&&form.leave_type==='unpaid';
   const unpaidPeriod=[form.kind,form.leave_type,form.starts_at,form.ends_at].join(':');
@@ -162,7 +166,8 @@ export default function RequestCenter({
   }, [page, status, revision, focusOnly, focused, requestKey,transport]);
   async function decide(row: EmployeeRequest, decision: string) {
     if (lock.current) return;
-    if (decision === "cancelled" && !(await confirm("إلغاء هذا الطلب؟")))
+    if(row.kind==='resignation'&&decision==='approved'&&!(await confirm("قبول الاستقالة الآن؟ يُوثّق انتهاء العقد من وقت القبول وتبدأ إجراءات تسليم العهد وتصفية الحقوق.")))return;
+    if (decision === "cancelled" && !(await confirm(row.kind==='resignation'?"تأكيد العدول عن الاستقالة؟":"إلغاء هذا الطلب؟")))
       return;
     lock.current = true;
     setBusy(true);
@@ -174,6 +179,7 @@ export default function RequestCenter({
           id: row.id,
           version: row.version,
           decision,
+          ...(decision==='deferred'?{days:Number(deferralDays[row.id]||60)}:{}),
           reason: reasons[row.id],
           ...(row.kind==='overtime'&&decision==='approved'?{starts_at:`${overtimePeriods[row.id]?.starts_at??localRequestTime(row.starts_at)}:00+03:00`,ends_at:`${overtimePeriods[row.id]?.ends_at??localRequestTime(row.ends_at)}:00+03:00`}:{}),
         }),
@@ -404,6 +410,12 @@ export default function RequestCenter({
                     </p>
                   </div>
                 )}
+                {row.kind==='resignation'&&row.resignation_details&&<section className="space-y-3 rounded-xl border border-amber-300/30 p-4 text-sm">
+                  <div className="grid gap-3 sm:grid-cols-2"><div><span className="opacity-70">{row.resignation_details.effective_at?'تاريخ انتهاء العقد':'آخر موعد للقرار'}</span><p className="mt-1 font-bold">{new Date(row.resignation_details.effective_at||row.resignation_details.response_due).toLocaleString('ar-SA',{calendar:'gregory',timeZone:'Asia/Riyadh'})}</p></div><div><span className="opacity-70">{row.resignation_details.settlement_due?'موعد تصفية الحقوق الأقصى':'العدول متاح حتى'}</span><p className="mt-1 font-bold">{new Date(row.resignation_details.settlement_due?row.resignation_details.settlement_due+'T12:00:00+03:00':row.resignation_details.withdraw_until).toLocaleDateString('ar-SA',{calendar:'gregory',timeZone:'Asia/Riyadh'})}</p></div></div>
+                  {row.resignation_details.deferred_at&&<p>تأجيل القبول: {row.resignation_details.deferral_reason}</p>}
+                  <a className="inline-block font-bold underline" target="_blank" rel="noopener" href={`/api/workforce/requests/${row.id}/document`}>عرض النموذج وطباعته</a>
+                  {row.resignation_details.effective_at&&<div className="flex flex-wrap gap-3">{admin?<><Link className="font-bold underline" href="/admin/workforce/tasks">تسليم المهام</Link><Link className="font-bold underline" href={`/admin/workforce/employees/${row.employee_id}`}>العهد وشهادة الخدمة</Link><Link className="font-bold underline" href="/admin/workforce/payroll">مراجعة التسوية النهائية</Link></>:<Link className="font-bold underline" href="/employee/work/tasks">تسليم مهامي</Link>}</div>}
+                </section>}
                 {row.status === "pending" &&
                   (admin ? (
                     <form
@@ -414,7 +426,7 @@ export default function RequestCenter({
                           (e.nativeEvent as SubmitEvent)
                             .submitter as HTMLButtonElement
                         )?.value;
-                        if (["approved", "rejected"].includes(value))
+                        if (["approved", "rejected", "deferred"].includes(value))
                           void decide(row, value);
                       }}
                     >
@@ -435,7 +447,9 @@ export default function RequestCenter({
                           }
                         />
                       </Field>
-                      <div className="flex gap-3">
+                      {row.kind==='resignation'&&!row.resignation_details?.deferred_at&&<Field id={`defer-${row.id}`} label="مدة تأجيل القبول · يوم"><input id={`defer-${row.id}`} type="number" min={1} max={60} className={controlClass} value={deferralDays[row.id]??'60'} onChange={e=>setDeferralDays(p=>({...p,[row.id]:e.target.value}))}/></Field>}
+                      <div className="flex flex-wrap gap-3">
+                        {row.kind==='resignation'&&!row.resignation_details?.deferred_at&&<Button type="submit" value="deferred" variant="outline" disabled={busy}>تأجيل مسبب</Button>}
                         <Button type="submit" value="approved" disabled={busy||(row.kind==='leave'&&row.leave_type==='unpaid'&&!row.unpaid_estimate)}>
                           موافقة
                         </Button>
@@ -453,10 +467,10 @@ export default function RequestCenter({
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={busy}
+                      disabled={busy||(row.kind==='resignation'&&(!row.resignation_details||requestNow>Date.parse(row.resignation_details.withdraw_until)))}
                       onClick={() => void decide(row, "cancelled")}
                     >
-                      إلغاء الطلب
+                      {row.kind==='resignation'?'العدول عن الاستقالة':'إلغاء الطلب'}
                     </Button>
                   ))}
               </article>
@@ -495,6 +509,7 @@ export default function RequestCenter({
           className="space-y-4"
           onSubmit={async (e) => {
             e.preventDefault();
+            if(form.kind==='resignation'&&!resignationAck){setError('أكدي إقرار الاستقالة');return;}
             if(unpaidLeave&&!unpaidEstimate){setError(unpaidError||'انتظري احتساب الخصم قبل إرسال الطلب');return;}
             if(unpaidLeave&&unpaidAck!==unpaidAgreement){setError('أكّدي اطلاعك على خصم فترة الإجازة غير المدفوعة');return;}
             if(form.kind==='leave'&&form.leave_type==='sick'&&!files.some(file=>MEDICAL_REPORT_MIMES.includes(file.type))){setError('أرفقي التقرير الطبي بصيغة PDF أو صورة');return;}
@@ -511,13 +526,14 @@ export default function RequestCenter({
                 else data.set(name, value);
               }
               data.set("request_key", key.current);
+              if(form.kind==='resignation')data.set('resignation_ack','true');
               if(unpaidLeave)data.set('unpaid_leave_ack','true');
               files.forEach((file) => data.append("files", file));
               await transport("/api/workforce/requests", {
                 method: "POST",
                 body: data,
               });
-              setOpen(false);setUnpaidAck('');
+              setOpen(false);setUnpaidAck('');setResignationAck(false);
               setForm(initialForm(initialKind));
               setFiles([]);
               setPage(1);
@@ -543,6 +559,7 @@ export default function RequestCenter({
                 setForm((current) => ({
                   ...current,
                   kind: e.target.value,
+                  title:e.target.value==='resignation'?'طلب استقالة':'',
                   starts_at: "",
                   ends_at: "",
                   amount: "",
@@ -672,7 +689,7 @@ export default function RequestCenter({
               />
             </Field>
           )}
-          <Field id="request-body" label="التفاصيل">
+          <Field id="request-body" label={form.kind==='resignation'?"مبررات الاستقالة":"التفاصيل"}>
             <textarea
               id="request-body"
               className={controlClass}
@@ -686,6 +703,7 @@ export default function RequestCenter({
               }
             />
           </Field>
+          {form.kind==='resignation'&&<div className="space-y-3 rounded-xl border border-amber-300/40 bg-amber-200/10 p-4 text-sm"><p>للعقد المحدد المدة: يمكنكِ العدول خلال ٧ أيام ما لم تُقبل الاستقالة قبل ذلك. تُقبل بانقضاء ٣٠ يومًا دون رد، ويجوز تأجيل القبول بسبب مكتوب حتى ٦٠ يومًا من الإيضاح. يستمر العمل أثناء الانتظار، ولا يُحدد تاريخ مؤجل في الطلب.</p><label className="flex items-start gap-2"><input type="checkbox" required checked={resignationAck} onChange={e=>setResignationAck(e.target.checked)}/><span>أتقدم باستقالتي بإرادتي الحرة ودون إكراه، وألتزم بواجبات العمل خلال سريان العقد وتسليم ما بعهدتي.</span></label></div>}
           <Field id="request-files" label={form.kind==='leave'&&form.leave_type==='sick'?"التقرير الطبي · مطلوب":form.kind==='expenses'?"الفاتورة والمرفقات · الفاتورة مطلوبة":"المرفقات · 5 ملفات × 4 م.ب"}>
             <input
               ref={requestFiles}

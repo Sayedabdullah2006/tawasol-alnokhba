@@ -9,6 +9,7 @@ export const REQUEST_KINDS = {
   "payroll-review": "استفسار مالي",
   "attendance-correction": "تصحيح حضور",
   "missing-hours": "تسجيل ساعات مفقودة",
+  resignation: "استقالة",
   general: "طلب إداري",
 } as const;
 export const REQUEST_STATUS = {
@@ -53,5 +54,6 @@ export type EmployeeRequest = {
   created_at: string;
   version: number;
   overtime_details?:{hours:number;hourly_rate:string;actual_salary:string;basic_salary:string;work_day:string;payroll_month:string}|null;
+  resignation_details?: {employee_name:string;job_title:string;contract_end:string;start_date:string;submitted_at:string;withdraw_until:string;response_due:string;deferred_at?:string;deferral_reason?:string;effective_at?:string;settlement_due?:string;declaration:string;history:{action:string;at:string;reason?:string}[]};
   expense_details?:{payroll_month:string;approved_at:string}|null;
 };

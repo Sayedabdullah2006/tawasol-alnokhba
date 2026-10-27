@@ -37,7 +37,7 @@ export async function GET(request: Request) {
     let query = actor.db
       .from("wf_employee_requests")
       .select(
-        "id,employee_id,kind,title,body,starts_at,ends_at,work_day,missing_minutes,amount,overtime_details,expense_details,attendance_session_id,leave_type,attachments,status,decision_reason,decided_at,created_at,version",
+        "id,employee_id,kind,title,body,starts_at,ends_at,work_day,missing_minutes,amount,overtime_details,expense_details,resignation_details,attendance_session_id,leave_type,attachments,status,decision_reason,decided_at,created_at,version",
         { count: "exact" },
       )
       .order("created_at", { ascending: false })
@@ -126,6 +126,7 @@ export async function POST(request: Request) {
     if (!["paid", "unpaid", "sick"].includes(String(leave_type)))
       throw new WorkforceError("نوع الإجازة غير صحيح");
     try { requireUnpaidLeaveAcknowledgment(kind,String(leave_type),form.get('unpaid_leave_ack')); } catch(e) { throw new WorkforceError((e as Error).message); }
+    if(kind==='resignation' && (form.get('resignation_ack')!=='true' || !actor.employee.contract_end)) throw new WorkforceError("أكدي الإقرار، وتأكدي من توثيق مدة العقد لدى الإدارة");
     const title = textField(form.get("title"), "العنوان", 3, 150),
       body = textField(form.get("body"), "التفاصيل", 3, 10000);
     const date = (key: string) => {
@@ -144,6 +145,7 @@ export async function POST(request: Request) {
     };
     const starts_at = date("starts_at"),
       ends_at = date("ends_at");
+    if(kind==='resignation'&&(starts_at||ends_at||form.get('amount')))throw new WorkforceError("لا يحدد طلب الاستقالة تاريخًا مؤجلًا أو مبلغًا");
     if (datedRequest(kind) && (!starts_at || !ends_at))
       throw new WorkforceError("حدد بداية الفترة ونهايتها");
     if (ends_at && (!starts_at || ends_at < starts_at))
@@ -275,7 +277,7 @@ export async function PATCH(request: Request) {
     if (!Number.isInteger(body.version) || body.version < 1)
       throw new WorkforceError("نسخة الطلب غير صحيحة");
     const decision = textField(body.decision, "القرار", 1, 20);
-    if (!["approved", "rejected", "cancelled"].includes(decision))
+    if (!["approved", "rejected", "cancelled", "deferred"].includes(decision))
       throw new WorkforceError("قرار غير صحيح");
     if (actor.role !== "admin" && decision !== "cancelled")
       throw new WorkforceError("القرار للإدارة فقط", 403);
@@ -293,6 +295,7 @@ export async function PATCH(request: Request) {
         "هذا الطلب حقيقي. اخرج من وضع الاختبار للتعديل عليه",
         409,
       );
+    if(decision==='deferred'&&visible.data.kind!=='resignation')throw new WorkforceError("التأجيل للاستقالة فقط");
     const reason =
       decision === "cancelled"
         ? "ألغت الموظفة الطلب"
@@ -322,7 +325,10 @@ export async function PATCH(request: Request) {
       }
     }
     let result;
-    if(visible.data.kind==="overtime"&&decision==="approved"){
+    if(visible.data.kind==='resignation'){
+      if(decision==='deferred'&&(!Number.isInteger(body.days)||body.days<1||body.days>60))throw new WorkforceError('حدد مدة التأجيل من يوم إلى ستين يومًا');
+      result=await service.rpc('wf_decide_resignation',{p_id:id,p_actor:actor.user.id,p_version:body.version,p_decision:decision,p_reason:decision==='cancelled'?'عدول الموظفة عن الاستقالة':reason,p_days:decision==='deferred'?body.days:null});
+    }else if(visible.data.kind==="overtime"&&decision==="approved"){
       const period=(value:unknown)=>{
         if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/.test(value)||!Number.isFinite(Date.parse(value)))throw new WorkforceError("فترة خارج الدوام غير صحيحة");
         dateField(value.slice(0,10));return new Date(value).toISOString();

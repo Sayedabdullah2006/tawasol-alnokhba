@@ -58,6 +58,7 @@ const screen = (
       "requests/expenses",
       "requests/advance",
       "requests/attendance-correction",
+      "requests/resignation",
       "requests/missing-hours",
       "requests/letter",
       "requests/payroll-review",
@@ -269,6 +270,7 @@ export const employeeModules: EmployeeModule[] = [
         "السجل المراد تصحيحه والقيمة المقترحة وسبب التعديل.",
         ["attendance/overview"],
       ),
+      screen("requests/resignation","طلب استقالة","",["requests/history"]),
       screen("requests/missing-hours","تسجيل ساعات مفقودة","",["attendance/overview"]),
       screen(
         "requests/letter",
