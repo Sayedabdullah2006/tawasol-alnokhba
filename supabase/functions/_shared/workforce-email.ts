@@ -131,6 +131,7 @@ const nextAction: Record<string, string> = {
   approval_reminder: "مراجعة العناصر المعلقة واتخاذ القرار.",
   welcome: "أهلًا بكِ في تواصل النخبة. ابدئي من لوحتكِ.",
   meeting_reminder: "افتحي الاجتماع من الموقع، ثم انضمي من نفس جهاز ومتصفح تسجيل الحضور لتفعيل حماية جلسة الدوام.",
+  meeting_event: "افتحي تفاصيل الاجتماع من الموقع للاطلاع على الموعد والانضمام خلاله.",
 };
 export function renderWorkforceEmail(mail: WorkforceMail) {
   if (mail.kind === "monthly_payroll") {
@@ -140,7 +141,8 @@ export function renderWorkforceEmail(mail: WorkforceMail) {
   if (mail.kind === "weekly_report" && !mail.weeklyReport) throw new Error("Weekly report snapshot missing");
   const weekly = mail.kind === "weekly_report" ? mail.weeklyReport : undefined;
   if (weekly) return renderWeeklyEmail(mail,weekly);
-  const href = /^\/(employee|admin\/workforce)(\/|\?|$)/.test(mail.href)
+  const guestLink = mail.kind === "meeting_guest" && /^https:\/\/(?:[a-z0-9-]+\.)?zoom\.us\/j\/[0-9]{9,11}(?:\?pwd=[A-Za-z0-9._~-]+)?$/.test(mail.href);
+  const href = guestLink ? mail.href : mail.kind === "meeting_guest" ? site + "/meetings" : /^\/(employee|admin\/workforce)(\/|\?|$)/.test(mail.href)
     ? site + mail.href
     : site + "/employee";
   const isTask = taskKinds.has(mail.kind) && !!mail.taskTitle;
@@ -165,7 +167,8 @@ export function renderWorkforceEmail(mail: WorkforceMail) {
   const admin = mail.href.startsWith("/admin/workforce");
   const label = ["employee_request", "profile_request"].includes(mail.kind)
     ? admin ? "مراجعة الطلب" : "عرض الطلب"
-    : mail.kind === "meeting_reminder" ? "فتح الاجتماع والانضمام من الموقع"
+    : mail.kind === "meeting_guest" ? guestLink ? "الانضمام للاجتماع" : "تواصل النخبة"
+    : ["meeting_reminder", "meeting_event"].includes(mail.kind) ? "فتح الاجتماع والانضمام من الموقع"
     : mail.kind.startsWith("attendance_") ? "عرض الحضور"
     : ["payroll", "compensation"].includes(mail.kind) ? "عرض المستحقات"
     : mail.kind === "knowledge_file" ? "فتح الملف في مركز المعرفة" : isTask

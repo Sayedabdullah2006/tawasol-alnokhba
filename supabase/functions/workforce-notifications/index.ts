@@ -35,7 +35,12 @@ Deno.serve(async (req: Request) => {
   const items = (claim.data?.deliveries || []) as {
     id: string;
     snapshot: WorkforceMail;
+    externalMeeting?: boolean;
   }[];
+  if (token && items.length < 8) {
+    const guests = await db.rpc("wf_claim_meeting_guest_deliveries", {p_token:token,p_limit:8-items.length});
+    if (!guests.error) items.push(...(guests.data || []));
+  }
   let sent = 0,
     failed = 0;
   try {
@@ -83,7 +88,7 @@ Deno.serve(async (req: Request) => {
       } catch {
         error = "Mail provider request timed out or failed";
       }
-      const finished = await db.rpc("wf_finish_notification_delivery", {
+      const finished = await db.rpc(item.externalMeeting ? "wf_finish_meeting_guest_delivery" : "wf_finish_notification_delivery", {
         p_id: item.id,
         p_token: token,
         p_result: outcome,

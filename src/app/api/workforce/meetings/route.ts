@@ -1,6 +1,7 @@
 import {workforceActor,createServiceRoleClient,assertMutation,apiError} from '@/lib/workforce/server';
 import {privateResponse} from '@/lib/workforce/task-server';
 import {meetingColumns,googleConnection,publicMeetingConnection,syncMeeting} from '@/lib/workforce/meeting-server';
+import {zoomConnection,publicZoomConnection} from '@/lib/workforce/meeting-zoom-server';
 import {meetingCalendarRange,meetingDay} from '@/lib/workforce/meeting-calendar';
 import {uuid,WorkforceError} from '@/lib/workforce/validation';
 export async function GET(request:Request){try{
@@ -16,10 +17,10 @@ export async function GET(request:Request){try{
   const rows=await query;if(rows.error)throw rows.error;meetings.push(...rows.data);if(dashboard||rows.data.length<500)break;
  }
  const requested=params.get('meeting');if(requested&&!dashboard&&!meetings.some(m=>m.id===requested)){const row=await actor.db.from('wf_meetings').select(meetingColumns).eq('id',uuid(requested)).maybeSingle();if(row.error)throw row.error;if(row.data)meetings.push(row.data);}
- let connection=null,schedulingReady=false;if(directory.data.can_manage){const c=await googleConnection(actor);schedulingReady=!!c.refresh_token_cipher;if(actor.role==='admin')connection=publicMeetingConnection(c,request,true);}
+ let connection=null,zoom=null,schedulingReady=false,googleReady=false;if(directory.data.can_manage){const [c,z]=await Promise.all([googleConnection(actor),zoomConnection(actor)]);googleReady=!!c.refresh_token_cipher;schedulingReady=!!z.checked_at;if(actor.role==='admin'){connection=publicMeetingConnection(c,request,true);zoom=publicZoomConnection(z);}}
  const tasks=directory.data.can_manage&&!dashboard?await actor.db.from('wf_tasks').select('id,title').is('archived_at',null).is('test_run_id',null).order('due_at',{nullsFirst:false}).limit(200):{data:[],error:null};if(tasks.error)throw tasks.error;
  const attendance=[];for(let i=0;i<meetings.length;i+=100){for(let offset=0;;offset+=500){const rows=await actor.db.from('wf_meeting_attendance').select('meeting_id,user_id,joined_at,left_at').in('meeting_id',meetings.slice(i,i+100).map(m=>m.id)).order('meeting_id').order('user_id').range(offset,offset+499);if(rows.error)throw rows.error;attendance.push(...rows.data);if(rows.data.length<500)break;}}
- return privateResponse({meetings,attendance,people:directory.data.people,canManage:directory.data.can_manage,isAdmin:actor.role==='admin',userId:actor.user.id,connection,schedulingReady,tasks:tasks.data});
+ return privateResponse({meetings,attendance,people:directory.data.people,canManage:directory.data.can_manage,isAdmin:actor.role==='admin',userId:actor.user.id,connection,zoom,schedulingReady,googleReady,tasks:tasks.data});
  }catch(error){return apiError(error);}}
 export async function POST(request:Request){try{
  await assertMutation(request);const actor=await workforceActor(),body=await request.json();if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(k=>!['id','version','command','payload'].includes(k)))throw new WorkforceError('بيانات الاجتماع غير صحيحة');

@@ -4,7 +4,9 @@ import {createServiceRoleClient,type WorkforceActor} from './server';
 import {WorkforceError} from './validation';
 import {googleMeetingId,GoogleMeetingCalendar,MeetingGoogleError,meetingTokenFailure,encryptMeetingSecret,decryptMeetingSecret,meetLink,type GoogleConnection} from './meeting-google';
 import type {MeetingConnection,MeetingData} from './meetings';
-export const meetingColumns='id,title,description,starts_at,ends_at,task_id,participant_ids,external_attendees,reminder_minutes,created_by,status,meet_url,google_event_id,google_etag,proposed_data,sync_state,sync_error,version,series_id,series_frequency';
+import {zoomClient} from './meeting-zoom-server';
+import {MeetingZoomError} from './meeting-zoom';
+export const meetingColumns='id,title,description,starts_at,ends_at,task_id,participant_ids,external_attendees,reminder_minutes,created_by,status,meet_url,google_event_id,google_etag,proposed_data,sync_state,sync_error,version,series_id,series_frequency,provider,zoom_meeting_id';
 export function meetingOrigin(request:Request){const origin=new URL(request.url).origin;if(process.env.NODE_ENV==='development'&&['localhost','127.0.0.1'].includes(new URL(origin).hostname))return origin;return new URL(process.env.APP_BASE_URL||'https://nukhba.media').origin;}
 export const meetingCallback=(request:Request)=>`${meetingOrigin(request)}/api/workforce/meetings/google/callback`;
 export function meetingRoot(){const key=process.env.SUPABASE_SERVICE_ROLE_KEY;if(!key||key.length<32)throw new WorkforceError('إعداد حماية الربط غير متاح',503);return key;}
@@ -16,10 +18,16 @@ export async function syncMeeting(actor:WorkforceActor,request:Request,id:string
  const service=await createServiceRoleClient(),prepared=await service.rpc('wf_meeting_command',{p_actor:actor.user.id,p_id:id,p_version:version,p_command:cancel?'prepare_cancel':'prepare'});
  if(prepared.error)throw prepared.error;const {meeting,data,emails,lease}=prepared.data;
  try{
+  if(meeting.provider==='zoom'){
+   const client=await zoomClient(actor,request);let event;
+   if(cancel)await client.cancel(id,meeting.zoom_meeting_id);
+   else event=await client.publish(id,version,data as MeetingData,meeting.zoom_meeting_id,async zoomId=>{const saved=await service.rpc('wf_meeting_zoom_checkpoint',{p_actor:actor.user.id,p_id:id,p_version:version,p_lease:lease,p_zoom_id:zoomId});if(saved.error)throw saved.error;});
+   const result=await service.rpc('wf_meeting_command',{p_actor:actor.user.id,p_id:id,p_version:version,p_command:'finish',p_payload:{lease,meet_url:event?.join_url??null}});if(result.error)throw result.error;return result.data;
+  }
   const client=await calendarClient(actor,request);let event;
   if(cancel){await client.cancel(meeting.google_event_id||googleMeetingId(id));}
   else {event=await client.publish(id,version,data as MeetingData,emails);if(!meetLink(event)){const fresh=await client.read(event.id||meeting.google_event_id||googleMeetingId(id));if(fresh)event=fresh;}}
   const result=await service.rpc('wf_meeting_command',{p_actor:actor.user.id,p_id:id,p_version:version,p_command:'finish',p_payload:{lease,event_id:event?.id??meeting.google_event_id,meet_url:event?meetLink(event):null,etag:event?.etag??null}});if(result.error)throw result.error;return result.data;
- }catch(error){await service.rpc('wf_meeting_command',{p_actor:actor.user.id,p_id:id,p_version:version,p_command:'fail',p_payload:{lease}});if(error instanceof MeetingGoogleError)throw new WorkforceError(error.message,409);throw error;}
+ }catch(error){await service.rpc('wf_meeting_command',{p_actor:actor.user.id,p_id:id,p_version:version,p_command:'fail',p_payload:{lease}});if(error instanceof MeetingGoogleError||error instanceof MeetingZoomError)throw new WorkforceError(error.message,409);throw error;}
 }
 export {encryptMeetingSecret};

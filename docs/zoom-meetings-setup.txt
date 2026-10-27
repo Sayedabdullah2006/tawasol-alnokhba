@@ -1,0 +1,42 @@
+Zoom meetings / Nukhba workforce
+
+Organizer: elitecnnct@gmail.com
+App: Nukhba Workforce Meetings (account-owned Server-to-Server OAuth).
+Only admins configure credentials. Noor retains existing meeting-manager rights;
+Monwa and other invited staff can view/join only their permitted meetings.
+
+Scopes:
+meeting:write:meeting:admin
+meeting:read:meeting:admin
+meeting:read:list_meetings:admin
+meeting:update:meeting:admin
+meeting:delete:meeting:admin
+user:read:user:admin
+user:read:settings:admin
+user:update:settings:admin
+
+Configure Account ID, Client ID, Client Secret in Admin > Meetings > Zoom.
+The secret is authenticated encrypted with the existing backend secret root.
+No host start_url or ZAK is stored or returned to participants.
+An access token is acquired on the server; no recurring browser consent is needed.
+Revoking/deactivating the Zoom app prevents future API operations.
+
+New rows use Zoom. Existing Google rows retain provider/resource identity and
+the existing Google integration for editing/cancellation. No bulk conversion.
+Each recurring occurrence has its own resource and independent attendance window.
+Join-before-host true, waiting-room false, authentication requirement false,
+random passcode in the attendee URL; host screen sharing policy must permit all.
+The API reads back the effective meeting settings and fails closed on conflict.
+
+Staff invitations use the existing deduplicated workforce outbox and site-first
+entry. External guest invitations use a private retry queue and attendee join URL;
+they do not alter attendance. Pending superseded invitations are cancelled.
+Site join records the existing bounded meeting protection, subject to the existing
+employee-specific attendance/device policy. It is a site join record, not proof
+of continuous Zoom participation. Invitation or page opening alone grants no time.
+
+Testing: in-memory PGlite + injected HTTP transport, no delivery worker invocation.
+Before a live no-invite provider test, verify host schedule/cancel/join-before-host
+email reminders are disabled, omit all invitees, disable recording/AI summaries,
+and do not insert live workforce meeting rows. Delete the provider resource after.
+Keep test data and credentials out of source control and logs.
