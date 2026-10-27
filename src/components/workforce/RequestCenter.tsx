@@ -24,11 +24,15 @@ import {
   Notice,
   useConfirm,
   useUnsavedChanges,
+  hasUnsavedWorkforceChanges,
 } from "./shared";
 import FinalSettlementCard from "./FinalSettlementCard";
 import ProfileApprovals from "./ProfileApprovals";
 import PdfAttachmentPreview from "./PdfAttachmentPreview";
 import OvertimePeriod,{localRequestTime} from "./OvertimePeriod";
+import RemoteWorkRequest from './RemoteWorkRequest';
+import RemoteAgreementSettings from './RemoteAgreementSettings';
+import {remoteMoney,remoteMinutes} from '@/lib/workforce/remote-work';
 const initialForm = (kind = "general") => ({
   kind,
   title: kind==='resignation'?"طلب استقالة":"",
@@ -101,6 +105,7 @@ export default function RequestCenter({
   const [resignationAck,setResignationAck]=useState(false);
   const [deferralDays,setDeferralDays]=useState<Record<string,string>>({});
   const [unpaidAck,setUnpaidAck]=useState('');
+  const [remoteVersion,setRemoteVersion]=useState(0);
   const unpaidLeave=form.kind==='leave'&&form.leave_type==='unpaid';
   const unpaidPeriod=[form.kind,form.leave_type,form.starts_at,form.ends_at].join(':');
   const [unpaidQuote,setUnpaidQuote]=useState<{key:string;estimate?:UnpaidLeaveEstimate;error?:string}|null>(null);
@@ -205,11 +210,11 @@ export default function RequestCenter({
   async function close() {
     if (busy) return;
     if (
-      (form.title || form.body || files.length) &&
+      (form.title || form.body || files.length || hasUnsavedWorkforceChanges()) &&
       !(await confirm("تجاهل الطلب غير المحفوظ؟"))
     )
       return;
-    setOpen(false);setUnpaidAck('');
+    setOpen(false);setUnpaidAck('');if(form.kind==='remote-work')setRemoteVersion(n=>n+1);
   }
   return (
     <div
@@ -256,6 +261,7 @@ export default function RequestCenter({
             >
               تعديل البيانات
             </Button>
+            <Button variant={tab==='remote-settings'?'primary':'outline'} onClick={()=>setTab('remote-settings')}>بيانات الاتفاقات</Button>
           </>
         ) : (
           <Link
@@ -268,6 +274,7 @@ export default function RequestCenter({
       </nav>
       <Notice message={error} error />
       <Notice message={message} />
+      {admin&&tab==='remote-settings'&&<RemoteAgreementSettings/>}
       {profileVisited && (
         <section hidden={tab !== "profile"}>
           <ProfileApprovals
@@ -338,6 +345,7 @@ export default function RequestCenter({
                   </span>
                 </div>
                 <h2 className="font-black">{row.title}</h2>
+                {row.remote_details&&<div className="space-y-3 rounded-xl border border-current/20 p-3 text-sm"><dl className="grid gap-3 sm:grid-cols-2"><div><dt>أجر الفترة المتفق عليه</dt><dd className="font-bold">{remoteMoney(row.remote_details.snapshot.agreed_amount)}</dd></div><div><dt>البدلات الموقوفة للفترة</dt><dd className="font-bold">{remoteMoney(row.remote_details.snapshot.adjustment_amount)}</dd></div><div><dt>ساعات العمل اليومية</dt><dd className="font-bold">{remoteMinutes(row.remote_details.snapshot.days[0].required_minutes)}</dd></div><div><dt>العودة للشروط السابقة</dt><dd><bdi>{row.remote_details.snapshot.returns_on}</bdi></dd></div></dl><a className="font-bold underline" target="_blank" rel="noreferrer" href={`/api/workforce/requests/${row.id}/remote-agreement`}>عرض الاتفاق الموقّع PDF</a><a className="mr-4 font-bold underline" href={`/api/workforce/requests/${row.id}/remote-agreement?download=1`}>تحميل PDF</a></div>}
                 {row.kind==='leave'&&row.leave_type==='unpaid'&&<UnpaidLeaveSummary estimate={row.unpaid_estimate} error={row.unpaid_estimate_error}/>}
                 {row.kind==='missing-hours'&&<p className="text-sm font-bold">{row.work_day} · {Number((row.missing_minutes??0)/60).toLocaleString('ar-SA')} ساعة</p>}
                 <p className="whitespace-pre-wrap break-words text-sm leading-7">
@@ -506,8 +514,8 @@ export default function RequestCenter({
           </nav>
         )}
       </section>
-      <Dialog title="طلب جديد" open={open} onClose={() => void close()}>
-        <form
+      <Dialog title="طلب جديد" open={open} wide={form.kind==='remote-work'} onClose={() => void close()}>
+        {form.kind==='remote-work'?<RemoteWorkRequest key={remoteVersion} transport={transport} onBusyChange={setBusy} onBack={()=>void(async()=>{if(hasUnsavedWorkforceChanges()&&!(await confirm('تجاهل الاتفاق غير المرسل؟')))return;setForm(initialForm('general'));})()} onSubmitted={()=>{setOpen(false);setForm(initialForm(initialKind));setFiles([]);key.current=crypto.randomUUID();setPage(1);setStatus('');setMessage('تم توقيع الاتفاق وإرساله للمدير');setRemoteVersion(n=>n+1);setRevision(n=>n+1);window.dispatchEvent(new Event('workforce-data-changed'));onChanged?.();}}/>:<form
           className="space-y-4"
           onSubmit={async (e) => {
             e.preventDefault();
@@ -770,7 +778,7 @@ export default function RequestCenter({
           <Button type="submit" loading={busy} disabled={unpaidLeave&&!unpaidEstimate}>
             إرسال الطلب
           </Button>
-        </form>
+        </form>}
       </Dialog>
       <Dialog
         title={preview?.file.filename || "معاينة المرفق"}

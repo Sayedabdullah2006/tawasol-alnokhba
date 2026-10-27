@@ -77,24 +77,24 @@ export function summarizeAttendance({ periods, startDate, endDate, month, now, d
   const startsOn = startDate > bounds.first ? startDate : bounds.first;
   const endsOn=endDate&&endDate<bounds.last?endDate:bounds.last;
   const from = midnight(startsOn), until = Math.min(midnight(bounds.next),midnight(endsOn)+DAY), dayStart = midnight(today);
-  let workdayCount = 0,paidHolidayMinutes=0,approvedLeaveMinutes=0;
+  let workdayCount = 0,paidHolidayMinutes=0,approvedLeaveMinutes=0,targetMinutes=0;
+  const targets=new Map((weeklyCompensation?.remote_days??[]).map(d=>[d.day,d.required_minutes]));
   const excused=new Set(excusedDays);
   for (let day = from; day < until; day += DAY) {
     if (workdays.includes(new Date(day + 12 * 60 * MINUTE).getUTCDay())) {
       const date=new Date(day+12*60*MINUTE).toISOString().slice(0,10);
-      if(paidHoliday(date,paidCalendarDays)){if(date<=today)paidHolidayMinutes+=dailyMinutes;}
-      else if(excused.has(date)){if(date<=today)approvedLeaveMinutes+=dailyMinutes;}
-      else workdayCount++;
+      if(paidHoliday(date,paidCalendarDays)){if(date<=today)paidHolidayMinutes+=targets.get(date)??dailyMinutes;}
+      else if(excused.has(date)){if(date<=today)approvedLeaveMinutes+=targets.get(date)??dailyMinutes;}
+      else {workdayCount++;targetMinutes+=targets.get(date)??dailyMinutes;}
     }
   }
   const monthlySeconds = workedSeconds(periods, from, until, now.getTime());
   const todaySeconds = workedSeconds(periods, Math.max(from, dayStart), Math.min(until, dayStart + DAY), now.getTime());
-  const targetMinutes = workdayCount * dailyMinutes;
   const workedMinutes = Math.floor(monthlySeconds / 60), todayMinutes = Math.floor(todaySeconds / 60);
   const creditedMinutes = weeklyCompensation?.enabled ? Math.floor(((weeklyCompensation.credited_seconds??0)+workedSeconds(periods,from,Math.min(until,midnight(weeklyCompensation.starts_on!)),now.getTime()))/60) : workedMinutes;
   return {
     month, today, asOf: now.toISOString(), startsOn, endsOn, employmentEndsOn:endDate??null, employmentEnded:!!endDate&&today>endDate,
-    workdayCount, dailyMinutes, targetMinutes, workedMinutes,creditedMinutes,weeklyCompensation,paidHolidayMinutes,approvedLeaveMinutes,
+    workdayCount, dailyMinutes:targets.get(today)??dailyMinutes, regularDailyMinutes:dailyMinutes, targetMinutes, workedMinutes,creditedMinutes,weeklyCompensation,paidHolidayMinutes,approvedLeaveMinutes,
     remainingMinutes: Math.max(0, targetMinutes - creditedMinutes),
     extraMinutes: Math.max(0, workedMinutes - targetMinutes),
     monthlySeconds, todaySeconds, todayMinutes,

@@ -1,11 +1,13 @@
 import {fromCents,moneyCents} from './payroll';
 /** The sick wage adjustment is part of the existing total, never an extra deduction. */
-export function splitAttendanceAdjustment(total:string,sick:string="0",unpaid:string="0") {
- const all=moneyCents(total),leave=moneyCents(unpaid)>all?all:moneyCents(unpaid),remaining=all-leave;
- const medical=moneyCents(sick)>remaining?remaining:moneyCents(sick);
- return {hours:fromCents(remaining-medical),sick:fromCents(medical),unpaid:fromCents(leave)};
+export function splitAttendanceAdjustment(total:string|number,sick:string|number="0",unpaid:string|number="0",remote:string|number="0") {
+ const all=moneyCents(String(total)),remoteCents=moneyCents(String(remote)),unpaidCents=moneyCents(String(unpaid)),sickCents=moneyCents(String(sick));
+ const remotePart=remoteCents>all?all:remoteCents,rest=all-remotePart,leave=unpaidCents>rest?rest:unpaidCents,remaining=rest-leave;
+ const medical=sickCents>remaining?remaining:sickCents;
+ return {hours:fromCents(remaining-medical),sick:fromCents(medical),unpaid:fromCents(leave),...(remotePart>0?{remote:fromCents(remotePart)}:{})};
 }
 export type AttendanceSettlement = {
+ remote_work?:{amount:string;days:{day:string;amount:string;required_minutes:number}[]};
  weekly_compensation?:import('./weekly-hours').WeeklyHours;
  waived_amount?:string;waiver_reason?:string|null;
  starts_on: string; through: string | null; required_seconds: number; credited_seconds: number;

@@ -1,4 +1,5 @@
 export type WeeklyHours = {
+ remote_days?:{day:string;required_minutes:number}[];
  enabled:boolean;starts_on?:string;as_of?:string;credited_seconds?:number;applied_seconds?:number;
  current_week?:WeeklyHoursWeek|null;weeks:WeeklyHoursWeek[];
  days:{day:string;week_start:string;required_seconds:number;attendance_seconds:number;base_credited_seconds:number;generated_seconds:number;unused_seconds:number;applied_seconds:number;missing_seconds:number}[];

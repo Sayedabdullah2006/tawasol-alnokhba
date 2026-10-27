@@ -70,11 +70,13 @@ export function Dialog({
   open,
   onClose,
   children,
+  wide = false,
 }: {
   title: string;
   open: boolean;
   onClose: () => void;
   children: ReactNode;
+  wide?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -90,7 +92,7 @@ export function Dialog({
         event.preventDefault();
         onClose();
       }}
-      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-2xl border border-border bg-white p-5 text-dark shadow-2xl backdrop:bg-slate-950/50 md:p-7"
+      className={`fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] ${wide?'max-w-5xl':'max-w-2xl'} overflow-y-auto rounded-2xl border border-border bg-white p-5 text-dark shadow-2xl backdrop:bg-slate-950/50 md:p-7`}
     >
       <div className="mb-5 flex items-center justify-between gap-4">
         <h2 className="text-xl font-bold">{title}</h2>

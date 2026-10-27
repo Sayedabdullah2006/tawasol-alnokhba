@@ -239,7 +239,7 @@ export default function AttendanceHub({
                     </thead>
                     <tbody>
                       {data.sessions.map((row,index) => {
-                        const progress = attendanceDayProgress(data.dayPeriods??data.sessions,row.business_date,tick||Date.parse(data.summary.asOf),data.settings.daily_minutes);
+                        const progress = attendanceDayProgress(data.dayPeriods??data.sessions,row.business_date,tick||Date.parse(data.summary.asOf),data.summary.weeklyCompensation?.remote_days?.find(d=>d.day===row.business_date)?.required_minutes??data.settings.daily_minutes);
                         const firstForDay=!row.overtime_request_id&&!data.sessions.slice(0,index).some(previous=>previous.business_date===row.business_date&&!previous.overtime_request_id);
                         const workingDay=data.settings.workdays.includes(new Date(`${row.business_date}T12:00:00Z`).getUTCDay());
                         const compensation=data.summary.weeklyCompensation?.days.find(d=>d.day===row.business_date)?.applied_seconds??0;

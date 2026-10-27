@@ -32,6 +32,7 @@ export type RequestFile = {
   size_bytes: number;
 };
 export type EmployeeRequest = {
+  remote_details?:import('./remote-work').RemoteDetails|null;
   id: string;
   employee_id: string;
   employeeName?: string;
