@@ -31,9 +31,14 @@ The API reads back the effective meeting settings and fails closed on conflict.
 Staff invitations use the existing deduplicated workforce outbox and site-first
 entry. External guest invitations use a private retry queue and attendee join URL;
 they do not alter attendance. Pending superseded invitations are cancelled.
+Email and site actions open the Zoom web client (/wc/{id}/join) rather than the
+app launcher. An authenticated email deep link authorizes a single POST join within
+the scheduled window, then navigates in the same tab. Future/ended/cancelled meetings
+never auto-join. Missing attendance/device permission is not bypassed.
 Site join records the existing bounded meeting protection, subject to the existing
 employee-specific attendance/device policy. It is a site join record, not proof
-of continuous Zoom participation. Invitation or page opening alone grants no time.
+of continuous Zoom participation. Receiving an invitation grants no attendance. Protection follows a successful
+authorized site join POST only.
 
 Testing: in-memory PGlite + injected HTTP transport, no delivery worker invocation.
 Before a live no-invite provider test, verify host schedule/cancel/join-before-host

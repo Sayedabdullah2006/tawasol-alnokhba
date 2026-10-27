@@ -130,8 +130,8 @@ const nextAction: Record<string, string> = {
   attendance_missing_admin: "مراجعة حضور الموظفة أو طلبات إجازتها.",
   approval_reminder: "مراجعة العناصر المعلقة واتخاذ القرار.",
   welcome: "أهلًا بكِ في تواصل النخبة. ابدئي من لوحتكِ.",
-  meeting_reminder: "افتحي الاجتماع من الموقع، ثم انضمي من نفس جهاز ومتصفح تسجيل الحضور لتفعيل حماية جلسة الدوام.",
-  meeting_event: "افتحي تفاصيل الاجتماع من الموقع للاطلاع على الموعد والانضمام خلاله.",
+  meeting_reminder: "الانضمام من نفس جهاز ومتصفح تسجيل الحضور يفعّل حماية جلسة الدوام أثناء الاجتماع.",
+  meeting_event: "يفتح رابط الانضمام الاجتماع في المتصفح خلال موعده.",
 };
 export function renderWorkforceEmail(mail: WorkforceMail) {
   if (mail.kind === "monthly_payroll") {
@@ -142,9 +142,16 @@ export function renderWorkforceEmail(mail: WorkforceMail) {
   const weekly = mail.kind === "weekly_report" ? mail.weeklyReport : undefined;
   if (weekly) return renderWeeklyEmail(mail,weekly);
   const guestLink = mail.kind === "meeting_guest" && /^https:\/\/(?:[a-z0-9-]+\.)?zoom\.us\/j\/[0-9]{9,11}(?:\?pwd=[A-Za-z0-9._~-]+)?$/.test(mail.href);
-  const href = guestLink ? mail.href : mail.kind === "meeting_guest" ? site + "/meetings" : /^\/(employee|admin\/workforce)(\/|\?|$)/.test(mail.href)
+  let browserGuestURL = mail.href;
+  if(guestLink){const url=new URL(mail.href);url.pathname=`/wc/${url.pathname.split('/')[2]}/join`;url.searchParams.set('prefer','1');browserGuestURL=url.href;}
+  let href = guestLink ? browserGuestURL : mail.kind === "meeting_guest" ? site + "/meetings" : /^\/(employee|admin\/workforce)(\/|\?|$)/.test(mail.href)
     ? site + mail.href
     : site + "/employee";
+  const meetingMail=["meeting_reminder","meeting_event"].includes(mail.kind);
+  if(meetingMail&&!/ألغي|إلغاء/.test(mail.title)){
+    const url=new URL(href),meeting=url.searchParams.get('meeting');
+    if(/^\/(employee|admin\/workforce)\/meetings$/.test(url.pathname)&&meeting&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(meeting)){url.searchParams.set('join','1');href=url.href;}
+  }
   const isTask = taskKinds.has(mail.kind) && !!mail.taskTitle;
   const content = workforceEmailContent(mail);
   const message = nextAction[mail.kind] || "";
@@ -168,7 +175,7 @@ export function renderWorkforceEmail(mail: WorkforceMail) {
   const label = ["employee_request", "profile_request"].includes(mail.kind)
     ? admin ? "مراجعة الطلب" : "عرض الطلب"
     : mail.kind === "meeting_guest" ? guestLink ? "الانضمام للاجتماع" : "تواصل النخبة"
-    : ["meeting_reminder", "meeting_event"].includes(mail.kind) ? "فتح الاجتماع والانضمام من الموقع"
+    : meetingMail ? /ألغي|إلغاء/.test(mail.title) ? "تفاصيل الاجتماع" : "الانضمام من المتصفح"
     : mail.kind.startsWith("attendance_") ? "عرض الحضور"
     : ["payroll", "compensation"].includes(mail.kind) ? "عرض المستحقات"
     : mail.kind === "knowledge_file" ? "فتح الملف في مركز المعرفة" : isTask

@@ -8,6 +8,7 @@ export type ZoomMeetingConnection={configured:boolean;connected:boolean;organize
 export function validMeetURL(value:unknown):value is string{return typeof value==='string'&&/^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/.test(value);}
 export function validZoomURL(value:unknown):value is string{return typeof value==='string'&&/^https:\/\/(?:[a-z0-9-]+\.)?zoom\.us\/j\/[0-9]{9,11}(?:\?pwd=[A-Za-z0-9._~-]+)?$/.test(value);}
 export function validMeetingURL(value:unknown):value is string{return validMeetURL(value)||validZoomURL(value);}
+export function meetingBrowserURL(value:unknown){if(validMeetURL(value))return value;if(!validZoomURL(value))return null;const url=new URL(value);url.pathname=`/wc/${url.pathname.split('/')[2]}/join`;url.searchParams.set('prefer','1');return url.href;}
 export function meetingDate(value:string){return new Date(value).toLocaleString('ar-SA',{calendar:'gregory',timeZone:'Asia/Riyadh',dateStyle:'medium',timeStyle:'short'});}
 export function localMeetingDate(value:string){return new Date(Date.parse(value)+3*3600000).toISOString().slice(0,16);}
 export function meetingDefaults():MeetingData {const start=new Date(Math.ceil((Date.now()+3600000)/1800000)*1800000);return {title:'',description:'',starts_at:start.toISOString(),ends_at:new Date(+start+1800000).toISOString(),task_id:null,participant_ids:[],external_attendees:[],reminder_minutes:15};}

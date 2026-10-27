@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {ZoomMeetings,zoomMeetingBody,assertZoomEntry} from '../src/lib/workforce/meeting-zoom.ts';
-import {validMeetingURL,validZoomURL} from '../src/lib/workforce/meetings.ts';
+import {validMeetingURL,validZoomURL,meetingBrowserURL} from '../src/lib/workforce/meetings.ts';
 import {createMeetingsDB,scheduled,meetingCommand,meetingPresence,meetingData} from './helpers/meetings-db.mjs';
 import {ids,command,clock,snapshot,at} from './helpers/work-session-db.mjs';
 import {renderWorkforceEmail} from '../supabase/functions/_shared/workforce-email.ts';
@@ -83,7 +83,7 @@ test('external guest queue deduplicates, hides secrets, requires worker lease an
   const token=crypto.randomUUID();assert.deepEqual((await db.query('select wf_claim_meeting_guest_deliveries($1,8) v',[token])).rows[0].v,[]);
   await db.query("update wf_notification_delivery_settings set worker_token=$1,worker_until=now()+interval '3 minutes'",[token]);
   const claimed=(await db.query('select wf_claim_meeting_guest_deliveries($1,8) v',[token])).rows[0].v;assert.equal(claimed.length,1);assert.equal(claimed[0].externalMeeting,true);
-  const rendered=renderWorkforceEmail(claimed[0].snapshot);assert.ok(rendered.html.includes(url));assert.ok(!rendered.html.includes('start_url'));assert.ok(!rendered.text.includes('نفس جهاز'));
+  const rendered=renderWorkforceEmail(claimed[0].snapshot);assert.ok(rendered.html.includes(meetingBrowserURL(url).replaceAll("&","&amp;")));assert.ok(!rendered.html.includes('start_url'));assert.ok(!rendered.text.includes('نفس جهاز'));
   assert.equal((await db.query('select wf_finish_meeting_guest_delivery($1,$2,$3) v',[claimed[0].id,crypto.randomUUID(),'sent'])).rows[0].v,false);
   assert.equal((await db.query('select wf_finish_meeting_guest_delivery($1,$2,$3) v',[claimed[0].id,token,'retry'])).rows[0].v,true);
   rows=(await db.query('select * from workforce_private.meeting_guest_deliveries')).rows;assert.equal(rows[0].status,'pending');assert.equal(rows[0].attempts,1);
@@ -129,4 +129,15 @@ test('Basic organizer cannot schedule beyond the real 40-minute limit',async()=>
 test('running meetings give a clear cancellation action; already deleted meetings are idempotent',async()=>{
  const busy=new ZoomMeetings('fixture','elitecnnct@gmail.com',async()=>Response.json({code:3002},{status:400}));await assert.rejects(()=>busy.cancel(id,zoomId),/أنه/);
  const deleted=new ZoomMeetings('fixture','elitecnnct@gmail.com',async()=>Response.json({code:3001},{status:400}));await deleted.cancel(id,zoomId);assert.equal(await deleted.read(zoomId),null);
+});
+
+
+test('browser entry bypasses the Zoom app launcher and preserves the passcode; emails request site authorization first',()=>{
+ const target=meetingBrowserURL(url),parsed=new URL(target);assert.equal(parsed.pathname,'/wc/'+zoomId+'/join');assert.equal(parsed.searchParams.get('pwd'),'exampleToken');assert.equal(parsed.searchParams.get('prefer'),'1');
+ assert.equal(meetingBrowserURL('https://meet.google.com/abc-defg-hij'),'https://meet.google.com/abc-defg-hij');assert.equal(meetingBrowserURL('https://zoom.us.evil.test/j/'+zoomId),null);
+ for(const role of ['admin/workforce','employee']){
+  const rendered=renderWorkforceEmail({kind:'meeting_event',email:'fixture@example.com',name:'عضو الفريق',title:'موعد اجتماع',href:'/'+role+'/meetings?meeting='+id,createdAt:'2026-10-27T10:00:00Z'});
+  assert.ok(rendered.text.includes('meeting='+id+'&join=1'));assert.ok(!rendered.html.includes('https://zoom.us/'));assert.ok(rendered.text.includes('الانضمام من المتصفح'));
+ }
+ const cancelled=renderWorkforceEmail({kind:'meeting_event',email:'fixture@example.com',name:'عضو الفريق',title:'ألغي الاجتماع',href:'/employee/meetings?meeting='+id,createdAt:'2026-10-27T10:00:00Z'});assert.ok(!cancelled.text.includes('join=1'));
 });

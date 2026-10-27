@@ -17,7 +17,7 @@ test('meeting invitees resolve with production auth permissions; anonymous and s
 });
 test('reminder email opens the meeting in the site and states the device requirement, without rendering a direct Meet action',()=>{
  for(const role of ['admin','employee']){const result=renderWorkforceEmail({email:'fixture@example.com',name:'مشاركة',kind:'meeting_reminder',title:'تذكير باجتماع قادم',body:'مراجعة الخطة',href:meetingPortalPath(id,role),createdAt:'2026-10-25T08:45:00+03:00'});
-  assert.ok(result.text.includes('نفس جهاز ومتصفح تسجيل الحضور'));assert.ok(result.text.includes('فتح الاجتماع والانضمام من الموقع'));
+  assert.ok(result.text.includes('نفس جهاز ومتصفح تسجيل الحضور'));assert.ok(result.text.includes('الانضمام من المتصفح'));
   assert.ok(result.text.includes('https://nukhba.media'+meetingPortalPath(id,role)));assert.ok(!result.html.includes('https://meet.google.com/'));
  }
 });
