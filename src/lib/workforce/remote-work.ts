@@ -19,4 +19,5 @@ export function remoteSignature(raw:unknown):RemoteSignature{
 export const remoteMinutes=(n:number)=>`${Math.floor(n/60)} س${n%60?` و${n%60} د`:''}`;
 export const remoteMoney=(v:string)=>Number(v).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2})+' ر.س';
 export const remoteReturnCommitment='وألتزم بالعودة إلى العمل بشكل كامل، وفق مكان العمل وساعات الدوام والشروط السابقة، فور انتهاء الفترة المعتمدة، ما لم يُعتمد اتفاق جديد.';
-export const remoteAcknowledgment='اطّلعت على ملف الاتفاق والأرقام والفترة، وأوافق على إيقاف بدل النقل وبدل المهام الإضافية الثابت وإيقاف تكليفي بالمهام الإضافية المحددة خلال الفترة فقط، وعلى الساعات والأجر الموضحين. '+remoteReturnCommitment;
+export const remoteAcknowledgment='اطّلعت على ملف الاتفاق والأرقام والفترة، وأوافق على إيقاف بدل النقل وبدل المهام الإضافية الثابت وإيقاف تكليفي بالمهام الإضافية المحددة خلال الفترة فقط، وعلى الأجر الموضح، مع بقاء ساعات دوامي المعتادة دون تخفيض. '+remoteReturnCommitment;
+export const remoteAcknowledgmentForQuote=(q:RemoteQuote)=>q.days[0].required_minutes===q.days[0].regular_minutes?remoteAcknowledgment:'اطّلعت على ملف الاتفاق والأرقام والفترة، وأوافق على إيقاف بدل النقل وبدل المهام الإضافية الثابت وإيقاف تكليفي بالمهام الإضافية المحددة خلال الفترة فقط، وعلى الساعات والأجر الموضحين. '+remoteReturnCommitment;

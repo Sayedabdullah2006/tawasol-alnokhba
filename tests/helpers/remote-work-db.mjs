@@ -2,9 +2,10 @@ import {readFile} from 'node:fs/promises';
 import {createSettlementDB,ids,setTime} from './settlement-db.mjs';
 export {ids,setTime};
 export const remoteMigration='20261027210844_temporary_remote_work_agreements';
+export const regularHoursMigration='20261031191833_remote_work_keep_regular_hours';
 export const input={starts_on:'2026-11-01',ends_on:'2026-11-30',starts_time:'09:00',location:'الرياض · المنزل',duties:'متابعة العملاء والمهام الأساسية المتفق عليها',reason:'ظروف مؤقتة مع الاقتصار على المهام الأساسية'};
 export const signature=[Array.from({length:20},(_,i)=>[100+i*18,100+(i%4)*15])];
-export async function createRemoteDB({migration=true}={}){const db=await createSettlementDB();await db.exec(`reset role;
+export async function createRemoteDB({migration=true,regularHours=true}={}){const db=await createSettlementDB();await db.exec(`reset role;
  create schema if not exists auth;create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  create table if not exists wf_audit_events(entity_table text,entity_id text,action text,actor_id uuid,changed_fields text[]);
  grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;
@@ -16,6 +17,7 @@ export async function createRemoteDB({migration=true}={}){const db=await createS
  await db.exec(await readFile(new URL('../fixtures/remote-request-decision.sql',import.meta.url),'utf8'));
  if(!migration){await db.exec('set role service_role');await setTime(db,'2026-10-28T08:00:00+03:00');return db;}
  await db.exec(await readFile(new URL(`../../supabase/migrations/${remoteMigration}.sql`,import.meta.url),'utf8'));
+ if(regularHours)await db.exec(await readFile(new URL(`../../supabase/migrations/${regularHoursMigration}.sql`,import.meta.url),'utf8'));
  await db.exec(`insert into wf_remote_company values(true,'شركة تواصل النخبة للدعاية والإعلان','0000000000','عنوان منشأة للمعاينة','ممثل المنشأة','preview@example.invalid','0500000000','بيانات محاكاة فقط');
  insert into wf_remote_contracts values('${ids.en}','PREVIEW-NOOR','عقد محاكاة'),('${ids.em}','PREVIEW-MONWA','عقد محاكاة');set role service_role;`);
  await setTime(db,'2026-10-28T08:00:00+03:00');return db;

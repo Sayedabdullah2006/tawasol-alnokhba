@@ -14,7 +14,7 @@ function lines(s:string,max=108){const out:string[]=[];let line='';for(const wor
 /** A fixed, readable one-page agreement. Long input is rejected, never clipped or shrunk. */
 export async function renderRemoteAgreement(q:RemoteQuote,signature:RemoteSignature=[],stamp?:string,decision?:{status:string;at:string|null;reason:string|null},preview=false){
  const logo=`data:image/png;base64,${(await readFile(path.join(process.cwd(),'public/logo.png'))).toString('base64')}`;
- const first=q.days[0],company=q.company;let body='',y=184;
+ const first=q.days[0],company=q.company,reducedHours=first.required_minutes!==first.regular_minutes;let body='',y=184;
  function heading(s:string){body+=`<rect x="55" y="${y-24}" width="1080" height="35" rx="6" fill="#eef2f7"/>`+text(s,1115,y,21,'#173958',true);y+=37;}
  function paragraph(s:string,size=19){const bullet=s.startsWith('• ');if(bullet)body+=`<circle cx="1120" cy="${y-6}" r="3" fill="#183452"/>`;for(const row of lines(bullet?s.slice(2):s,bullet?104:108)){body+=text(row,bullet?1104:1125,y,size);y+=27;}y+=3;}
  heading('١ · طرفا الاتفاق');
@@ -27,7 +27,7 @@ export async function renderRemoteAgreement(q:RemoteQuote,signature:RemoteSignat
  heading('٢ · مدة الاتفاق والعمل');
  paragraph(`من ${date(q.starts_on)} إلى ${date(q.ends_on)} (${q.calendar_days} يوم تقويم) · العودة للشروط السابقة: ${date(q.returns_on)}.`);
  paragraph(`المكان: ${q.location} · سبب الطلب: ${q.reason}`);
- paragraph(`الدوام اليومي: ${remoteMinutes(first.required_minutes)} بدلًا من ${remoteMinutes(first.regular_minutes)} · ${q.starts_time.slice(0,5)} إلى ${first.ends_time.slice(0,5)} بتوقيت الرياض.`);
+ paragraph(`الدوام اليومي: ${remoteMinutes(first.required_minutes)}${reducedHours?` بدلًا من ${remoteMinutes(first.regular_minutes)}`:' · دون تغيير'} · ${q.starts_time.slice(0,5)} إلى ${first.ends_time.slice(0,5)} بتوقيت الرياض.`);
  paragraph(`المهام الأساسية: ${q.duties}`);
  heading('٣ · الأجر المتفق عليه');
  const rows=[['الراتب الأساسي',first.basic,first.basic],['بدل السكن',first.housing,first.housing],['بدل النقل',first.transport_allowance??'0','0'],['بدل المهام الإضافية الثابت',first.extra_allowance??'0','0']];
@@ -40,7 +40,7 @@ export async function renderRemoteAgreement(q:RemoteQuote,signature:RemoteSignat
  heading('٤ · شروط الاتفاق');
  const denominators=[...new Set(q.days.map(v=>Math.round(Number(v.original_monthly)/Number(v.original))))];
  paragraph('• يوقف بدلا النقل والمهام الإضافية الثابت بنسبة ١٠٠٪ للفترة فقط، مع وقف التنقل والمهام الإضافية المقابلة لهما. الأساسي والسكن محفوظان وبمجموع شهري لا يقل عن ٤٬٠٠٠ ريال.');
- paragraph(`• تخفض الساعات بنسبة الانخفاض الفعلية في إجمالي الراتب وتقرب لأعلى دقيقة؛ الفرق المعتمد لا يعد غيابًا ولا يحتسب مرتين. ${denominators.length===1?`أجر الفترة = الأجر الشهري ÷ ${denominators[0]} × أيام التقويم المشمولة.`:'أجر الفترة هو مجموع الأجر اليومي المعتمد لكل شهر مشمول.'}`);
+ paragraph(`• ${reducedHours?'تخفض الساعات بنسبة الانخفاض الفعلية في إجمالي الراتب وتقرب لأعلى دقيقة؛ الفرق المعتمد لا يعد غيابًا ولا يحتسب مرتين.':'تبقى ساعات الدوام اليومية والمستهدف الشهري دون تخفيض؛ يقتصر التعديل المالي على البدلات المحددة خلال الفترة فقط، دون احتساب مكرر.'} ${denominators.length===1?`أجر الفترة = الأجر الشهري ÷ ${denominators[0]} × أيام التقويم المشمولة.`:'أجر الفترة هو مجموع الأجر اليومي المعتمد لكل شهر مشمول.'}`);
  paragraph('• مبالغ الأجر قبل التأمينات والتسويات النظامية؛ لا يشمل الإيقاف العمولات المكتسبة أو المصروفات المعتمدة أو الحقوق السابقة. وتبقى أيام الراحة والإجازات والعمل الإضافي وفق العقد والأنظمة.');
  paragraph('• تلتزم الموظفة بالحضور والانصراف وتأكيد الجلسة والمهام والسرية. يسري الاتفاق بتوقيعها واعتماد المدير قبل بدايته، دون أثر رجعي؛ وتعود الشروط السابقة تلقائيًا بعد نهايته. أي تمديد يتطلب اتفاقًا جديدًا.');
  heading('٥ · الإقرار والتوقيع');
@@ -55,7 +55,7 @@ export async function renderRemoteAgreement(q:RemoteQuote,signature:RemoteSignat
  }
  const signed=stamp?new Date(stamp).toLocaleString('ar-SA',{calendar:'gregory',timeZone:'Asia/Riyadh'}):'يوقّع إلكترونيًا من حساب الموظفة';
  body+=text(signed,1110,boxY+115,15)+text(decision?.status==='approved'?'معتمد إلكترونيًا':decision?.status==='rejected'?'مرفوض · غير نافذ':decision?.status==='cancelled'?'ملغى · غير نافذ':'بانتظار اعتماد المدير',555,boxY+72,20)+text(decision?.at?new Date(decision.at).toLocaleDateString('ar-SA',{calendar:'gregory',timeZone:'Asia/Riyadh'}):'لا يسري قبل الاعتماد',555,boxY+110,16);
- const header=`<defs><filter id="white-logo" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0"/></filter></defs><rect width="1190" height="1684" fill="#fff"/><rect width="1190" height="140" fill="#112b4d"/><image x="1015" y="19" width="115" height="103" filter="url(#white-logo)" href="${logo}"/>${text('اتفاق مؤقت للعمل عن بُعد',970,62,34,'#edcf8d',true)}${text('ملحق محدد المدة بعقد العمل · ساعات وأجر مخفضان',970,105,21,'#fff')}<path d="M55 151 H1135" stroke="#bb9650" stroke-width="3"/>`;
+ const header=`<defs><filter id="white-logo" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0"/></filter></defs><rect width="1190" height="1684" fill="#fff"/><rect width="1190" height="140" fill="#112b4d"/><image x="1015" y="19" width="115" height="103" filter="url(#white-logo)" href="${logo}"/>${text('اتفاق مؤقت للعمل عن بُعد',970,62,34,'#edcf8d',true)}${text(reducedHours?'ملحق محدد المدة بعقد العمل · ساعات وأجر مخفضان':'ملحق محدد المدة بعقد العمل · ساعات الدوام دون تغيير',970,105,21,'#fff')}<path d="M55 151 H1135" stroke="#bb9650" stroke-width="3"/>`;
  const footer=(preview?`<rect x="55" y="1550" width="1080" height="36" rx="5" fill="#fff3cc"/>${text('معاينة للمراجعة فقط · الاتفاق والتوقيع غير نافذين · لا تتغير البيانات الحقيقية',1120,1575,16,'#855f16',true)}`:'')+text(`مرجع النسخة: ${q.hash}`,1130,1620,14,'#63758a')+text(q.ready?'صفحة ١ من ١':'معاينة غير قابلة للإصدار · بيانات ناقصة',1130,1650,16,'#63758a');
  const png=new Resvg(`<svg xmlns="http://www.w3.org/2000/svg" width="1190" height="1684">${header}${body}${footer}</svg>`,{font:{fontFiles:[path.join(process.cwd(),'public/fonts/NotoSansArabic-Variable.ttf')],loadSystemFonts:false}}).render().asPng();
  const pdf=await PDFDocument.create(),page=pdf.addPage([595.28,841.89]);page.drawImage(await pdf.embedPng(png),{x:0,y:0,width:595.28,height:841.89});pdf.setTitle('اتفاق مؤقت للعمل عن بُعد - '+q.employee.full_name);pdf.setAuthor(company?.legal_name??'تواصل النخبة');return Buffer.from(await pdf.save());

@@ -3,7 +3,7 @@ import {createRemoteDB,ids,input,signature,quote,submit,approve,setTime} from '.
 import {addPeriod,weekly} from './helpers/weekly-hours-db.mjs';
 import {summarizeAttendance} from '../src/lib/workforce/attendance-summary.ts';
 import {readFile} from 'node:fs/promises';
-import {remoteMigration} from './helpers/remote-work-db.mjs';
+import {remoteMigration,regularHoursMigration} from './helpers/remote-work-db.mjs';
 import {attendanceExemptPath} from '../src/lib/workforce/action-access.ts';
 import {splitAttendanceAdjustment} from '../src/lib/workforce/payroll-attendance.ts';
 
@@ -13,8 +13,20 @@ test('agreement review remains available off duty and the remote adjustment is a
  const split=splitAttendanceAdjustment('2500.00','20.00','10.00','2430.00');assert.deepEqual(split,{hours:'40.00',sick:'20.00',unpaid:'10.00',remote:'2430.00'});
  assert.deepEqual(splitAttendanceAdjustment(2500,20,10,'2430.00'),split);
 });
-test('remote agreement freezes stopped allowances, protects basic+housing, derives hours and requires an explicit signature',async()=>{const db=await createRemoteDB();try{
- const q=await quote(db);assert.equal(q.ready,true);assert.equal(q.agreed_amount,'4000.00');assert.equal(q.adjustment_amount,'2430.00');assert.equal(q.days[0].required_minutes,299);assert.equal(Number(q.days[0].basic),3200);assert.equal(Number(q.days[0].housing),800);
+
+test('new agreements preserve configured hours while previously signed reduced-hour snapshots remain immutable',async()=>{
+ const db=await createRemoteDB({regularHours:false});try{
+  const oldQuote=await quote(db),id=await submit(db,oldQuote);await approve(db,id);assert.equal(oldQuote.days[0].required_minutes,299);
+  const before=(await db.query('select remote_details from wf_employee_requests where id=$1',[id])).rows[0].remote_details;
+  await db.exec('reset role');await db.exec(await readFile(new URL(`../supabase/migrations/${regularHoursMigration}.sql`,import.meta.url),'utf8'));await db.exec('set role service_role');
+  assert.deepEqual((await db.query('select remote_details from wf_employee_requests where id=$1',[id])).rows[0].remote_details,before);
+  assert.equal((await db.query("select workforce_private.effective_daily_minutes($1,'2026-11-02') n",[ids.en])).rows[0].n,299);
+  await db.query('update wf_attendance_settings set daily_minutes=360 where employee_id=$1',[ids.en]);
+  const next=await quote(db,{...input,starts_on:'2026-12-01',ends_on:'2026-12-15'});assert.equal(next.version,'remote-v2-regular-hours');assert.equal(next.days[0].required_minutes,360);assert.equal(next.days[0].regular_minutes,360);assert.equal(next.days[0].ends_time,'15:00:00');
+ }finally{await db.close();}
+});
+test('remote agreement freezes stopped allowances, protects basic+housing, retains ordinary hours and requires an explicit signature',async()=>{const db=await createRemoteDB();try{
+ const q=await quote(db);assert.equal(q.ready,true);assert.equal(q.agreed_amount,'4000.00');assert.equal(q.adjustment_amount,'2430.00');assert.equal(q.days[0].required_minutes,480);assert.equal(Number(q.days[0].basic),3200);assert.equal(Number(q.days[0].housing),800);
  await assert.rejects(submit(db,q,input,signature,crypto.randomUUID(),false),/وافق|استكمل/);
  await assert.rejects(submit(db,q,input,[[[1,2],[3,4]]]),/توقيع/);
  await assert.rejects(submit(db,{...q,hash:'forged'}),/تغير|استكمل/);
@@ -22,19 +34,19 @@ test('remote agreement freezes stopped allowances, protects basic+housing, deriv
  assert.equal((await db.query('select count(*)::int n from wf_employee_requests where id=$1',[id])).rows[0].n,1);
  assert.equal((await db.query("select workforce_private.effective_daily_minutes($1,'2026-11-02') n",[ids.en])).rows[0].n,480);
  await approve(db,id);
- assert.equal((await db.query("select workforce_private.effective_daily_minutes($1,'2026-11-02') n",[ids.en])).rows[0].n,299);
+ assert.equal((await db.query("select workforce_private.effective_daily_minutes($1,'2026-11-02') n",[ids.en])).rows[0].n,480);
  assert.equal((await db.query("select workforce_private.effective_daily_minutes($1,'2026-12-01') n",[ids.en])).rows[0].n,480);
  await setTime(db,'2026-11-01T10:00:00+03:00');const work=(await db.query('select wf_work_snapshot($1) value',[ids.noor])).rows[0].value;
- assert.equal(work.attendancePolicy.requiredMinutes,299);assert.equal(work.attendancePolicy.endsAt,'13:59:00');assert.equal(work.attendancePolicy.remote,true);
+ assert.equal(work.attendancePolicy.requiredMinutes,480);assert.equal(work.attendancePolicy.endsAt,'17:00:00');assert.equal(work.attendancePolicy.remote,true);
  await setTime(db,'2026-12-01T10:00:00+03:00');const restored=(await db.query('select wf_work_snapshot($1) value',[ids.noor])).rows[0].value;assert.notEqual(restored.attendancePolicy?.remote,true);
  await assert.rejects(db.query("update wf_employee_requests set remote_details=jsonb_set(remote_details,'{snapshot,agreed_amount}','\"1.00\"') where id=$1",[id]),/لا يقبل التعديل/);
  assert.equal((await db.query('select count(*)::int n from wf_notifications')).rows[0].n,0);
 }finally{await db.close();}});
 
-test('one missing reduced-work hour uses the agreed wage and rounded target, without charging the waived hours',async()=>{const db=await createRemoteDB();try{
- const q=await quote(db),id=await submit(db,q);await approve(db,id);await addPeriod(db,ids.en,'2026-11-01','09:00','12:59');await setTime(db,'2026-11-01T14:00:00+03:00');
+test('one missing ordinary work hour uses the agreed wage without a second allowance adjustment',async()=>{const db=await createRemoteDB();try{
+ const q=await quote(db),id=await submit(db,q);await approve(db,id);await addPeriod(db,ids.en,'2026-11-01','09:00','16:00');await setTime(db,'2026-11-01T18:00:00+03:00');
  const d=(await db.query("select workforce_private.attendance_payroll($1,'2026-11-01') v",[ids.en])).rows[0].v;
- assert.equal(d.required_seconds,299*60);assert.equal(d.missing_seconds,3600);assert.equal(Number(d.calculated_amount),107.76);assert.equal(d.remote_work.amount,'81.00');
+ assert.equal(d.required_seconds,480*60);assert.equal(d.missing_seconds,3600);assert.equal(Number(d.calculated_amount),97.67);assert.equal(d.remote_work.amount,'81.00');
  await assert.rejects(db.query('update wf_compensation_versions set basic_salary=3300 where employee_id=$1',[ids.en]),/اتفاق عمل عن بُعد معتمد/);
 }finally{await db.close();}});
 
@@ -51,10 +63,10 @@ test('approved paid/sick leave stays available and sick pay uses the agreed wage
  assert.equal((await db.query('select count(*)::int n from wf_notifications')).rows[0].n,0);
 }finally{await db.close();}});
 
-test('current daily accrual charges the allowance adjustment only once after a complete reduced day',async()=>{const db=await createRemoteDB();try{
- const q=await quote(db),id=await submit(db,q);await approve(db,id);await addPeriod(db,ids.en,'2026-11-01','09:00','13:59');await setTime(db,'2026-11-01T14:00:00+03:00');
+test('current daily accrual charges the allowance adjustment only once after a complete ordinary workday',async()=>{const db=await createRemoteDB();try{
+ const q=await quote(db),id=await submit(db,q);await approve(db,id);await addPeriod(db,ids.en,'2026-11-01','09:00','17:00');await setTime(db,'2026-11-01T18:00:00+03:00');
  const p=(await db.query("select wf_attendance_payroll_snapshot($1,$2,'2026-11-01') v",[ids.admin,ids.en])).rows[0].v.statement;
- const daily=p.daily_accrual;assert.equal(daily.remote_work_amount,'81.00');assert.equal(Number(daily.attendance_amount),81);assert.equal(Number(daily.current_credited_seconds),299*60);
+ const daily=p.daily_accrual;assert.equal(daily.remote_work_amount,'81.00');assert.equal(Number(daily.attendance_amount),81);assert.equal(Number(daily.current_credited_seconds),480*60);
  const expected=Math.max(0,Number(daily.gross_amount)-Number(daily.insurance_amount)-Number(daily.other_amount)-81)+Number(p.reimbursement_amount??0);assert.ok(Math.abs(Number(daily.total_amount)-expected)<.011);
  const again=(await db.query("select wf_attendance_payroll_snapshot($1,$2,'2026-11-01') v",[ids.admin,ids.en])).rows[0].v.statement;assert.equal(again.daily_accrual.total_amount,daily.total_amount);
 }finally{await db.close();}});
@@ -69,7 +81,7 @@ test('October absence waiver does not waive the signed allowance adjustment; hou
  const p={...input,starts_on:'2026-10-29',ends_on:'2026-10-31'};await db.exec('reset role');await db.query("insert into workforce_private.payroll_attendance_waivers values($1,'2026-10-01','إعفاء أكتوبر')",[ids.en]);await db.exec('set role service_role');
  const q=await quote(db,p),id=await submit(db,q,p);await approve(db,id);await setTime(db,'2026-11-01T09:00:00+03:00');
  const detail=(await db.query("select workforce_private.attendance_payroll($1,'2026-10-01') v",[ids.en])).rows[0].v;assert.equal(detail.remote_work.amount,'243.00');assert.equal(Number(detail.calculated_amount),243);
- const bounds=(await db.query("select workforce_private.employee_work_start($1,'2026-10-29')::text starts,workforce_private.employee_work_end($1,'2026-10-29')::text ends,workforce_private.employee_work_end($1,'2026-11-01')::text restored",[ids.en])).rows[0];assert.equal(bounds.starts,'09:00:00');assert.equal(bounds.ends,'13:59:00');assert.equal(bounds.restored,'24:00:00');
+ const bounds=(await db.query("select workforce_private.employee_work_start($1,'2026-10-29')::text starts,workforce_private.employee_work_end($1,'2026-10-29')::text ends,workforce_private.employee_work_end($1,'2026-11-01')::text restored",[ids.en])).rows[0];assert.equal(bounds.starts,'09:00:00');assert.equal(bounds.ends,'17:00:00');assert.equal(bounds.restored,'24:00:00');
  assert.equal((await db.query('select count(*)::int n from wf_notifications')).rows[0].n,0);
 }finally{await db.close();}});
 
@@ -85,14 +97,14 @@ test('employees cannot approve requests or edit contract settings, and cannot re
  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[ids.monwa]);assert.deepEqual((await db.query('select employee_id from wf_remote_contracts')).rows,[{employee_id:ids.em}]);
 }finally{await db.close();}});
 
-test('monthly and daily pay deduct stopped allowances once; reduced hours satisfy attendance and cannot mint a weekly surplus',async()=>{const db=await createRemoteDB();try{
+test('monthly and daily pay deduct stopped allowances once; ordinary hours satisfy attendance and cannot mint a weekly surplus',async()=>{const db=await createRemoteDB();try{
  const q=await quote(db),id=await submit(db,q);await approve(db,id);
- for(let n=1;n<=30;n++){const day=`2026-11-${String(n).padStart(2,'0')}`;if(new Date(day+'T12:00:00Z').getUTCDay()===5)continue;await addPeriod(db,ids.en,day,'09:00','13:59');}
+ for(let n=1;n<=30;n++){const day=`2026-11-${String(n).padStart(2,'0')}`;if(new Date(day+'T12:00:00Z').getUTCDay()===5)continue;await addPeriod(db,ids.en,day,'09:00','17:00');}
  await setTime(db,'2026-12-01T01:00:00+03:00');
  const detail=(await db.query("select workforce_private.attendance_payroll($1,'2026-11-01') v",[ids.en])).rows[0].v;
  assert.equal(detail.remote_work.amount,'2430.00');assert.equal(Number(detail.missing_seconds),0);assert.equal(Number(detail.calculated_amount),2430);
- const week=await weekly(db,ids.noor,ids.en,'2026-11-01');assert.equal(week.remote_days.length,30);assert.equal(week.days[0].required_seconds,299*60);assert.equal(week.days[0].generated_seconds,0);
- const summary=summarizeAttendance({periods:[],startDate:'2026-10-18',month:'2026-11',now:new Date('2026-12-01T01:00:00+03:00'),weeklyCompensation:week});assert.equal(summary.targetMinutes,26*299);
+ const week=await weekly(db,ids.noor,ids.en,'2026-11-01');assert.equal(week.remote_days.length,30);assert.equal(week.days[0].required_seconds,480*60);assert.equal(week.days[0].generated_seconds,0);
+ const summary=summarizeAttendance({periods:[],startDate:'2026-10-18',month:'2026-11',now:new Date('2026-12-01T01:00:00+03:00'),weeklyCompensation:week});assert.equal(summary.targetMinutes,26*480);
  const snap=(await db.query("select wf_attendance_payroll_snapshot($1,$2,'2026-11-01') v",[ids.admin,ids.en])).rows[0].v.statement;
  assert.equal(Number(snap.gross_amount),6430);assert.equal(Number(snap.total_amount),4000-Number(snap.insurance_details.amount));
  const again=(await db.query("select wf_attendance_payroll_snapshot($1,$2,'2026-11-01') v",[ids.admin,ids.en])).rows[0].v.statement;assert.equal(again.total_amount,snap.total_amount);
