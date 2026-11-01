@@ -31,6 +31,7 @@ export type WorkTask = {
   client_name: string;
   assigneeName?: string | null;
   canWork?: boolean;
+  canMove?: boolean;
   id: string;
   board_id: string;
   position: number;
@@ -75,6 +76,7 @@ export type TaskDetail = {
   boardDetail: BoardDetail;
   task: WorkTask;
   canWork: boolean;
+  canMove?: boolean;
   canEdit: boolean;
   canReview: boolean;
   canAssign: boolean;

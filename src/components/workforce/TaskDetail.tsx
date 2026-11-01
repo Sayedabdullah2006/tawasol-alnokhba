@@ -691,7 +691,7 @@ export default function TaskDetail({
                 </div>
               )}
             </Panel>
-            {data.canWork && !frozen && !reviewing && (!done || admin) && (
+            {(data.canWork || data.canMove) && !frozen && !reviewing && (!done || admin) && (
               <Panel title={done ? "إعادة فتح المهمة" : "تحديث حالة العمل"}>
                 <form
                   className="space-y-4"

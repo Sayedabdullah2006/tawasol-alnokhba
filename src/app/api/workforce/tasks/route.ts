@@ -1,3 +1,4 @@
+import {canManageTasksOutsideAttendance} from "@/lib/workforce/action-access";
 import {
   apiError,
   createServiceRoleClient,
@@ -195,6 +196,7 @@ export async function GET(request: Request) {
             : nameMap.get(task.assignee_id)),
           ...(task.co_assignee_ids ?? []).map((id: string) => nameMap.get(id)),
         ].filter(Boolean).join("، ") || null,
+        canMove: actor.role === "admin" || task.assignee_id === actor.employee?.id || (task.co_assignee_ids ?? []).includes(actor.employee?.id ?? "") || canManageTasksOutsideAttendance(actor.employee),
         canEdit: actor.canManageTasks,
         canWork:
           actor.role === "admin" || task.assignee_id === actor.employee?.id || (task.co_assignee_ids ?? []).includes(actor.employee?.id ?? ""),

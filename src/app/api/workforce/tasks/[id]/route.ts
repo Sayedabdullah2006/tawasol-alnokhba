@@ -5,6 +5,7 @@ import {
 } from "@/lib/workforce/server";
 import { privateResponse } from "@/lib/workforce/task-server";
 import { uuid, WorkforceError } from "@/lib/workforce/validation";
+import {canManageTasksOutsideAttendance} from "@/lib/workforce/action-access";
 import { canReviewTask } from "@/lib/workforce/task-review";
 
 export async function GET(
@@ -82,6 +83,7 @@ export async function GET(
       assigneeName: [assignee.data?.full_name, ...(task.co_assignee_ids?.length ? (await service.from("wf_employees").select("full_name").in("id", task.co_assignee_ids)).data?.map(row => row.full_name) ?? [] : [])].filter(Boolean).join("، ") || null,
       canWork:
         actor.role === "admin" || task.assignee_id === actor.employee?.id || (task.co_assignee_ids ?? []).includes(actor.employee?.id ?? ""),
+      canMove: actor.role === "admin" || task.assignee_id === actor.employee?.id || (task.co_assignee_ids ?? []).includes(actor.employee?.id ?? "") || canManageTasksOutsideAttendance(actor.employee),
       canEdit:
         actor.canManageTasks ||
         (task.assignment_origin === "self" &&

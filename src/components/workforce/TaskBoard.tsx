@@ -213,7 +213,7 @@ export default function TaskBoard({
               <div className="space-y-3">
                 {rows.map((task) => {
                   const editable =
-                    !!task.canWork &&
+                    !!(task.canWork || task.canMove) &&
                     !task.archived_at &&
                     !task.board?.archived_at &&
                     (admin || !["review", "done"].includes(task.column.kind));
