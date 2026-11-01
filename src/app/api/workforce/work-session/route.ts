@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { workforceActor, assertMutation, apiError, createServiceRoleClient, requireEmployeeAccess } from "@/lib/workforce/server";
 import { privateResponse } from "@/lib/workforce/task-server";
 import { uuid, WorkforceError } from "@/lib/workforce/validation";
+import {canManageTasksOutsideAttendance} from '@/lib/workforce/action-access';
 
 async function overtimeWindow(actor: Awaited<ReturnType<typeof workforceActor>>) {
   if (!actor.employee) return null;
@@ -27,7 +28,7 @@ export async function GET(request: Request) {
       if(owner.error)throw owner.error;
       canControl=owner.data?.device_hash===createHash("sha256").update(device).digest("hex");
     }
-    return privateResponse({...result.data,canControl,overtimeWindow:await overtimeWindow(actor)});
+    return privateResponse({...result.data,canControl,canManageTasksOffDuty:canManageTasksOutsideAttendance(actor.employee),overtimeWindow:await overtimeWindow(actor)});
   } catch(error) { return apiError(error); }
 }
 export async function POST(request: Request) {
@@ -54,6 +55,6 @@ export async function POST(request: Request) {
       p_task:body.task_id?uuid(body.task_id):null,p_title:title,
     });
     if(result.error) throw result.error;
-    return privateResponse({...result.data,canControl:true,overtimeWindow:await overtimeWindow(actor)});
+    return privateResponse({...result.data,canControl:true,canManageTasksOffDuty:canManageTasksOutsideAttendance(actor.employee),overtimeWindow:await overtimeWindow(actor)});
   } catch(error) {return apiError(error);}
 }

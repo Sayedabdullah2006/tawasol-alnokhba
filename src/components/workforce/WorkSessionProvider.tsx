@@ -7,7 +7,7 @@ import {REGULAR_WORK_END,isFriday,type WorkSnapshot,type WorkCommand,type WorkIn
 import {paidHolidayAt} from '@/lib/workforce/calendar';
 import { CLOSE_REASONS } from "@/lib/workforce/work-session";
 import { attendanceDuration } from "@/lib/workforce/attendance-summary";
-import { attendanceExemptPath, OFF_DUTY_REQUESTS } from "@/lib/workforce/action-access";
+import { attendanceExemptPath,offDutyTaskPath, OFF_DUTY_REQUESTS } from "@/lib/workforce/action-access";
 
 type Transport={read:()=>Promise<WorkSnapshot>;write:(input:WorkInput)=>Promise<WorkSnapshot>};
 const transport:Transport={read:()=>api("/api/workforce/work-session"),write:input=>api("/api/workforce/work-session",{method:"POST",body:JSON.stringify(input)})};
@@ -59,6 +59,7 @@ export default function WorkSessionProvider({children,adapter=transport}:{childr
    const event=raw as CustomEvent<{url:string;options:RequestInit;message:string}>;
    const path=new URL(event.detail.url,window.location.origin).pathname;
    if(!path.startsWith("/api/workforce/"))return;
+   if(latest.current?.canManageTasksOffDuty&&offDutyTaskPath(path))return;
    if(attendanceExemptPath(path)){
     if(path!=="/api/workforce/requests"||event.detail.options.method?.toUpperCase()!=="POST")return;
     const form=event.detail.options.body;

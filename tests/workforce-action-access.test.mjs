@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile,readdir} from 'node:fs/promises';
 import {createWorkDB,ids,command,clock,at,device} from './helpers/work-session-db.mjs';
-import {attendanceExemptPath,OFF_DUTY_REQUESTS} from '../src/lib/workforce/action-access.ts';
+import {attendanceExemptPath,offDutyTaskPath,canManageTasksOutsideAttendance,OFF_DUTY_REQUESTS} from '../src/lib/workforce/action-access.ts';
 import {workedSeconds} from '../src/lib/workforce/attendance-summary.ts';
 
 const migration=new URL('../supabase/migrations/20261023205919_attendance_action_gate.sql',import.meta.url);
-async function setup(){
+async function setup({offDuty=false}={}){
  const db=await createWorkDB();
  await db.exec(`reset role;
  create table wf_employee_requests(id uuid primary key,employee_id uuid,kind text,status text,test_run_id uuid,starts_at timestamptz,ends_at timestamptz);
@@ -17,10 +17,37 @@ async function setup(){
  `);
  await db.exec(await readFile(new URL('../supabase/migrations/20261023022342_three_daily_work_confirmations.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(migration,'utf8'));
+ if(offDuty){
+  await db.exec('alter table wf_employees add column can_manage_tasks boolean not null default false');
+  await db.exec(await readFile(new URL('../supabase/migrations/20261101153749_noor_off_duty_task_management.sql',import.meta.url),'utf8'));
+  await db.query('update wf_employees set can_manage_tasks=true,can_manage_tasks_off_duty=true where id=$1',[ids.en]);
+ }
  await db.exec('set role service_role');return db;
 }
 const access=async(db,actor=ids.noor)=>(await db.query('select wf_work_action_access($1) value',[actor])).rows[0].value;
 const comment=(db,actor=ids.noor)=>db.query('select wf_comments_command($1,$2)',[actor,'مخرج عمل']);
+
+test('explicit task-management exception works off duty only for Noor, without opening attendance or bypassing HR/time guards',async()=>{
+ const db=await setup({offDuty:true});try{
+  await clock(db,'22:00');await comment(db);await assert.rejects(()=>comment(db,ids.monwa),/سجلي الحضور/);
+  await assert.rejects(db.query('select workforce_private.assert_work_action($1)',[ids.noor]),/سجلي الحضور/);
+  const idle=await command(db,{command:'task',task_id:ids.task});assert.equal(idle.session,null);
+  assert.equal((await db.query('select count(*)::int n from wf_attendance_sessions')).rows[0].n,0);
+  assert.equal((await db.query('select count(*)::int n from wf_task_time_entries')).rows[0].n,0);
+  await db.exec('reset role');await db.query('update wf_employees set can_manage_tasks=false where id=$1',[ids.en]);await db.exec('set role service_role');await assert.rejects(()=>comment(db));
+  await db.exec('reset role');await db.query('update wf_employees set can_manage_tasks=true,can_manage_tasks_off_duty=false where id=$1',[ids.en]);await db.exec('set role service_role');await assert.rejects(()=>comment(db));
+  await db.exec('set role authenticated');await assert.rejects(db.query('select workforce_private.assert_task_management_action($1)',[ids.noor]));
+  await assert.rejects(db.query('update wf_employees set can_manage_tasks_off_duty=true where id=$1',[ids.em]));
+ }finally{await db.close();}
+});
+
+test('HTTP and client exception allow task management paths only and require active delegated permission',()=>{
+ const id=ids.task;
+ for(const path of ['tasks','tasks/suggest',`tasks/${id}`,`tasks/${id}/attachments`,`tasks/${id}/performance`,'checklist','comments','members','boards','columns',`attachments/${id}`])assert.equal(offDutyTaskPath('/api/workforce/'+path),true,path);
+ for(const path of ['time',`tasks/${id}/time`,'work-session','knowledge','journeys','employees','requests','meetings','tasks/not-a-task','tasks/../employees'])assert.equal(offDutyTaskPath('/api/workforce/'+path),false,path);
+ const noor={status:'active',can_manage_tasks:true,can_manage_tasks_off_duty:true};assert.equal(canManageTasksOutsideAttendance(noor),true);
+ for(const person of [null,{...noor,status:'suspended'},{...noor,can_manage_tasks:false},{...noor,can_manage_tasks_off_duty:false}])assert.equal(canManageTasksOutsideAttendance(person),false);
+});
 
 test('Noor and Monwa are read-only off duty, including delegated actions; admin remains unrestricted',async()=>{
  const db=await setup();try{

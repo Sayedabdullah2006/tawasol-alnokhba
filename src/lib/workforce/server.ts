@@ -1,7 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { createHash } from "node:crypto";
-import { attendanceExemptPath, type ActionAccess } from "./action-access";
+import { attendanceExemptPath, offDutyTaskPath,canManageTasksOutsideAttendance,type ActionAccess } from "./action-access";
 import { cache } from "react";
 import { employeeRecords } from "./employee-records";
 import {
@@ -100,8 +100,11 @@ export async function assertMutation(request: Request) {
   await assertAttendanceMutation(request);
 }
 async function assertAttendanceMutation(request: Request) {
-  if (!attendanceExemptPath(new URL(request.url).pathname))
-    await requireWorkingAttendance(await workforceActor());
+  const path=new URL(request.url).pathname;
+  if(attendanceExemptPath(path))return;
+  const actor=await workforceActor();
+  if(offDutyTaskPath(path)&&canManageTasksOutsideAttendance(actor.employee))return;
+  await requireWorkingAttendance(actor);
 }
 export async function requireWorkingAttendance(actor: WorkforceActor) {
   if (actor.role === "admin") return;
