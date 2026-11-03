@@ -5,3 +5,10 @@
 
 .collapsible{border:1px solid #e0e6e8;border-radius:8px;background:white;padding:10px 16px}.collapsible>summary{font-size:13px;font-weight:600}.collapsible[open]>.summary{margin-top:12px}
 @media(max-width:640px){.tools>button:nth-child(2){display:none}.tools .field{min-width:170px}.tools input[type=month]{min-width:0}.workspace table{min-width:0}.workspace table,.workspace tbody{display:block}.workspace thead{display:none}.workspace tbody tr{display:grid;grid-template-columns:1fr 1fr;padding:12px 0;border-bottom:1px solid #dfe7e9}.workspace td{display:block;border:0;padding:5px 8px;white-space:normal;text-align:start!important}.workspace td:first-child{grid-column:1/-1;font-weight:650;font-size:15px}.workspace td:not(:first-child)::before{content:attr(data-label);display:block;font-size:12px;color:#53656e;font-weight:400}.workspace .num{font-size:15px}.summary{padding:14px}.summary strong{font-size:22px}.tabs a{padding:10px;font-size:13px}}
+
+/* Keep this working sheet and its dialogs readable inside the portal wallpaper theme. */
+.workspace{--dark:#17252b;--muted:#53656e;--border:#dfe7e9;background:#f8fafb;border:1px solid #dfe7e9;border-radius:12px;margin-top:20px;color-scheme:light}
+.workspace :is(input:not([type=checkbox]):not([type=radio]),textarea,select){background-color:#fff!important;color:#17252b!important;border-color:#aebbc0!important;color-scheme:light}
+.workspace dialog{background:#fff!important;color:#17252b!important}
+.quote{--dark:#17252b;--muted:#53656e;background:#fff!important;color:#17252b!important;color-scheme:light}.quote :is(p,dd,dt,h1,h2,strong,span,a){color:inherit!important}.quote dt{color:#53656e!important}
+@media print{.quote{border:0!important;margin:0!important;padding:0!important}body:has(.quote) :global(.portal-topbar),body:has(.quote) :global(.portal-dock),body:has(.quote) :global(.portal-contrast-toggle),body:has(.quote) :global(.portal-wallpaper){display:none!important}body:has(.quote) :global(#workspace-main){padding-top:0!important}}
