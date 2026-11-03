@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useState,type FormEvent,type ReactNode} from 'react';
 import Link from 'next/link';
 import {Dialog,Notice} from './shared';
-import {defaultSalesPlan,evaluateSales,riyadhToday,salesMetrics,salesStages,type SalesAccount,type SalesActivity,type SalesData,type SalesGoal,type SalesOpportunity,type SalesPlan} from '@/lib/workforce/sales';
+import {defaultSalesPlan,evaluateSales,firstPaidSales,riyadhToday,salesMetrics,salesStages,type SalesAccount,type SalesActivity,type SalesData,type SalesGoal,type SalesOpportunity,type SalesPlan} from '@/lib/workforce/sales';
 import styles from './sales.module.css';
 
 type View='goals'|'competition'|'reviews'|'crm';
@@ -29,7 +29,7 @@ export default function SalesWorkspace({view='goals',initialData,initialMonth,en
   for(const e of data?.employees??[]){const previous=source?.plans.find(p=>p.employee_id===e.id);let values=defaultSalesPlan(month,e.id===closing);if(previous){const last=new Date(+month.slice(0,4),+month.slice(5),0).getDate();values={...previous,weekly:previous.weekly.map(w=>({...w,title:w.title.replace(/20\d{2}-\d{2}/g,month),due_on:month+'-'+String(Math.min(+w.due_on.slice(8),last)).padStart(2,'0')}))};}result=await post('save_plan',{employee_id:e.id,...values,reason:copyMonth?`نسخ خطة ${copyMonth}`:'إعداد خطة الشهر'},result.version);}
   await refresh();setDialog('');setMessage('تم إنشاء مسودة الشهر؛ راجع الأهداف ثم انشر الخطة لإسناد المهام.');
  }catch(e){setError(e instanceof Error?e.message:'تعذر إنشاء الخطة');await refresh();}finally{setBusy(false);}}
- const teamWon=data?new Set(data.activities.filter(a=>a.metric==='collection'&&a.status==='approved'&&a.amount>0&&a.month.slice(0,7)===month&&data.activities.some(c=>c.metric==='contract'&&c.status==='approved'&&c.opportunity_id===a.opportunity_id)).map(a=>a.opportunity_id)).size:0;
+ const teamWon=data?firstPaidSales(data.activities).filter(a=>a.month.slice(0,7)===month).length:0;
  const received=data?.activities.filter(a=>a.metric==='collection'&&a.status==='approved'&&a.month.slice(0,7)===month).reduce((s,a)=>s+Number(a.amount),0)??0;
  const pending=data?.activities.filter(a=>a.month.slice(0,7)===month&&a.status==='pending')??[];
  const canEdit=(o:SalesOpportunity)=>manager||data?.employeeId===o.source_employee_id||data?.employeeId===o.closing_employee_id;

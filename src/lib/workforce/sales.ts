@@ -41,11 +41,20 @@ export function validateSalesPlan(value:unknown):Pick<SalesPlan,'goals'|'weekly'
  const weekKeys=new Set<string>();const weekly=p.weekly.map((w:SalesWeek)=>{const key=textField(w.key,'رمز الأسبوع',1,40);if(weekKeys.has(key))throw new WorkforceError('رمز المهمة مكرر');weekKeys.add(key);return{key,title:textField(w.title,'المهمة',2,180),details:textField(w.details,'تفاصيل المهمة',3,6000),due_on:dateField(w.due_on)!};});
  return {competition_weight,goals,weekly};
 }
+/** An installment is revenue in its own month, but never a second closed sale. */
+export function firstPaidSales(activities:SalesActivity[],status='approved'){
+ const contracts=new Set(activities.filter(a=>a.metric==='contract'&&a.status==='approved').map(a=>a.opportunity_id));
+ const paid=new Set(activities.filter(a=>a.metric==='collection'&&a.status==='approved'&&Number(a.amount)>0).map(a=>a.opportunity_id));
+ const first=new Map<string,SalesActivity>();
+ for(const a of activities.filter(a=>a.metric==='collection'&&a.status===status&&Number(a.amount)>0&&a.opportunity_id&&contracts.has(a.opportunity_id)&&(status==='approved'||!paid.has(a.opportunity_id)))){
+  const id=a.opportunity_id!;const before=first.get(id);if(!before||a.occurred_on<before.occurred_on||(a.occurred_on===before.occurred_on&&a.id<before.id))first.set(id,a);
+ }
+ return [...first.values()];
+}
 function countMetric(g:SalesGoal,employee:string,month:string,activities:SalesActivity[],status:string){
  const rows=activities.filter(a=>a.employee_id===employee&&a.month.slice(0,7)===month&&a.status===status&&(g.metric==='manual'?a.metric==='manual'&&a.goal_key===g.key:a.metric===g.metric));
  if(g.metric==='closed'){
-  const ids=new Set(activities.filter(a=>a.metric==='collection'&&a.status===status&&a.month.slice(0,7)===month&&a.amount>0&&a.employee_id===employee).map(a=>a.opportunity_id));
-  return [...ids].filter(id=>id&&activities.some(a=>a.opportunity_id===id&&a.metric==='contract'&&a.status==='approved')).length;
+  return firstPaidSales(activities,status).filter(a=>a.employee_id===employee&&a.month.slice(0,7)===month).length;
  }
  if(g.metric==='collection')return Math.round(rows.reduce((s,a)=>s+Number(a.amount),0)*100)/100;
  const week=(date:string)=>{const d=new Date(`${date}T12:00:00Z`);d.setUTCDate(d.getUTCDate()-d.getUTCDay());return d.toISOString().slice(0,10);};
@@ -81,6 +90,6 @@ export function scopeSalesData(raw:SalesData&{_competitionFacts?:SalesActivity[]
  const competition=raw.plans.map(p=>{const e=evaluateSales(p,raw._competitionFacts??raw.activities);return{employee_id:p.employee_id,score:e.competition,goals:e.goals.filter(g=>g.group==='competition')};});
  const {_competitionFacts:privateFacts,...safe}=raw;void privateFacts;
  const facts=raw._competitionFacts??raw.activities;const month=raw.month?.month.slice(0,7);
- const teamWon=new Set(facts.filter(a=>a.metric==='collection'&&a.status==='approved'&&Number(a.amount)>0&&a.month.slice(0,7)===month&&facts.some(c=>c.metric==='contract'&&c.status==='approved'&&c.opportunity_id===a.opportunity_id)).map(a=>a.opportunity_id)).size;
+ const teamWon=firstPaidSales(facts).filter(a=>a.month.slice(0,7)===month).length;
  return{...safe,competition,teamWon,plans:raw.admin?safe.plans:safe.plans.filter(p=>p.employee_id===raw.employeeId)};
 }

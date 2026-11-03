@@ -8,6 +8,15 @@ test('plan weights are checked and competition is capped; excluded goals are not
  const activities=Array.from({length:40},(_,i)=>({id:String(i),employee_id:ids.ne,month,metric:'prospect',account_id:String(i),occurred_on:'2026-11-04',status:'approved'}));
  assert.equal(evaluateSales(p,activities).goals[0].score,100);p.goals[0].excluded=true;assert.equal(evaluateSales(p,activities).goals[0].score,null);
 });
+test('installments in later months never count as another closed sale, while collections stay in their actual month',()=>{
+ const facts=[{id:'contract',employee_id:ids.ne,opportunity_id:'deal',metric:'contract',amount:1000,status:'approved',month:'2026-11',occurred_on:'2026-11-04'},
+ {id:'first',employee_id:ids.ne,opportunity_id:'deal',metric:'collection',amount:400,status:'approved',month:'2026-11',occurred_on:'2026-11-04'},
+ {id:'second',employee_id:ids.ne,opportunity_id:'deal',metric:'collection',amount:600,status:'approved',month:'2026-12',occurred_on:'2026-12-04'}];
+ const nov={id:'n',employee_id:ids.ne,month:'2026-11',...defaultSalesPlan('2026-11',true)},dec={...nov,month:'2026-12'};
+ assert.equal(evaluateSales(nov,facts).goals.find(g=>g.metric==='closed').actual,1);assert.equal(evaluateSales(dec,facts).goals.find(g=>g.metric==='closed').actual,0);
+ const raw={admin:true,employeeId:null,month:{month:'2026-12-01'},plans:[dec],activities:facts,_competitionFacts:facts};assert.equal(scopeSalesData(raw).teamWon,0);
+ const cash={...dec,goals:[{key:'cash',title:'التحصيل',metric:'collection',target:1000,weight:100,group:'role',excluded:false}]};assert.equal(evaluateSales(cash,facts).goals[0].actual,600);
+});
 test('roles, draft privacy, monthly revisions, idempotency and weekly task linking',async()=>{
  const db=await prepared();try{
  assert.equal((await snapshot(db,ids.monwa)).plans.length,0);await assert.rejects(command(db,'publish',{},ids.client));await assert.rejects(command(db,'publish',{},ids.monwa));
