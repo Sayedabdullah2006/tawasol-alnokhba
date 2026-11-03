@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import PortalIcon from "@/components/layout/PortalIcon";
 const links = [
   ["/admin/workforce", "الأداء"],
+  ["/admin/workforce/sales", "المبيعات"],
   ["/admin/workforce/tasks", "المهام"],
   ["/admin/workforce/meetings", "الاجتماعات"],
   ["/admin/workforce/employees", "الموظفات"],
@@ -32,7 +33,7 @@ export default function AdminNavigation({ activePath }: { activePath?: string } 
           }
           className="portal-launcher flex-1"
         >
-          <PortalIcon name={["performance","tasks","meetings","people","profile","attendance","finance","requests","knowledge"][index]} />
+          <PortalIcon name={["performance","performance","tasks","meetings","people","profile","attendance","finance","requests","knowledge"][index]} />
           {label}
         </Link>
       ))}

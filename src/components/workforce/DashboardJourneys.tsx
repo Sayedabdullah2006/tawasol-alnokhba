@@ -20,7 +20,7 @@ export default function DashboardJourneys({ admin = false }: { admin?: boolean }
         {Object.entries(journeySections).map(([key, section], index) => (
           <Link
             key={key}
-            href={admin ? `/admin/workforce/people?section=${key}` : `/employee/${section.employee}`}
+            href={admin ? key==='goal'?'/admin/workforce/sales/goals':key==='review'?'/admin/workforce/sales/reviews':`/admin/workforce/people?section=${key}` : `/employee/${section.employee}`}
             className={`flex min-h-20 items-center justify-between gap-3 rounded-2xl border p-4 text-sm font-bold transition focus-visible:outline-2 focus-visible:outline-offset-4 ${tones[index]}`}
           >
             <span>{section.title}</span><span aria-hidden="true">←</span>

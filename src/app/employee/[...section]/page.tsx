@@ -1,4 +1,5 @@
 import AttendanceHub from "@/components/workforce/AttendanceHub";
+import SalesWorkspace from "@/components/workforce/SalesWorkspace";
 import EmployeeJourneys from "@/components/workforce/EmployeeJourneys";
 import { journeySections, type JourneyKind } from "@/lib/workforce/journeys";
 import EmployeeWorkPages from "@/components/workforce/EmployeeWorkPages";
@@ -19,11 +20,13 @@ export default async function Page({
   searchParams,
 }: {
   params: Promise<{ section: string[] }>;
-  searchParams: Promise<{ request?: string; subject?:string }>;
+  searchParams: Promise<{ request?: string; subject?:string;month?:string }>;
 }) {
   const { section } = await params;
   const path = `/employee/${section.join("/")}`;
   const { employee } = await employeePageActor();
+  if(section[0]==='performance'&&section.length===2&&['goals','competition','reviews'].includes(section[1]))
+    return <SalesWorkspace initialMonth={(await searchParams).month} key={path} view={section[1] as 'goals'|'competition'|'reviews'}/>;
   const journey = Object.entries(journeySections).find(
     ([, s]) => `/employee/${s.employee}` === path,
   );

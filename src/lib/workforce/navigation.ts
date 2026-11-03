@@ -40,6 +40,8 @@ const screen = (
       "work/projects",
       "performance/goals",
       "performance/reviews",
+      "performance/competition",
+      "crm",
       "finance/advances",
       "requests/performance-review",
       "profile/assets",
@@ -66,6 +68,7 @@ const screen = (
 });
 
 export const employeeModules: EmployeeModule[] = [
+  {key:'sales',title:'المبيعات',purpose:'تسجيل العملاء والفرص ومتابعة النتائج.',adminArea:'المبيعات والأهداف',screens:[screen('crm','العملاء والفرص — CRM','جهات وفرص وأنشطة وعروض موثقة.',[],undefined,true)]},
   {
     key: "knowledge",
     title: "مركز المعرفة",
@@ -115,6 +118,7 @@ export const employeeModules: EmployeeModule[] = [
     purpose: "متابعة ما تستهدفه ونتائجك المعتمدة وملاحظات تطويرك.",
     adminArea: "الأهداف والتقييم: تحديد الأهداف واعتماد النتائج والمراجعات",
     screens: [
+      screen('performance/competition','لوحة التنافس','المؤشرات المشتركة المعتمدة.',[],undefined,true),
       screen(
         "performance/goals",
         "أهدافي",
