@@ -22,6 +22,7 @@ export type DailyPayrollAccrual = {
  insurance_amount:string;other_amount:string;attendance_amount:string;total_amount:string;current_credited_seconds:number;
 };
 export type PayrollCardData = {
+ remote_work_projection?:AttendanceSettlement['remote_work']|null;
  month: string; status: "draft"|"approved"|"paid"; total_amount: string; paid_amount: string;
  gross_amount: string; basic_amount: string; allowances_amount: string; attendance_amount: string;
  attendance_details: AttendanceSettlement;
@@ -32,4 +33,14 @@ export type PayrollCardData = {
  reimbursement_amount?:string;
  reimbursements?:ExpenseReimbursement[];
 };
+/** Use the approved full-period allowance stop only in the month-end display. */
+export function payrollCardProjection(data:PayrollCardData|null|undefined) {
+ const detail=data?.attendance_details;
+ const adjustment=splitAttendanceAdjustment(data?.attendance_amount??'0',detail?.sick_leave?.amount??'0',detail?.unpaid_leave?.amount??'0',detail?.remote_work?.amount??'0');
+ const posted=moneyCents(adjustment.remote??'0'),target=moneyCents(data?.remote_work_projection?.amount??'0');
+ const remaining=data?.status!=='paid'&&target>posted?target-posted:BigInt(0);
+ const available=moneyCents(String(data?.total_amount??'0'));
+ const extra=remaining>available?available:remaining;
+ return {adjustment:{...adjustment,remote:fromCents(posted+extra)},total:fromCents(available-extra),remoteDays:data?.status!=='paid'&&data?.remote_work_projection?.days.length?data.remote_work_projection.days:detail?.remote_work?.days??[]};
+}
 export type ExpenseReimbursement={request_id:string;title:string;amount:string;approved_at:string;invoices:{id:string;filename:string;mime_type:string}[]};

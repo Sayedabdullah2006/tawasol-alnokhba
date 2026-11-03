@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import {useEffect,useId,useState} from "react";
-import {splitAttendanceAdjustment} from "@/lib/workforce/payroll-attendance";
+import {payrollCardProjection} from "@/lib/workforce/payroll-attendance";
 import type {PayrollCardData} from "@/lib/workforce/payroll-attendance";
 import {fromCents,moneyCents} from "@/lib/workforce/payroll";
 const money=(value:string)=>Number(value).toLocaleString("ar-SA",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -21,13 +21,13 @@ export default function PayrollCard({initial,month,employeeId,preview=false,titl
   return()=>{abort.abort();clearInterval(timer);window.removeEventListener("workforce-data-changed",listener);window.removeEventListener("focus",listener);document.removeEventListener("visibilitychange",listener);};
  },[employeeId,month,initial]);
  const detail=data?.attendance_details;
- const adjustment=splitAttendanceAdjustment(data?.attendance_amount??"0",detail?.sick_leave?.amount??"0",detail?.unpaid_leave?.amount??"0",detail?.remote_work?.amount??"0");
+ const projection=payrollCardProjection(data),adjustment=projection.adjustment;
  const overtime=String(data?.overtime_amount??0);
  const insurance=data?.deductions?.filter(d=>d.kind==='insurance')??[];
  const other=data?.deductions?.filter(d=>d.kind!=='insurance')??[];
  const sum=(rows:{amount:string}[])=>fromCents(rows.reduce((n,row)=>n+moneyCents(String(row.amount)),BigInt(0)));
  const otherDeductions=fromCents(moneyCents(sum(other))+moneyCents(adjustment.remote??"0"));
- const remoteDays=detail?.remote_work?.days??[];
+ const remoteDays=projection.remoteDays;
  const remotePeriod=remoteDays.length?`${remoteDays[0].day} إلى ${remoteDays[remoteDays.length-1].day}`:"";
 
  return <section style={{backdropFilter:"none",WebkitBackdropFilter:"none"}} data-work-summary-card="payroll" id={cardId} aria-label={title} className="flex min-w-0 flex-1 flex-col rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/80 p-5 text-emerald-950 shadow-lg sm:p-6">
@@ -41,7 +41,7 @@ export default function PayrollCard({initial,month,employeeId,preview=false,titl
      {[["إجمالي الراتب",`${money(fromCents(moneyCents(String(data.gross_amount))-moneyCents(overtime)))} ر.س`],...(data.insurance_details?[["الخاضع للتأمينات لفترة الشهر",`${money(data.insurance_details.basis_amount)} ر.س`]]:[]),["الساعات المطلوبة",duration(detail?.required_seconds??0)],[detail?.weekly_compensation?.enabled?"المحتسب بعد التعويض الأسبوعي":"المحتسب بحد ٨ س/يوم",duration(detail?.credited_seconds??0)],...(detail?.weekly_compensation?.enabled?[["تعويض ساعات مستخدم",duration(detail.weekly_compensation.applied_seconds??0)]]:[]),["الساعات غير المستوفاة",duration(detail?.missing_seconds??0)],["قيمة الساعة",detail?.hourly_rate?`${Number(detail.hourly_rate).toLocaleString('ar-SA',{maximumFractionDigits:6})} ر.س`:"—"],["تسوية الساعات",`${money(adjustment.hours)} ر.س`],...(Number(adjustment.remote??0)>0?[[`اتفاق العمل عن بُعد · ${remotePeriod}`,`${money(adjustment.remote!)} ر.س`]]:[]),...(Number(adjustment.sick)>0?[["تسوية أجر المرضية",`${money(adjustment.sick)} ر.س`]]:[]),...(Number(adjustment.unpaid)>0?[["إجازة غير مدفوعة",`${money(adjustment.unpaid)} ر.س`]]:[])].map(([label,value])=><span key={label} className="mt-2 flex justify-between gap-4"><span className="text-slate-300">{label}</span><strong>{value}</strong></span>)}
      {detail?.waiver_reason&&<span className="mt-3 block text-amber-200">{detail.waiver_reason}</span>}{Number(detail?.unapplied_amount??0)>0&&<span className="mt-3 block text-amber-200">تسوية تتجاوز الرصيد المتاح: {money(detail!.unapplied_amount!)} ر.س</span>}
     </span>}
-   </span></div><p className="mt-2 flex items-baseline gap-1.5 whitespace-nowrap"><strong className="text-2xl font-black tabular-nums">{money(data.total_amount)}</strong><span className="text-sm">ر.س</span></p>{Number(data.paid_amount)>0&&<div className="mt-6 flex justify-between gap-2 whitespace-nowrap text-xs"><span>المصروف</span><strong>{money(data.paid_amount)} ر.س</strong></div>}</>:<p className="py-8 text-sm">لا يوجد كشف لهذا الشهر</p>}</div>
+   </span></div><p className="mt-2 flex items-baseline gap-1.5 whitespace-nowrap"><strong className="text-2xl font-black tabular-nums">{money(projection.total)}</strong><span className="text-sm">ر.س</span></p>{Number(data.paid_amount)>0&&<div className="mt-6 flex justify-between gap-2 whitespace-nowrap text-xs"><span>المصروف</span><strong>{money(data.paid_amount)} ر.س</strong></div>}</>:<p className="py-8 text-sm">لا يوجد كشف لهذا الشهر</p>}</div>
   {error&&<p role="status" className="mt-3 text-xs">{error}</p>}
   {!preview&&<Link href="/employee/finance/overview" className="mt-5 flex justify-between border-t border-current/10 pt-4 text-sm font-bold hover:underline"><span>عرض كشف المستحقات</span><span aria-hidden>←</span></Link>}
  </section>;

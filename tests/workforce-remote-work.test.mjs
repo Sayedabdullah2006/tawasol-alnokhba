@@ -5,7 +5,22 @@ import {summarizeAttendance} from '../src/lib/workforce/attendance-summary.ts';
 import {readFile} from 'node:fs/promises';
 import {remoteMigration,regularHoursMigration} from './helpers/remote-work-db.mjs';
 import {attendanceExemptPath} from '../src/lib/workforce/action-access.ts';
-import {splitAttendanceAdjustment} from '../src/lib/workforce/payroll-attendance.ts';
+import {splitAttendanceAdjustment,payrollCardProjection} from '../src/lib/workforce/payroll-attendance.ts';
+
+test('month-end display includes all approved remote days while daily accrual and paid payroll remain unchanged',async()=>{
+ const db=await createRemoteDB();try{
+  const p={...input,ends_on:'2026-11-05'};const q=await quote(db,p),id=await submit(db,q,p);await approve(db,id);
+  await addPeriod(db,ids.en,'2026-11-01','09:00','17:00');await addPeriod(db,ids.en,'2026-11-02','09:00','17:00');await setTime(db,'2026-11-03T11:00:00+03:00');
+  const snapshot=async()=> (await db.query("select wf_attendance_payroll_snapshot($1,$2,'2026-11-01') v",[ids.admin,ids.en])).rows[0].v.statement;
+  const before=await snapshot();await db.exec('reset role');
+  await db.exec(await readFile(new URL('../supabase/migrations/20261103083415_remote_work_month_end_projection.sql',import.meta.url),'utf8'));await db.exec('set role service_role');
+  const after=await snapshot();assert.equal(after.remote_work_projection.amount,'405.00');assert.equal(after.attendance_details.remote_work.amount,'162.00');assert.equal(after.total_amount,before.total_amount);assert.deepEqual(after.daily_accrual,before.daily_accrual);
+  const projected=payrollCardProjection(after);assert.equal(projected.adjustment.remote,'405.00');assert.equal(Number(projected.total),Number(after.total_amount)-243);assert.equal(projected.remoteDays.length,5);
+  assert.deepEqual(payrollCardProjection(await snapshot()),projected);
+  assert.equal(Number(payrollCardProjection({...after,status:'paid'}).total),Number(after.total_amount));assert.equal(payrollCardProjection({...after,status:'paid'}).adjustment.remote,'162.00');
+  assert.equal((await db.query('select count(*)::int n from wf_notifications')).rows[0].n,0);
+ }finally{await db.close();}
+});
 
 test('approved remote work preserves a flexible employee day without changing signed hours or other employees',async()=>{
  const db=await createRemoteDB();try{
