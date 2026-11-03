@@ -6,14 +6,14 @@ export const salesMetrics: Record<string,string> = {
  contract:'عقود موقعة',collection:'تحصيل بالريال',service_card:'بطاقات خدمات',technical_study:'دراسات فنية',
  technical_quote:'عروض فنية',demo:'نموذج توضيحي',responsiveness:'استجابة فنية',manual:'إنجاز مخصص',
 };
-export const salesStages: Record<string,string> = {target:'مستهدفة',contacted:'تم التواصل',qualified:'مؤهلة',meeting:'لقاء',proposal:'عرض سعر',negotiation:'تفاوض',contracting:'التعاقد والتوقيع',contract:'عقد موقع',won:'فوز وتحصيل',lost:'خسارة',paused:'مؤجلة'};
+export const salesStages: Record<string,string> = {target:'استهداف',contacted:'تواصل وتأهيل',qualified:'مؤهلة ومحالة',meeting:'اكتشاف الاحتياج',proposal:'عرض سعر مقدم',negotiation:'تفاوض واتفاق',contracting:'بانتظار التوقيع',won:'مغلقة — ناجحة',lost:'خسارة',paused:'مؤجلة'};
 export type SalesGoal={key:string;title:string;metric:string;target:number;weight:number;group:'competition'|'role';unit:string;excluded:boolean;exclusion_reason:string};
 export type SalesWeek={key:string;title:string;details:string;due_on:string};
 export type SalesPlan={id:string;month:string;employee_id:string;competition_weight:number;goals:SalesGoal[];weekly:SalesWeek[]};
 export type SalesMonth={month:string;status:'draft'|'published'|'closed';version:number;closing_employee_id:string;team_target:number;note:string};
 export type SalesAccount={id:string;name:string;contact_name:string;email:string;phone:string;website:string;fit_reason:string;owner_id:string;created_at:string};
 export type SalesOpportunity={id:string;account_id:string;title:string;service:string;source_employee_id:string;closing_employee_id:string;followup_employee_id:string;stage:string;value:number;need:string;decision_maker:string;purchase_timing:string;next_action:string;next_on:string|null;loss_reason:string;request_id:string|null;created_at:string};
-export type SalesActivity={id:string;month:string;employee_id:string;account_id:string|null;opportunity_id:string|null;metric:string;goal_key:string;occurred_on:string;summary:string;evidence_url:string;reference:string;amount:number;details:string;status:'pending'|'approved'|'rejected';decision_note:string;created_at:string};
+export type SalesActivity={id:string;month:string;employee_id:string;account_id:string|null;opportunity_id:string|null;metric:string;goal_key:string;occurred_on:string;summary:string;evidence_url:string;evidence_attachment_id?:string|null;reference:string;amount:number;details:string;status:'pending'|'approved'|'rejected';decision_note:string;created_at:string};
 export type SalesReview={employee_id:string;month:string;self_note:string;manager_note:string;status:'draft'|'published';snapshot:SalesEvaluation|null;development:string};
 export type SalesTaskLink={plan_id:string;week_key:string;task_id:string;title:string;due_at:string;kind:string};
 export type SalesAudit={id:number;action:string;reason:string;created_at:string;before_data:unknown;after_data:unknown};

@@ -66,8 +66,37 @@ test('sales manager sees all CRM; sellers see their own pipeline, cannot enter c
  await assert.rejects(command(db,'opportunity_edit',{...rows[1],stage:'proposal',reason:'محاولة إغلاق'},ids.monwa),/مسؤولة/);
  await command(db,'opportunity_edit',{...rows[1],stage:'qualified',reason:'إحالة إلى مديرة المبيعات'},ids.monwa);
  let s=await snapshot(db,ids.noor);assert.equal(s.opportunities.find(o=>o.id===rows[1].id).followup_employee_id,ids.ne);
- await command(db,'opportunity_edit',{...rows[1],stage:'proposal',reason:'تجهيز العرض'},ids.noor);
+ await assert.rejects(command(db,'opportunity_edit',{...rows[1],stage:'proposal',reason:'تجهيز العرض'},ids.noor),/عرض سعر معتمد/);
+ await command(db,'activity',{employee_id:ids.ne,account_id:rows[1].account_id,opportunity_id:rows[1].id,metric:'quote',occurred_on:'2026-11-04',summary:'عرض السعر للعميل',details:'النطاق والمخرجات وشروط الدفع',reference:'Q-TEST',amount:1000},ids.noor);
+ const quote=(await snapshot(db)).activities.find(a=>a.metric==='quote');await command(db,'approve_activity',{id:quote.id,status:'approved',reason:'عرض سعر معتمد'});
  s=await snapshot(db,ids.monwa);assert.equal(s.opportunities[0].source_employee_id,ids.me);assert.equal(s.opportunities[0].stage,'proposal');
  const safe=scopeSalesData(s);assert.equal(safe.plans.length,1);assert.equal(safe.competition.length,2);assert.equal('_competitionFacts' in safe,false);assert.ok(!JSON.stringify(safe.activities).includes(rows[0].id));
+ }finally{await db.close();}
+});
+
+test('opportunity files follow source and manager access, bind evidence, preserve audit and separate signed sales from paid targets',async()=>{
+ const db=await prepared();try{
+ await command(db,'publish',{});const opportunities=[];
+ for(const actor of [ids.monwa,ids.noor]){
+  const account=crypto.randomUUID(),id=crypto.randomUUID();await command(db,'account_create',{id:account,name:actor,name_key:actor,email:actor+'@test.invalid',contact_name:'مسؤول',phone:'',website:'',fit_reason:'ملاءمة للاختبار'},actor);
+  await command(db,'opportunity_create',{id,account_id:account,title:'فرصة مستندات',service:'موقع',value:1000,need:'موقع جديد',decision_maker:'المدير',purchase_timing:'نوفمبر',next_action:'تحديد لقاء',next_on:'2026-11-10',stage:'qualified'},actor);opportunities.push({id,account});
+ }
+ const [own,other]=opportunities,id=crypto.randomUUID(),payload={filename:'عقد.pdf',mime_type:'application/pdf',size_bytes:100,sha256:'a'.repeat(64),purpose:'contract',object_path:own.id+'/'+crypto.randomUUID()};
+ const fileCommand=async(actor,opp,cmd,fileId=null,p={})=>(await db.query('select wf_sales_file_command($1,$2,$3,$4,$5) data',[actor,opp,cmd,fileId,p])).rows[0].data;
+ await fileCommand(ids.monwa,own.id,'add',id,payload);await fileCommand(ids.monwa,own.id,'add',id,{...payload,object_path:own.id+'/'+crypto.randomUUID()});
+ assert.equal((await fileCommand(ids.noor,own.id,'list')).files.length,1);assert.equal((await fileCommand(ids.monwa,own.id,'list')).files[0].object_path,undefined);
+ await assert.rejects(fileCommand(ids.monwa,other.id,'list'),/غير متاحة/);await assert.rejects(fileCommand(ids.monwa,other.id,'download',id),/غير متاحة/);
+ await assert.rejects(fileCommand(ids.monwa,own.id,'add',id,{...payload,sha256:'b'.repeat(64)}),/مفتاح/);
+ await assert.rejects(fileCommand(ids.noor,other.id,'download',id),/المرفق غير متاح/);
+ const activity={employee_id:ids.ne,opportunity_id:own.id,account_id:own.account,metric:'contract',occurred_on:'2026-11-04',summary:'العقد الموقع من العميل',reference:'SIGNED-FILE',amount:1000,evidence_attachment_id:id,evidence_url:''};
+ await assert.rejects(command(db,'activity',{...activity,opportunity_id:other.id,account_id:other.account},ids.noor),/الفرصة نفسها/);
+ await assert.rejects(command(db,'activity',activity,ids.monwa),/مسؤولة/);await command(db,'activity',activity,ids.noor);
+ await assert.rejects(fileCommand(ids.monwa,own.id,'archive',id),/مرتبط/);
+ const signed=(await snapshot(db)).activities.find(a=>a.reference==='SIGNED-FILE');await command(db,'approve_activity',{id:signed.id,status:'approved',reason:'الملف عقد موقع'});
+ let s=await snapshot(db);assert.equal(s.opportunities.find(o=>o.id===own.id).stage,'won');assert.equal(evaluateSales(s.plans.find(p=>p.employee_id===ids.ne),s.activities).goals.find(g=>g.metric==='closed').actual,0);
+ await command(db,'activity',{...activity,metric:'collection',reference:'PAY-FILE',amount:300},ids.noor);let payment=(await snapshot(db)).activities.find(a=>a.reference==='PAY-FILE');await command(db,'approve_activity',{id:payment.id,status:'approved',reason:'دفعة موثقة'});
+ s=await snapshot(db);assert.equal(evaluateSales(s.plans.find(p=>p.employee_id===ids.ne),s.activities).goals.find(g=>g.metric==='closed').actual,1);assert.equal(s.opportunities.find(o=>o.id===own.id).source_employee_id,ids.me);
+ const disposable=crypto.randomUUID();await fileCommand(ids.noor,own.id,'add',disposable,{...payload,filename:'عرض.pdf',object_path:own.id+'/'+crypto.randomUUID()});await assert.rejects(fileCommand(ids.monwa,own.id,'archive',disposable),/ملفاتك/);await command(db,'activity',{...activity,metric:'quote',reference:'REJECT-FILE',details:'عرض للاختبار قبل الأرشفة',evidence_attachment_id:disposable},ids.noor);const rejected=(await snapshot(db)).activities.find(a=>a.reference==='REJECT-FILE');await command(db,'approve_activity',{id:rejected.id,status:'rejected',reason:'ملف غير معتمد'});await fileCommand(ids.admin,own.id,'archive',disposable);await assert.rejects(fileCommand(ids.noor,own.id,'download',disposable),/غير متاح/);await assert.rejects(db.query("update wf_sales_activities set status='approved' where id=$1",[rejected.id]),/مرفق الإثبات غير متاح/);
+ await db.exec('reset role;set role authenticated');await assert.rejects(fileCommand(ids.monwa,own.id,'list'),/permission denied/);await assert.rejects(db.query('select * from wf_crm_files'),/permission denied/);
  }finally{await db.close();}
 });
