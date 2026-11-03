@@ -1,3 +1,4 @@
+import type {OverallPerformance} from './overall-performance';
 import { dateField, textField, uuid, WorkforceError } from './validation';
 
 export const salesMetrics: Record<string,string> = {
@@ -8,16 +9,16 @@ export const salesMetrics: Record<string,string> = {
 };
 export const salesStages: Record<string,string> = {target:'استهداف',contacted:'تواصل وتأهيل',qualified:'مؤهلة ومحالة',meeting:'اكتشاف الاحتياج',proposal:'عرض سعر مقدم',negotiation:'تفاوض واتفاق',contracting:'بانتظار التوقيع',won:'مغلقة — ناجحة',lost:'خسارة',paused:'مؤجلة'};
 export type SalesGoal={key:string;title:string;metric:string;target:number;weight:number;group:'competition'|'role';unit:string;excluded:boolean;exclusion_reason:string};
-export type SalesWeek={key:string;title:string;details:string;due_on:string};
+export type SalesWeek={key:string;title:string;details:string;due_on:string;starts_on?:string};
 export type SalesPlan={id:string;month:string;employee_id:string;competition_weight:number;goals:SalesGoal[];weekly:SalesWeek[]};
-export type SalesMonth={month:string;status:'draft'|'published'|'closed';version:number;closing_employee_id:string;team_target:number;note:string};
+export type SalesMonth={month:string;status:'draft'|'published'|'closed';version:number;performance_sales_weight?:number;closing_employee_id:string;team_target:number;note:string};
 export type SalesAccount={id:string;name:string;contact_name:string;email:string;phone:string;website:string;fit_reason:string;owner_id:string;created_at:string};
 export type SalesOpportunity={id:string;account_id:string;title:string;service:string;source_employee_id:string;closing_employee_id:string;followup_employee_id:string;stage:string;value:number;need:string;decision_maker:string;purchase_timing:string;next_action:string;next_on:string|null;loss_reason:string;request_id:string|null;created_at:string};
 export type SalesActivity={id:string;month:string;employee_id:string;account_id:string|null;opportunity_id:string|null;metric:string;goal_key:string;occurred_on:string;summary:string;evidence_url:string;evidence_attachment_id?:string|null;reference:string;amount:number;details:string;status:'pending'|'approved'|'rejected';decision_note:string;created_at:string};
 export type SalesReview={employee_id:string;month:string;self_note:string;manager_note:string;status:'draft'|'published';snapshot:SalesEvaluation|null;development:string};
 export type SalesTaskLink={plan_id:string;week_key:string;task_id:string;title:string;due_at:string;kind:string};
 export type SalesAudit={id:number;action:string;reason:string;created_at:string;before_data:unknown;after_data:unknown};
-export type SalesData={canManageSales?:boolean;managerEmployeeId?:string;teamWon?:number;competition?:{employee_id:string;score:number|null;goals:GoalResult[]}[];selfNote?:string;admin:boolean;employeeId:string|null;month:SalesMonth|null;months:{month:string;status:string}[];employees:{id:string;full_name:string}[];plans:SalesPlan[];accounts:SalesAccount[];opportunities:SalesOpportunity[];activities:SalesActivity[];reviews:SalesReview[];tasks:SalesTaskLink[];audit:SalesAudit[]};
+export type SalesData={performance?:{employee_id:string;eligible:number;required:number;overall:OverallPerformance}[];canManageSales?:boolean;managerEmployeeId?:string;teamWon?:number;competition?:{employee_id:string;score:number|null;goals:GoalResult[]}[];selfNote?:string;admin:boolean;employeeId:string|null;month:SalesMonth|null;months:{month:string;status:string}[];employees:{id:string;full_name:string}[];plans:SalesPlan[];accounts:SalesAccount[];opportunities:SalesOpportunity[];activities:SalesActivity[];reviews:SalesReview[];tasks:SalesTaskLink[];audit:SalesAudit[]};
 export type GoalResult=SalesGoal&{actual:number;pending:number;score:number|null};
 export type SalesEvaluation={goals:GoalResult[];competition:number|null;role:number|null;total:number|null;rating:string;unrated:number};
 export function salesMonth(value:unknown){const month=textField(value,'الشهر',7,7);if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))throw new WorkforceError('الشهر غير صحيح');return month;}
@@ -38,7 +39,7 @@ export function validateSalesPlan(value:unknown):Pick<SalesPlan,'goals'|'weekly'
  });
  for(const group of ['competition','role']){const sum=goals.filter(g=>g.group===group).reduce((s,g)=>s+g.weight,0);if(Math.abs(sum-100)>0.001)throw new WorkforceError(`مجموع أوزان ${group==='competition'?'التنافس':'المسؤوليات الإضافية'} يجب أن يساوي 100%`);}
  if(!Array.isArray(p.weekly)||p.weekly.length>12)throw new WorkforceError('المهام الأسبوعية غير صحيحة');
- const weekKeys=new Set<string>();const weekly=p.weekly.map((w:SalesWeek)=>{const key=textField(w.key,'رمز الأسبوع',1,40);if(weekKeys.has(key))throw new WorkforceError('رمز المهمة مكرر');weekKeys.add(key);return{key,title:textField(w.title,'المهمة',2,180),details:textField(w.details,'تفاصيل المهمة',3,6000),due_on:dateField(w.due_on)!};});
+ const weekKeys=new Set<string>();const weekly=p.weekly.map((w:SalesWeek)=>{const key=textField(w.key,'رمز الأسبوع',1,40);if(weekKeys.has(key))throw new WorkforceError('رمز المهمة مكرر');weekKeys.add(key);return{key,title:textField(w.title,'المهمة',2,180),details:textField(w.details,'تفاصيل المهمة',3,6000),due_on:dateField(w.due_on)!,...(w.starts_on?{starts_on:dateField(w.starts_on)!}:{})};});
  return {competition_weight,goals,weekly};
 }
 /** An installment is revenue in its own month, but never a second closed sale. */
@@ -75,12 +76,12 @@ export function evaluateSales(plan:SalesPlan,activities:SalesActivity[]):SalesEv
  return{goals,competition,role,total,rating:total===null?'غير مقيم':total<50?'ضعيف':total<70?'يحتاج إلى تحسين':total<90?'مرضي':total<100?'جيد جدًا':'تحققت المستهدفات',unrated:goals.filter(g=>g.excluded).length};
 }
 const goal=(key:string,title:string,metric:string,target:number,weight:number,group:'competition'|'role'):SalesGoal=>({key,title,metric,target,weight,group,unit:'عدد',excluded:false,exclusion_reason:''});
-export function defaultSalesPlan(month:string,closer:boolean){
+export function defaultSalesPlan(month:string,closer:boolean):Pick<SalesPlan,'competition_weight'|'goals'|'weekly'>{
  const goals=[goal('prospects','إضافة جهات مناسبة','prospect',15,10,'competition'),goal('contacts','التواصل الأولي','contact',10,20,'competition'),goal('followups','المتابعات التجارية','followup',6,20,'competition'),goal('qualified','تأهيل فرص جادة','qualified',2,40,'competition'),goal('records','تحديث السجل أسبوعيًا','recordkeeping',4,10,'competition'),
  ...(closer?[goal('meetings','عقد لقاءات الاحتياج','meeting',3,30,'role'),goal('quotes','تقديم عروض معتمدة','quote',2,30,'role'),goal('closed','إغلاق صفقة مدفوعة','closed',1,30,'role'),goal('closing-followup','متابعة العروض أسبوعيًا','recordkeeping',4,10,'role')]:[goal('cards','تجهيز بطاقتي خدمة','service_card',2,20,'role'),goal('studies','دراسة الفرص التقنية','technical_study',2,25,'role'),goal('technical-quotes','تجهيز العروض الفنية','technical_quote',2,25,'role'),goal('demo','نموذج توضيحي للبيع','demo',1,15,'role'),goal('response','استجابة فنية أسبوعية','responsiveness',4,15,'role')])];
  const last=new Date(Date.UTC(+month.slice(0,4),+month.slice(5),0)).getUTCDate();
  const details=['إضافة 5 جهات والتواصل مع 3. '+(closer?'مراجعة الفرص الحالية وتجهيز قوالب التأهيل والعرض.':'مراجعة واعتماد بطاقتي خدمة.'),'إضافة 5 جهات والتواصل مع 3، ومتابعتان وتأهيل فرصة. '+(closer?'عقد أول لقاء وتجهيز أول عرض.':'دراسة الفرصة الأولى وتجهيز النموذج التوضيحي.'),'إضافة 5 جهات والتواصل مع 4، ومتابعتان وتأهيل الفرصة الثانية. '+(closer?'عقد اللقاءين المتبقيين وتجهيز العرض الثاني.':'دراسة الفرصة الثانية وتجهيز العرض الفني الأول.'),'متابعتان واستكمال السجل وترحيل الفرص المفتوحة. '+(closer?'متابعة القرار والتوقيع والتحصيل للصفقة المستهدفة.':'تجهيز العرض الفني الثاني ومعالجة الاستفسارات وتجهيز بدء التنفيذ.')];
- const weekly=details.map((details,i)=>({key:`week-${i+1}`,title:`مبيعات ${month} — الأسبوع ${i+1}`,details:details+' توثيق الأنشطة والإثبات في CRM؛ اعتماد المهمة لا يمنح نقاط بيع تلقائيًا.',due_on:`${month}-${String([7,14,21,last][i]).padStart(2,'0')}`}));
+ const weekly=details.map((details,i)=>({key:`week-${i+1}`,title:`مبيعات ${month} — الأسبوع ${i+1}`,details:details+' توثيق الأنشطة والإثبات في CRM؛ اعتماد المهمة لا يمنح نقاط بيع تلقائيًا.',starts_on:(()=>{const start=`${month}-${String([1,8,15,22][i]).padStart(2,'0')}`,due=`${month}-${String([7,14,21,last][i]).padStart(2,'0')}`,today=riyadhToday();return start>today?start:today<due?today:due;})(),due_on:`${month}-${String([7,14,21,last][i]).padStart(2,'0')}`}));
  return{competition_weight:60,goals,weekly};
 }
 export function checkedEmployee(value:unknown){return uuid(value);}
@@ -91,5 +92,6 @@ export function scopeSalesData(raw:SalesData&{_competitionFacts?:SalesActivity[]
  const {_competitionFacts:privateFacts,...safe}=raw;void privateFacts;
  const facts=raw._competitionFacts??raw.activities;const month=raw.month?.month.slice(0,7);
  const teamWon=firstPaidSales(facts).filter(a=>a.month.slice(0,7)===month).length;
- return{...safe,competition,teamWon,plans:raw.admin?safe.plans:safe.plans.filter(p=>p.employee_id===raw.employeeId)};
+ const plans=raw.admin?safe.plans:safe.plans.filter(p=>p.employee_id===raw.employeeId),planIds=new Set(plans.map(p=>p.id));
+ return{...safe,competition,teamWon,plans,tasks:raw.admin?safe.tasks:safe.tasks?.filter(t=>planIds.has(t.plan_id))??[]};
 }

@@ -48,12 +48,12 @@ test('CRM attribution, approved evidence, closer permissions, money integrity, f
 test('weekly tasks use the existing real task command and preserve assignee and approval workflow',async()=>{
  const {createPerformanceDB,ids:existing}=await import('./helpers/performance-db.mjs');
  const {readFile}=await import('node:fs/promises');const db=await createPerformanceDB();
- try{await db.exec('reset role');await db.exec(await readFile(new URL('../supabase/migrations/20261103212605_monthly_sales_crm.sql',import.meta.url),'utf8'));await db.exec('set role service_role');
+ try{await db.exec('reset role');await db.exec(await readFile(new URL('../supabase/migrations/20261103212605_monthly_sales_crm.sql',import.meta.url),'utf8'));await db.exec(await readFile(new URL('../supabase/migrations/20261103222721_overall_sales_task_performance.sql',import.meta.url),'utf8'));await db.exec('set role service_role');
  await command(db,'create_month',{closing_employee_id:existing.ne},existing.admin);
  await command(db,'save_plan',{employee_id:existing.ne,...defaultSalesPlan(month,true),reason:'خطة متكاملة'},existing.admin);
  await command(db,'publish',{},existing.admin);const s=await snapshot(db,existing.admin);assert.equal(s.tasks.length,4);
- const tasks=(await db.query('select assignee_id,requires_approval from public.wf_tasks where id in (select task_id from public.wf_sales_task_links)')).rows;
- assert.ok(tasks.every(t=>t.assignee_id===existing.ne&&t.requires_approval));
+ const tasks=(await db.query('select assignee_id,requires_approval,starts_at from public.wf_tasks where id in (select task_id from public.wf_sales_task_links)')).rows;
+ assert.ok(tasks.every(t=>t.assignee_id===existing.ne&&t.requires_approval&&t.starts_at));const configs=(await db.query('select size,configured_at from wf_performance_assignments where task_id in (select task_id from wf_sales_task_links)')).rows;assert.equal(configs.length,4);assert.ok(configs.every(x=>x.size&&x.configured_at));
  }finally{await db.close();}
 });
 test('sales manager sees all CRM; sellers see their own pipeline, cannot enter closing stages, and shared board contains no private evidence',async()=>{
@@ -70,7 +70,7 @@ test('sales manager sees all CRM; sellers see their own pipeline, cannot enter c
  await command(db,'activity',{employee_id:ids.ne,account_id:rows[1].account_id,opportunity_id:rows[1].id,metric:'quote',occurred_on:'2026-11-04',summary:'عرض السعر للعميل',details:'النطاق والمخرجات وشروط الدفع',reference:'Q-TEST',amount:1000},ids.noor);
  const quote=(await snapshot(db)).activities.find(a=>a.metric==='quote');await command(db,'approve_activity',{id:quote.id,status:'approved',reason:'عرض سعر معتمد'});
  s=await snapshot(db,ids.monwa);assert.equal(s.opportunities[0].source_employee_id,ids.me);assert.equal(s.opportunities[0].stage,'proposal');
- const safe=scopeSalesData(s);assert.equal(safe.plans.length,1);assert.equal(safe.competition.length,2);assert.equal('_competitionFacts' in safe,false);assert.ok(!JSON.stringify(safe.activities).includes(rows[0].id));
+ const safe=scopeSalesData(s);assert.equal(safe.plans.length,1);assert.equal(safe.tasks.length,4);assert.ok(safe.tasks.every(t=>t.plan_id===safe.plans[0].id));assert.equal(safe.competition.length,2);assert.equal('_competitionFacts' in safe,false);assert.ok(!JSON.stringify(safe.activities).includes(rows[0].id));
  }finally{await db.close();}
 });
 

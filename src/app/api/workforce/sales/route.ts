@@ -14,7 +14,7 @@ export async function POST(request:Request){try{
  const reason=()=>textField(p.reason??'','سبب الإجراء',3,2000);
  const employee=()=>uuid(actor.role==='admin'?p.employee_id:actor.employee?.id);
  if(['create_month','settings','save_plan','publish','close','reopen','review','approve_activity'].includes(command))requireAdmin(actor);
- if(['create_month','settings'].includes(command))payload={closing_employee_id:uuid(p.closing_employee_id),team_target:numberField(p.team_target,'هدف الفريق',10000),note:textField(p.note??'','ملاحظات الشهر',0,4000),...(command==='settings'?{reason:reason(),manager_employee_id:uuid(p.manager_employee_id)}:{})};
+ if(['create_month','settings'].includes(command))payload={closing_employee_id:uuid(p.closing_employee_id),team_target:numberField(p.team_target,'هدف الفريق',10000),performance_sales_weight:numberField(p.performance_sales_weight??60,'وزن المبيعات في التقييم الكلي',100),note:textField(p.note??'','ملاحظات الشهر',0,4000),...(command==='settings'?{reason:reason(),manager_employee_id:uuid(p.manager_employee_id)}:{})};
  else if(command==='save_plan')payload={employee_id:uuid(p.employee_id),...validateSalesPlan(p),reason:reason()};
  else if(['publish','close'].includes(command))payload={reason:textField(p.reason??'اعتماد الخطة','السبب',3,2000)};
  else if(command==='reopen')payload={reason:reason()};
