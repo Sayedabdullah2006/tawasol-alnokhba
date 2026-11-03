@@ -15,7 +15,7 @@ export async function createSalesDB(){
  insert into wf_employees values('${ids.ne}','${ids.noor}','نور','active'),('${ids.me}','${ids.monwa}','منوه','active');
  grant usage on schema public,workforce_private to service_role;grant all on all tables in schema public to service_role;grant execute on all functions in schema public,workforce_private to service_role;
  `);
- await db.exec(await readFile(new URL('../../supabase/migrations/20261103210307_monthly_sales_crm.sql',import.meta.url),'utf8'));await db.exec('set role service_role');return db;
+ await db.exec(await readFile(new URL('../../supabase/migrations/20261103212605_monthly_sales_crm.sql',import.meta.url),'utf8'));await db.exec('set role service_role');return db;
 }
 export async function snapshot(db,actor=ids.admin,month='2026-11'){return(await db.query('select wf_sales_snapshot($1,$2) data',[actor,month+'-01'])).rows[0].data;}
 export async function command(db,cmd,payload={},actor=ids.admin,month='2026-11',key=crypto.randomUUID(),version=null){const data=await snapshot(db,actor,month);return(await db.query('select wf_sales_command($1,$2,$3,$4,$5,$6) data',[actor,month+'-01',version??data.month?.version??0,cmd,payload,key])).rows[0].data;}
