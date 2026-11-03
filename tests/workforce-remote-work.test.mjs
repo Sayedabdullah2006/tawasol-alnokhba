@@ -7,6 +7,27 @@ import {remoteMigration,regularHoursMigration} from './helpers/remote-work-db.mj
 import {attendanceExemptPath} from '../src/lib/workforce/action-access.ts';
 import {splitAttendanceAdjustment} from '../src/lib/workforce/payroll-attendance.ts';
 
+test('approved remote work preserves a flexible employee day without changing signed hours or other employees',async()=>{
+ const db=await createRemoteDB();try{
+  const q=await quote(db,{...input,starts_time:'07:00'}),id=await submit(db,q,{...input,starts_time:'07:00'});await approve(db,id);
+  const before=(await db.query('select remote_details from wf_employee_requests where id=$1',[id])).rows[0].remote_details;
+  await db.exec(`reset role;
+   create or replace function workforce_private.employee_work_end_before_remote(p_employee uuid,p_day date) returns time language sql stable as $$select case when exists(select 1 from public.wf_employees where id=p_employee and flexible_workday_from<=p_day) then time '24:00' else time '18:00' end$$;
+   create or replace function workforce_private.employee_work_start_before_remote(p_employee uuid,p_day date) returns time language sql stable as $$select case when exists(select 1 from public.wf_employees where id=p_employee and flexible_workday_from<=p_day) then time '00:00' else time '09:00' end$$;`);
+  await db.exec(await readFile(new URL('../supabase/migrations/20261103083007_remote_work_preserve_flexible_attendance.sql',import.meta.url),'utf8'));
+  await db.exec('set role service_role');await setTime(db,'2026-11-02T20:00:00+03:00');
+  const snap=async()=> (await db.query('select wf_work_snapshot($1) v',[ids.noor])).rows[0].v;
+  assert.equal((await snap()).attendancePolicy.endsAt,'15:00:00');assert.equal((await snap()).attendancePolicy.flexibleDay,false);
+  await db.query("update wf_employees set flexible_workday_from='2026-10-26' where id=$1",[ids.en]);
+  const policy=(await snap()).attendancePolicy;
+  assert.equal(policy.flexibleDay,true);assert.equal(policy.endsAt,'24:00:00');assert.equal(policy.startsAt,'00:00:00');assert.equal(policy.requiredMinutes,480);
+  assert.equal((await db.query("select workforce_private.employee_work_end($1,'2026-11-02') v",[ids.em])).rows[0].v,'18:00:00');
+  await setTime(db,'2026-12-01T20:00:00+03:00');assert.notEqual((await snap()).attendancePolicy?.remote,true);
+  assert.deepEqual((await db.query('select remote_details from wf_employee_requests where id=$1',[id])).rows[0].remote_details,before);
+  assert.equal((await db.query('select count(*)::int n from wf_notifications')).rows[0].n,0);
+ }finally{await db.close();}
+});
+
 test('agreement review remains available off duty and the remote adjustment is allocated once alongside other deductions',()=>{
  for(const path of ['/api/workforce/requests/remote-work/quote','/api/workforce/requests/remote-work/document','/api/workforce/requests'])assert.equal(attendanceExemptPath(path),true);
  assert.equal(attendanceExemptPath('/api/workforce/tasks'),false);
