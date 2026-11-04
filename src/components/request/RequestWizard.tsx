@@ -15,7 +15,8 @@ import type { ClientType } from './RStep1ClientType'
 import type { CampaignSetup } from './RStepCampaignSetup'
 import RStep3Details, { type ContentDetails } from './RStep3Details'
 import RStepExtras from './RStepExtras'
-import { type ContactData } from './RStep5Contact'
+import RStep5Contact, { type ContactData } from './RStep5Contact'
+import PackageComparison from './PackageComparison'
 import { TERMS_TEXT } from './RStep6Terms'
 import RStepCampaignPosts, { type CampaignPostData, makeEmptyPost, isPostComplete } from './RStepCampaignPosts'
 import SuccessScreen from './SuccessScreen'
@@ -112,7 +113,7 @@ const fieldLabel = 'block text-sm font-bold text-dark mb-1.5'
 
 // ─── مكوّن قسم قابل للطي ─────────────────────────────────────────
 function FormSection({
-  index, title, subtitle, complete, open, onToggle, children, wide = false,
+  index, title, subtitle, complete, open, onToggle, children, wide = false, disabled = false,
 }: {
   index: number
   title: string
@@ -122,18 +123,20 @@ function FormSection({
   onToggle: () => void
   children: ReactNode
   wide?: boolean
+  disabled?: boolean
 }) {
   return (
-    <div data-request-section data-complete={complete} data-open={open} className={cn(
+    <div data-request-section data-request-title={title} data-complete={complete} data-open={open} className={cn(
       'bg-card rounded-2xl border-2 overflow-hidden transition-all',
       complete ? 'border-green/40' : 'border-border',
     )}>
       <button
         type="button"
         onClick={onToggle}
+        disabled={disabled}
         aria-expanded={open}
         aria-controls={`request-section-${index}`}
-        className="w-full flex items-center gap-3 px-5 py-4 text-right hover:bg-muted/5 transition-colors"
+        className="w-full flex items-center gap-3 px-5 py-4 text-right hover:bg-muted/5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       >
         <div className={cn(
           'w-8 h-8 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0',
@@ -147,7 +150,7 @@ function FormSection({
         </div>
         <span className="text-muted text-xs flex-shrink-0">{open ? '▲' : '▼'}</span>
       </button>
-      {open && (
+      {open && !disabled && (
         <div id={`request-section-${index}`} className={cn('px-5 pb-5 pt-2 border-t border-border wizard-enter', !wide && 'max-w-4xl mx-auto')}>
           {children}
         </div>
@@ -443,7 +446,7 @@ export default function RequestWizard() {
       setSelectedPackage(pkg.id)
       setSelectedExtras([])
       if (pkg.requiredCategory) { setCategory(pkg.requiredCategory); setSubOption(null); setCompetitionSelection(null) }
-      setOpenSection(pkg.requiredCategory ? 2 : 0)
+      setOpenSection(0)
     })
     return () => { cancelled = true }
   }, [hydrated, membershipMode, requestedPackage, singlePackages])
@@ -457,14 +460,15 @@ export default function RequestWizard() {
       ? !!competitionSelection?.subcategory && !!competitionSelection?.position
       : needsSubOption ? !!subOption : true
 
+  const identityComplete = !!selectedInfluencer && !!effectiveClientType && (effectiveClientType === 'individual' || orgInfo.name.trim() !== '')
   const aboutComplete =
-    !!selectedInfluencer && !!requestType && !!effectiveClientType && (
+    identityComplete && !!requestType && (
       requestType === 'campaign'
         ? campaignSetup.postCount >= 2
         : (!!category && subOptionSatisfied)
     )
 
-  const contentComplete =
+  const baseContentComplete =
     requestType === 'campaign'
       ? campaignPosts.length > 0 && campaignPosts.every(isPostComplete)
       : requestType === 'single'
@@ -478,13 +482,17 @@ export default function RequestWizard() {
   const showPackages = !membershipMode && clientType === 'individual' && !isOtherCategory
   // الباقة الأساسية تتطلّب اختيار قناة واحدة للنشر
   const basicNeedsChannel = showPackages && (selectedPackage === 'basic' || !!singlePackages.find(p=>p.id===selectedPackage&&!p.channels&&p.channelCount===1))
-  const offeredPackages = requestType === 'campaign' ? ORDERABLE_PACKAGES : singlePackages
+  const offeredPackages = requestType === 'campaign' ? ORDERABLE_PACKAGES : singlePackages.filter(p=>!p.requiredCategory || p.requiredCategory===category)
   const chosenV2 = getIndividualPackage(selectedPackage ?? '',singlePackages)
   const chosenChannels = chosenV2?.channels ? [...chosenV2.channels] : chosenV2?.channelCount===1 ? (basicChannel?[basicChannel]:[]) : reachChannels
   let validV2Channels = true
   if (chosenV2) { try { resolvePackageChannels(chosenV2, chosenChannels, availableChannels) } catch { validV2Channels = false } }
-  const careerComplete = chosenV2?.id !== 'v2_career' || [career.goal, career.experience, career.education].every(v => v.trim().length > 0)
-  const packagesComplete = !showPackages || ((requestType==='campaign'||(!!catalog&&!catalogError)) && careerComplete && (!chosenV2?.requiredCategory || category === chosenV2.requiredCategory) && !!selectedPackage && offeredPackages.some(p => p.id === selectedPackage) && (!basicNeedsChannel || !!basicChannel) && validV2Channels)
+  const careerComplete = !showPackages || chosenV2?.id !== 'v2_career' || [career.goal, career.experience, career.education].every(v => v.trim().length > 0)
+  const packagesComplete = !showPackages || ((requestType==='campaign'||(!!catalog&&!catalogError)) && (!chosenV2?.requiredCategory || category === chosenV2.requiredCategory) && !!selectedPackage && offeredPackages.some(p => p.id === selectedPackage) && (!basicNeedsChannel || !!basicChannel) && validV2Channels)
+
+  const contentComplete = baseContentComplete && careerComplete
+
+  const activeSection = !identityComplete ? 0 : openSection > 1 && !aboutComplete ? 1 : openSection === 3 && showPackages && !packagesComplete ? 2 : openSection
 
   // السعر الديناميكي للباقة الأساسية = سعر التسعير التلقائي حسب نوع الخبر
   const basicDynamicPrice: number | null = (() => {
@@ -586,7 +594,7 @@ export default function RequestWizard() {
     estimatedTotal, extrasTotal,
   ])
 
-  const sectionComplete = [aboutComplete, contentComplete, packagesComplete, contactComplete]
+  const sectionComplete = [identityComplete, aboutComplete, packagesComplete, contentComplete, contactComplete]
   const canSubmit = sectionComplete.every(Boolean)
 
   // أول متطلب ناقص — يُعرض كتلميح فوق زر الإرسال
@@ -685,7 +693,7 @@ export default function RequestWizard() {
           recovery_token: recoveryToken,
           selected_package: showPackages ? selectedPackage : null,
           catalog_version: catalog?.version,
-          ...(requestType === 'single' && chosenV2 ? { channels: chosenChannels, ...(chosenV2.id === 'v2_career' ? { career } : {}) } : {}),
+          ...(showPackages && requestType === 'single' && chosenV2 ? { channels: chosenChannels, ...(chosenV2.id === 'v2_career' ? { career } : {}) } : {}),
           basic_channel: showPackages && (selectedPackage === 'basic' || selectedPackage === 'v2_basic') ? basicChannel : null,
         }
       }
@@ -860,7 +868,7 @@ export default function RequestWizard() {
               </section>
             )}
 
-            {selectedPackageData && (
+            {showPackages && selectedPackageData && (
               <section className="bg-card border border-border rounded-2xl p-5">
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div>
@@ -968,6 +976,7 @@ export default function RequestWizard() {
   // اختيار نوع الطلب / الصفة عبر البطاقات — بنفس آثار القوائم المنسدلة السابقة
   const selectRequestType = (v: RequestType) => {
     setRequestType(v)
+    setSelectedPackage(null); setBasicChannel(null); setReachChannels([])
     if (v === 'campaign') {
       setCategory(null); setSubOption(null); setCompetitionSelection(null)
       setSelectedExtras([])
@@ -976,6 +985,7 @@ export default function RequestWizard() {
   const selectClientType = (v: ClientType) => {
     if (clientType !== v) {
       setCategory(null); setSubOption(null); setCompetitionSelection(null)
+      setSelectedPackage(null); setBasicChannel(null); setReachChannels([])
       setCampaignPosts(prev => prev.map(p => ({ ...p, category: '', subOption: null })))
     }
     if (v !== 'individual') {
@@ -987,8 +997,9 @@ export default function RequestWizard() {
 
   // تقدّم التعبئة — للأقسام الفعّالة فقط (الباقة للأفراد، التواصل للزائر)
   const progressSteps = [
-    aboutComplete, contentComplete,
+    identityComplete, aboutComplete,
     ...(showPackages ? [packagesComplete] : []),
+    contentComplete,
     ...(!isLoggedIn ? [contactComplete] : []),
   ]
   const progressDone = progressSteps.filter(Boolean).length
@@ -1020,7 +1031,7 @@ export default function RequestWizard() {
           </div>
           <div role="progressbar" aria-label="اكتمال بيانات الطلب" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPct} className="request-progress h-2 rounded-full bg-muted/15 overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-l from-green to-green/70 transition-all duration-500 ease-out"
+              className="h-full rounded-full bg-green transition-all duration-500 ease-out"
               style={{ width: `${progressPct}%` }}
             />
           </div>
@@ -1032,45 +1043,8 @@ export default function RequestWizard() {
         <main className={cn('min-w-0 mx-auto w-full', !membershipMode ? 'max-w-none' : membershipPortalMode ? 'max-w-3xl' : 'max-w-2xl lg:max-w-none lg:mx-0')}>
         <div className="space-y-3">
 
-          {/* ① عن الطلب ─────────────────────────────────────────── */}
-          <FormSection
-            index={1}
-            title="عن الطلب"
-            subtitle={membershipMode ? 'الحساب ونوع الطلب والفئة' : 'الحساب ونوع الطلب وصفتك والفئة'}
-            complete={aboutComplete}
-            open={openSection === 0}
-            onToggle={() => setOpenSection(openSection === 0 ? -1 : 0)}
-          >
+          <FormSection index={1} title="الصفة" subtitle="حدد صفة مقدم الطلب" complete={identityComplete} open={activeSection===0} onToggle={()=>setOpenSection(activeSection===0?-1:0)}>
             <div className="space-y-4">
-              <div>
-                <label className={fieldLabel}>نوع الطلب *</label>
-                <div className={membershipMode ? 'grid grid-cols-1 gap-3' : 'grid grid-cols-2 gap-3'}>
-                  {REQUEST_TYPE_OPTIONS.map(o => {
-                    if (membershipMode && o.id === 'campaign') return null
-                    const active = requestType === o.id
-                    return (
-                      <button
-                        type="button"
-                        key={o.id}
-                        onClick={() => selectRequestType(o.id)}
-                        aria-pressed={active}
-                        className={cn(
-                          'rounded-2xl border-2 p-4 text-center transition-all active:scale-[0.98]',
-                          active ? 'border-green bg-green/5 ring-2 ring-green/20' : 'border-border bg-white hover:border-green/40',
-                        )}
-                      >
-                        <div className="text-3xl mb-1.5">{o.icon}</div>
-                        <div className="font-black text-dark text-sm">{o.label}</div>
-                        <div className="text-[11px] text-muted mt-0.5">{o.desc}</div>
-                      </button>
-                    )
-                  })}
-                </div>
-                {requestType === 'campaign' && (
-                  <p className="text-xs text-green-700 mt-2">🎉 الحملة المتعددة تمنحك خصماً على الإجمالي</p>
-                )}
-              </div>
-
               {!membershipMode && <div>
                 <label className={fieldLabel}>صفة مقدّم الطلب *</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -1087,7 +1061,6 @@ export default function RequestWizard() {
                           active ? 'border-green bg-green/5 text-dark ring-2 ring-green/20' : 'border-border bg-white text-muted hover:border-green/40',
                         )}
                       >
-                        <span className="text-lg leading-none">{o.icon}</span>
                         <span className="leading-tight text-right">{o.label}</span>
                       </button>
                     )
@@ -1132,12 +1105,47 @@ export default function RequestWizard() {
                 </div>
               )}
 
+              {membershipMode && <p className="text-sm text-muted">الصفة مرتبطة بالعضوية الحالية.</p>}
+              <div className="flex justify-end pt-2"><Button size="sm" disabled={!identityComplete} onClick={()=>setOpenSection(1)}>التالي إلى نوع الخبر</Button></div>
+            </div>
+          </FormSection>
+          <FormSection index={2} title="نوع الخبر" subtitle="نوع الطلب والفئة والخيارات الخاصة بها" complete={aboutComplete} disabled={!identityComplete} open={activeSection===1} onToggle={()=>setOpenSection(activeSection===1?-1:1)}>
+            <div className="space-y-4">
+              <div>
+                <label className={fieldLabel}>نوع الطلب *</label>
+                <div className={membershipMode ? 'grid grid-cols-1 gap-3' : 'grid grid-cols-2 gap-3'}>
+                  {REQUEST_TYPE_OPTIONS.map(o => {
+                    if (membershipMode && o.id === 'campaign') return null
+                    const active = requestType === o.id
+                    return (
+                      <button
+                        type="button"
+                        key={o.id}
+                        onClick={() => selectRequestType(o.id)}
+                        aria-pressed={active}
+                        className={cn(
+                          'rounded-2xl border-2 p-4 text-center transition-all active:scale-[0.98]',
+                          active ? 'border-green bg-green/5 ring-2 ring-green/20' : 'border-border bg-white hover:border-green/40',
+                        )}
+                      >
+                        <div className="font-black text-dark text-sm">{o.label}</div>
+                        <div className="text-[11px] text-muted mt-0.5">{o.desc}</div>
+                      </button>
+                    )
+                  })}
+                </div>
+                {requestType === 'campaign' && (
+                  <p className="text-xs text-green-700 mt-2">🎉 الحملة المتعددة تمنحك خصماً على الإجمالي</p>
+                )}
+              </div>
+
               {/* منشور واحد: الفئة + الخيار الفرعي */}
               {requestType === 'single' && (
                 <>
                   <div>
-                    <label className={fieldLabel}>فئة المحتوى *</label>
+                    <label htmlFor="request-news-category" className={fieldLabel}>فئة المحتوى *</label>
                     <select
+                      id="request-news-category"
                       value={category ?? ''}
                       onChange={e => {
                         setCategory(e.target.value || null)
@@ -1246,22 +1254,178 @@ export default function RequestWizard() {
                 </div>
               )}
 
-              <div className="flex justify-end pt-2">
-                <Button size="sm" onClick={() => setOpenSection(1)} disabled={!aboutComplete}>
-                  التالي ←
-                </Button>
-              </div>
+              {effectiveClientType && effectiveClientType!=='individual' && <p className="text-sm leading-7 text-muted">طلبات الجهات تُراجع وتُسعّر يدويًا. يصلك عرض السعر قبل الدفع.</p>}
+              <div className="flex justify-end pt-2"><Button size="sm" disabled={!aboutComplete} onClick={()=>setOpenSection(showPackages?2:3)}>{showPackages?'التالي إلى الباقات':'التالي إلى التفاصيل'}</Button></div>
             </div>
           </FormSection>
+          {/* ③ اختيار الباقة — للأفراد، مع إبقاء مسار الحملات الحالي */}
+          {showPackages && (
+            <FormSection
+              index={3}
+              disabled={!aboutComplete}
+              title="اختر الباقة"
+              subtitle={requestType === 'campaign' ? 'باقة واحدة تنطبق على كل أخبار الحملة' : 'حدّد الباقة المناسبة لخبرك'}
+              wide={requestType === 'single'}
+              complete={packagesComplete}
+              open={activeSection === 2}
+              onToggle={() => setOpenSection(activeSection === 2 ? -1 : 2)}
+            >
+              {requestType === 'campaign' && (
+                <p className="text-xs text-muted mb-3 bg-cream rounded-lg p-2">
+                  🚀 الباقة المختارة تنطبق على كل أخبار الحملة ({campaignPosts.length} منشورات) — السعر يشمل خصم الحملة {CAMPAIGN_DISCOUNT}%.
+                </p>
+              )}
+              {requestType==='single'&&(!catalog||catalogError)&&<p role="status" className="mb-4 text-sm">{catalogError?'تعذر تحديث الباقات. حدّثها قبل المتابعة.':'جارٍ تحميل الباقات الحالية…'} <button type="button" className="underline" onClick={()=>refreshCatalog()}>تحديث الباقات</button></p>}
+              {requestType==='single' ? <PackageComparison
+                packages={singlePackages.filter(p=>!p.requiredCategory || p.requiredCategory===category)}
+                selected={selectedPackage}
+                prices={Object.fromEntries(singlePackages.map(p=>[p.id,basicDynamicPrice==null?null:packagePrice(basicDynamicPrice,p)]))}
+                availableChannels={availableChannels}
+                onSelect={id=>{setSelectedPackage(id);if(id!=='v2_basic')setSelectedExtras([])}}
+              /> : (
+              <div data-package-grid className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {offeredPackages.map(pkg => {
+                  const isSelected = selectedPackage === pkg.id
+                  // السعر: المفرد = سعر الخبر × معامل الباقة ؛ الحملة = مجموع الأخبار × معامل الباقة − خصم الحملة
+                  let pkgPrice: number | null = null   // بعد الخصم
+                  let pkgBefore: number | null = null  // قبل خصم الحملة (مشطوب)
+                  if (requestType === 'campaign') {
+                    if (campaignBaseSubtotal != null) {
+                      const withPkg = Math.round(campaignBaseSubtotal * pkg.priceMultiplier)
+                      pkgBefore = withPkg
+                      pkgPrice = withPkg - Math.round(withPkg * CAMPAIGN_DISCOUNT / 100)
+                    }
+                  } else if (basicDynamicPrice != null) {
+                    pkgPrice = getIndividualPackage(pkg.id,singlePackages) ? packagePrice(basicDynamicPrice, getIndividualPackage(pkg.id,singlePackages)!) : Math.round(basicDynamicPrice * pkg.priceMultiplier)
+                  }
+                  if (getIndividualPackage(pkg.id,singlePackages)?.fixedPrice != null) pkgPrice = getIndividualPackage(pkg.id,singlePackages)!.fixedPrice!
+                  const priceLabel = pkgPrice != null ? `${pkgPrice} ر.س` : 'يُحسب بعد تفاصيل الحملة'
+                  const postPrice = pkgPrice == null
+                    ? null
+                    : pkgPrice / (requestType === 'campaign' ? Math.max(campaignPosts.length, 1) : 1)
+                  const visibleFeatures = getIndividualPackage(pkg.id,singlePackages) ? pkg.features : getPackageFeaturesForPostPrice(pkg, postPrice)
+                  return (
+                    <button
+                      type="button"
+                      key={pkg.id}
+                      onClick={() => {
+                        setSelectedPackage(pkg.id)
+                        if (pkg.id !== 'basic' && pkg.id !== 'v2_basic') setSelectedExtras([])
+                        if (pkg.id === 'v2_career') { setCategory('cv'); setSubOption(null); setCompetitionSelection(null) }
+                      }}
+                      className={cn(
+                        'relative text-right rounded-2xl border-2 p-4 transition-all flex flex-col',
+                        isSelected
+                          ? 'border-green bg-green/5 ring-2 ring-green/30'
+                          : 'border-border bg-card hover:border-green/40',
+                      )}
+                    >
+                      {pkg.highlighted && (
+                        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-green text-white text-[10px] font-black px-2.5 py-0.5 rounded-full whitespace-nowrap">
+                          اختيار مقترح
+                        </span>
+                      )}
+                      <div className="flex items-center justify-between gap-2 mb-1 mt-1">
+                        <span className="font-black text-dark text-sm">{pkg.name}</span>
+                        {isSelected && <span className="text-green text-base flex-shrink-0">✓</span>}
+                      </div>
+                      <div className="flex items-baseline gap-2 mb-1">
+                        {pkgBefore != null && pkgBefore !== pkgPrice && (
+                          <span className="text-muted text-sm line-through">{pkgBefore} ر.س</span>
+                        )}
+                        <span className="text-green font-black text-lg">{priceLabel}</span>
+                      </div>
+                      <p className="text-xs text-muted mb-2">{pkg.blurb}</p>
+                      {pkg.badge && (
+                        <span className="inline-flex items-center gap-1 self-start bg-pink-50 text-pink-600 border border-pink-200 text-[10px] font-bold px-2 py-1 rounded-lg mb-3">
+                          🛍️ {pkg.badge}
+                        </span>
+                      )}
+                      <ul className="space-y-1.5 mt-3">
+                        {visibleFeatures.map((f, i) => {
+                          const isSponsored = f.includes('مموّل')
+                          return (
+                            <li
+                              key={i}
+                              className={
+                                isSponsored
+                                  ? 'flex items-start gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded-md px-1.5 py-1'
+                                  : 'flex items-start gap-1.5 text-xs text-dark'
+                              }
+                            >
+                              <span className={isSponsored ? 'flex-shrink-0' : 'text-green flex-shrink-0'}>
+                                {isSponsored ? '📣' : '✓'}
+                              </span>
+                              <span>{f}</span>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </button>
+                  )
+                })}
+              </div>
 
-          {/* ② تفاصيل المحتوى ───────────────────────────────────── */}
+              )}
+              {chosenV2 && !chosenV2.channels && chosenV2.channelCount>1 && (
+                <div className="mt-4 rounded-xl border border-border p-4">
+                  <p className={fieldLabel}>اختر {chosenV2.channelCount} قنوات مختلفة *</p>
+                  <div className="flex flex-wrap gap-2 mt-3">{availableChannels.map(ch => (
+                    <button type="button" key={ch} aria-pressed={reachChannels.includes(ch)}
+                      onClick={() => setReachChannels(prev => prev.includes(ch) ? prev.filter(c => c !== ch) : prev.length < chosenV2.channelCount ? [...prev, ch] : prev)}
+                      className={cn('rounded-lg border px-4 py-3', reachChannels.includes(ch) ? 'border-green text-green' : 'border-border')}>
+                      {CHANNEL_LABELS[ch] ?? ch}
+                    </button>
+                  ))}</div>
+                </div>
+              )}
+              {chosenV2 && !validV2Channels && <p role="status" className="mt-3 text-sm text-red-700">أكمل اختيار القنوات المطلوبة؛ يجب أن تتوفر جميع قنوات الباقة لدى الحساب الناشر.</p>}
+              {/* اختيار قناة النشر — للباقة الأساسية فقط (قناة واحدة) */}
+              {basicNeedsChannel && (
+                <div className="mt-4 bg-cream rounded-xl p-4">
+                  <label className={fieldLabel}>اختر قناة النشر *</label>
+                  <p className="text-xs text-muted mb-3">الباقة المختارة تشمل النشر في قناة واحدة يختارها العميل</p>
+                  {availableChannels.length === 0 ? (
+                    <p className="text-xs text-muted">لا توجد قنوات متاحة لهذا الحساب</p>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {availableChannels.map(ch => (
+                        <button
+                          type="button"
+                          key={ch}
+                          onClick={() => setBasicChannel(ch)}
+                          className={cn(
+                            'rounded-xl border-2 px-3 py-2.5 text-sm font-medium transition-all',
+                            basicChannel === ch
+                              ? 'border-green bg-green/5 text-dark'
+                              : 'border-border bg-white text-muted hover:border-green/40',
+                          )}
+                        >
+                          {basicChannel === ch && <span className="text-green">✓ </span>}
+                          {CHANNEL_LABELS[ch] ?? ch}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end pt-4">
+                <Button size="sm" onClick={()=>setOpenSection(3)} disabled={!packagesComplete}>
+                  التالي إلى التفاصيل
+                </Button>
+              </div>
+            </FormSection>
+          )}
+          {/* ④ تفاصيل المحتوى — بعد الباقة، أو مباشرة للجهات */}
           <FormSection
-            index={2}
+            index={showPackages?4:3}
             title="تفاصيل المحتوى"
             subtitle={requestType === 'campaign' ? 'منشورات الحملة' : 'عنوان ونص المنشور'}
             complete={contentComplete}
-            open={openSection === 1}
-            onToggle={() => setOpenSection(openSection === 1 ? -1 : 1)}
+            disabled={!aboutComplete || (showPackages && !packagesComplete)}
+            open={activeSection === 3}
+            onToggle={() => setOpenSection(activeSection === 3 ? -1 : 3)}
           >
             {/* شروط قبول الخبر — شرط الفئة (للمنشور المفرد) + أي بنود عامة إن وُجدت — تُدار من لوحة الأدمن */}
             {(() => {
@@ -1313,174 +1477,14 @@ export default function RequestWizard() {
               </>
             )}
 
-            <div className="flex justify-end pt-4">
-              {showPackages ? (
-                <Button size="sm" onClick={() => setOpenSection(2)} disabled={!contentComplete}>
-                  التالي ←
-                </Button>
-              ) : (
-                <Button size="sm" onClick={openReview} disabled={!canSubmit}>
-                  مراجعة الطلب
-                </Button>
-              )}
-            </div>
-          </FormSection>
-
-          {/* ③ اختيار الباقة — للأفراد + المنشور الواحد فقط ──────── */}
-          {showPackages && (
-            <FormSection
-              index={3}
-              title="اختر الباقة"
-              subtitle={requestType === 'campaign' ? 'باقة واحدة تنطبق على كل أخبار الحملة' : 'حدّد الباقة المناسبة لخبرك'}
-              wide={requestType === 'single'}
-              complete={packagesComplete}
-              open={openSection === 2}
-              onToggle={() => setOpenSection(openSection === 2 ? -1 : 2)}
-            >
-              {requestType === 'campaign' && (
-                <p className="text-xs text-muted mb-3 bg-cream rounded-lg p-2">
-                  🚀 الباقة المختارة تنطبق على كل أخبار الحملة ({campaignPosts.length} منشورات) — السعر يشمل خصم الحملة {CAMPAIGN_DISCOUNT}%.
-                </p>
-              )}
-              {requestType==='single'&&(!catalog||catalogError)&&<p role="status" className="mb-4 text-sm">{catalogError?'تعذر تحديث الباقات. حدّثها قبل المتابعة.':'جارٍ تحميل الباقات الحالية…'} <button type="button" className="underline" onClick={()=>refreshCatalog()}>تحديث الباقات</button></p>}
-              <div data-package-grid className={cn('grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3', requestType === 'single' && 'xl:grid-cols-5')}>
-                {offeredPackages.map(pkg => {
-                  const isSelected = selectedPackage === pkg.id
-                  // السعر: المفرد = سعر الخبر × معامل الباقة ؛ الحملة = مجموع الأخبار × معامل الباقة − خصم الحملة
-                  let pkgPrice: number | null = null   // بعد الخصم
-                  let pkgBefore: number | null = null  // قبل خصم الحملة (مشطوب)
-                  if (requestType === 'campaign') {
-                    if (campaignBaseSubtotal != null) {
-                      const withPkg = Math.round(campaignBaseSubtotal * pkg.priceMultiplier)
-                      pkgBefore = withPkg
-                      pkgPrice = withPkg - Math.round(withPkg * CAMPAIGN_DISCOUNT / 100)
-                    }
-                  } else if (basicDynamicPrice != null) {
-                    pkgPrice = getIndividualPackage(pkg.id,singlePackages) ? packagePrice(basicDynamicPrice, getIndividualPackage(pkg.id,singlePackages)!) : Math.round(basicDynamicPrice * pkg.priceMultiplier)
-                  }
-                  if (getIndividualPackage(pkg.id,singlePackages)?.fixedPrice != null) pkgPrice = getIndividualPackage(pkg.id,singlePackages)!.fixedPrice!
-                  const priceLabel = pkgPrice != null ? `${pkgPrice} ر.س` : 'حسب نوع الخبر'
-                  const postPrice = pkgPrice == null
-                    ? null
-                    : pkgPrice / (requestType === 'campaign' ? Math.max(campaignPosts.length, 1) : 1)
-                  const visibleFeatures = getIndividualPackage(pkg.id,singlePackages) ? pkg.features : getPackageFeaturesForPostPrice(pkg, postPrice)
-                  return (
-                    <button
-                      type="button"
-                      key={pkg.id}
-                      onClick={() => {
-                        setSelectedPackage(pkg.id)
-                        if (pkg.id !== 'basic' && pkg.id !== 'v2_basic') setSelectedExtras([])
-                        if (pkg.id === 'v2_career') { setCategory('cv'); setSubOption(null); setCompetitionSelection(null) }
-                      }}
-                      className={cn(
-                        'relative text-right rounded-2xl border-2 p-4 transition-all flex flex-col',
-                        isSelected
-                          ? 'border-green bg-green/5 ring-2 ring-green/30'
-                          : 'border-border bg-card hover:border-green/40',
-                      )}
-                    >
-                      {pkg.highlighted && (
-                        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-green text-white text-[10px] font-black px-2.5 py-0.5 rounded-full whitespace-nowrap">
-                          الأكثر اختياراً
-                        </span>
-                      )}
-                      <div className="flex items-center justify-between gap-2 mb-1 mt-1">
-                        <span className="font-black text-dark text-sm">{pkg.name}</span>
-                        {isSelected && <span className="text-green text-base flex-shrink-0">✓</span>}
-                      </div>
-                      <div className="flex items-baseline gap-2 mb-1">
-                        {pkgBefore != null && pkgBefore !== pkgPrice && (
-                          <span className="text-muted text-sm line-through">{pkgBefore} ر.س</span>
-                        )}
-                        <span className="text-green font-black text-lg">{priceLabel}</span>
-                      </div>
-                      <p className="text-xs text-muted mb-2">{pkg.blurb}</p>
-                      {pkg.badge && (
-                        <span className="inline-flex items-center gap-1 self-start bg-pink-50 text-pink-600 border border-pink-200 text-[10px] font-bold px-2 py-1 rounded-lg mb-3">
-                          🛍️ {pkg.badge}
-                        </span>
-                      )}
-                      <ul className="space-y-1.5 mt-3">
-                        {visibleFeatures.map((f, i) => {
-                          const isSponsored = f.includes('مموّل')
-                          return (
-                            <li
-                              key={i}
-                              className={
-                                isSponsored
-                                  ? 'flex items-start gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-300 rounded-md px-1.5 py-1'
-                                  : 'flex items-start gap-1.5 text-xs text-dark'
-                              }
-                            >
-                              <span className={isSponsored ? 'flex-shrink-0' : 'text-green flex-shrink-0'}>
-                                {isSponsored ? '📣' : '✓'}
-                              </span>
-                              <span>{f}</span>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    </button>
-                  )
-                })}
-              </div>
-
-              {chosenV2?.id === 'v2_career' && <fieldset className="mt-4 border border-border rounded-xl p-4 space-y-4"><legend className="font-bold">البيانات المهنية المطلوبة</legend>
+              {showPackages && chosenV2?.id === 'v2_career' && <fieldset className="mt-4 border border-border rounded-xl p-4 space-y-4"><legend className="font-bold">البيانات المهنية المطلوبة</legend>
                 <p className="text-xs leading-6 text-muted">أكمل بياناتك المهنية وفق المزايا المعروضة للباقة. لا تتضمن الخدمة ضمان التوظيف.</p>
                 <label className="block text-sm">لغة السيرة<select value={career.language} onChange={e => setCareer(v => ({ ...v, language: e.target.value }))} className="block w-full border border-border rounded-lg p-3 mt-2"><option value="ar">العربية</option><option value="en">الإنجليزية</option></select></label>
                 {([['goal','الهدف المهني'],['experience','الخبرات أو الأنشطة والمشاريع'],['education','المؤهلات والتعليم']] as const).map(([key,label]) => <label className="block text-sm" key={key}>{label} *<textarea maxLength={6000} value={career[key]} onChange={e => setCareer(v => ({ ...v, [key]: e.target.value }))} className="block w-full border border-border rounded-lg p-3 mt-2" /></label>)}
               </fieldset>}
-              {chosenV2 && !chosenV2.channels && chosenV2.channelCount>1 && (
-                <div className="mt-4 rounded-xl border border-border p-4">
-                  <p className={fieldLabel}>اختر {chosenV2.channelCount} قنوات مختلفة *</p>
-                  <div className="flex flex-wrap gap-2 mt-3">{availableChannels.map(ch => (
-                    <button type="button" key={ch} aria-pressed={reachChannels.includes(ch)}
-                      onClick={() => setReachChannels(prev => prev.includes(ch) ? prev.filter(c => c !== ch) : prev.length < chosenV2.channelCount ? [...prev, ch] : prev)}
-                      className={cn('rounded-lg border px-4 py-3', reachChannels.includes(ch) ? 'border-green text-green' : 'border-border')}>
-                      {CHANNEL_LABELS[ch] ?? ch}
-                    </button>
-                  ))}</div>
-                </div>
-              )}
-              {chosenV2 && !validV2Channels && <p role="status" className="mt-3 text-sm text-red-700">أكمل اختيار القنوات المطلوبة؛ يجب أن تتوفر جميع قنوات الباقة لدى الحساب الناشر.</p>}
-              {/* اختيار قناة النشر — للباقة الأساسية فقط (قناة واحدة) */}
-              {basicNeedsChannel && (
-                <div className="mt-4 bg-cream rounded-xl p-4">
-                  <label className={fieldLabel}>اختر قناة النشر *</label>
-                  <p className="text-xs text-muted mb-3">الباقة المختارة تشمل النشر في قناة واحدة يختارها العميل</p>
-                  {availableChannels.length === 0 ? (
-                    <p className="text-xs text-muted">لا توجد قنوات متاحة لهذا الحساب</p>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {availableChannels.map(ch => (
-                        <button
-                          type="button"
-                          key={ch}
-                          onClick={() => setBasicChannel(ch)}
-                          className={cn(
-                            'rounded-xl border-2 px-3 py-2.5 text-sm font-medium transition-all',
-                            basicChannel === ch
-                              ? 'border-green bg-green/5 text-dark'
-                              : 'border-border bg-white text-muted hover:border-green/40',
-                          )}
-                        >
-                          {basicChannel === ch && <span className="text-green">✓ </span>}
-                          {CHANNEL_LABELS[ch] ?? ch}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="flex justify-end pt-4">
-                <Button size="sm" onClick={openReview} disabled={!canSubmit}>
-                  مراجعة الطلب
-                </Button>
-              </div>
-            </FormSection>
-          )}
+            {!isLoggedIn && <section className="mt-6 border-t border-border pt-5"><RStep5Contact data={contact} onChange={setContact}/></section>}
+            <div className="flex justify-end pt-4"><Button size="sm" onClick={openReview} disabled={!canSubmit}>مراجعة الطلب</Button></div>
+          </FormSection>
 
         </div>
         </main>
