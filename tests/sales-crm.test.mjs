@@ -48,7 +48,7 @@ test('CRM attribution, approved evidence, closer permissions, money integrity, f
 test('weekly tasks use the existing real task command and preserve assignee and approval workflow',async()=>{
  const {createPerformanceDB,ids:existing}=await import('./helpers/performance-db.mjs');
  const {readFile}=await import('node:fs/promises');const db=await createPerformanceDB();
- try{await db.exec('reset role');await db.exec(await readFile(new URL('../supabase/migrations/20261103212605_monthly_sales_crm.sql',import.meta.url),'utf8'));await db.exec(await readFile(new URL('../supabase/migrations/20261103222721_overall_sales_task_performance.sql',import.meta.url),'utf8'));await db.exec('set role service_role');
+ try{await db.exec('reset role');await db.exec(await readFile(new URL('../supabase/migrations/20261103212605_monthly_sales_crm.sql',import.meta.url),'utf8'));await db.exec(await readFile(new URL('../supabase/migrations/20261103222721_overall_sales_task_performance.sql',import.meta.url),'utf8'));await db.exec(await readFile(new URL('../supabase/migrations/20261104075134_monthly_minimum_performance_tasks.sql',import.meta.url),'utf8'));await db.exec('set role service_role');
  await command(db,'create_month',{closing_employee_id:existing.ne},existing.admin);
  await command(db,'save_plan',{employee_id:existing.ne,...defaultSalesPlan(month,true),reason:'خطة متكاملة'},existing.admin);
  await command(db,'publish',{},existing.admin);const s=await snapshot(db,existing.admin);assert.equal(s.tasks.length,4);

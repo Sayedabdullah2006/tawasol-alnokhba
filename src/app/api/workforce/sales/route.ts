@@ -11,10 +11,11 @@ export async function POST(request:Request){try{
  if(!Number.isSafeInteger(body.version)||body.version<0)throw new WorkforceError('نسخة الشهر غير صحيحة');
  if(!body.payload||typeof body.payload!=='object'||Array.isArray(body.payload))throw new WorkforceError('بيانات الإجراء غير صحيحة');
  const p=body.payload;let payload:Record<string,unknown>={};
+ const minimumTasks=()=>{const n=numberField(p.minimum_tasks??5,'الحد الأدنى للمهام المؤهلة',100);if(!Number.isSafeInteger(n)||n<1)throw new WorkforceError('الحد الأدنى للمهام يجب أن يكون عددًا صحيحًا من 1 إلى 100');return n;};
  const reason=()=>textField(p.reason??'','سبب الإجراء',3,2000);
  const employee=()=>uuid(actor.role==='admin'?p.employee_id:actor.employee?.id);
  if(['create_month','settings','save_plan','publish','close','reopen','review','approve_activity'].includes(command))requireAdmin(actor);
- if(['create_month','settings'].includes(command))payload={closing_employee_id:uuid(p.closing_employee_id),team_target:numberField(p.team_target,'هدف الفريق',10000),performance_sales_weight:numberField(p.performance_sales_weight??60,'وزن المبيعات في التقييم الكلي',100),note:textField(p.note??'','ملاحظات الشهر',0,4000),...(command==='settings'?{reason:reason(),manager_employee_id:uuid(p.manager_employee_id)}:{})};
+ if(['create_month','settings'].includes(command))payload={closing_employee_id:uuid(p.closing_employee_id),team_target:numberField(p.team_target,'هدف الفريق',10000),performance_sales_weight:numberField(p.performance_sales_weight??60,'وزن المبيعات في التقييم الكلي',100),...(p.minimum_tasks===undefined?{}:{minimum_tasks:minimumTasks()}),note:textField(p.note??'','ملاحظات الشهر',0,4000),...(command==='settings'?{reason:reason(),manager_employee_id:uuid(p.manager_employee_id)}:{})};
  else if(command==='save_plan')payload={employee_id:uuid(p.employee_id),...validateSalesPlan(p),reason:reason()};
  else if(['publish','close'].includes(command))payload={reason:textField(p.reason??'اعتماد الخطة','السبب',3,2000)};
  else if(command==='reopen')payload={reason:reason()};

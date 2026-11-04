@@ -19,13 +19,25 @@ test('five-task threshold, missing axes and excluded sales are never turned into
  assert.equal(combinePerformance(five,0).score,40);assert.equal(combinePerformance(four,80,100).score,80);assert.equal(combinePerformance(five,null,0).score,100);
  assert.equal(combinePerformance(five,null,60,false).score,100);assert.equal(combinePerformance(five,null,60,false).mode,'tasks');assert.throws(()=>combinePerformance(five,80,101));
 });
+test('monthly threshold four releases the grade only after four eligible approvals, with the same 60/40 blend',()=>{
+ const four=Array.from({length:4},(_,i)=>task(i));
+ const three=evaluatePerformance(four.slice(0,3),month,now,4);assert.equal(three.score,null);assert.equal(three.required,4);
+ const pending=structuredClone(four);pending[3].deliveries[0].status='pending';pending[3].deliveries[0].decided_at=null;
+ assert.equal(evaluatePerformance(pending,month,now,4).score,null);
+ const approved=evaluatePerformance(four,month,now,4);assert.equal(approved.eligible,4);assert.equal(approved.score,100);assert.equal(combinePerformance(approved,22,60).score,53.2);
+ assert.equal(evaluatePerformance(four,month,now).score,null);assert.equal(evaluatePerformance(four,month,now).required,5);
+ assert.deepEqual(approved.axes,{punctuality:100,quality:100,completion:100});
+ for(const value of [0,1.5,101,NaN])assert.throws(()=>evaluatePerformance(four,month,now,value));
+});
 test('only company admin can change monthly blend weights; another month remains independent',async()=>{
  const db=await createSalesDB();try{
  await command(db,'create_month',{closing_employee_id:ids.ne,team_target:1,performance_sales_weight:60});for(const id of [ids.ne,ids.me])await command(db,'save_plan',{employee_id:id,...defaultSalesPlan(month,id===ids.ne),reason:'خطة منشورة'});await command(db,'publish',{});
- const settings={closing_employee_id:ids.ne,manager_employee_id:ids.ne,team_target:1,performance_sales_weight:70,note:'خطة',reason:'تعديل وزن التقييم'};
+ const settings={closing_employee_id:ids.ne,manager_employee_id:ids.ne,team_target:1,performance_sales_weight:70,minimum_tasks:4,note:'خطة',reason:'تعديل وزن التقييم'};
  const before=(await snapshot(db)).month;for(const actor of [ids.noor,ids.monwa])await assert.rejects(command(db,'settings',settings,actor),/للإدارة/);
- assert.equal((await snapshot(db)).month.version,before.version);await command(db,'settings',settings);assert.equal((await snapshot(db)).month.performance_sales_weight,70);
+ assert.equal((await snapshot(db)).month.version,before.version);await command(db,'settings',settings);assert.equal((await snapshot(db)).month.performance_sales_weight,70);assert.equal((await snapshot(db)).month.minimum_tasks,4);
  await command(db,'create_month',{closing_employee_id:ids.ne,performance_sales_weight:50},ids.admin,'2026-12');assert.equal((await snapshot(db)).month.performance_sales_weight,70);assert.equal((await snapshot(db,ids.admin,'2026-12')).month.performance_sales_weight,50);
  await assert.rejects(command(db,'settings',{...settings,performance_sales_weight:101}));
+ assert.equal((await snapshot(db,ids.admin,'2026-12')).month.minimum_tasks,5);
+ await assert.rejects(command(db,'settings',{...settings,minimum_tasks:0}));
  }finally{await db.close();}
 });

@@ -85,12 +85,13 @@ export function weeklyTaskActivity(tasks:PerformanceTask[],start:string,asOf:Dat
  }
  return {completed,unfinished,pendingReview,overdue,onTime,lateSubmissions,changesCount,repeatedChanges};
 }
-export function evaluatePerformance(tasks: PerformanceTask[], month: string, now = new Date()): PerformanceSummary {
+export function evaluatePerformance(tasks: PerformanceTask[], month: string, now = new Date(), required = 5): PerformanceSummary {
+  if(!Number.isSafeInteger(required)||required<1||required>100)throw new RangeError("عدد المهام المؤهلة يجب أن يكون بين 1 و100");
   const start = Date.parse(`${month}-01T00:00:00+03:00`);
   const next = new Date(start + 32 * 86400000).toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }).slice(0, 7);
   const end = Math.min(now.getTime(), Date.parse(`${next}-01T00:00:00+03:00`) - 1);
   const rows: PerformanceRow[] = [];
-  if(end<start)return {month,generatedAt:now.toISOString(),score:null,eligible:0,required:5,completed:0,late:0,pending:0,revisions:0,excluded:0,axes:{punctuality:null,quality:null,completion:null},rows};
+  if(end<start)return {month,generatedAt:now.toISOString(),score:null,eligible:0,required,completed:0,late:0,pending:0,revisions:0,excluded:0,axes:{punctuality:null,quality:null,completion:null},rows};
   for (const task of tasks) {
     // Use evidence known at the selected month's end, not a later approval or return.
     const deliveries = task.deliveries.filter(d => Date.parse(d.delivered_at) <= end).sort((a,b) => a.round-b.round).map(d => ({...d, ...(d.decided_at && Date.parse(d.decided_at)>end ? {status:"pending",category:null,incomplete:false,affected:false} : {})}));
@@ -123,6 +124,6 @@ export function evaluatePerformance(tasks: PerformanceTask[], month: string, now
   const scored = rows.filter(r=>r.eligible), mean=(items:PerformanceRow[],key:"punctuality"|"quality")=>{const known=items.filter(r=>r[key]!==null);return known.length?Math.round(known.reduce((n,r)=>n+r[key]!*r.weight,0)/known.reduce((n,r)=>n+r.weight,0)):null;};
   const axes={punctuality:mean(scored,"punctuality"),quality:mean(scored,"quality"),completion:scored.length?Math.round(scored.reduce((n,r)=>n+(r.completed?r.weight:0),0)/scored.reduce((n,r)=>n+r.weight,0)*100):null};
   const eligible = scored.filter(r=>r.completed && r.quality!==null&&r.punctuality!==null).length;
-  return {month,generatedAt:now.toISOString(),score:eligible>=5 && Object.values(axes).every(v=>v!==null)?Math.round(axes.punctuality!*0.4+axes.quality!*0.35+axes.completion!*0.25):null,
-    eligible,required:5,completed:rows.filter(r=>r.completed).length,late:rows.filter(r=>r.punctuality!==null&&r.punctuality<100).length,pending:rows.filter(r=>r.status==="بانتظار المراجعة").length,revisions:rows.reduce((n,r)=>n+r.returns,0),excluded:rows.filter(r=>r.reason&&r.reason!=="انتظار المراجعة لا يؤثر على الإنجاز"&&r.reason!=="موعدها لم يحن").length,axes,rows:rows.sort((a,b)=>(a.due??"z").localeCompare(b.due??"z")||a.id.localeCompare(b.id))};
+  return {month,generatedAt:now.toISOString(),score:eligible>=required && Object.values(axes).every(v=>v!==null)?Math.round(axes.punctuality!*0.4+axes.quality!*0.35+axes.completion!*0.25):null,
+    eligible,required,completed:rows.filter(r=>r.completed).length,late:rows.filter(r=>r.punctuality!==null&&r.punctuality<100).length,pending:rows.filter(r=>r.status==="بانتظار المراجعة").length,revisions:rows.reduce((n,r)=>n+r.returns,0),excluded:rows.filter(r=>r.reason&&r.reason!=="انتظار المراجعة لا يؤثر على الإنجاز"&&r.reason!=="موعدها لم يحن").length,axes,rows:rows.sort((a,b)=>(a.due??"z").localeCompare(b.due??"z")||a.id.localeCompare(b.id))};
 }
