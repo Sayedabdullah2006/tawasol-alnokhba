@@ -13,7 +13,7 @@ dotenv.config({ path: '.env.local', quiet: true })
 const realRequire = createRequire(import.meta.url)
 assert(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY, 'Database test configuration required')
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
-const testId = `qa-partner-${crypto.randomUUID()}`
+const testId = `awwal-saudi-qa-${crypto.randomUUID()}`
 const customer = 'customer-one'; const otherCustomer = 'customer-two'
 const secret = crypto.randomBytes(32).toString('hex')
 const publisher = 'a91880b6-2252-4aa7-807d-a53eb734771f'

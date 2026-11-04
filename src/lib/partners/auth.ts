@@ -26,11 +26,13 @@ export function canonicalRequest(method: string, target: string, timestamp: stri
 }
 export function configuredClients(): PartnerClient[] {
   let clients: PartnerClient[]
-  let sandbox: PartnerClient[]
-  try { clients = JSON.parse(process.env.PARTNER_API_CLIENTS_JSON ?? '[]'); sandbox = JSON.parse(process.env.PARTNER_SANDBOX_CLIENTS_JSON ?? '[]') } catch { throw new PartnerError('PARTNER_CONFIG_INVALID', 503) }
+  let sandbox: PartnerClient[] = []
+  try { clients = JSON.parse(process.env.PARTNER_API_CLIENTS_JSON ?? '[]') } catch { throw new PartnerError('PARTNER_CONFIG_INVALID', 503) }
   if (!Array.isArray(clients)) throw new PartnerError('PARTNER_CONFIG_INVALID', 503)
-  if (!Array.isArray(sandbox) || sandbox.some(c => c.sandbox_only !== true) || new Set([...clients, ...sandbox].map(c => c.id)).size !== clients.length + sandbox.length) throw new PartnerError('PARTNER_CONFIG_INVALID', 503)
-  return [...clients, ...sandbox]
+  // A malformed temporary QA lane fails closed without disabling live partners.
+  try { const value = JSON.parse(process.env.PARTNER_SANDBOX_CLIENTS_JSON ?? '[]'); if (Array.isArray(value)) sandbox = value } catch { /* QA unavailable */ }
+  return [...clients, ...sandbox.filter(c => c && c.sandbox_only === true && c.id?.startsWith('awwal-saudi-qa-') &&
+    !clients.some(live => live.id === c.id) && sandbox.filter(other => other?.id === c.id).length === 1)]
 }
 export function validateSandboxClient(client: PartnerClient) {
   if (client.sandbox_only === undefined || client.sandbox_only === false) return
