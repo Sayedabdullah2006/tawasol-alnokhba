@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Tawasol al Nukhba Partner API",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "description": "Dynamic published catalog managed centrally in Tawasol al Nukhba. Treat catalog.version as an opaque string. Cache catalog display for at most cache_ttl_seconds; use fresh server quotes for purchases. Package IDs, HMAC and checkout remain compatible. All partner money fields are integer halalas."
   },
   "servers": [
@@ -1284,6 +1284,93 @@
           }
         }
       }
+    },
+    "/orders/{id}/state": {
+      "get": {
+        "summary": "Read current order and financial states without modifying them",
+        "operationId": "get__orders_id_state",
+        "parameters": [
+          {
+            "name": "X-Partner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Key-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Nonce",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Customer-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Owner-only current states; private server-signed read, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/OrderState"
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see error.code and trace_id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1650,6 +1737,39 @@
           "cache_ttl_seconds": {
             "type": "integer",
             "const": 60
+          },
+          "status_definitions": {
+            "type": "object",
+            "description": "Current canonical client labels; never use the admin labels. progress_steps is a presentation definition, not transition history.",
+            "properties": {
+              "version": {
+                "type": "string"
+              },
+              "request": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object"
+                }
+              },
+              "payment": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object"
+                }
+              },
+              "checkout": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object"
+                }
+              },
+              "progress_steps": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
           }
         }
       },
@@ -1974,6 +2094,102 @@
               "string",
               "null"
             ]
+          },
+          "status_info": {
+            "$ref": "#/components/schemas/StateLabel"
+          },
+          "payment_info": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StateLabel"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "is_paid": {
+                    "type": "boolean"
+                  },
+                  "has_confirmed_payment": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            ]
+          },
+          "financial_review": {
+            "type": "object",
+            "properties": {
+              "required": {
+                "type": "boolean"
+              },
+              "label": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "checkout_state": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "known": {
+                "type": "boolean"
+              },
+              "label": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "color": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "expires_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "paid_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "expired": {
+                "type": "boolean"
+              }
+            }
+          },
+          "provider_attempt_status_available": {
+            "type": "boolean",
+            "const": false
+          },
+          "refresh_after_seconds": {
+            "type": "integer",
+            "enum": [
+              0,
+              15,
+              60
+            ]
           }
         }
       },
@@ -2117,6 +2333,185 @@
           "value",
           "included"
         ]
+      },
+      "StateLabel": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "known": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "known",
+          "label",
+          "description",
+          "color"
+        ]
+      },
+      "OrderState": {
+        "type": "object",
+        "description": "Read-only projection. Stored request/payment codes never change. No provider IDs or checkout capabilities.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "payment_status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "paid_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "refund_amount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Halalas"
+          },
+          "refund_timing": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "content_sent_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "content_approved_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status_info": {
+            "$ref": "#/components/schemas/StateLabel"
+          },
+          "payment_info": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StateLabel"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "is_paid": {
+                    "type": "boolean"
+                  },
+                  "has_confirmed_payment": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            ]
+          },
+          "financial_review": {
+            "type": "object",
+            "properties": {
+              "required": {
+                "type": "boolean"
+              },
+              "label": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "checkout_state": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "known": {
+                "type": "boolean"
+              },
+              "label": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "color": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "expires_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "paid_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "expired": {
+                "type": "boolean"
+              }
+            }
+          },
+          "provider_attempt_status_available": {
+            "type": "boolean",
+            "const": false
+          },
+          "refresh_after_seconds": {
+            "type": "integer",
+            "enum": [
+              0,
+              15,
+              60
+            ]
+          }
+        }
       }
     }
   }

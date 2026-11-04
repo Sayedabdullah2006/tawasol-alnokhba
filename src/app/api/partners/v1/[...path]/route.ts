@@ -2,6 +2,8 @@ import {CatalogError} from '@/lib/catalog/model'
 import { authenticatePartner, PartnerError } from '@/lib/partners/auth'
 import { partnerOperation } from '@/lib/partners/service'
 import { partnerInvoice } from '@/lib/partners/invoice'
+import { enrichPartnerOrderStates, readPartnerOrderState } from '@/lib/partners/status'
+import { partnerStatusDefinitions } from '@/lib/partners/status-view'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -13,7 +15,19 @@ async function handle(request: Request, context: { params: Promise<{ path: strin
     if (request.method === 'GET' && path.length === 3 && path[0] === 'orders' && path[2] === 'invoice') {
       return await partnerInvoice(ctx, path[1], trace)
     }
-    const data = await partnerOperation(request, ctx, path)
+    let data
+    if (request.method === 'GET' && path.length === 3 && path[0] === 'orders' && path[2] === 'state') {
+      data = await readPartnerOrderState(ctx, path[1])
+    } else {
+      const result = await partnerOperation(request, ctx, path)
+      if (request.method === 'GET' && path.length === 1 && path[0] === 'catalog') {
+        data = { ...result, status_definitions: partnerStatusDefinitions() }
+      } else if (request.method === 'GET' && path.length === 1 && path[0] === 'orders' && 'orders' in result) {
+        data = { ...result, orders: await enrichPartnerOrderStates(result.orders as Record<string, unknown>[]) }
+      } else if (request.method === 'GET' && path.length === 2 && path[0] === 'orders') {
+        data = (await enrichPartnerOrderStates([result as Record<string, unknown>]))[0]
+      } else data = result
+    }
     return Response.json({ data, trace_id: trace }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     const known = error instanceof PartnerError || error instanceof CatalogError

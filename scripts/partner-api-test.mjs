@@ -109,6 +109,7 @@ let filePath
 try {
   let r = await call('catalog'); assert.equal(r.status,200); assert.equal(r.data.packages.length,5)
   const catalogVersion=r.data.version; assert(catalogVersion.startsWith('catalog-'))
+  assert.equal(Object.keys(r.data.status_definitions.request).length,19)
   assert.deepEqual(Array.from(r.data.packages,p=>p.advertising),[0,0,0,30000,40000])
   assert.equal(r.data.packages[4].required_category,'cv')
   assert(r.data.packages.every(p=>p.benefits.length===21))
@@ -179,6 +180,9 @@ try {
   const list=await call('orders'); assert(list.data.orders.some(o=>o.id===id))
   const otherList=await call('orders',{who:otherCustomer}); assert.equal(otherList.data.orders.length,0)
   const details=await call(`orders/${id}`);assert.equal(details.data.source_site,testId);assert.equal(details.data.admin_notes,undefined)
+  assert.equal(details.data.status_info.code,details.data.status)
+  const state=await call(`orders/${id}/state`);assert.equal(state.status,200);assert.equal(state.data.status,details.data.status);assert.equal(state.data.payment_info.code,details.data.payment_status)
+  assert.equal((await call(`orders/${id}/state`,{who:otherCustomer})).status,404)
   const sessions=await Promise.all([call(`orders/${id}/checkout`,{method:'POST',body:{}}),call(`orders/${id}/checkout`,{method:'POST',body:{}})])
   assert(sessions.every(r=>r.status===200),JSON.stringify(sessions))
   assert.equal(sessions[0].data.checkout_url,sessions[1].data.checkout_url)
