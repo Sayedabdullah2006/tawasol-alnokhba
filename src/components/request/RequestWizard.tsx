@@ -23,7 +23,6 @@ import RequestManageActions from '@/components/dashboard/RequestManageActions'
 import { getStatusLabel } from '@/lib/status-labels'
 import { COMPETITION_SUBCATEGORIES, getCompetitionPositions, getPackageFeaturesForPostPrice, ORDERABLE_PACKAGES, CATEGORY_CONDITIONS, type RequestStatus } from '@/lib/constants'
 import { AQ_EXTRAS_PRICES, calculateAutoQuote } from '@/lib/auto-quote'
-import MembershipTeaser from '@/components/memberships/MembershipTeaser'
 import MembershipBenefitPicker, { type MembershipBenefitWallet } from '@/components/memberships/MembershipBenefitPicker'
 import RequestReviewsTrust from './RequestReviewsTrust'
 import {
@@ -1007,9 +1006,8 @@ export default function RequestWizard() {
 
         <RequestReviewsTrust />
 
-        {!membershipMode && <div className="mb-4 lg:hidden"><MembershipTeaser compact /></div>}
-        <div className={cn(!membershipPortalMode && 'lg:grid lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start lg:gap-6 xl:gap-8')}>
-        <main className={cn('min-w-0 mx-auto w-full', membershipPortalMode ? 'max-w-4xl' : 'max-w-2xl lg:max-w-none lg:mx-0')}>
+        <div className={cn(membershipMode && !membershipPortalMode && 'lg:grid lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start lg:gap-6 xl:gap-8')}>
+        <main className={cn('min-w-0 mx-auto w-full', !membershipMode || membershipPortalMode ? 'max-w-3xl' : 'max-w-2xl lg:max-w-none lg:mx-0')}>
         <div className="space-y-3">
 
           {/* ① عن الطلب ─────────────────────────────────────────── */}
@@ -1459,8 +1457,7 @@ export default function RequestWizard() {
         </div>
         </main>
 
-        {!membershipPortalMode && <aside className="hidden lg:block sticky top-28">
-          {membershipMode ? (
+        {membershipMode && !membershipPortalMode && <aside className="hidden lg:block sticky top-28">
             <div className="overflow-hidden rounded-lg border border-gold/40 bg-dark p-6 text-white shadow-xl">
               <p className="text-xs font-bold text-gold">طلب ضمن العضوية</p>
               <h2 className="mt-2 text-2xl font-black">رصيدك يغطي هذا الطلب</h2>
@@ -1468,7 +1465,6 @@ export default function RequestWizard() {
               <div className="my-5 border-y border-white/10 py-4"><strong className="text-3xl text-gold">1</strong><span className="mr-2 text-sm text-white/60">رصيد لهذا المنشور</span></div>
               <button type="button" onClick={() => router.push('/dashboard/membership')} className="w-full rounded-lg border border-white/20 px-4 py-3 text-sm font-bold hover:bg-white/10">العودة إلى عضويتي</button>
             </div>
-          ) : <MembershipTeaser />}
         </aside>}
       </div>
       </div>
