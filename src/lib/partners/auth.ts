@@ -11,6 +11,9 @@ export interface PartnerClient {
   return_url: string
   notifications?: boolean
   auto_studio?: boolean
+  /** Server-configured QA partners only; no browser-supplied mode is accepted. */
+  sandbox_only?: boolean
+  expires_at?: string
 }
 export interface PartnerContext { client: PartnerClient; customer: string; idempotencyKey: string; raw: string }
 export function sha256(value: string) { return createHash('sha256').update(value).digest('hex') }
@@ -23,9 +26,20 @@ export function canonicalRequest(method: string, target: string, timestamp: stri
 }
 export function configuredClients(): PartnerClient[] {
   let clients: PartnerClient[]
-  try { clients = JSON.parse(process.env.PARTNER_API_CLIENTS_JSON ?? '[]') } catch { throw new PartnerError('PARTNER_CONFIG_INVALID', 503) }
+  let sandbox: PartnerClient[]
+  try { clients = JSON.parse(process.env.PARTNER_API_CLIENTS_JSON ?? '[]'); sandbox = JSON.parse(process.env.PARTNER_SANDBOX_CLIENTS_JSON ?? '[]') } catch { throw new PartnerError('PARTNER_CONFIG_INVALID', 503) }
   if (!Array.isArray(clients)) throw new PartnerError('PARTNER_CONFIG_INVALID', 503)
-  return clients
+  if (!Array.isArray(sandbox) || sandbox.some(c => c.sandbox_only !== true) || new Set([...clients, ...sandbox].map(c => c.id)).size !== clients.length + sandbox.length) throw new PartnerError('PARTNER_CONFIG_INVALID', 503)
+  return [...clients, ...sandbox]
+}
+export function validateSandboxClient(client: PartnerClient) {
+  if (client.sandbox_only === undefined || client.sandbox_only === false) return
+  if (client.sandbox_only !== true || client.notifications !== false || client.auto_studio !== false ||
+      client.influencer_ids?.length !== 1 || client.influencer_ids[0] !== 'a91880b6-2252-4aa7-807d-a53eb734771f' ||
+      client.return_url !== 'https://first1saudi.net/services/orders/return' ||
+      !client.expires_at || !Number.isFinite(Date.parse(client.expires_at)) || Date.parse(client.expires_at) <= Date.now()) {
+    throw new PartnerError('SANDBOX_PARTNER_NOT_CONFIGURED', 503)
+  }
 }
 export async function authenticatePartner(request: Request): Promise<PartnerContext> {
   const id = request.headers.get('x-partner-id') ?? ''
@@ -36,6 +50,8 @@ export async function authenticatePartner(request: Request): Promise<PartnerCont
   const idempotencyKey = request.headers.get('idempotency-key') ?? ''
   const signature = request.headers.get('x-signature') ?? ''
   const client = configuredClients().find(c => c.id === id)
+  if (client?.expires_at && (!Number.isFinite(Date.parse(client.expires_at)) || Date.parse(client.expires_at) <= Date.now())) throw new PartnerError('UNAUTHORIZED', 401)
+  if (client) validateSandboxClient(client)
   const secret = client?.keys?.[kid]
   if (!client || typeof secret !== 'string' || secret.length < 32 || !/^\d{10}$/.test(timestamp) ||
       Math.abs(Date.now() / 1000 - Number(timestamp)) > 300 || !/^[a-zA-Z0-9_-]{16,96}$/.test(nonce) ||

@@ -39,10 +39,20 @@ export async function POST(request: NextRequest) {
     console.log('[WEBHOOK] ✅ Signature verified, processing:', payload.type);
 
     const supabase = await createServiceRoleClient();
+    let sandboxPartner = false;
+    if (payload.data?.metadata?.resource_type === 'partner_order') {
+      try {
+        const { storedCheckout } = await import('@/lib/partners/checkout');
+        const { uuid } = await import('@/lib/partners/auth');
+        sandboxPartner = (await storedCheckout(uuid(payload.data.metadata.partner_checkout_id))).sandbox;
+      } catch {
+        return NextResponse.json({ error: 'retry_required' }, { status: 503 });
+      }
+    }
 
     // Step 3: Log to webhook_logs
     try {
-      await supabase.from('webhook_logs').insert({
+      if (!sandboxPartner) await supabase.from('webhook_logs').insert({
         event_type: payload.type,
         payment_id: payload.data?.id,
         request_id: payload.data?.metadata?.request_id,

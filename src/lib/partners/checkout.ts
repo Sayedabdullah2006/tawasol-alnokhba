@@ -3,6 +3,23 @@ import { createHmac } from 'node:crypto'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { MOYASAR_API_URL } from '@/lib/moyasar'
 import { configuredClients, equalSecret, PartnerError, uuid } from './auth'
+import { validateSandboxClient } from './auth'
+import { partnerData } from './data'
+
+export async function storedCheckout(id: string) {
+  const native = await createServiceRoleClient()
+  const live = await native.from('partner_checkout_sessions').select('*').eq('id', id).maybeSingle()
+  if (live.error) throw new PartnerError('CHECKOUT_UNAVAILABLE', 503)
+  if (live.data) return { ...live.data, sandbox: false }
+  const db = await partnerData(true)
+  const { data, error } = await db.from('partner_checkout_sessions').select('*').eq('id', id).maybeSingle()
+  if (error || !data) throw new PartnerError('CHECKOUT_NOT_FOUND', 404)
+  const { data: order } = await db.from('publish_requests').select('partner_id').eq('id', data.request_id).single()
+  const client = configuredClients().find(c => c.id === order?.partner_id)
+  if (!client || client.sandbox_only !== true || data.payment_mode !== 'sandbox') throw new PartnerError('SANDBOX_PARTNER_NOT_CONFIGURED', 503)
+  validateSandboxClient(client)
+  return { ...data, sandbox: true }
+}
 
 export function checkoutToken(id: string) {
   const secret = process.env.PARTNER_CHECKOUT_SECRET
@@ -12,9 +29,7 @@ export function checkoutToken(id: string) {
 export async function checkoutSession(token: string, allowExpired = false) {
   const id = uuid(token.split('.')[0])
   if (!equalSecret(checkoutToken(id), token)) throw new PartnerError('INVALID_CHECKOUT', 401)
-  const db = await createServiceRoleClient()
-  const { data, error } = await db.from('partner_checkout_sessions').select('*').eq('id', id).single()
-  if (error || !data) throw new PartnerError('CHECKOUT_NOT_FOUND', 404)
+  const data = await storedCheckout(id)
   if (!allowExpired && Date.parse(data.expires_at) <= Date.now()) throw new PartnerError('CHECKOUT_EXPIRED', 410)
   return data
 }
@@ -27,9 +42,8 @@ export function checkoutOrigin() {
 export async function settlePartnerPayment(paymentId: string, expectedSession?: string) {
   if (!/^[a-zA-Z0-9_-]{1,128}$/.test(paymentId)) throw new PartnerError('INVALID_PAYMENT_ID')
   if (!expectedSession) throw new PartnerError('PAYMENT_CONTEXT_REQUIRED', 401)
-  const db = await createServiceRoleClient()
-  const { data: session } = await db.from('partner_checkout_sessions').select('id,request_id,payment_mode').eq('id', uuid(expectedSession)).single()
-  if (!session) throw new PartnerError('CHECKOUT_NOT_FOUND', 404)
+  const session = await storedCheckout(uuid(expectedSession))
+  const db = await partnerData(session.sandbox)
   const gateway = partnerGateway(session.payment_mode as PartnerPaymentMode)
   const response = await fetch(`${MOYASAR_API_URL}/payments/${paymentId}`, { headers: { Authorization: gateway.authorization }, cache: 'no-store', signal: AbortSignal.timeout(15000) })
   if (!response.ok) throw new PartnerError('PAYMENT_PROVIDER_UNAVAILABLE', 503)

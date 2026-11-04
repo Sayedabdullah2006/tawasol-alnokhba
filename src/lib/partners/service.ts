@@ -2,7 +2,7 @@ import { getPublishedCatalog } from '@/lib/catalog/server'
 import { activePackages, newsPrice } from '@/lib/catalog/model'
 import { partnerPaymentMode, partnerGateway } from './payment-mode'
 import { validateNews } from '@/lib/individual-news'
-import { createServiceRoleClient } from '@/lib/supabase-server'
+import { partnerData } from './data'
 import { CATEGORIES } from '@/lib/constants'
 import { type IndividualPackage, getIndividualPackage, priceIndividualPackage, resolvePackageChannels } from '@/lib/individual-packages'
 import { PartnerContext, PartnerError, parseBody, sha256, text, uuid } from './auth'
@@ -25,7 +25,7 @@ function revision(order: Record<string, unknown>) {
   return sha256(JSON.stringify([order.proposed_content, order.proposed_images, order.content_sent_at]))
 }
 async function owned(ctx: PartnerContext, id: string) {
-  const db = await createServiceRoleClient()
+  const db = await partnerData(ctx.client)
   const { data, error } = await db.from('publish_requests').select(ORDER_FIELDS).eq('id', uuid(id)).eq('partner_id', ctx.client.id).eq('external_customer_id', ctx.customer).single()
   if (error || !data) throw new PartnerError('ORDER_NOT_FOUND', 404)
   const review = data.post_reviews?.[0]
@@ -43,21 +43,21 @@ function publicSnapshot(raw: unknown) {
 }
 async function publisher(ctx: PartnerContext, id: string) {
   if (!ctx.client.influencer_ids?.includes(id)) throw new PartnerError('PUBLISHER_UNAVAILABLE')
-  const db = await createServiceRoleClient()
+  const db = await partnerData(ctx.client)
   const { data } = await db.from('influencers').select('id,name_ar,x_followers,ig_followers,li_followers,tk_followers').eq('id', uuid(id)).eq('is_active', true).single()
   if (!data) throw new PartnerError('PUBLISHER_UNAVAILABLE')
   return data
 }
-async function discount(code: unknown) {
+async function discount(ctx: PartnerContext, code: unknown) {
   if (code === undefined || code === '') return { pct: 0, code: null, cap: null as number | null }
   const normalized = text(code, 64).toUpperCase()
-  const db = await createServiceRoleClient()
+  const db = await partnerData(ctx.client)
   const { data } = await db.from('discount_codes').select('code,discount_pct,is_active,expires_at,max_uses,used_count,max_discount_amount,recovery_draft_id').eq('code', normalized).single()
   if (data?.recovery_draft_id || !data?.is_active || (data.expires_at && Date.parse(data.expires_at) <= Date.now()) || (data.max_uses !== null && data.used_count >= data.max_uses)) throw new PartnerError('DISCOUNT_UNAVAILABLE')
   return { pct: Number(data.discount_pct), code: normalized, cap: data.max_discount_amount == null ? null : Number(data.max_discount_amount) }
 }
-async function fileLinks(id: string) {
-  const db = await createServiceRoleClient()
+async function fileLinks(ctx: PartnerContext, id: string) {
+  const db = await partnerData(ctx.client)
   const { data, error } = await db.from('partner_files').select('id,path,name,mime_type,size').eq('request_id', id).eq('completed', true)
   dbError(error)
   return Promise.all((data ?? []).map(async f => {
@@ -67,7 +67,7 @@ async function fileLinks(id: string) {
   }))
 }
 export async function partnerOperation(request: Request, ctx: PartnerContext, path: string[]) {
-  const db = await createServiceRoleClient()
+  const db = await partnerData(ctx.client)
   const method = request.method
   if (method === 'GET' && path.join('/') === 'catalog') {
     const catalog = await getPublishedCatalog()
@@ -102,7 +102,7 @@ export async function partnerOperation(request: Request, ctx: PartnerContext, pa
     if (!Array.isArray(ids) || ids.length > 20 || ids.some(id => typeof id !== 'string' || !ALLOWED_EXTRAS.some(e => e.id === id))) throw new PartnerError('INVALID_EXTRAS')
     const extras = ALLOWED_EXTRAS.filter(e => ids.includes(e.id))
     if (extras.some(e => e.id === 'infographic') && category !== 'cv') throw new PartnerError('INVALID_EXTRAS')
-    const deal = await discount(body.discount_code)
+    const deal = await discount(ctx, body.discount_code)
     const base = newsPrice(catalog,category,body.sub_option)
     const effectivePkg = pkg
     const pricing = priceIndividualPackage(base, effectivePkg, extras, deal.pct)
@@ -146,7 +146,7 @@ export async function partnerOperation(request: Request, ctx: PartnerContext, pa
   }
   if (path[0] !== 'orders' || !path[1]) throw new PartnerError('NOT_FOUND', 404)
   const order = await owned(ctx, path[1])
-  if (method === 'GET' && path.length === 2) return { ...expose(order), files: await fileLinks(order.id) }
+  if (method === 'GET' && path.length === 2) return { ...expose(order), files: await fileLinks(ctx, order.id) }
   if (method === 'POST' && path.length === 3 && path[2] === 'cancel') {
     const { data, error } = await db.rpc('partner_cancel_order', { p_partner: ctx.client.id, p_customer: ctx.customer, p_request: order.id })
     dbError(error); return data
@@ -165,7 +165,7 @@ export async function partnerOperation(request: Request, ctx: PartnerContext, pa
   if (method === 'POST' && path.length === 3 && path[2] === 'checkout') {
     // Validate configuration before creating a durable session.
     checkoutToken('00000000-0000-4000-8000-000000000000')
-    const paymentMode = partnerPaymentMode(); partnerGateway(paymentMode)
+    const paymentMode = partnerPaymentMode(ctx.client); partnerGateway(paymentMode)
     let returnUrl: URL
     try { returnUrl = new URL(ctx.client.return_url) } catch { throw new PartnerError('RETURN_URL_NOT_CONFIGURED', 503) }
     if (returnUrl.protocol !== 'https:') throw new PartnerError('RETURN_URL_NOT_CONFIGURED', 503)

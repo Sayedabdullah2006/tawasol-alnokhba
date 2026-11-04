@@ -2,7 +2,7 @@ import { partnerGateway, type PartnerPaymentMode } from '@/lib/partners/payment-
 import { cookies } from 'next/headers'
 import { checkoutOrigin, checkoutSession, settlePartnerPayment } from '@/lib/partners/checkout'
 import { PartnerError, text } from '@/lib/partners/auth'
-import { createServiceRoleClient } from '@/lib/supabase-server'
+import { partnerData } from '@/lib/partners/data'
 
 export const dynamic = 'force-dynamic'
 async function handle(request: Request) {
@@ -11,7 +11,7 @@ async function handle(request: Request) {
     const sessionId = new URL(request.url).searchParams.get('session') ?? ''
     if (!/^[a-f0-9-]{36}$/.test(sessionId)) throw new PartnerError('INVALID_CHECKOUT', 401)
     const session = await checkoutSession(jar.get(`partner_checkout_${sessionId}`)?.value ?? '', request.method === 'POST')
-    const db = await createServiceRoleClient()
+    const db = await partnerData(session.sandbox)
     const { data: order } = await db.from('publish_requests').select('id,request_number,title,status,payment_status,final_total,package_snapshot').eq('id', session.request_id).single()
     if (!order) throw new PartnerError('ORDER_NOT_FOUND', 404)
     if (request.method === 'POST') {

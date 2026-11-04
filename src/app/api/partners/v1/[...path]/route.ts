@@ -26,9 +26,9 @@ async function handle(request: Request, context: { params: Promise<{ path: strin
       if (request.method === 'GET' && path.length === 1 && path[0] === 'catalog') {
         data = { ...result, status_definitions: partnerStatusDefinitions() }
       } else if (request.method === 'GET' && path.length === 1 && path[0] === 'orders' && 'orders' in result) {
-        data = { ...result, orders: await enrichPartnerOrderStates(result.orders as Record<string, unknown>[]) }
+        data = { ...result, orders: await enrichPartnerOrderStates(result.orders as Record<string, unknown>[], ctx) }
       } else if (request.method === 'GET' && path.length === 2 && path[0] === 'orders') {
-        data = (await enrichPartnerOrderStates([result as Record<string, unknown>]))[0]
+        data = (await enrichPartnerOrderStates([result as Record<string, unknown>], ctx))[0]
       } else data = result
     }
     return Response.json({ data, trace_id: trace }, { headers: { 'Cache-Control': 'no-store' } })
