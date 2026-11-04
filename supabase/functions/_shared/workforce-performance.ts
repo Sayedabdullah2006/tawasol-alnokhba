@@ -89,7 +89,8 @@ export function evaluatePerformance(tasks: PerformanceTask[], month: string, now
   if(!Number.isSafeInteger(required)||required<1||required>100)throw new RangeError("عدد المهام المؤهلة يجب أن يكون بين 1 و100");
   const start = Date.parse(`${month}-01T00:00:00+03:00`);
   const next = new Date(start + 32 * 86400000).toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }).slice(0, 7);
-  const end = Math.min(now.getTime(), Date.parse(`${next}-01T00:00:00+03:00`) - 1);
+  const monthEnd = Date.parse(`${next}-01T00:00:00+03:00`) - 1;
+  const end = Math.min(now.getTime(), monthEnd);
   const rows: PerformanceRow[] = [];
   if(end<start)return {month,generatedAt:now.toISOString(),score:null,eligible:0,required,completed:0,late:0,pending:0,revisions:0,excluded:0,axes:{punctuality:null,quality:null,completion:null},rows};
   for (const task of tasks) {
@@ -107,7 +108,7 @@ export function evaluatePerformance(tasks: PerformanceTask[], month: string, now
     // Review waiting is not incomplete work. Open future work is outside the denominator.
     const pending = last?.status === "pending";
     const completed = last ? last.status === "approved" && !last.incomplete : task.state === "done";
-    const considered = dueTime <= end && !pending && !(last?.status==="changes" && last.revision_due_at && Date.parse(last.revision_due_at)>end);
+    const considered = (dueTime <= end || (completed && dueTime >= start && dueTime <= monthEnd)) && !pending && !(last?.status==="changes" && last.revision_due_at && Date.parse(last.revision_due_at)>end);
     const timing = complete.map((d,i) => Math.max(0, 100 - workingDelay(i===0?due!:d.due_at, d.delivered_at) / 480 * 25));
     let punctuality = timing.length ? timing.reduce((a,b)=>a+b,0)/timing.length : null;
     if (considered && !completed && (!last || last.status === "changes")) {
@@ -117,7 +118,7 @@ export function evaluatePerformance(tasks: PerformanceTask[], month: string, now
     }
     rows.push({ id: task.task_id, title: task.title, source:task.source,plannedDays:automatic?.days??task.planned_days??null,share:1/Math.max(1,task.participant_count??(task.shared?2:1)),weight: (size ? weight[size] : 1)/Math.max(1,task.participant_count??(task.shared?2:1)), due, revisionDue:last?.status==="changes"?last.revision_due_at??null:null, submitted: first?.delivered_at ?? null,
       status: pending ? task.shared&&task.state!=="review"?"بانتظار تسليم الفريق":"بانتظار المراجعة" : completed ? "مكتملة" : (last?.status === "changes"||task.state==="changes") ? "للتعديل" : dueTime < end ? "مفتوحة" : "قادمة",
-      reason: task.notes?.join(" · ") || (task.archived&&task.state!=="done"?"مؤرشفة قبل إكمالها":task.withdrawn ? "أعيد إسنادها" : !task.configured_at || !size ? "دون توثيق سابق للتقييم" : unknown ? "سبب الإرجاع غير مصنف" : pending ? "انتظار المراجعة لا يؤثر على الإنجاز" : last?.status==="changes"&&last.revision_due_at&&Date.parse(last.revision_due_at)>end?"موعد إعادة التسليم لم يحن":dueTime>end ? "موعدها لم يحن" : ""),
+      reason: task.notes?.join(" · ") || (task.archived&&task.state!=="done"?"مؤرشفة قبل إكمالها":task.withdrawn ? "أعيد إسنادها" : !task.configured_at || !size ? "دون توثيق سابق للتقييم" : unknown ? "سبب الإرجاع غير مصنف" : pending ? "انتظار المراجعة لا يؤثر على الإنجاز" : last?.status==="changes"&&last.revision_due_at&&Date.parse(last.revision_due_at)>end?"موعد إعادة التسليم لم يحن":completed&&dueTime>monthEnd ? "تُحتسب في شهر استحقاقها" : !completed&&dueTime>end ? "موعدها لم يحن" : ""),
       returns, punctuality: eligible&&!unknown&&!limited("timing") ? punctuality : null, quality: eligible&&!unknown&&!limited("quality") && deliveries.some(d=>d.status!=="pending") ? Math.max(0,100-returns*20) : null,
       completed, eligible: eligible && considered&&!limited("completion")&&!(unknown&&last?.status==="changes"), responsibility: task.responsibility, exception: task.exception_reason });
   }

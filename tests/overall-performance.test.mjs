@@ -29,6 +29,17 @@ test('monthly threshold four releases the grade only after four eligible approva
  assert.deepEqual(approved.axes,{punctuality:100,quality:100,completion:100});
  for(const value of [0,1.5,101,NaN])assert.throws(()=>evaluatePerformance(four,month,now,value));
 });
+test('four weekly tasks approved early qualify immediately; future open work and pending approvals do not',()=>{
+ const asOf=new Date('2026-11-04T12:00:00+03:00');
+ const weekly=[7,14,21,30].map((day,i)=>{const t=task(i),due=`2026-11-${String(day).padStart(2,'0')}T17:00:00+03:00`;return {...t,due_at:due,deliveries:[{...t.deliveries[0],due_at:due,delivered_at:'2026-11-04T10:00:00+03:00',decided_at:'2026-11-04T11:00:00+03:00'}]};});
+ const three=evaluatePerformance(weekly.slice(0,3),month,asOf,4);assert.equal(three.eligible,3);assert.equal(three.score,null);
+ const pending=structuredClone(weekly);pending[3].deliveries[0].status='pending';pending[3].deliveries[0].decided_at=null;assert.equal(evaluatePerformance(pending,month,asOf,4).score,null);
+ const final=evaluatePerformance(weekly,month,asOf,4);assert.equal(final.eligible,4);assert.equal(final.score,100);assert.ok(final.rows.every(r=>r.reason===''));assert.equal(combinePerformance(final,22,60).score,53.2);
+ const open=task('open');open.state='new';open.due_at='2026-11-30T17:00:00+03:00';open.deliveries=[];
+ assert.equal(evaluatePerformance([...weekly,open],month,asOf,4).score,100);
+ const nextPeriod=structuredClone(weekly[0]);nextPeriod.due_at='2026-12-07T17:00:00+03:00';nextPeriod.deliveries[0].due_at=nextPeriod.due_at;assert.equal(evaluatePerformance([nextPeriod],month,asOf,1).score,null);assert.equal(evaluatePerformance([nextPeriod],'2026-12',new Date('2026-12-08T12:00:00+03:00'),1).score,100);
+ const decidedLater=structuredClone(weekly);decidedLater[3].deliveries[0].decided_at='2026-11-05T11:00:00+03:00';assert.equal(evaluatePerformance(decidedLater,month,asOf,4).score,null);
+});
 test('only company admin can change monthly blend weights; another month remains independent',async()=>{
  const db=await createSalesDB();try{
  await command(db,'create_month',{closing_employee_id:ids.ne,team_target:1,performance_sales_weight:60});for(const id of [ids.ne,ids.me])await command(db,'save_plan',{employee_id:id,...defaultSalesPlan(month,id===ids.ne),reason:'خطة منشورة'});await command(db,'publish',{});
