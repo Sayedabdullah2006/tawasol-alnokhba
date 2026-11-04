@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Tawasol al Nukhba Partner API",
-    "version": "1.5.0",
-    "description": "Dynamic published catalog managed centrally in Tawasol al Nukhba. Treat catalog.version as an opaque string. Cache catalog display for at most cache_ttl_seconds; use fresh server quotes for purchases. Package IDs, HMAC and checkout remain compatible. All partner money fields are integer halalas."
+    "version": "1.6.0",
+    "description": "Dynamic published catalog managed centrally in Tawasol al Nukhba. Treat catalog.version as an opaque string. Cache catalog display for at most cache_ttl_seconds; use fresh server quotes for purchases. Package IDs, HMAC and checkout remain compatible. All partner money fields are integer halalas. Additive organization intake and manual financial offers. Existing individual requests and signed payment paths remain compatible. amount=null means not yet priced; zero is a free approved offer, not a confirmed payment. Partner API supports single-post requests only."
   },
   "servers": [
     {
@@ -1668,6 +1668,172 @@
           }
         }
       }
+    },
+    "/orders/{id}/offer": {
+      "get": {
+        "summary": "Read current organization financial offer and central extras/quota",
+        "operationId": "getOrganizationOffer",
+        "parameters": [
+          {
+            "name": "X-Partner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Key-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Nonce",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Customer-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current offer or available:false before pricing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/FinancialOffer"
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not owned by this partner and customer"
+          },
+          "409": {
+            "description": "Individual order; manual offers are not applicable"
+          }
+        }
+      },
+      "post": {
+        "summary": "Preview, accept, reject or negotiate an organization offer",
+        "operationId": "decideOrganizationOffer",
+        "parameters": [
+          {
+            "name": "X-Partner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Key-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Nonce",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Customer-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Central amounts in halalas; decision is idempotent. Free acceptance returns in_progress, amount:0, ready_for_payment:false."
+          },
+          "409": {
+            "description": "OFFER_CHANGED, OFFER_EXPIRED, OFFER_NOT_AVAILABLE, CHECKOUT_ACTIVE, DISCOUNT_UNAVAILABLE, NEGOTIATION_LIMIT or IDEMPOTENCY_CONFLICT"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfferInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2067,6 +2233,69 @@
                 }
               }
             }
+          },
+          "client_types": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "enum": [
+                    "individual",
+                    "business",
+                    "government"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "pricing_mode": {
+                  "enum": [
+                    "automatic",
+                    "manual"
+                  ]
+                },
+                "package_selection": {
+                  "type": "boolean"
+                },
+                "request_types": {
+                  "type": "array",
+                  "items": {
+                    "const": "single"
+                  }
+                },
+                "category_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "organization_fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          },
+          "categories_by_client_type": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "content_requirements": {
+            "type": "object"
+          },
+          "request_types": {
+            "type": "array",
+            "items": {
+              "const": "single"
+            }
           }
         }
       },
@@ -2133,6 +2362,12 @@
             "type": "string",
             "maxLength": 100,
             "description": "Send the version shown to the customer. A mismatch returns 409 CATALOG_CHANGED; refresh the catalog, show the updated quote, then let the customer continue. Optional only for backward compatibility."
+          },
+          "client_type": {
+            "enum": [
+              "individual"
+            ],
+            "default": "individual"
           }
         },
         "required": [
@@ -2166,80 +2401,13 @@
         ]
       },
       "OrderInput": {
-        "type": "object",
-        "properties": {
-          "quote_id": {
-            "type": "string",
-            "format": "uuid"
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/IndividualOrderInput"
           },
-          "title": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 300
-          },
-          "content": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 20000
-          },
-          "customer": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "email": {
-                "type": "string",
-                "format": "email"
-              },
-              "phone": {
-                "type": "string"
-              },
-              "city": {
-                "type": "string"
-              },
-              "handle": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "name",
-              "email",
-              "phone"
-            ]
-          },
-          "career": {
-            "type": "object",
-            "properties": {
-              "language": {
-                "enum": [
-                  "ar",
-                  "en"
-                ]
-              },
-              "goal": {
-                "type": "string"
-              },
-              "experience": {
-                "type": "string"
-              },
-              "education": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "language",
-              "goal",
-              "experience",
-              "education"
-            ]
+          {
+            "$ref": "#/components/schemas/OrganizationOrderInput"
           }
-        },
-        "required": [
-          "quote_id",
-          "title",
-          "content",
-          "customer"
         ]
       },
       "CreatedOrder": {
@@ -2254,6 +2422,21 @@
           },
           "replayed": {
             "type": "boolean"
+          },
+          "pricing_mode": {
+            "enum": [
+              "manual"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "amount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
           }
         },
         "required": [
@@ -2325,12 +2508,22 @@
             "type": "string"
           },
           "amount": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0,
             "description": "Integer halalas; divide by 100 to display SAR"
           },
           "package_snapshot": {
-            "$ref": "#/components/schemas/Snapshot"
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Snapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "proposed_content": {
             "type": [
@@ -2486,6 +2679,36 @@
               0,
               15,
               60
+            ]
+          },
+          "client_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_representative": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_license": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quote_expires_at": {
+            "type": [
+              "string",
+              "null"
             ]
           }
         }
@@ -2927,6 +3150,331 @@
           "scope": {
             "type": "string",
             "const": "oauth_session"
+          }
+        }
+      },
+      "IndividualOrderInput": {
+        "type": "object",
+        "properties": {
+          "quote_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20000
+          },
+          "customer": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "phone": {
+                "type": "string"
+              },
+              "city": {
+                "type": "string"
+              },
+              "handle": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "email",
+              "phone"
+            ]
+          },
+          "career": {
+            "type": "object",
+            "properties": {
+              "language": {
+                "enum": [
+                  "ar",
+                  "en"
+                ]
+              },
+              "goal": {
+                "type": "string"
+              },
+              "experience": {
+                "type": "string"
+              },
+              "education": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "language",
+              "goal",
+              "experience",
+              "education"
+            ]
+          },
+          "client_type": {
+            "enum": [
+              "individual"
+            ],
+            "default": "individual"
+          },
+          "request_type": {
+            "const": "single"
+          }
+        },
+        "required": [
+          "quote_id",
+          "title",
+          "content",
+          "customer"
+        ]
+      },
+      "OrganizationOrderInput": {
+        "type": "object",
+        "required": [
+          "client_type",
+          "influencer_id",
+          "category",
+          "org_name",
+          "channels",
+          "title",
+          "content",
+          "customer"
+        ],
+        "properties": {
+          "client_type": {
+            "enum": [
+              "business",
+              "government"
+            ]
+          },
+          "request_type": {
+            "const": "single"
+          },
+          "influencer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "category": {
+            "type": "string",
+            "description": "Use categories_by_client_type; enforce the chosen client type."
+          },
+          "org_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "org_representative": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "org_license": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "channels": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "x",
+                "li",
+                "ig",
+                "tk"
+              ]
+            }
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20000
+          },
+          "customer": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "phone": {
+                "type": "string"
+              },
+              "city": {
+                "type": "string"
+              },
+              "handle": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "email",
+              "phone"
+            ]
+          },
+          "link": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "hashtags": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "preferred_date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "OfferInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "offer_revision"
+        ],
+        "properties": {
+          "action": {
+            "enum": [
+              "preview",
+              "accept",
+              "reject",
+              "negotiate"
+            ]
+          },
+          "offer_revision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "selected_extras": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 20,
+            "items": {
+              "type": "string"
+            }
+          },
+          "discount_code": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000
+          },
+          "proposed_amount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Proposed amount in integer halalas for negotiation; cannot exceed the current base offer."
+          }
+        }
+      },
+      "FinancialOffer": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "offer_revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "base_amount": {
+            "type": "integer"
+          },
+          "amount": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "expired": {
+            "type": "boolean"
+          },
+          "currency": {
+            "const": "SAR"
+          },
+          "money_unit": {
+            "const": "halala"
+          },
+          "offered_extras": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "price": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "selected_extras": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "negotiation": {
+            "type": "object",
+            "properties": {
+              "round": {
+                "type": "integer"
+              },
+              "max_rounds": {
+                "const": 3
+              },
+              "monthly_used": {
+                "type": "integer"
+              },
+              "monthly_limit": {
+                "const": 3
+              },
+              "monthly_remaining": {
+                "type": "integer"
+              },
+              "final": {
+                "type": "boolean"
+              }
+            }
           }
         }
       }

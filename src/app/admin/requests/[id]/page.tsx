@@ -88,6 +88,7 @@ type AdminStudioState = {
 }
 
 type AdminRequest = {
+  partner_id?: string | null
   package_snapshot?: { package: { name: string; features: string[] }; pricing: { advertising: number } } | null
 
   id: string
@@ -1209,7 +1210,7 @@ function DetailsTab({ request }: { request: AdminRequest }) {
 
   return (
     <div className="space-y-5">
-      {request.package_snapshot && <PartnerOrderPanel id={request.id} />}
+      {(request.package_snapshot || request.partner_id) && <PartnerOrderPanel id={request.id} />}
       {/* ① بيانات العميل */}
       <div className="bg-card rounded-2xl border border-border p-5">
         <h2 className="font-bold text-dark mb-4 flex items-center gap-2">👤 بيانات العميل</h2>

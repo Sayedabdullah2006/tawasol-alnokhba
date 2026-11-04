@@ -3,17 +3,20 @@ import { activePackages, newsPrice } from '@/lib/catalog/model'
 import { partnerPaymentMode, partnerGateway } from './payment-mode'
 import { validateNews } from '@/lib/individual-news'
 import { partnerData } from './data'
-import { CATEGORIES } from '@/lib/constants'
+import { CATEGORIES, CATEGORY_CONDITIONS } from '@/lib/constants'
+import { createServiceRoleClient } from '@/lib/supabase-server'
 import { type IndividualPackage, getIndividualPackage, priceIndividualPackage, resolvePackageChannels } from '@/lib/individual-packages'
 import { PartnerContext, PartnerError, parseBody, sha256, text, uuid } from './auth'
 import { checkoutOrigin, checkoutToken } from './checkout'
+import { clientType, clientDefinitions, organizationInput } from './organization'
+import { partnerOffer } from './offer'
 
 const UUID = /^[a-f0-9-]{36}$/i
 const MIME = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
-const ORDER_FIELDS = 'id,request_number,partner_id,external_customer_id,external_order_id,source_site,category,title,content,channels,status,payment_status,final_total,package_snapshot,created_at,updated_at,proposed_content,proposed_images,post_reviews,content_sent_at,content_approved_at,user_feedback,admin_info_request,partner_deliverables,refund_amount,refund_timing,paid_at'
+const ORDER_FIELDS = 'user_id,scope,client_type,org_name,org_representative,org_license,request_type,influencer_id,admin_quoted_price,admin_offered_extras,user_selected_extras,extras_selected_total,discount_code,discount_pct,discount_amount,quote_expires_at,quoted_at,approved_at,negotiation_round,negotiation_rejected,original_quoted_price,estimated_reach,link,hashtags,preferred_date,id,request_number,partner_id,external_customer_id,external_order_id,source_site,category,title,content,channels,status,payment_status,final_total,package_snapshot,created_at,updated_at,proposed_content,proposed_images,post_reviews,content_sent_at,content_approved_at,user_feedback,admin_info_request,partner_deliverables,refund_amount,refund_timing,paid_at'
 function dbError(error: { message: string } | null) {
   if (!error) return
-  const known = ['QUOTE_EXPIRED','QUOTE_NOT_FOUND','QUOTE_CONSUMED','IDEMPOTENCY_CONFLICT','ORDER_NOT_FOUND','ORDER_NOT_PAYABLE','CHECKOUT_EXPIRED','DISCOUNT_UNAVAILABLE','FILE_LIMIT','ORDER_NOT_EDITABLE','OPEN_REQUEST_EXISTS','ORDER_NOT_CANCELLABLE','CHECKOUT_ACTIVE']
+  const known = ['QUOTE_EXPIRED','QUOTE_NOT_FOUND','QUOTE_CONSUMED','IDEMPOTENCY_CONFLICT','ORDER_NOT_FOUND','ORDER_NOT_PAYABLE','CHECKOUT_EXPIRED','DISCOUNT_UNAVAILABLE','FILE_LIMIT','ORDER_NOT_EDITABLE','OPEN_REQUEST_EXISTS','ORDER_NOT_CANCELLABLE','CHECKOUT_ACTIVE','OFFER_CHANGED','OFFER_EXPIRED','OFFER_NOT_AVAILABLE','NEGOTIATION_LIMIT','ACTION_CONFLICT']
   const code = known.find(c => error.message.includes(c))
   throw new PartnerError(code ?? 'STORAGE_UNAVAILABLE', code ? 409 : 503)
 }
@@ -33,8 +36,8 @@ async function owned(ctx: PartnerContext, id: string) {
 }
 function expose(order: Record<string, unknown>) {
   const { final_total, refund_amount, package_snapshot } = order
-  const safe = Object.fromEntries(Object.entries(order).filter(([key]) => !['partner_id','external_customer_id','post_reviews','final_total','refund_amount','package_snapshot'].includes(key)))
-  return { ...safe, amount: Math.round(Number(final_total) * 100), refund_amount: refund_amount === null ? null : Math.round(Number(refund_amount) * 100), package_snapshot: publicSnapshot(package_snapshot), content_revision: revision(order) }
+  const safe = Object.fromEntries(Object.entries(order).filter(([key]) => !['user_id','partner_id','external_customer_id','post_reviews','final_total','refund_amount','package_snapshot','admin_quoted_price','admin_offered_extras','extras_selected_total','discount_amount','original_quoted_price'].includes(key)))
+  return { ...safe, amount: final_total == null ? null : Math.round(Number(final_total) * 100), refund_amount: refund_amount === null ? null : Math.round(Number(refund_amount) * 100), package_snapshot: publicSnapshot(package_snapshot), content_revision: revision(order) }
 }
 function publicSnapshot(raw: unknown) {
   if (!raw) return null
@@ -71,9 +74,13 @@ export async function partnerOperation(request: Request, ctx: PartnerContext, pa
   const method = request.method
   if (method === 'GET' && path.join('/') === 'catalog') {
     const catalog = await getPublishedCatalog()
+    const central = await createServiceRoleClient()
+    const {data: conditions} = await central.from('site_content').select('terms_text,news_conditions_general,news_conditions_footer,category_conditions').eq('id',1).single()
     const { data, error } = await db.from('influencers').select('id,name_ar,x_followers,ig_followers,li_followers,tk_followers').in('id', ctx.client.influencer_ids.filter(id => UUID.test(id))).eq('is_active', true)
     dbError(error)
     return { version: catalog.version, published_at: catalog.published_at, cache_ttl_seconds: 60, currency: 'SAR', money_unit: 'halala', seller: 'شركة تواصل النخبة للدعاية والإعلان',
+      content_requirements: { terms_text: conditions?.terms_text ?? '', news_conditions_general: conditions?.news_conditions_general ?? [], news_conditions_footer: conditions?.news_conditions_footer ?? '', category_conditions: conditions?.category_conditions ?? CATEGORY_CONDITIONS },
+      client_types: clientDefinitions(), request_types: ['single'], categories_by_client_type: Object.fromEntries(clientDefinitions().map(t => [t.id, CATEGORIES.filter(c => t.category_ids.includes(c.id)).map(c => ({ id: c.id, name: c.nameAr, requires_sub_option: !!c.hasSubOption, pricing_mode: t.pricing_mode }))])),
       packages: activePackages(catalog).map(p => ({ id: p.id, name: p.name, blurb: p.blurb, surcharge: Math.round(p.surcharge * 100), fixed_price: p.fixedPrice ? Math.round(p.fixedPrice * 100) : null, starts_from: Math.round((p.fixedPrice ?? (p.requiredCategory ? newsPrice(catalog,p.requiredCategory) : Math.min(...catalog.newsRates.map(r=>r.price))) + p.surcharge) * 100), advertising: Math.round(p.sponsoredCampaignBudget * 100), channel_count: p.channelCount, channels: p.channels ?? null, features: p.features, benefits: p.benefits, required_category: p.requiredCategory ?? null, included_extras: p.includedExtras })), extras: catalog.extras.filter(e=>e.enabled).map(e => ({ id: e.id, name: e.name, price: Math.round(e.price * 100) })),
       categories: CATEGORIES.filter(c => c.id !== 'Others' && (!c.clientTypes || c.clientTypes.includes('individual'))).map(c => ({ id: c.id, name: c.nameAr, requires_sub_option: !!c.hasSubOption,
         base_price: c.hasSubOption ? null : Math.round(newsPrice(catalog,c.id) * 100) })),
@@ -86,6 +93,8 @@ export async function partnerOperation(request: Request, ctx: PartnerContext, pa
   }
   if (method === 'POST' && path.join('/') === 'quotes') {
     const body = parseBody(ctx)
+    if (clientType(body.client_type) !== 'individual') throw new PartnerError('MANUAL_QUOTE_REQUIRED', 409)
+    if (body.request_type !== undefined && body.request_type !== 'single') throw new PartnerError('UNSUPPORTED_REQUEST_TYPE')
     const catalog = await getPublishedCatalog()
     if (body.catalog_version !== undefined && body.catalog_version !== catalog.version) throw new PartnerError('CATALOG_CHANGED',409)
     const ALLOWED_EXTRAS = catalog.extras.filter(e=>e.enabled)
@@ -121,6 +130,26 @@ export async function partnerOperation(request: Request, ctx: PartnerContext, pa
     const content = { title: text(body.title, 300), content: text(body.content, 20000), name: text(customer.name, 160),
       phone: text(customer.phone, 30), email: text(customer.email, 254), city: text(customer.city, 100, false), handle: text(customer.handle, 100, false) }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(content.email) || !/^\+?[\d ()-]{7,30}$/.test(content.phone)) throw new PartnerError('INVALID_CUSTOMER')
+    const type = clientType(body.client_type)
+    if (body.request_type !== undefined && body.request_type !== 'single') throw new PartnerError('UNSUPPORTED_REQUEST_TYPE')
+    if (type !== 'individual') {
+      const org = organizationInput(body)
+      const pub = await publisher(ctx, text(body.influencer_id, 36))
+      const channels = body.channels
+      if (!Array.isArray(channels) || !channels.length || channels.length > 4 || new Set(channels).size !== channels.length || channels.some(c => typeof c !== 'string' || !channelsOf(pub).includes(c))) throw new PartnerError('INVALID_CHANNELS')
+      const link = text(body.link ?? '', 2000, false)
+      if (link) { try { if (!['https:', 'http:'].includes(new URL(link).protocol)) throw new Error() } catch { throw new PartnerError('INVALID_LINK') } }
+      const preferred = text(body.preferred_date ?? '', 10, false)
+      if (preferred && (!/^\d{4}-\d{2}-\d{2}$/.test(preferred) || !Number.isFinite(Date.parse(preferred)))) throw new PartnerError('INVALID_DATE')
+      const details = { ...content, ...org, influencer_id: pub.id, channels, link, hashtags: text(body.hashtags ?? '', 2000, false), preferred_date: preferred }
+      const { data, error } = await db.rpc('partner_create_organization_order', { p_partner: ctx.client.id, p_customer: ctx.customer, p_key: ctx.idempotencyKey, p_fingerprint: sha256(JSON.stringify(details)), p_content: details })
+      dbError(error)
+      if (!data.replayed && ctx.client.notifications !== false) {
+        const { notifyRequestReceivedToClient } = await import('@/lib/email')
+        await notifyRequestReceivedToClient({ clientEmail: content.email, requestNumber: `ATH-${String(data.request_number).padStart(4,'0')}`, clientName: content.name, category: org.category, title: content.title, content: content.content, channels, requestId: data.id }).catch(() => undefined)
+      }
+      return data
+    }
     const quote = uuid(body.quote_id)
     const { data: q } = await db.from('partner_quotes').select('payload,snapshot,order_id').eq('id', quote).eq('partner_id', ctx.client.id).eq('customer_id', ctx.customer).single()
     if (!q) throw new PartnerError('QUOTE_NOT_FOUND', 404)
@@ -146,6 +175,7 @@ export async function partnerOperation(request: Request, ctx: PartnerContext, pa
   }
   if (path[0] !== 'orders' || !path[1]) throw new PartnerError('NOT_FOUND', 404)
   const order = await owned(ctx, path[1])
+  if (path.length === 3 && path[2] === 'offer') return partnerOffer(request, ctx, order)
   if (method === 'GET' && path.length === 2) return { ...expose(order), files: await fileLinks(ctx, order.id) }
   if (method === 'POST' && path.length === 3 && path[2] === 'cancel') {
     const { data, error } = await db.rpc('partner_cancel_order', { p_partner: ctx.client.id, p_customer: ctx.customer, p_request: order.id })
@@ -196,7 +226,7 @@ export async function partnerOperation(request: Request, ctx: PartnerContext, pa
     return { id: order.id, status: update.status }
   }
   if (method === 'POST' && path.length === 3 && path[2] === 'files') {
-    if (!['approved','in_progress','info_requested','content_review','changes_requested'].includes(order.status)) throw new PartnerError('ORDER_NOT_EDITABLE', 409)
+    if (![...(['business','government'].includes(order.client_type) ? ['pending','quoted','negotiation'] : []),'approved','in_progress','info_requested','content_review','changes_requested'].includes(order.status)) throw new PartnerError('ORDER_NOT_EDITABLE', 409)
     const body = parseBody(ctx); const name = text(body.name, 180); const mime = text(body.mime_type, 100); const size = Number(body.size)
     if (!MIME.includes(mime) || !Number.isSafeInteger(size) || size <= 0 || size > 20971520) throw new PartnerError('INVALID_FILE')
     const proposedId = crypto.randomUUID(); const proposedPath = `${ctx.client.id}/${order.id}/${proposedId}`

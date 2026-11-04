@@ -24,11 +24,13 @@ export async function enrichPartnerOrderStates(orders: Record<string, unknown>[]
 export async function readPartnerOrderState(ctx: PartnerContext, requestId: string) {
   const db = await partnerData(ctx?.client)
   const { data, error } = await db.from('publish_requests')
-    .select('id,status,payment_status,paid_at,updated_at,refund_amount,refund_timing,content_sent_at,content_approved_at')
+    .select('id,status,payment_status,paid_at,updated_at,refund_amount,refund_timing,content_sent_at,content_approved_at,client_type,final_total,quote_expires_at')
     .eq('id', uuid(requestId)).eq('partner_id', ctx.client.id).eq('external_customer_id', ctx.customer).maybeSingle()
   if (error) throw new PartnerError('STATE_UNAVAILABLE', 503)
   if (!data) throw new PartnerError('ORDER_NOT_FOUND', 404)
   const fields = ['id','status','payment_status','paid_at','updated_at','refund_timing','content_sent_at','content_approved_at'] as const
-  const order = { ...Object.fromEntries(fields.map(key => [key, data[key]])), refund_amount: data.refund_amount == null ? null : Math.round(Number(data.refund_amount) * 100) }
+  const order = { ...Object.fromEntries(fields.map(key => [key, data[key]])), client_type: data.client_type ?? 'individual', amount: data.final_total == null ? null : Math.round(Number(data.final_total)*100), quote_expires_at: data.quote_expires_at ?? null,
+    offer_available: ['business','government'].includes(data.client_type) && ['quoted','approved'].includes(data.status) && data.payment_status!=='paid',
+    refund_amount: data.refund_amount == null ? null : Math.round(Number(data.refund_amount) * 100) }
   return (await enrichPartnerOrderStates([order], ctx))[0]
 }
