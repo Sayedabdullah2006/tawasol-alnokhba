@@ -81,6 +81,7 @@ SHA256_OF_EXACT_UTF8_BODY
 | POST orders | إنشاء طلب من عرض السعر، مع منع التكرار |
 | GET orders?page=0 | طلبات العميل؛ 20 طلبًا للصفحة |
 | GET orders/{id} | التفاصيل وحالة الدفع والنسخة المقترحة والملفات والمخرجات |
+| GET orders/{id}/invoice | فاتورة PDF أصلية لطلب مدفوع يخص العميل؛ نجاح ثنائي لا JSON. اقرأ FIRST1SAUDI-INVOICE-PROMPT.txt |
 | POST orders/{id}/cancel | إلغاء طلب غير مدفوع دون جلسة دفع نشطة؛ body={} |
 | POST orders/{id}/checkout | جلسة دفع 30 دقيقة؛ body={} |
 | POST orders/{id}/files | إصدار رابط رفع خاص |

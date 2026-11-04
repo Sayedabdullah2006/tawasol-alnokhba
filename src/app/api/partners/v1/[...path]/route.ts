@@ -1,6 +1,7 @@
 import {CatalogError} from '@/lib/catalog/model'
 import { authenticatePartner, PartnerError } from '@/lib/partners/auth'
 import { partnerOperation } from '@/lib/partners/service'
+import { partnerInvoice } from '@/lib/partners/invoice'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -9,6 +10,9 @@ async function handle(request: Request, context: { params: Promise<{ path: strin
   try {
     const ctx = await authenticatePartner(request)
     const { path } = await context.params
+    if (request.method === 'GET' && path.length === 3 && path[0] === 'orders' && path[2] === 'invoice') {
+      return await partnerInvoice(ctx, path[1], trace)
+    }
     const data = await partnerOperation(request, ctx, path)
     return Response.json({ data, trace_id: trace }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {

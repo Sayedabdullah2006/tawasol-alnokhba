@@ -4,9 +4,12 @@ import { createHash, createHmac, randomUUID } from 'node:crypto'
 export function createNukhbaClient({ origin, partnerId, keyId, secret }) {
   const root = new URL(origin)
   if (root.protocol !== 'https:' && !['localhost','127.0.0.1'].includes(root.hostname)) throw new Error('HTTPS required')
-  return async function call(path, { customerId, body, idempotencyKey = body ? randomUUID() : '' } = {}) {
+  return async function call(path, { customerId, body, idempotencyKey = body ? randomUUID() : '', responseType = 'json' } = {}) {
     if (!/^[a-zA-Z0-9_.:@-]{1,128}$/.test(customerId ?? '')) throw new Error('A server-authenticated customer id is required')
     if (!/^(catalog|quotes|orders)(\/|\?|$)/.test(path)) throw new Error('Invalid API path')
+    const invoicePath = /^orders\/[a-f0-9-]{36}\/invoice$/i.test(path)
+    if (!['json', 'pdf'].includes(responseType) || (responseType === 'pdf' && (!invoicePath || body !== undefined))) throw new Error('Invalid response type')
+    if (invoicePath && responseType !== 'pdf') throw new Error('Use responseType: pdf for invoices')
     const method = body === undefined ? 'GET' : 'POST'
     const raw = body === undefined ? '' : JSON.stringify(body)
     const target = `/api/partners/v1/${path}`
@@ -21,12 +24,18 @@ export function createNukhbaClient({ origin, partnerId, keyId, secret }) {
         ...(method === 'POST' ? { 'Idempotency-Key': idempotencyKey } : {}),
       }, ...(method === 'POST' ? { body: raw } : {}),
     })
-    const result = await response.json()
     if (!response.ok) {
+      const result = await response.json()
       const error = new Error(result.error?.code ?? 'NUKHBA_UNAVAILABLE')
       error.status = response.status; error.traceId = result.trace_id
       throw error
     }
+    if (responseType === 'pdf') {
+      if (response.headers.get('content-type')?.split(';')[0] !== 'application/pdf') throw new Error('INVALID_INVOICE_RESPONSE')
+      const name = response.headers.get('content-disposition')?.match(/filename="([a-zA-Z0-9_-]+\.pdf)"/)?.[1] ?? 'invoice.pdf'
+      return { bytes: new Uint8Array(await response.arrayBuffer()), filename: name, contentType: 'application/pdf' }
+    }
+    const result = await response.json()
     return result.data
   }
 }

@@ -171,6 +171,8 @@ try {
   assert.equal(concurrent[0].data.id,concurrent[1].data.id)
   assert.equal(concurrent.filter(r=>r.data.replayed).length,1)
   const id=concurrent[0].data.id
+  assert.equal((await call(`orders/${id}/invoice`)).status,409)
+  assert.equal((await call(`orders/${id}/invoice`,{who:otherCustomer})).status,404)
   assert.equal((await call('orders',{method:'POST',body:{...orderBody,title:'changed'},key:orderKey})).status,409)
   assert.equal((await call(`orders/${id}`,{who:otherCustomer})).status,404)
   assert.equal((await call(`orders/${id}/checkout`,{method:'POST',body:{},who:otherCustomer})).status,404)
