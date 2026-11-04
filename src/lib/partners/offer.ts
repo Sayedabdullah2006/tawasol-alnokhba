@@ -33,14 +33,16 @@ export async function partnerOffer(request: Request, ctx: PartnerContext, order:
       return replay.data.response
     }
   }
-  const available = ['quoted','approved'].includes(String(order.status)) && order.admin_quoted_price != null
+  const available = order.admin_quoted_price != null
+  const canDecide = ['quoted','approved'].includes(String(order.status)) && order.payment_status !== 'paid' && !order.paid_at
   if (!available) {
     if (body) throw new PartnerError('OFFER_NOT_AVAILABLE',409)
     return { available:false, pricing_mode:'manual', amount:order.final_total == null ? null : cents(order.final_total), offer_revision:null }
   }
+  if (body && !canDecide) throw new PartnerError('OFFER_NOT_AVAILABLE',409)
   const details = await offerDetails(ctx,order)
   const expired = order.status === 'quoted' && !!order.quote_expires_at && Date.parse(String(order.quote_expires_at))<=Date.now()
-  if (!body) return { available:true, offer_revision:details.revision, base_amount:cents(order.admin_quoted_price), amount:order.final_total == null ? null : cents(order.final_total), expires_at:order.quote_expires_at, expired,
+  if (!body) return { available:true, can_decide:canDecide && !expired, offer_revision:details.revision, base_amount:cents(order.admin_quoted_price), extras_amount:cents(order.extras_selected_total ?? 0), discount_amount:cents(order.discount_amount ?? 0), discount_code:order.discount_code ?? null, amount:order.final_total == null ? null : cents(order.final_total), expires_at:order.quote_expires_at, expired,
     offered_extras:details.offered.map(e=>({id:e.id,name:e.name,price:cents(e.price)})), selected_extras:order.user_selected_extras ?? [], negotiation:details.negotiation, currency:'SAR', money_unit:'halala' }
   const action=text(body.action,20)
   if (!['preview','accept','reject','negotiate'].includes(action)) throw new PartnerError('INVALID_OFFER_ACTION')

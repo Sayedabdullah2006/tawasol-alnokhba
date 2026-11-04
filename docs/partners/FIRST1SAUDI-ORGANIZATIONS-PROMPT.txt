@@ -73,7 +73,9 @@ GET /orders/{id}/state ما زال يعيد الحالات المركزية، و
 GET /orders/{id}/offer
 
 قبل التسعير يعيد available=false وamount=null.
-عند وجود عرض يعيد offer_revision وbase_amount وamount وoffered_extras وselected_extras وexpires_at وexpired وnegotiation وcurrency وmoney_unit.
+عند وجود عرض يعيد can_decide وoffer_revision وbase_amount وamount وoffered_extras وselected_extras وexpires_at وexpired وnegotiation وcurrency وmoney_unit.
+يبقى ملخص العرض ومبالغه متاحًا بعد الدفع أو إغلاق الطلب؛ اعرضه للقراءة فقط عندما can_decide=false، دون أزرار قبول أو تعديل أو تفاوض.
+
 جميع مبالغ API الخارجية بالهللات؛ اقسم على 100 للعرض بالريال. النسب المئوية تبقى نسبًا وليست مبالغ.
 
 اعرض الإضافات من offered_extras لهذا العرض، لا من أسعار يكتبها WordPress أو يختارها المتصفح. القيم مأخوذة من العرض المركزي أو مصدر الإضافات المركزي المعتمد.

@@ -3475,6 +3475,24 @@
                 "type": "boolean"
               }
             }
+          },
+          "can_decide": {
+            "type": "boolean",
+            "description": "False for paid, closed or expired offers. Historical financial details remain readable."
+          },
+          "extras_amount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "discount_amount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "discount_code": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       }
