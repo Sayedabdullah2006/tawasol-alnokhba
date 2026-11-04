@@ -5,6 +5,7 @@ import { partnerInvoice } from '@/lib/partners/invoice'
 import { enrichPartnerOrderStates, readPartnerOrderState } from '@/lib/partners/status'
 import { partnerStatusDefinitions } from '@/lib/partners/status-view'
 import { partnerIdentity } from '@/lib/partners/identity'
+import { partnerHistory } from '@/lib/partners/history'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -15,6 +16,11 @@ async function handle(request: Request, context: { params: Promise<{ path: strin
     const { path } = await context.params
     if (request.method === 'GET' && path.length === 3 && path[0] === 'orders' && path[2] === 'invoice') {
       return await partnerInvoice(ctx, path[1], trace)
+    }
+    if (request.method === 'POST' && path.length === 2 && path[0] === 'identity' && ['orders','order','invoice'].includes(path[1])) {
+      const result = await partnerHistory(request,ctx,path[1],trace)
+      if (result instanceof Response) return result
+      return Response.json({data:result,trace_id:trace},{headers:{'Cache-Control':'private, no-store, max-age=0'}})
     }
     let data
     if (request.method === 'POST' && path.length === 2 && path[0] === 'identity') {
