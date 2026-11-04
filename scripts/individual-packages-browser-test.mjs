@@ -41,6 +41,14 @@ try{
  const packages=await page.eval(()=>['الأساسية','الانتشار','الظهور المتكامل','النخبة','الحضور المهني'].map(name=>[...document.querySelectorAll('button span')].some(s=>s.textContent===name)))
  assert(packages.every(Boolean),'All five packages must be visible for graduation')
  await page.send('Page.removeScriptToEvaluateOnNewDocument',{identifier:injection.identifier})
+ for(const width of [1440,768,390]){
+  await page.setViewport({width,height:1000,mobile:width===390})
+  const layout=await page.eval(()=>{const grid=document.querySelector('[data-package-grid]'),r=grid.getBoundingClientRect();return {width:r.width,left:r.left,right:r.right,viewport:innerWidth,columns:getComputedStyle(grid).gridTemplateColumns.split(' ').length,overflow:document.documentElement.scrollWidth>innerWidth+1}})
+  assert(!layout.overflow,JSON.stringify(layout))
+  if(width===1440){assert.equal(layout.columns,5);assert(layout.width>width*.9,JSON.stringify(layout))}
+  await page.screenshot({path:path.join(out,`request-packages-${width}.png`),format:'png',fullPage:true})
+ }
+
  await page.eval(()=>[...document.querySelectorAll('button')].find(b=>[...b.querySelectorAll('span')].some(s=>s.textContent==='الحضور المهني')).click())
  await new Promise(r=>setTimeout(r,300))
  await waitFor(()=>JSON.parse(localStorage.getItem('tn_request_draft_v1')??'{}').category==='cv')
@@ -55,7 +63,7 @@ try{
  const saved=await db.from('publish_requests').select('final_total,package_snapshot').eq('user_id',userId).single();assert.ifError(saved.error)
  assert.equal(saved.data.final_total,1799);assert.equal(saved.data.package_snapshot.version,'2026-11-04.v3');assert.equal(saved.data.package_snapshot.pricing.advertising,40000)
  assert(saved.data.package_snapshot.package.features.some(f=>f.includes('5 إعلانات')))
- const result={passed:true,origin:base,viewports:[1440,768,390],all_five_for_graduation:true,career_switches_category:true,career_deep_link:true,native_order_snapshot:true,career_total:1799,career_advertising:400,provider_payment_submitted:false}
+ const result={passed:true,origin:base,viewports:[1440,768,390],desktop_full_width:true,desktop_columns:5,all_five_for_graduation:true,career_switches_category:true,career_deep_link:true,native_order_snapshot:true,career_total:1799,career_advertising:400,provider_payment_submitted:false}
  writeFileSync(path.join(out,'browser-results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result))
 }catch(e){if(qaPage){console.error(await qaPage.eval(()=>({path:location.pathname,text:document.body.innerText})));await qaPage.screenshot({path:path.join(out,'failure.png'),format:'png',fullPage:true})}console.error(logs.slice(-1500));throw e}
 finally{

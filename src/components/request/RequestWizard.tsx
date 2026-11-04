@@ -110,7 +110,7 @@ const fieldLabel = 'block text-sm font-bold text-dark mb-1.5'
 
 // ─── مكوّن قسم قابل للطي ─────────────────────────────────────────
 function FormSection({
-  index, title, subtitle, complete, open, onToggle, children,
+  index, title, subtitle, complete, open, onToggle, children, wide = false,
 }: {
   index: number
   title: string
@@ -119,6 +119,7 @@ function FormSection({
   open: boolean
   onToggle: () => void
   children: ReactNode
+  wide?: boolean
 }) {
   return (
     <div data-request-section data-complete={complete} data-open={open} className={cn(
@@ -145,7 +146,7 @@ function FormSection({
         <span className="text-muted text-xs flex-shrink-0">{open ? '▲' : '▼'}</span>
       </button>
       {open && (
-        <div id={`request-section-${index}`} className="px-5 pb-5 pt-2 border-t border-border wizard-enter">
+        <div id={`request-section-${index}`} className={cn('px-5 pb-5 pt-2 border-t border-border wizard-enter', !wide && 'max-w-4xl mx-auto')}>
           {children}
         </div>
       )}
@@ -995,7 +996,7 @@ export default function RequestWizard() {
   // ── العرض ───────────────────────────────────────────────────────
   return (
     <div className="request-screen min-h-screen pb-36 lg:pb-10">
-      <div className="max-w-6xl mx-auto w-full px-4 pt-6">
+      <div className={cn('mx-auto w-full px-4 pt-6 lg:px-6 2xl:px-8', membershipMode ? 'max-w-6xl' : 'max-w-none')}>
         <div className="relative max-w-3xl mx-auto text-center mb-5">
           {membershipMode && membershipAvailable != null && (
             <div className="mb-4 inline-flex items-center gap-3 rounded-lg border border-gold/30 bg-white/80 px-4 py-2 text-right shadow-sm lg:absolute lg:left-0 lg:top-0 lg:mb-0">
@@ -1024,7 +1025,7 @@ export default function RequestWizard() {
         <RequestReviewsTrust />
 
         <div className={cn(membershipMode && !membershipPortalMode && 'lg:grid lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start lg:gap-6 xl:gap-8')}>
-        <main className={cn('min-w-0 mx-auto w-full', !membershipMode || membershipPortalMode ? 'max-w-3xl' : 'max-w-2xl lg:max-w-none lg:mx-0')}>
+        <main className={cn('min-w-0 mx-auto w-full', !membershipMode ? 'max-w-none' : membershipPortalMode ? 'max-w-3xl' : 'max-w-2xl lg:max-w-none lg:mx-0')}>
         <div className="space-y-3">
 
           {/* ① عن الطلب ─────────────────────────────────────────── */}
@@ -1327,6 +1328,7 @@ export default function RequestWizard() {
               index={3}
               title="اختر الباقة"
               subtitle={requestType === 'campaign' ? 'باقة واحدة تنطبق على كل أخبار الحملة' : 'حدّد الباقة المناسبة لخبرك'}
+              wide={requestType === 'single'}
               complete={packagesComplete}
               open={openSection === 2}
               onToggle={() => setOpenSection(openSection === 2 ? -1 : 2)}
@@ -1336,7 +1338,7 @@ export default function RequestWizard() {
                   🚀 الباقة المختارة تنطبق على كل أخبار الحملة ({campaignPosts.length} منشورات) — السعر يشمل خصم الحملة {CAMPAIGN_DISCOUNT}%.
                 </p>
               )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div data-package-grid className={cn('grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3', requestType === 'single' && 'xl:grid-cols-5')}>
                 {offeredPackages.map(pkg => {
                   const isSelected = selectedPackage === pkg.id
                   // السعر: المفرد = سعر الخبر × معامل الباقة ؛ الحملة = مجموع الأخبار × معامل الباقة − خصم الحملة
@@ -1394,7 +1396,7 @@ export default function RequestWizard() {
                           🛍️ {pkg.badge}
                         </span>
                       )}
-                      <ul className="space-y-1.5 mt-auto">
+                      <ul className="space-y-1.5 mt-3">
                         {visibleFeatures.map((f, i) => {
                           const isSponsored = f.includes('مموّل')
                           return (
