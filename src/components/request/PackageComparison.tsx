@@ -5,11 +5,9 @@ import type { IndividualPackage } from '@/lib/individual-packages'
 import styles from './PackageComparison.module.css'
 
 type Props = { packages: IndividualPackage[]; selected: string | null; prices: Record<string, number | null>; availableChannels: string[]; onSelect: (id: string) => void }
-const summaryRows = ['channels','copy_design','revision_rounds','mention','story_page','produced_video','advertising','campaign_report']
 export default function PackageComparison({ packages, selected, prices, availableChannels, onSelect }: Props) {
-  const [expanded,setExpanded]=useState(false),[mobileTable,setMobileTable]=useState(false),[active,setActive]=useState(selected ?? packages[0]?.id ?? '')
+  const [mobileTable,setMobileTable]=useState(false),[active,setActive]=useState(selected ?? packages[0]?.id ?? '')
   const rows=[...new Map(packages.flatMap(p=>p.benefits).filter(b=>b.id!=='purpose').map(b=>[b.id,{id:b.id,label:b.label}])).values()]
-  const visible=expanded?rows:rows.filter(r=>summaryRows.includes(r.id))
   const usable=(p:IndividualPackage)=>p.channels?p.channels.every(c=>availableChannels.includes(c)):availableChannels.length>=p.channelCount
   const price=(p:IndividualPackage)=>prices[p.id]==null?'يُحسب بعد اختيار نوع الخبر':`${prices[p.id]!.toLocaleString('ar-SA')} ريال`
   const choose=(p:IndividualPackage)=><button type="button" className={`${styles.choose} ${selected===p.id?styles.chosen:''}`} disabled={!usable(p)||prices[p.id]==null} aria-pressed={selected===p.id} onClick={()=>{setActive(p.id);onSelect(p.id)}}>{!usable(p)?'غير متاحة لقنوات الناشر':selected===p.id?'الباقة المختارة':`اختيار ${p.name}`}</button>
@@ -26,7 +24,7 @@ export default function PackageComparison({ packages, selected, prices, availabl
         <caption className="sr-only">مقارنة أسعار الباقات ومزاياها؛ اختر باقة واحدة ثم أكمل القنوات والتفاصيل.</caption>
         <colgroup><col className={styles.labelColumn}/>{packages.map(p=><col key={p.id}/>)}</colgroup>
         <thead><tr><th scope="col">المزايا</th>{packages.map(p=><th scope="col" key={p.id} className={selected===p.id?styles.selected:''}><span className={styles.name}>{p.name}</span><strong className={styles.price}>{price(p)}</strong>{choose(p)}</th>)}</tr></thead>
-        <tbody>{visible.map(row=><tr key={row.id}><th scope="row">{row.label}</th>{packages.map(p=><td key={p.id} className={selected===p.id?styles.selected:''}>{value(p,row.id)}</td>)}</tr>)}</tbody>
+        <tbody>{rows.map(row=><tr key={row.id} data-benefit-id={row.id}><th scope="row">{row.label}</th>{packages.map(p=><td key={p.id} className={selected===p.id?styles.selected:''}>{value(p,row.id)}</td>)}</tr>)}</tbody>
         <tfoot><tr><th scope="row">اختيار الباقة</th>{packages.map(p=><td key={p.id} className={selected===p.id?styles.selected:''}>{choose(p)}</td>)}</tr></tfoot>
       </table>
     </div>
@@ -34,11 +32,10 @@ export default function PackageComparison({ packages, selected, prices, availabl
       <div className={styles.tabs} role="tablist" aria-label="استعراض الباقات">{packages.map(p=><button key={p.id} type="button" role="tab" id={`package-tab-${p.id}`} aria-selected={current.id===p.id} aria-controls="mobile-package-panel" tabIndex={current.id===p.id?0:-1} onClick={()=>setActive(p.id)} onKeyDown={event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const index=packages.findIndex(v=>v.id===current.id),next=event.key==='Home'?0:event.key==='End'?packages.length-1:(index+(event.key==='ArrowLeft'?1:-1)+packages.length)%packages.length;setActive(packages[next].id);document.getElementById(`package-tab-${packages[next].id}`)?.focus()}}}>{p.name}</button>)}</div>
       <section id="mobile-package-panel" role="tabpanel" aria-labelledby={`package-tab-${current.id}`} className={`${styles.card} ${selected===current.id?styles.selected:''}`}>
         <h3 className={styles.name}>{current.name}</h3><strong className={styles.price}>{price(current)}</strong>
-        <dl>{visible.map(row=><div key={row.id}><dt>{row.label}</dt><dd>{value(current,row.id)}</dd></div>)}</dl>
+        <dl>{rows.map(row=><div key={row.id} data-benefit-id={row.id}><dt>{row.label}</dt><dd>{value(current,row.id)}</dd></div>)}</dl>
         {choose(current)}
       </section>
     </div>
-    <button type="button" className={styles.expand} aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}>{expanded?'عرض المقارنة المختصرة':'عرض جميع المزايا'}</button>
     <p className={styles.legend}><span aria-hidden="true">✓</span> مشمول <span aria-hidden="true">×</span> غير مشمول. تظهر الإضافات المتاحة في مراجعة الطلب.</p>{/* taste-skill-ignore: Legend for user-requested comparison indicators. */}
   </div>
 }
