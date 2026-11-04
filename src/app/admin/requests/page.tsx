@@ -83,6 +83,8 @@ type AdminRequest = {
   remainingRefundAmount?: number
   selected_package?: string | null
   category?: string | null
+  source_site?: string | null
+  package_snapshot?: { package: { name: string; features: string[] } } | null
   auto_quote_tier?: string | null
   campaign_post_count?: number | null
   num_posts?: number | null
@@ -1244,7 +1246,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: RequestScope }
           {pageLoading && <div className="rounded-lg border border-border bg-card p-10 text-center text-sm text-muted">جارٍ تحميل الطلبات...</div>}
           {!pageLoading && filteredRequests.map(r => {
             const cat = CATEGORIES.find(c => c.id === r.category)
-            const selectedPackage = PACKAGES.find(pkg => pkg.id === (r.auto_quote_tier ?? r.selected_package))
+            const selectedPackage = r.package_snapshot?.package ?? PACKAGES.find(pkg => pkg.id === (r.auto_quote_tier ?? r.selected_package))
             const total = r.final_total ?? r.admin_quoted_price
             const expanded = !!expandedRequests[r.id]
             const thumbnailUrl = getRequestThumbnail(r)
@@ -1269,7 +1271,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: RequestScope }
                       {storeOnly && <span className="rounded-full border border-cyan-300 bg-cyan-50 px-2 py-0.5 text-[10px] font-bold text-cyan-800">طلب من مسار المخترع</span>}
                       {r.is_external && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">خارجي</span>}
                     </div>
-                    <button type="button" onClick={() => openRequest(r)} className="mt-2 block text-right text-sm font-black leading-6 text-dark hover:text-green sm:text-base">{r.title || 'طلب بدون عنوان'}</button>
+                    <button type="button" onClick={() => openRequest(r)} className="mt-2 block text-right text-sm font-black leading-6 text-dark hover:text-green sm:text-base">{r.source_site === 'awwal-saudi' ? 'أول سعودي · ' : ''}{r.title || 'طلب بدون عنوان'}</button>
                     {r.content && <p className="mt-1 max-w-3xl text-xs leading-5 text-muted">{truncateContent(r.content, 150)}</p>}
                     <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-bold">
                       {cat && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{cat.icon} {cat.nameAr}</span>}
@@ -1417,7 +1419,7 @@ export function AdminRequestsPage({ scope = 'direct' }: { scope?: RequestScope }
                 const cat = CATEGORIES.find(c => c.id === r.category)
                 // الباقة المثبتة في سجل الطلب تُحفظ مع التسعير التلقائي في auto_quote_tier.
                 // نُبقي selected_package كاحتياط للطلبات التي استُوردت بصيغة أقدم.
-                const selectedPackage = PACKAGES.find(pkg => pkg.id === (r.auto_quote_tier ?? r.selected_package))
+                const selectedPackage = r.package_snapshot?.package ?? PACKAGES.find(pkg => pkg.id === (r.auto_quote_tier ?? r.selected_package))
                 return (
                   <tr
                     key={r.id}

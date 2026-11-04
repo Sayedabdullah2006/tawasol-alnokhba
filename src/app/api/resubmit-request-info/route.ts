@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { notifyInfoResubmittedToAdmin } from '@/lib/email'
 import { normalizeImageUrls, normalizeSupportingDocuments } from '@/lib/request-attachments'
 
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
       if (Array.isArray(body.supportingDocuments)) update.supporting_documents = normalizeSupportingDocuments(body.supportingDocuments)
     }
 
-    const { error } = await supabase
+    const { error } = await (await createServiceRoleClient())
       .from('publish_requests')
       .update(update)
       .eq('id', requestId)

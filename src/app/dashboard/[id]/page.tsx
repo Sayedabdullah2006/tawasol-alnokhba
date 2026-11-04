@@ -289,6 +289,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
         {effectiveStatus === 'approved' && request.admin_quoted_price != null && (
           <div className="mt-4 space-y-4">
             {/* الخدمات الإضافية ما بعد العرض — تُعطَّل عند اختيار باقة */}
+            {request.package_snapshot && <section className="rounded-xl border border-border p-5 mb-5"><h2 className="font-bold mb-3">{request.package_snapshot.package.name}</h2><ul className="space-y-2 text-sm">{request.package_snapshot.package.features.map((feature: string) => <li key={feature}>{feature}</li>)}</ul><p className="mt-3 text-sm">ميزانية الإعلان المشمولة: {request.package_snapshot.pricing.advertising / 100} ريال</p></section>}
             {!request.auto_quote_tier && (
               <EditableExtras
                 requestId={request.id}

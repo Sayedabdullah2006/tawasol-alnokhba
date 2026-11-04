@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { notifyContentApprovedToClient } from '@/lib/email'
 
 export async function POST(request: Request) {
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     }
 
     // Update request status back to in_progress
-    const { data: updatedRows, error } = await supabase
+    const { data: updatedRows, error } = await (await createServiceRoleClient())
       .from('publish_requests')
       .update({
         status: 'in_progress',

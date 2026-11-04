@@ -3,6 +3,7 @@
 // throw, so a missing key or transient network blip never blocks the request
 // pipeline that triggered the email.
 
+import { partnerFollowUpHtml } from './partners/notifications'
 import { createServiceRoleClient } from './supabase-server'
 import * as templates from './email-templates'
 import { sendEnhancedEmail, htmlToText } from './email-deliverability'
@@ -93,7 +94,7 @@ export async function notifyPaymentConfirmedToClient(args: {
       invoiceNumber: invoice.invoiceNumber,
       invoiceDownloadUrl,
     })
-    const sent = await sendEmail(args.email, t.subject, t.html, [{
+    const sent = await sendEmail(args.email, t.subject, await partnerFollowUpHtml(t.html, args.requestId), [{
       filename: invoice.filename,
       content: invoice.pdf.toString('base64'),
       contentType: 'application/pdf',
@@ -103,7 +104,7 @@ export async function notifyPaymentConfirmedToClient(args: {
   } catch (error) {
     console.error('[INVOICE] Failed to create or attach payment invoice:', error)
     const t = templates.paymentConfirmedToClient(args)
-    return sendEmail(args.email, t.subject, t.html)
+    return sendEmail(args.email, t.subject, await partnerFollowUpHtml(t.html, args.requestId))
   }
 }
 
@@ -122,24 +123,24 @@ export async function notifyQuoteApprovedAwaitingPaymentToClient(args: {
 }
 
 export async function notifyInProgressToClient(args: {
-  email: string; requestNumber: string; clientName: string
+  requestId?: string; email: string; requestNumber: string; clientName: string
 }) {
   const t = templates.inProgressToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendEmail(args.email, t.subject, await partnerFollowUpHtml(t.html, args.requestId))
 }
 
 export async function notifyCompletedToClient(args: {
-  email: string; requestNumber: string; clientName: string; reviewUrl?: string
+  requestId?: string; email: string; requestNumber: string; clientName: string; reviewUrl?: string
 }) {
   const t = templates.completedToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendEmail(args.email, t.subject, await partnerFollowUpHtml(t.html, args.requestId))
 }
 
 export async function notifyRejectedToClient(args: {
-  email: string; requestNumber: string; clientName: string; reason: string
+  requestId?: string; email: string; requestNumber: string; clientName: string; reason: string
 }) {
   const t = templates.rejectedToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendEmail(args.email, t.subject, await partnerFollowUpHtml(t.html, args.requestId))
 }
 
 export async function sendRegistrationCode(args: {
@@ -178,19 +179,19 @@ export async function sendResetPasswordCode(args: {
 }
 
 export async function notifyStatusUpdateToClient(args: {
-  email: string; requestNumber: string; clientName: string; status: string; statusLabel: string; adminNotes?: string
+  requestId?: string; email: string; requestNumber: string; clientName: string; status: string; statusLabel: string; adminNotes?: string
 }) {
   const t = templates.statusUpdateToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendEmail(args.email, t.subject, await partnerFollowUpHtml(t.html, args.requestId))
 }
 
 // ─── Content Review Email Functions ───
 
 export async function notifyContentReadyForReview(args: {
-  email: string; requestNumber: string; clientName: string; proposedContent: string; proposedImages: string[]; edited?: boolean
+  email: string; requestNumber: string; clientName: string; proposedContent: string; proposedImages: string[]; edited?: boolean; requestId?: string
 }) {
   const t = templates.contentReadyForReview(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendEmail(args.email, t.subject, await partnerFollowUpHtml(t.html, args.requestId))
 }
 
 export async function sendRequestReviewEmail(args: {
@@ -201,10 +202,10 @@ export async function sendRequestReviewEmail(args: {
 }
 
 export async function notifyRefundUpdateToClient(args: {
-  email: string; requestNumber: string; clientName: string; amount: number; timing: string; isPending: boolean
+  requestId?: string; email: string; requestNumber: string; clientName: string; amount: number; timing: string; isPending: boolean
 }) {
   const t = templates.refundUpdateToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendEmail(args.email, t.subject, await partnerFollowUpHtml(t.html, args.requestId))
 }
 
 export async function notifyCampaignReadyForReview(args: {
@@ -240,10 +241,10 @@ export async function notifyContentChangesRequested(args: {
 }
 
 export async function notifyInfoRequestedToClient(args: {
-  email: string; requestNumber: string; clientName: string; message: string
+  requestId?: string; email: string; requestNumber: string; clientName: string; message: string
 }) {
   const t = templates.infoRequestedToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendEmail(args.email, t.subject, await partnerFollowUpHtml(t.html, args.requestId))
 }
 
 export async function notifyMotivateUser(args: { email: string; clientName?: string }) {

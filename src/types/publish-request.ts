@@ -1,6 +1,8 @@
 export interface PublishRequest {
   [key: string]: unknown
   id: string
+  package_snapshot?: { package: { name: string; features: string[] }; pricing: { advertising: number } } | null
+
   request_number: number
   category: string
   status: string

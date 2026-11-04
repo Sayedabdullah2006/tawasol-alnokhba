@@ -15,7 +15,8 @@ interface UseMoyasarReturn {
     amount: number,
     description: string,
     metadata?: PaymentMetadata,
-    elementRef?: HTMLElement
+    elementRef?: HTMLElement,
+    publishableKeyOverride?: string
   ) => Promise<void>;
 }
 
@@ -91,7 +92,8 @@ export function useMoyasar(): UseMoyasarReturn {
       amount: number,
       description: string,
       metadata?: PaymentMetadata,
-      elementRef?: HTMLElement
+      elementRef?: HTMLElement,
+    publishableKeyOverride?: string
     ): Promise<void> => {
       if (!isLoaded || !window.Moyasar) {
         throw new Error('مكتبة الدفع الإلكتروني غير محملة بعد');
@@ -106,11 +108,12 @@ export function useMoyasar(): UseMoyasarReturn {
           throw new Error('عنصر نموذج الدفع غير موجود في الصفحة');
         }
 
-        const publishableKey = getPublishableKey();
+        const publishableKey = publishableKeyOverride ?? getPublishableKey();
         const isMembership = metadata?.resource_type === 'membership' && metadata?.membership_id;
         const isMembershipTopup = metadata?.resource_type === 'membership_topup' && metadata?.topup_id;
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-        const callbackUrl = isMembershipTopup
+        const isPartner = metadata?.resource_type === 'partner_order';
+        const callbackUrl = isPartner ? `${siteUrl}/checkout/partner/callback?session=${encodeURIComponent(String(metadata?.partner_checkout_id ?? ""))}` : isMembershipTopup
           ? `${siteUrl}/memberships/topup/payment/callback`
           : isMembership
             ? `${siteUrl}/memberships/payment/callback`
@@ -133,6 +136,7 @@ export function useMoyasar(): UseMoyasarReturn {
           }),
           metadata,
           on_completed: (payment: MoyasarPayment) => {
+            if (isPartner) { window.location.href = `/checkout/partner/callback?session=${encodeURIComponent(String(metadata?.partner_checkout_id ?? ""))}&id=${encodeURIComponent(payment.id)}`; return; }
             if (isMembership) {
               const membershipId = String(payment.metadata?.membership_id ?? metadata?.membership_id ?? '');
               if (payment.status === 'paid' && membershipId) {
@@ -166,6 +170,7 @@ export function useMoyasar(): UseMoyasarReturn {
             }
           },
           on_failed: (error: MoyasarPaymentFailure) => {
+            if (isPartner) { window.location.href = `/checkout/partner/callback?session=${encodeURIComponent(String(metadata?.partner_checkout_id ?? ''))}${error?.id ? `&id=${encodeURIComponent(error.id)}` : ''}`; return; }
             console.error('[Moyasar] Payment failed:', error);
             const membershipId = paymentConfig.metadata?.membership_id ?? '';
             const topupId = paymentConfig.metadata?.topup_id ?? '';

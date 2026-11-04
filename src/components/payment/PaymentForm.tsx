@@ -14,6 +14,7 @@ import type { PaymentMetadata } from '@/types/moyasar';
 interface PaymentFormProps {
   /** Payment amount in SAR */
   amount: number;
+  publishableKey?: string;
   /** Payment description */
   description: string;
   /** Additional metadata to include with payment */
@@ -24,6 +25,7 @@ interface PaymentFormProps {
 
 export default function PaymentForm({
   amount,
+  publishableKey,
   description,
   metadata,
   className = '',
@@ -44,14 +46,14 @@ export default function PaymentForm({
 
     // تأخير قصير لضمان تحديث DOM قبل تهيئة Moyasar
     const timer = setTimeout(() => {
-      initPayment(amount, description, metadata, el).catch((err) => {
+      initPayment(amount, description, metadata, el, publishableKey).catch((err) => {
         console.error('Failed to initialize payment:', err);
         initedAmountRef.current = null; // السماح بإعادة المحاولة
       });
     }, 200);
 
     return () => clearTimeout(timer);
-  }, [isLoaded, amount, description, metadata, initPayment]);
+  }, [isLoaded, amount, description, metadata, initPayment, publishableKey]);
 
   // Loading state
   if (isLoading) {

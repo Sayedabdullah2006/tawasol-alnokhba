@@ -12,6 +12,9 @@ import WorkSessionProvider, { WorkSessionBar } from "@/components/workforce/Work
 /** Internal workspaces never mount customer navigation, marketing or promotions. */
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  if (pathname.startsWith('/checkout/partner')) {
+    return <div className="min-h-screen bg-cream"><header className="border-b border-border bg-card px-5 py-4 text-sm font-bold">تواصل النخبة · الدفع الآمن</header>{children}</div>;
+  }
   if (pathname.startsWith("/card/")) return <>{children}</>;
   const employee =
     pathname === "/employee" || pathname.startsWith("/employee/");

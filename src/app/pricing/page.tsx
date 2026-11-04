@@ -1,50 +1,11 @@
+import { SINGLE_PACKAGES } from '@/lib/individual-packages'
 import Link from 'next/link'
 
 export const metadata = {
   title: 'الأسعار | تواصل النخبة',
 }
 
-const tiers = [
-  {
-    name: 'الباقة الأساسية',
-    startsFrom: 3000,
-    blurb: 'لإطلاق منتج أو موقع أو تطبيق بصورة احترافية',
-    badge: 'تمارا · ادفع على 3 أقساط',
-    features: [
-      'منشور على قناة واحدة',
-      'صياغة احترافية للمحتوى',
-      'صورة واحدة جاهزة للنشر',
-      'تنفيذ خلال 24–48 ساعة',
-    ],
-  },
-  {
-    name: 'الباقة الاحترافية',
-    startsFrom: 4380,
-    blurb: 'الأنسب للأفراد والشركات الناشئة',
-    badge: 'تمارا · ادفع على 3 أقساط',
-    highlighted: true,
-    features: [
-      'نشر على عدة قنوات',
-      'محتوى ثنائي اللغة',
-      'مجموعة صور احترافية',
-      'تثبيت قصير + إعادة نشر',
-      'حملة إعلانية مموّلة بميزانية 100 ر.س',
-    ],
-  },
-  {
-    name: 'باقة التميز',
-    startsFrom: 4800,
-    blurb: 'لإطلاق أوسع وأثر أطول لمنتجك أو تطبيقك',
-    badge: 'تمارا · ادفع على 3 أقساط',
-    features: [
-      'حملة متكاملة على جميع القنوات',
-      'محتوى مرئي + انفوجرافيك',
-      'تثبيت طويل + إعادة نشر',
-      'تقرير أداء تفصيلي',
-      'حملة إعلانية مموّلة بميزانية 250 ر.س',
-    ],
-  },
-]
+const tiers = SINGLE_PACKAGES.map(pkg => ({ ...pkg, startsFrom: pkg.fixedPrice ?? 499 + pkg.surcharge }))
 
 export default function PricingPage() {
   return (
@@ -53,7 +14,7 @@ export default function PricingPage() {
           <div className="max-w-4xl mx-auto px-4 text-center">
             <h1 className="text-3xl md:text-5xl font-black mb-4">الأسعار</h1>
             <p className="text-cream/70 text-base md:text-lg max-w-2xl mx-auto">
-              باقات إطلاق المنتج أو الموقع أو التطبيق تبدأ من <span className="font-black text-cream">3,000 ر.س</span> — ويُحدَّد السعر النهائي حسب طبيعة المحتوى والخدمات الإضافية المطلوبة
+              باقات الأفراد تبدأ من <span className="font-black text-cream">499 ر.س</span> — اختر نوع الخبر لمعرفة سعر الباقة. إطلاق المنتج أو الموقع أو التطبيق يبدأ من 3,000 ر.س للباقة الأساسية.
             </p>
           </div>
         </section>
@@ -76,7 +37,7 @@ export default function PricingPage() {
                   <h2 className="text-xl font-black text-dark mb-1">{t.name}</h2>
                   <p className="text-xs text-muted mb-5">{t.blurb}</p>
                   <span className="mb-4 inline-flex items-center gap-1 rounded-lg border border-pink-200 bg-pink-50 px-2 py-1 text-[10px] font-bold text-pink-600">
-                    🛍️ {t.badge}
+                    ميزانية الإعلان مشمولة إن وجدت
                   </span>
                   <div className="mb-5">
                     <div className="text-xs text-muted">تبدأ من</div>
@@ -110,7 +71,7 @@ export default function PricingPage() {
                         ? 'bg-green text-white hover:bg-green/90'
                         : 'border-2 border-green text-green hover:bg-green/5'
                     }`}>
-                    اطلب تسعيرة
+                    اختر نوع خبرك
                   </Link>
                 </div>
               ))}
@@ -118,10 +79,10 @@ export default function PricingPage() {
 
             <div className="mt-12 bg-card border border-border rounded-2xl p-6 max-w-3xl mx-auto text-center">
               <div className="text-3xl mb-3">💬</div>
-              <h3 className="font-bold text-dark text-lg mb-2">السعر النهائي يحدده فريقنا بعد مراجعة الطلب</h3>
+              <h3 className="font-bold text-dark text-lg mb-2">سعر واضح حسب نوع الخبر والباقة</h3>
               <p className="text-sm text-muted leading-relaxed">
-                بعد إرسال طلبك، يقوم فريق تواصل النخبة بمراجعة المحتوى وإرسال عرض سعر مخصص يناسب طبيعة المحتوى والقنوات المختارة.
-                يمكنك بعدها إضافة الخدمات الاختيارية لرفع مستوى الحملة، وكل خدمة تضاف يظهر أمامك أثرها على السعر والوصول المتوقع.
+                سعر الباقة الأساسية يعتمد على نوع خبرك. الانتشار يضيف 400 ريال، والظهور المتكامل 1,400 ريال، والنخبة 2,800 ريال. الحضور المهني بسعر مستقل 1,799 ريال.
+                الإنتاج من مواد العميل، والتصوير الميداني والترجمة خارج النطاق. فئة «أخرى» والجهات تحتاج عرض سعر. يظهر الإجمالي المعتمد قبل الدفع.
               </p>
               <Link href="/request"
                 className="inline-block mt-4 px-6 py-3 bg-green text-white rounded-xl text-sm font-bold hover:bg-green/90 transition-all">

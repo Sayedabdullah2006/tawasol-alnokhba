@@ -11,7 +11,11 @@ import { createServiceRoleClient } from '@/lib/supabase-server';
 export async function POST(request: NextRequest) {
   try {
     // Step 1: Verify signature FIRST — reject unauthorized requests immediately
-    const signature = request.headers.get('x-moyasar-signature');
+    const raw = await request.text();
+    if (raw.length > 131072) return NextResponse.json({ error: 'payload too large' }, { status: 413 });
+    let payload: any;
+    try { payload = JSON.parse(raw) } catch { return NextResponse.json({ error: 'invalid json' }, { status: 400 }) }
+    const signature = request.headers.get('x-moyasar-signature') || (typeof payload.secret_token === 'string' ? payload.secret_token : null);
     const webhookSecret = process.env.MOYASAR_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
@@ -31,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 2: Parse body only after signature passes
-    const payload = await request.json();
+    // Payload is parsed above; no side effects occur until the shared secret is verified.
     console.log('[WEBHOOK] ✅ Signature verified, processing:', payload.type);
 
     const supabase = await createServiceRoleClient();
@@ -42,7 +46,7 @@ export async function POST(request: NextRequest) {
         event_type: payload.type,
         payment_id: payload.data?.id,
         request_id: payload.data?.metadata?.request_id,
-        raw_payload: payload,
+        raw_payload: { id: payload.id, type: payload.type, data: { id: payload.data?.id, metadata: payload.data?.metadata } },
         processed_at: new Date().toISOString(),
       });
     } catch (logError) {
@@ -52,6 +56,17 @@ export async function POST(request: NextRequest) {
     // يدعم الصيغة القديمة والجديدة لأسماء أحداث ميسر.
     if ((payload.type === 'payment.paid' || payload.type === 'payment_paid') && payload.data) {
       const { id: paymentId, metadata } = payload.data;
+      if (metadata?.resource_type === 'partner_order') {
+        try {
+          const { settlePartnerPayment } = await import('@/lib/partners/checkout');
+          await settlePartnerPayment(paymentId, metadata?.partner_checkout_id);
+          return NextResponse.json({ received: true });
+        } catch (error) {
+          console.error('[PARTNER_WEBHOOK] verification failed; provider should retry', error);
+          return NextResponse.json({ error: 'retry_required' }, { status: 503 });
+        }
+      }
+
       if (metadata?.resource_type === 'membership_topup' && metadata?.topup_id) {
         try {
           const { verifyAndApplyMembershipTopup } = await import('@/lib/membership-topup-payment');

@@ -1,5 +1,6 @@
 'use client'
 
+import { SINGLE_PACKAGES, getIndividualPackage, packagesForCategory, packagePrice, resolvePackageChannels } from '@/lib/individual-packages'
 import { useState, useEffect, useMemo, type ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -219,6 +220,8 @@ export default function RequestWizard() {
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null)
   // قناة النشر للباقة الأساسية (قناة واحدة يحددها المستخدم)
   const [basicChannel, setBasicChannel] = useState<string | null>(null)
+  const [reachChannels, setReachChannels] = useState<string[]>([])
+  const [career, setCareer] = useState({ language: 'ar', goal: '', experience: '', education: '' })
 
   // ── بيانات الحملة ──────────────────────────────────────────────
   const [campaignSetup, setCampaignSetup] = useState<CampaignSetup>({ postCount: 2, duration: '' })
@@ -316,11 +319,13 @@ export default function RequestWizard() {
           if (d.contact)              setContact(d.contact)
           if (d.orgInfo)              setOrgInfo(d.orgInfo)
           if (d.campaignSetup)        setCampaignSetup(d.campaignSetup)
-          if (d.selectedPackage === 'basic' && Array.isArray(d.selectedExtras)) setSelectedExtras(d.selectedExtras)
+          if ((d.selectedPackage === 'basic' || d.selectedPackage === 'v2_basic') && Array.isArray(d.selectedExtras)) setSelectedExtras(d.selectedExtras)
           if (typeof d.discountCode === 'string') setDiscountCode(d.discountCode)
-          if (ORDERABLE_PACKAGES.some((pkg) => pkg.id === d.selectedPackage)) {
+          if ([...ORDERABLE_PACKAGES, ...SINGLE_PACKAGES].some((pkg) => pkg.id === d.selectedPackage)) {
             setSelectedPackage(d.selectedPackage)
           }
+          if (d.career && typeof d.career === 'object') setCareer(d.career)
+          if (Array.isArray(d.reachChannels)) setReachChannels(d.reachChannels)
           if (d.basicChannel)         setBasicChannel(d.basicChannel)
           if (Array.isArray(d.campaignPosts) && d.campaignPosts.length) {
             setCampaignPosts(d.campaignPosts.map((post: CampaignPostData) => ({
@@ -411,13 +416,13 @@ export default function RequestWizard() {
         savedAt: Date.now(),
         selectedInfluencer, requestType, clientType, category, subOption,
         competitionSelection, details, channels, contact, orgInfo,
-        campaignSetup, campaignPosts, selectedPackage, basicChannel, selectedExtras, discountCode,
+        campaignSetup, campaignPosts, selectedPackage, basicChannel, reachChannels, career, selectedExtras, discountCode,
       }))
     } catch { /* تجاوز سعة التخزين — نتجاهل بهدوء */ }
   }, [
     hydrated, selectedInfluencer, requestType, clientType, category, subOption,
     competitionSelection, details, channels, contact, orgInfo,
-    campaignSetup, campaignPosts, selectedPackage, basicChannel, selectedExtras, discountCode,
+    campaignSetup, campaignPosts, selectedPackage, basicChannel, reachChannels, career, selectedExtras, discountCode,
   ])
 
   // ملاحظة: بيانات التواصل تُحمَّل تلقائياً من بروفايل الحساب وتُرسَل مع الطلب،
@@ -449,8 +454,14 @@ export default function RequestWizard() {
   const isOtherCategory = category === 'Others'
   const showPackages = !membershipMode && clientType === 'individual' && !isOtherCategory
   // الباقة الأساسية تتطلّب اختيار قناة واحدة للنشر
-  const basicNeedsChannel = showPackages && selectedPackage === 'basic'
-  const packagesComplete = !showPackages || (!!selectedPackage && (!basicNeedsChannel || !!basicChannel))
+  const basicNeedsChannel = showPackages && (selectedPackage === 'basic' || selectedPackage === 'v2_basic')
+  const offeredPackages = requestType === 'campaign' ? ORDERABLE_PACKAGES : packagesForCategory(category ?? '')
+  const chosenV2 = getIndividualPackage(selectedPackage ?? '')
+  const chosenChannels = chosenV2?.id === 'v2_basic' ? (basicChannel ? [basicChannel] : []) : chosenV2?.id === 'v2_reach' ? reachChannels : [...(chosenV2?.channels ?? [])]
+  let validV2Channels = true
+  if (chosenV2) { try { resolvePackageChannels(chosenV2, chosenChannels, availableChannels) } catch { validV2Channels = false } }
+  const careerComplete = chosenV2?.id !== 'v2_career' || [career.goal, career.experience, career.education].every(v => v.trim().length > 0)
+  const packagesComplete = !showPackages || (careerComplete && !!selectedPackage && offeredPackages.some(p => p.id === selectedPackage) && (!basicNeedsChannel || !!basicChannel) && validV2Channels)
 
   // السعر الديناميكي للباقة الأساسية = سعر التسعير التلقائي حسب نوع الخبر
   const basicDynamicPrice: number | null = (() => {
@@ -491,8 +502,8 @@ export default function RequestWizard() {
     }
   })()
 
-  const selectedPackageData = ORDERABLE_PACKAGES.find((pkg) => pkg.id === selectedPackage) ?? null
-  const extrasTotal = selectedExtras.reduce((total, id) => total + (AQ_EXTRAS_PRICES[id] ?? 0), 0)
+  const selectedPackageData = offeredPackages.find((pkg) => pkg.id === selectedPackage) ?? null
+  const extrasTotal = selectedExtras.filter(id => !chosenV2?.includedExtras.includes(id)).reduce((total, id) => total + (AQ_EXTRAS_PRICES[id] ?? 0), 0)
   const estimatedTotal = (() => {
     if (!showPackages || !selectedPackageData) return null
     if (requestType === 'campaign' && campaignBaseSubtotal != null) {
@@ -500,7 +511,7 @@ export default function RequestWizard() {
       return packageTotal - Math.round(packageTotal * CAMPAIGN_DISCOUNT / 100)
     }
     if (requestType === 'single' && basicDynamicPrice != null) {
-      return Math.round(basicDynamicPrice * selectedPackageData.priceMultiplier)
+      return chosenV2 ? packagePrice(basicDynamicPrice, chosenV2) : Math.round(basicDynamicPrice * selectedPackageData.priceMultiplier)
     }
     return null
   })()
@@ -604,7 +615,8 @@ export default function RequestWizard() {
           recovery_token:   recoveryToken,
           // باقة واحدة للحملة كلها (للأفراد)
           selected_package: showPackages ? selectedPackage : null,
-          basic_channel:    showPackages && selectedPackage === 'basic' ? basicChannel : null,
+
+          basic_channel:    showPackages && (selectedPackage === 'basic' || selectedPackage === 'v2_basic') ? basicChannel : null,
           client_name:      contact.fullName,
           client_phone:     contact.phone,
           client_email:     contact.email,
@@ -654,7 +666,8 @@ export default function RequestWizard() {
           discount_code: discountCode.trim() || null,
           recovery_token: recoveryToken,
           selected_package: showPackages ? selectedPackage : null,
-          basic_channel: showPackages && selectedPackage === 'basic' ? basicChannel : null,
+          ...(requestType === 'single' && chosenV2 ? { channels: chosenChannels, ...(chosenV2.id === 'v2_career' ? { career } : {}) } : {}),
+          basic_channel: showPackages && (selectedPackage === 'basic' || selectedPackage === 'v2_basic') ? basicChannel : null,
         }
       }
 
@@ -782,7 +795,7 @@ export default function RequestWizard() {
     const totalLabel = membershipMode ? 'رصيد واحد' : checkoutTotalAfterRecovery != null
       ? `${checkoutTotalAfterRecovery.toLocaleString('ar-SA')} ر.س`
       : 'سيصلك عرض سعر بعد المراجعة'
-    const canSelectExtras = requestType === 'single' && selectedPackage === 'basic' && estimatedTotal != null
+    const canSelectExtras = requestType === 'single' && (selectedPackage === 'basic' || selectedPackage === 'v2_basic') && estimatedTotal != null
 
     return (
       <div className="request-screen min-h-screen pb-8">
@@ -858,6 +871,7 @@ export default function RequestWizard() {
                 onChange={setSelectedExtras}
                 basePrice={estimatedTotal}
                 baseLabel="سعر الباقة الأساسية"
+                included={chosenV2?.includedExtras}
               />
             )}
 
@@ -1307,7 +1321,7 @@ export default function RequestWizard() {
                 </p>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {ORDERABLE_PACKAGES.map(pkg => {
+                {offeredPackages.map(pkg => {
                   const isSelected = selectedPackage === pkg.id
                   // السعر: المفرد = سعر الخبر × معامل الباقة ؛ الحملة = مجموع الأخبار × معامل الباقة − خصم الحملة
                   let pkgPrice: number | null = null   // بعد الخصم
@@ -1319,7 +1333,7 @@ export default function RequestWizard() {
                       pkgPrice = withPkg - Math.round(withPkg * CAMPAIGN_DISCOUNT / 100)
                     }
                   } else if (basicDynamicPrice != null) {
-                    pkgPrice = Math.round(basicDynamicPrice * pkg.priceMultiplier)
+                    pkgPrice = getIndividualPackage(pkg.id) ? packagePrice(basicDynamicPrice, getIndividualPackage(pkg.id)!) : Math.round(basicDynamicPrice * pkg.priceMultiplier)
                   }
                   const priceLabel = pkgPrice != null ? `${pkgPrice} ر.س` : 'حسب نوع الخبر'
                   const postPrice = pkgPrice == null
@@ -1332,7 +1346,7 @@ export default function RequestWizard() {
                       key={pkg.id}
                       onClick={() => {
                         setSelectedPackage(pkg.id)
-                        if (pkg.id !== 'basic') setSelectedExtras([])
+                        if (pkg.id !== 'basic' && pkg.id !== 'v2_basic') setSelectedExtras([])
                       }}
                       className={cn(
                         'relative text-right rounded-2xl border-2 p-4 transition-all flex flex-col',
@@ -1387,6 +1401,23 @@ export default function RequestWizard() {
                 })}
               </div>
 
+              {chosenV2?.id === 'v2_career' && <fieldset className="mt-4 border border-border rounded-xl p-4 space-y-4"><legend className="font-bold">بيانات الحضور المهني</legend>
+                <label className="block text-sm">لغة السيرة<select value={career.language} onChange={e => setCareer(v => ({ ...v, language: e.target.value }))} className="block w-full border border-border rounded-lg p-3 mt-2"><option value="ar">العربية</option><option value="en">الإنجليزية</option></select></label>
+                {([['goal','الهدف المهني'],['experience','الخبرات أو الأنشطة والمشاريع'],['education','المؤهلات والتعليم']] as const).map(([key,label]) => <label className="block text-sm" key={key}>{label} *<textarea maxLength={6000} value={career[key]} onChange={e => setCareer(v => ({ ...v, [key]: e.target.value }))} className="block w-full border border-border rounded-lg p-3 mt-2" /></label>)}
+              </fieldset>}
+              {chosenV2?.id === 'v2_reach' && (
+                <div className="mt-4 rounded-xl border border-border p-4">
+                  <p className={fieldLabel}>اختر قناتين مختلفتين *</p>
+                  <div className="flex flex-wrap gap-2 mt-3">{availableChannels.map(ch => (
+                    <button type="button" key={ch} aria-pressed={reachChannels.includes(ch)}
+                      onClick={() => setReachChannels(prev => prev.includes(ch) ? prev.filter(c => c !== ch) : prev.length < 2 ? [...prev, ch] : prev)}
+                      className={cn('rounded-lg border px-4 py-3', reachChannels.includes(ch) ? 'border-green text-green' : 'border-border')}>
+                      {CHANNEL_LABELS[ch] ?? ch}
+                    </button>
+                  ))}</div>
+                </div>
+              )}
+              {chosenV2 && !validV2Channels && <p role="status" className="mt-3 text-sm text-red-700">أكمل اختيار القنوات المطلوبة؛ يجب أن تتوفر جميع قنوات الباقة لدى الحساب الناشر.</p>}
               {/* اختيار قناة النشر — للباقة الأساسية فقط (قناة واحدة) */}
               {basicNeedsChannel && (
                 <div className="mt-4 bg-cream rounded-xl p-4">

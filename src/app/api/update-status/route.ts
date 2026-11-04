@@ -166,6 +166,7 @@ export async function POST(request: Request) {
     if (updated?.client_email) {
       const requestNumber = `ATH-${String(updated.request_number).padStart(4, '0')}`
       const base = {
+        requestId,
         email: updated.client_email,
         requestNumber,
         clientName: updated.client_name ?? 'عزيزنا',

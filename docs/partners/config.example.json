@@ -1,0 +1,10 @@
+[
+  {
+    "id": "awwal-saudi",
+    "keys": { "2026-11": "REPLACE_WITH_A_RANDOM_SECRET_OF_AT_LEAST_32_BYTES" },
+    "influencer_ids": ["a91880b6-2252-4aa7-807d-a53eb734771f"],
+    "return_url": "https://first1saudi.net/services/orders/return",
+    "notifications": true,
+    "auto_studio": true
+  }
+]

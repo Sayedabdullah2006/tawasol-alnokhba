@@ -83,6 +83,7 @@ export async function verifyAndUpdatePayment(paymentId: string, requestId?: stri
     }
 
     if (existingPayment) {
+      if (requestId && existingPayment.id !== requestId) return { success: false, reason: 'payment_binding_mismatch' };
       console.log(`[MOYASAR_VERIFY] 🔄 Payment ${paymentId} already processed for request ${existingPayment.id}`);
 
       // Fetch payment details from Moyasar to return consistent response
@@ -143,6 +144,13 @@ export async function verifyAndUpdatePayment(paymentId: string, requestId?: stri
       metadata: payment.metadata
     });
 
+    if (payment.metadata?.resource_type === 'partner_order') {
+      if (requestId && requestId !== payment.metadata?.request_id) return { success: false, reason: 'payment_binding_mismatch' };
+      const { settlePartnerPayment } = await import('@/lib/partners/checkout');
+      const result = await settlePartnerPayment(paymentId, String(payment.metadata?.partner_checkout_id ?? ""));
+      return { success: result.paid, reason: result.paid ? (result.applied ? 'verified_and_updated' : 'already_processed') : result.status };
+    }
+    if (requestId && payment.metadata?.request_id !== requestId) return { success: false, reason: 'payment_binding_mismatch' };
     // Step 3: Extract order ID from metadata
     const targetRequestId = requestId || payment.metadata?.request_id;
     console.log(`[MOYASAR_VERIFY] 🎯 Target request ID: ${targetRequestId} (source: ${requestId ? 'parameter' : 'metadata'})`);
@@ -249,7 +257,7 @@ export async function verifyAndUpdatePayment(paymentId: string, requestId?: stri
     }
 
     // Step 7: Send payment confirmation email to client (CC to admin is automatic)
-    if (originalOrder.client_email) {
+    if (updateData?.length && originalOrder.client_email) {
       notifyPaymentConfirmedToClient({
         email: originalOrder.client_email,
         requestId: String(targetRequestId),

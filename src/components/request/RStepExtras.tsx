@@ -8,9 +8,10 @@ interface Props {
   onChange: (extras: string[]) => void
   basePrice: number
   baseLabel?: string
+  included?: string[]
 }
 
-export default function RStepExtras({ selected, onChange, basePrice, baseLabel }: Props) {
+export default function RStepExtras({ selected, onChange, basePrice, baseLabel, included = [] }: Props) {
   const toggle = (id: string) => {
     // pin6 و pin12 متعارضان
     if (id === 'pin6' && !selected.includes('pin6')) {
@@ -26,7 +27,7 @@ export default function RStepExtras({ selected, onChange, basePrice, baseLabel }
     )
   }
 
-  const extrasTotal = selected.reduce((s, id) => s + (AQ_EXTRAS_PRICES[id] ?? 0), 0)
+  const extrasTotal = selected.filter(id => !included.includes(id)).reduce((s, id) => s + (AQ_EXTRAS_PRICES[id] ?? 0), 0)
   const total       = basePrice + extrasTotal
 
   return (
@@ -39,7 +40,7 @@ export default function RStepExtras({ selected, onChange, basePrice, baseLabel }
       </p>
 
       <div className="grid grid-cols-2 gap-3 mb-4">
-        {AQ_EXTRAS_LIST.map(id => {
+        {AQ_EXTRAS_LIST.filter(id => !included.includes(id)).map(id => {
           const isSelected = selected.includes(id)
           return (
             <button

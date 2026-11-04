@@ -1,8 +1,10 @@
+import { validateNews } from '@/lib/individual-news'
+import { PACKAGE_VERSION, SINGLE_PACKAGES, getIndividualPackage, priceIndividualPackage, resolvePackageChannels } from '@/lib/individual-packages'
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { generateRequestNumber } from '@/lib/utils'
 import { notifyRequestReceivedToClient } from '@/lib/email'
-import { CATEGORIES, ORDERABLE_PACKAGES, packageHasSponsoredCampaign } from '@/lib/constants'
+import { CATEGORIES, EXTRAS, ORDERABLE_PACKAGES, packageHasSponsoredCampaign } from '@/lib/constants'
 import { calculateAutoQuote, calculateCampaignQuote, CAMPAIGN_DISCOUNT_PCT } from '@/lib/auto-quote'
 import { normalizeImageUrls, normalizeSupportingDocuments } from '@/lib/request-attachments'
 import { normalizeRecoveryEmail, parseRecoveryToken, verifyLocalRecoverySecret } from '@/lib/request-recovery'
@@ -16,9 +18,21 @@ const OPEN_BLOCKING_STATUSES = [
 export async function POST(request: Request) {
   try {
     const body = await request.json()
+    if (body.request_type !== 'campaign' && (body.client_type ?? 'individual') === 'individual' && body.category !== 'Others') {
+      if (!getIndividualPackage(body.selected_package ?? '')) return NextResponse.json({ error: 'اختر باقة متاحة' }, { status: 400 })
+      try { validateNews(body.category, body.sub_option) } catch { return NextResponse.json({ error: 'نوع الخبر أو الخيار الفرعي غير صالح' }, { status: 400 }) }
+      if (body.selected_package === 'v2_career') {
+        const career = body.career
+        if (body.category !== 'cv' || !career || !['ar','en'].includes(career.language) ||
+            ['goal','experience','education'].some(key => typeof career[key] !== 'string' || !career[key].trim() || career[key].length > 6000)) {
+          return NextResponse.json({ error: 'أكمل بيانات الحضور المهني' }, { status: 400 })
+        }
+        body.content = `${body.content ?? ''}\n\n${JSON.stringify({ language: career.language, goal: career.goal, experience: career.experience, education: career.education })}`
+      }
+    }
     const serviceClient = await createServiceRoleClient()
 
-    if (body.selected_package && !ORDERABLE_PACKAGES.some((pkg) => pkg.id === body.selected_package)) {
+    if (body.selected_package && !(body.request_type === 'campaign' ? ORDERABLE_PACKAGES : SINGLE_PACKAGES).some((pkg) => pkg.id === body.selected_package)) {
       return NextResponse.json({ error: 'الباقة المختارة لم تعد متاحة' }, { status: 400 })
     }
 
@@ -386,18 +400,19 @@ export async function POST(request: Request) {
     // ── الباقة المختارة (للأفراد + المنشور الواحد فقط، ولا تُطبَّق على «أخرى») ──
     const selectedPackage: string | null = needsManualQuote ? null : (body.selected_package ?? null)
     const pkg = selectedPackage
-      ? ORDERABLE_PACKAGES.find(p => p.id === selectedPackage) ?? null
+      ? SINGLE_PACKAGES.find(p => p.id === selectedPackage) ?? null
       : null
 
     // قنوات النشر الفعلية:
     //  - الاحتراف/التميز: كل قنوات الحساب المتاحة
     //  - الأساسية: القناة الواحدة التي اختارها المستخدم (basic_channel)
     let effectiveChannels = channels
-    if (pkg?.allChannels) {
+    if (pkg) {
       const { data: inf } = await serviceClient
         .from('influencers')
         .select('*')
         .eq('id', body.influencer_id)
+        .eq('is_active', true)
         .single()
       if (inf) {
         const allCh = [
@@ -406,16 +421,18 @@ export async function POST(request: Request) {
           inf.li_followers ? 'li' : null,
           inf.tk_followers ? 'tk' : null,
         ].filter(Boolean) as string[]
-        if (allCh.length > 0) effectiveChannels = allCh
-      }
-    } else if (pkg && !pkg.allChannels && body.basic_channel) {
-      // الباقة الأساسية: قناة واحدة فقط يحددها المستخدم
-      effectiveChannels = [body.basic_channel]
+        try {
+          if (pkg.id === 'v2_career' && body.category !== 'cv') throw new Error('INVALID_CATEGORY')
+          effectiveChannels = resolvePackageChannels(pkg, channels, allCh)
+        } catch { return NextResponse.json({ error: 'اختر القنوات المطلوبة والمتاحة للباقة' }, { status: 400 }) }
+      } else { return NextResponse.json({ error: 'الحساب الناشر غير متاح' }, { status: 400 }) }
     }
     const effectiveScope = effectiveChannels.length > 1 ? 'all' : 'single'
 
     // الإضافات المضمَّنة في الباقة (مدمجة في السعر الثابت — لا تُضاف فوقه)
-    const packageIncludedExtras: string[] = pkg ? pkg.includedExtras : []
+    const effectivePkg = pkg?.id === 'v2_reach' && effectiveChannels.includes('tk') ? { ...pkg, includedExtras: [...pkg.includedExtras, 'video'] } : pkg
+    if (pkg && selectedExtras.some(id => !EXTRAS.some(e => e.id === id))) return NextResponse.json({ error: 'إضافة غير صالحة' }, { status: 400 })
+    const packageIncludedExtras: string[] = effectivePkg ? effectivePkg.includedExtras : []
 
     const priceCalc = calculateAutoQuote({
       category:       body.category ?? '',
@@ -428,21 +445,16 @@ export async function POST(request: Request) {
     // سعر الباقة = سعر الباقة الأساسية (الديناميكي حسب نوع الخبر) × معامل الباقة
     //  - الأساسية: المعامل 1.0  → السعر التلقائي للخبر
     //  - الاحتراف: ×1.46 ، التميز: ×1.60
-    const packagePrice = pkg
-      ? Math.round(priceCalc.total * pkg.priceMultiplier)
-      : priceCalc.total
+    const v2Price = effectivePkg ? priceIndividualPackage(priceCalc.singleChannelBase, effectivePkg, priceCalc.extrasBreakdown, discountRow ? Number(discountRow.discount_pct) : 0) : null
+    const packagePrice = v2Price ? v2Price.subtotal / 100 : priceCalc.total
 
     // تطبيق كود الخصم على سعر الباقة النهائي
-    const singleDiscountAmt = discountRow
-      ? Math.min(
-          Math.round(packagePrice * Number(discountRow.discount_pct) / 100),
-          discountRow.max_discount_amount == null ? Number.POSITIVE_INFINITY : Number(discountRow.max_discount_amount),
-        )
-      : 0
+    const singleDiscountAmt = Math.min(v2Price ? v2Price.discount / 100 : discountRow ? Math.round(packagePrice * Number(discountRow.discount_pct) / 100) : 0, discountRow?.max_discount_amount == null ? Number.POSITIVE_INFINITY : Number(discountRow.max_discount_amount))
+    if (v2Price) { v2Price.discount = Math.round(singleDiscountAmt * 100); v2Price.total = v2Price.subtotal - v2Price.discount }
     const singleFinalPrice = packagePrice - singleDiscountAmt
 
     // قيم التسعير المخزَّنة: باقات الاحتراف/التميز تُخزَّن بسعرها الكامل بلا إضافات منفصلة
-    const isUpgradedPackage = pkg != null && pkg.id !== 'basic'
+    const isUpgradedPackage = pkg != null
     const storedBasePrice   = isUpgradedPackage ? packagePrice : priceCalc.basePrice
     const storedExtrasTotal = isUpgradedPackage ? 0 : priceCalc.extrasTotal
     const storedTotalAmount = isUpgradedPackage ? packagePrice : priceCalc.total
@@ -481,6 +493,7 @@ export async function POST(request: Request) {
         x_handle:         body.x_handle,
 
         request_type:     'single',
+        ...(pkg && v2Price ? { package_snapshot: { version: PACKAGE_VERSION, package: effectivePkg, pricing: v2Price }, source_site: 'nukhba' } : {}),
 
         base_price:            storedBasePrice,
         extras_total:          storedExtrasTotal,

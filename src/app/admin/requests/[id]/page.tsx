@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import PartnerOrderPanel from '@/components/admin/PartnerOrderPanel'
 import { CATEGORIES, EXTRAS, PACKAGES, REQUEST_STATUSES, type RequestStatus } from '@/lib/constants'
 import { formatNumber, formatDate, generateRequestNumber } from '@/lib/utils'
 import { useToast } from '@/components/ui/Toast'
@@ -87,6 +88,8 @@ type AdminStudioState = {
 }
 
 type AdminRequest = {
+  package_snapshot?: { package: { name: string; features: string[] }; pricing: { advertising: number } } | null
+
   id: string
   request_number: number
   status: RequestStatus
@@ -1206,6 +1209,7 @@ function DetailsTab({ request }: { request: AdminRequest }) {
 
   return (
     <div className="space-y-5">
+      {request.package_snapshot && <PartnerOrderPanel id={request.id} />}
       {/* ① بيانات العميل */}
       <div className="bg-card rounded-2xl border border-border p-5">
         <h2 className="font-bold text-dark mb-4 flex items-center gap-2">👤 بيانات العميل</h2>
@@ -1258,14 +1262,14 @@ function DetailsTab({ request }: { request: AdminRequest }) {
           </InfoRow>
 
           {request.auto_quote_tier && (() => {
-            const pkg = PACKAGES.find(p => p.id === request.auto_quote_tier)
+            const pkg = request.package_snapshot?.package ?? PACKAGES.find(p => p.id === request.auto_quote_tier)
             if (!pkg) return null
             return (
               <InfoRow label="الباقة">
                 <div className="flex flex-col gap-1.5">
                   <span className="font-bold text-green">{pkg.name}</span>
                   <div className="flex flex-wrap gap-1.5">
-                    {pkg.features.map((f, i) => (
+                    {pkg.features.map((f: string, i: number) => (
                       <span key={i} className="px-2 py-0.5 rounded-lg bg-green/10 text-green text-[11px] font-medium">{f}</span>
                     ))}
                   </div>

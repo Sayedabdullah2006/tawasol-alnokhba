@@ -1,3 +1,4 @@
+import { canVerifyCustomerPayment } from '@/lib/payment-access';
 /**
  * Payment Verification API Route
  * Now uses shared verifyAndUpdatePayment function from @/lib/moyasar
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('[PAYMENT_VERIFY] 📥 GET request for payment:', paymentId, 'requestId:', requestId);
+    if (!await canVerifyCustomerPayment(paymentId, requestId)) return NextResponse.json({ success: false, error: 'غير مصرح' }, { status: 403 });
     const result = await verifyAndUpdatePayment(paymentId, requestId || undefined);
     console.log('[PAYMENT_VERIFY] 📤 GET response:', { success: result.success, reason: result.reason });
 
@@ -67,6 +69,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[PAYMENT_VERIFY] 📥 POST request for payment:', paymentId, 'requestId:', requestId);
+    if (!await canVerifyCustomerPayment(paymentId, requestId)) return NextResponse.json({ success: false, error: 'غير مصرح' }, { status: 403 });
     const result = await verifyAndUpdatePayment(paymentId, requestId);
     console.log('[PAYMENT_VERIFY] 📤 POST response:', { success: result.success, reason: result.reason });
 

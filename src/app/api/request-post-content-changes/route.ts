@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { PostReview } from '@/lib/review-items'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { notifyContentChangesRequested } from '@/lib/email'
 import { validateRequestId, validateUserFeedback, ValidationException, formatValidationErrors } from '@/lib/validation'
 
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
       history,
     }
 
-    const { data: updatedRows, error } = await supabase
+    const { data: updatedRows, error } = await (await createServiceRoleClient())
       .from('publish_requests')
       .update({
         post_reviews: reviews,

@@ -1,3 +1,4 @@
+import { SINGLE_PACKAGES } from './individual-packages'
 // ─── Platform Info ───
 export const PLATFORM = {
   nameAr: 'تواصل النخبة',
@@ -128,7 +129,7 @@ export const EXTRAS = [
 // ─── Packages (الباقات) — للأفراد + المنشور الواحد فقط ───
 // السعر = سعر الباقة الأساسية (الديناميكي حسب نوع الخبر لقناة واحدة) × priceMultiplier
 export interface Package {
-  id: 'basic' | 'pro' | 'elite' | 'prime'
+  id: string
   name: string
   priceMultiplier: number
   blurb: string
@@ -228,8 +229,10 @@ export const PACKAGES: Package[] = [
   },
 ]
 
+PACKAGES.push(...SINGLE_PACKAGES)
+
 // «الصدارة» محفوظة لعرض الطلبات القديمة فقط، ولا تتاح للطلبات الجديدة.
-export const ORDERABLE_PACKAGES = PACKAGES.filter((pkg) => pkg.id !== 'prime')
+export const ORDERABLE_PACKAGES = PACKAGES.filter((pkg) => ['basic', 'pro', 'elite'].includes(pkg.id))
 
 // ─── Post count messages ───
 export const POST_COUNT_MESSAGES: Record<number, string> = {

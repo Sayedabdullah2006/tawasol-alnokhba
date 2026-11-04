@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { notifyContentChangesRequested } from '@/lib/email'
 import { validateRequestId, validateUserFeedback, ValidationException, formatValidationErrors } from '@/lib/validation'
 
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     }
 
     // Update request with feedback and change status back to in_progress for admin action
-    const { data: updatedRows, error } = await supabase
+    const { data: updatedRows, error } = await (await createServiceRoleClient())
       .from('publish_requests')
       .update({
         status: 'changes_requested',

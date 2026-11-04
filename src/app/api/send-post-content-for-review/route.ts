@@ -99,6 +99,7 @@ export async function POST(request: Request) {
     if (existingRequest.client_email) {
       const requestNumber = `ATH-${String(existingRequest.request_number).padStart(4, '0')}`
       notifyContentReadyForReview({
+        requestId,
         email: existingRequest.client_email,
         requestNumber,
         clientName: existingRequest.client_name ?? 'عزيزنا العميل',

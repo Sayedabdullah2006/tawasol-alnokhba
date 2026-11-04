@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { PostReview } from '@/lib/review-items'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { notifyContentApprovedToAdmin } from '@/lib/email'
 
 /**
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     }
     if (allApproved) { upd.status = 'in_progress'; upd.content_approved_at = now } // خرج من مرحلة المراجعة
 
-    const { data: updatedRows, error } = await supabase
+    const { data: updatedRows, error } = await (await createServiceRoleClient())
       .from('publish_requests')
       .update(upd)
       .eq('id', requestId)

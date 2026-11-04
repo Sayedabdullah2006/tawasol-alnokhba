@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     const service = await createServiceRoleClient()
     const { data: req } = await service
       .from('publish_requests')
-      .select('id, user_id, status, admin_quoted_price, discount_code_id')
+      .select('id, user_id, status, admin_quoted_price, discount_code_id, package_snapshot')
       .eq('id', requestId)
       .single()
 
@@ -44,25 +44,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'تم استنفاد استخدامات الكود' }, { status: 400 })
     }
 
-    const base = Number(req.admin_quoted_price ?? 0)
+    const base = req.package_snapshot?.pricing ? Number(req.package_snapshot.pricing.subtotal) / 100 : Number(req.admin_quoted_price ?? 0)
+    const protectedAdvertising = Number(req.package_snapshot?.pricing?.advertising ?? 0) / 100
     const pct = Number(dc.discount_pct)
-    const discountAmount = Math.min(
-      Math.round(base * pct / 100),
-      dc.max_discount_amount == null ? Number.POSITIVE_INFINITY : Number(dc.max_discount_amount),
-    )
+    const discountAmount = Math.min(req.package_snapshot ? Math.round((base - protectedAdvertising) * pct) / 100 : Math.round(base * pct / 100), dc.max_discount_amount == null ? Number.POSITIVE_INFINITY : Number(dc.max_discount_amount))
     const newTotal = Math.max(0, base - discountAmount)
 
     const { error } = await service
       .from('publish_requests')
       .update({
         final_total:      newTotal,
+        ...(req.package_snapshot ? { package_snapshot: { ...req.package_snapshot, pricing: { ...req.package_snapshot.pricing, discount_pct: pct, discount: Math.round(discountAmount * 100), total: Math.round(newTotal * 100) } } } : {}),
         discount_code:    dc.code,
         discount_code_id: dc.id,
         discount_pct:     pct,
         discount_amount:  discountAmount,
         updated_at:       new Date().toISOString(),
       })
-      .eq('id', requestId)
+      .eq('id', requestId).eq('status', 'approved')
     if (error) return NextResponse.json({ error: 'فشل تطبيق الخصم' }, { status: 500 })
 
     // زيادة عدّاد الاستخدام (مرة واحدة لكل طلب — فقط إن لم يكن مطبّقاً سابقاً)

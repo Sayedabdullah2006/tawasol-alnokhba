@@ -92,6 +92,7 @@ export async function POST(request: Request) {
     if (req.status !== 'quoted' && req.status !== 'approved') {
       return NextResponse.json({ error: 'لا يمكن تعديل هذا الطلب' }, { status: 400 })
     }
+    if (req.package_snapshot) return NextResponse.json({ error: 'الباقة مسعّرة بالفعل؛ استخدم ملخص الطلب والدفع المعتمد' }, { status: 409 })
     // التحقق من مهلة الموافقة (24 ساعة)
     if (req.status === 'quoted' && req.quote_expires_at && new Date(req.quote_expires_at).getTime() < Date.now()) {
       return NextResponse.json({

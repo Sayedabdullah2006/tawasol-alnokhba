@@ -1,0 +1,41 @@
+{
+  "tested_at": "2026-11-04T09:24:40.961Z",
+  "origin": "https://nukhba.media",
+  "provider": "Moyasar real Sandbox",
+  "paid": {
+    "id": "fc1345f7-23a5-44af-9977-a9244cc96ad6",
+    "status": "paid",
+    "amount": 79900,
+    "currency": "SAR",
+    "three_ds": true
+  },
+  "failed": {
+    "id": "32b96f05-2ce6-4a62-8d2e-1f6d0d785385",
+    "status": "failed",
+    "message": "INSUFFICIENT FUNDS",
+    "order_status": {
+      "payment_status": "pending",
+      "status": "approved",
+      "paid_at": null
+    }
+  },
+  "receipts": [
+    {
+      "payment_id": "fc1345f7-23a5-44af-9977-a9244cc96ad6",
+      "status": "paid",
+      "amount": 79900
+    }
+  ],
+  "webhooks": [
+    {
+      "id": 5,
+      "event_type": "payment_paid",
+      "payment_id": "fc1345f7-23a5-44af-9977-a9244cc96ad6"
+    },
+    {
+      "id": 6,
+      "event_type": "payment_paid",
+      "payment_id": "fc1345f7-23a5-44af-9977-a9244cc96ad6"
+    }
+  ]
+}
