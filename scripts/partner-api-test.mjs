@@ -54,8 +54,31 @@ assert.equal(oldCalc.calculateAutoQuote({ category: 'product', selectedExtras: [
 assert.equal(oldCalc.calculateAutoQuote({ category: 'competitions', subOption: { subcategory: 'local', position: 'second' }, selectedExtras: [] }).total, 549)
 const presence = packages.getIndividualPackage('v2_presence')
 const quoted = packages.priceIndividualPackage(799, presence, [{ id: 'video', price: 400 }, { id: 'bilingual', price: 300 }, { id: 'bilingual', price: 300 }], 20)
-assert.equal(quoted.subtotal, 249900)
-assert.equal(quoted.discount, 44980, 'Advertising excluded from discount; included/duplicate extras never charged twice')
+assert.equal(quoted.subtotal, 289900)
+assert.equal(quoted.discount, 57980, 'Presence has no advertising or produced-video inclusion; duplicate extras never charged twice')
+assert.equal(packages.PACKAGE_VERSION, '2026-11-04.v3')
+assert.equal(packages.packagesForCategory().length, 5)
+assert.deepEqual(Array.from(packages.SINGLE_PACKAGES, p => p.sponsoredCampaignBudget), [0,0,0,300,400])
+for (const id of ['v2_basic','v2_reach']) {
+  const pkg = packages.getIndividualPackage(id)
+  assert(!pkg.includedExtras.includes('mention'))
+  assert(!pkg.includedExtras.includes('video'))
+  assert.equal(packages.priceIndividualPackage(799,pkg,[{id:'mention',price:200},{id:'video',price:400}]).subtotal, (packages.packagePrice(799,pkg)+600)*100)
+}
+assert.equal(presence.benefits.find(b=>b.id==='self_recorded_video').included,true)
+assert.equal(presence.benefits.find(b=>b.id==='produced_video').included,false)
+assert.equal(presence.benefits.find(b=>b.id==='news_cover').value,'14 يوم')
+const elite = packages.getIndividualPackage('v2_elite')
+assert.equal(elite.benefits.find(b=>b.id==='news_cover').value,'28 يوم')
+assert.equal(elite.benefits.find(b=>b.id==='character_cover').value,'28 يوم')
+assert.equal(elite.benefits.find(b=>b.id==='personal_page').value,'صفحة شخصية وتحديث مرتين خلال 6 شهور')
+assert(!elite.features.some(f=>f.includes('مقتطف')))
+const career = packages.getIndividualPackage('v2_career')
+assert.equal(career.requiredCategory,'cv')
+assert.equal(packages.priceIndividualPackage(799,career,[],20).discount,27980,'400 SAR advertising is protected from discounts')
+const {initialPartnerDeliverables}=load('src/lib/partners/deliverables.ts')
+assert.equal(initialPartnerDeliverables(career).filter(d=>d.label.startsWith('إعلان التوظيف')).length,5)
+assert.deepEqual(Array.from(initialPartnerDeliverables({features:['ميزة قديمة']}),d=>d.label),['ميزة قديمة'])
 assert.throws(() => packages.resolvePackageChannels(packages.getIndividualPackage('v2_reach'), ['x','x'], ['x','li']))
 assert.throws(() => packages.resolvePackageChannels(presence, [], ['x','li']))
 const { GET, POST } = load('src/app/api/partners/v1/[...path]/route.ts')
@@ -77,6 +100,10 @@ assert.ifError(legacyError)
 let filePath
 try {
   let r = await call('catalog'); assert.equal(r.status,200); assert.equal(r.data.packages.length,5)
+  assert.equal(r.data.version,packages.PACKAGE_VERSION)
+  assert.deepEqual(Array.from(r.data.packages,p=>p.advertising),[0,0,0,30000,40000])
+  assert.equal(r.data.packages[4].required_category,'cv')
+  assert(r.data.packages.every(p=>p.benefits.length===21))
   const originalFetch=globalThis.fetch
   try {
     globalThis.fetch=async(input,options)=>{
@@ -89,7 +116,7 @@ try {
     assert.equal((await officialClient('catalog',{customerId:customer})).packages.length,5)
   } finally { globalThis.fetch=originalFetch }
 
-  assert.equal(r.data.packages.find(p => p.id === 'v2_presence').advertising,25000)
+  assert.equal(r.data.packages.find(p => p.id === 'v2_presence').advertising,0)
   assert(r.data.sub_options.competitions.hackathon.length)
   assert.equal((await call('catalog', { mutateSignature:true })).status,401)
   assert.equal((await call('catalog', { timestamp:'1000000000' })).status,401)
@@ -104,6 +131,31 @@ try {
   const quote = await call('quotes', { method:'POST',body:baseQuote }); assert.equal(quote.status,200)
   assert.equal(quote.data.snapshot.pricing.total,79900)
   assert.equal(quote.data.snapshot.pricing.vat,0)
+  for (const [package_id,category,channels,advertising] of [
+    ['v2_presence','graduation',['x','li','ig','tk'],0],
+    ['v2_elite','graduation',['x','li','ig','tk'],30000],
+    ['v2_career','cv',['x','li'],40000],
+  ]) {
+    const priced = await call('quotes',{method:'POST',body:{package_id,category,influencer_id:publisher,channels}})
+    assert.equal(priced.status,200)
+    assert.equal(priced.data.snapshot.pricing.advertising,advertising)
+    assert.equal(priced.data.snapshot.version,packages.PACKAGE_VERSION)
+  }
+  const reachVideo=await call('quotes',{method:'POST',body:{package_id:'v2_reach',category:'graduation',influencer_id:publisher,channels:['x','tk'],extras:['video','mention']}})
+  assert.equal(reachVideo.data.snapshot.pricing.total,179900,'TikTok does not silently include production or mention in the updated reach package')
+  const oldQuote=await call('quotes',{method:'POST',body:baseQuote,who:'legacy-snapshot-customer'})
+  const rawHistorical=await db.from('partner_quotes').select('snapshot').eq('id',oldQuote.data.id).single()
+  assert.ifError(rawHistorical.error)
+  const oldSnapshot={...rawHistorical.data.snapshot,version:'2026-11-04.v2',package:{...rawHistorical.data.snapshot.package,features:['ميزة محفوظة من النسخة القديمة']},pricing:{...rawHistorical.data.snapshot.pricing,advertising:25000}}
+  delete oldSnapshot.package.benefits
+  const historicalUpdate=await db.from('partner_quotes').update({snapshot:oldSnapshot}).eq('id',oldQuote.data.id)
+  assert.ifError(historicalUpdate.error)
+  const historical=await call('orders',{method:'POST',who:'legacy-snapshot-customer',body:{quote_id:oldQuote.data.id,title:'QA retained snapshot',content:'Synthetic historical quote fixture.',customer:{name:'QA Historical',phone:'+966500000000',email:'qa@example.invalid'}}})
+  assert.equal(historical.status,200)
+  const preserved=await call(`orders/${historical.data.id}`,{who:'legacy-snapshot-customer'})
+  assert.equal(preserved.data.package_snapshot.version,'2026-11-04.v2')
+  assert.deepEqual(preserved.data.package_snapshot.package.features,['ميزة محفوظة من النسخة القديمة'])
+  assert.equal(preserved.data.package_snapshot.pricing.advertising,25000)
   const orderBody={quote_id:quote.data.id,title:'QA integration order',content:'Test fixture; do not fulfill.',customer:{name:'اختبار ربط',phone:'+966500000000',email:'qa@example.invalid'}}
   const orderKey=crypto.randomUUID()
   const concurrent=await Promise.all([call('orders',{method:'POST',body:orderBody,key:orderKey}),call('orders',{method:'POST',body:orderBody,key:orderKey})])

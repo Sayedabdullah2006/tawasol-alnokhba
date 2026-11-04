@@ -1,12 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { initialPartnerDeliverables } from '@/lib/partners/deliverables'
+import type { PackageBenefit } from '@/lib/individual-package-benefits'
 interface Deliverable { label: string; status: string; url: string }
-interface Panel { source_site: string; external_customer_id: string; files: { id: string; name: string }[]; partner_deliverables: Deliverable[]; package_snapshot: { package: { name: string; features: string[] }; pricing: { advertising: number } }; payments: { id: string; status: string }[] }
+interface Panel { source_site: string; external_customer_id: string; files: { id: string; name: string }[]; partner_deliverables: Deliverable[]; package_snapshot: { package: { name: string; features: string[]; benefits?: PackageBenefit[] }; pricing: { advertising: number } }; payments: { id: string; status: string }[] }
 export default function PartnerOrderPanel({ id }: { id: string }) {
   const [data, setData] = useState<Panel | null>(null); const [items, setItems] = useState<Deliverable[]>([]); const [message, setMessage] = useState(''); const [saving, setSaving] = useState(false)
   useEffect(() => { fetch(`/api/admin/partner-orders/${id}`).then(async r => {
     if (!r.ok) throw new Error(); const d = await r.json(); setData(d)
-    setItems(d.partner_deliverables?.length ? d.partner_deliverables : d.package_snapshot.package.features.map((label: string) => ({ label, status: 'pending', url: '' })))
+    setItems(d.partner_deliverables?.length ? d.partner_deliverables : initialPartnerDeliverables(d.package_snapshot.package))
   }).catch(() => setMessage('تعذر تحميل تفاصيل الباقة.')) }, [id])
   async function save() {
     setSaving(true); setMessage('')

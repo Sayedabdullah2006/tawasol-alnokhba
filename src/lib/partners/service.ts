@@ -39,7 +39,7 @@ function expose(order: Record<string, unknown>) {
 function publicSnapshot(raw: unknown) {
   if (!raw) return null
   const value = raw as { version: string; package: IndividualPackage; pricing: ReturnType<typeof priceIndividualPackage> }
-  return { version: value.version, pricing: value.pricing, package: { id: value.package.id, name: value.package.name, features: value.package.features, included_extras: value.package.includedExtras, channel_count: value.package.channelCount, channels: value.package.channels ?? null } }
+  return { version: value.version, pricing: value.pricing, package: { id: value.package.id, name: value.package.name, features: value.package.features, benefits: value.package.benefits ?? null, required_category: value.package.requiredCategory ?? null, included_extras: value.package.includedExtras, channel_count: value.package.channelCount, channels: value.package.channels ?? null } }
 }
 async function publisher(ctx: PartnerContext, id: string) {
   if (!ctx.client.influencer_ids?.includes(id)) throw new PartnerError('PUBLISHER_UNAVAILABLE')
@@ -73,7 +73,7 @@ export async function partnerOperation(request: Request, ctx: PartnerContext, pa
     const { data, error } = await db.from('influencers').select('id,name_ar,x_followers,ig_followers,li_followers,tk_followers').in('id', ctx.client.influencer_ids.filter(id => UUID.test(id))).eq('is_active', true)
     dbError(error)
     return { version: PACKAGE_VERSION, currency: 'SAR', money_unit: 'halala', seller: 'شركة تواصل النخبة للدعاية والإعلان',
-      packages: SINGLE_PACKAGES.map(p => ({ id: p.id, name: p.name, blurb: p.blurb, surcharge: p.surcharge * 100, fixed_price: p.fixedPrice ? p.fixedPrice * 100 : null, starts_from: (p.fixedPrice ?? 499 + p.surcharge) * 100, advertising: p.sponsoredCampaignBudget * 100, channel_count: p.channelCount, channels: p.channels ?? null, features: p.features, included_extras: p.includedExtras })), extras: ALLOWED_EXTRAS.map(e => ({ id: e.id, name: e.nameAr, price: e.price * 100 })),
+      packages: SINGLE_PACKAGES.map(p => ({ id: p.id, name: p.name, blurb: p.blurb, surcharge: p.surcharge * 100, fixed_price: p.fixedPrice ? p.fixedPrice * 100 : null, starts_from: (p.fixedPrice ?? 499 + p.surcharge) * 100, advertising: p.sponsoredCampaignBudget * 100, channel_count: p.channelCount, channels: p.channels ?? null, features: p.features, benefits: p.benefits, required_category: p.requiredCategory ?? null, included_extras: p.includedExtras })), extras: ALLOWED_EXTRAS.map(e => ({ id: e.id, name: e.nameAr, price: e.price * 100 })),
       categories: CATEGORIES.filter(c => !c.clientTypes || c.clientTypes.includes('individual')).map(c => ({ id: c.id, name: c.nameAr, requires_sub_option: !!c.hasSubOption,
         base_price: c.hasSubOption ? null : calculateAutoQuote({ category: c.id, clientType: 'individual', selectedExtras: [] }).singleChannelBase * 100 })),
       sub_options: {
@@ -100,7 +100,7 @@ export async function partnerOperation(request: Request, ctx: PartnerContext, pa
     if (extras.some(e => e.id === 'infographic') && category !== 'cv') throw new PartnerError('INVALID_EXTRAS')
     const deal = await discount(body.discount_code)
     const base = calculateAutoQuote({ category, subOption: parseSubOption(body.sub_option as string), selectedExtras: [] }).singleChannelBase
-    const effectivePkg = pkg.id === 'v2_reach' && channels.includes('tk') ? { ...pkg, includedExtras: [...pkg.includedExtras, 'video'] } : pkg
+    const effectivePkg = pkg
     const pricing = priceIndividualPackage(base, effectivePkg, extras, deal.pct)
     if (deal.cap !== null) { pricing.discount = Math.min(pricing.discount, Math.round(deal.cap * 100)); pricing.total = pricing.subtotal - pricing.discount }
     if (pricing.total <= 0) throw new PartnerError('ZERO_PAYMENT_UNSUPPORTED')

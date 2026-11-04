@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Tawasol al Nukhba Partner API",
-    "version": "1.0.0",
-    "description": "Server-to-server signed API. Production origin deployed and Sandbox verified on 2026-11-04. All public money fields are integer halalas. See FIRST1SAUDI-HANDOFF.md for canonical HMAC construction."
+    "version": "1.1.0",
+    "description": "Signed server-to-server API. Catalog version 2026-11-04.v3 implements the approved five-package table. Existing package IDs, endpoints, HMAC and checkout remain compatible. Public money fields are integer halalas."
   },
   "servers": [
     {
@@ -1279,6 +1279,23 @@
             "items": {
               "type": "string"
             }
+          },
+          "benefits": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/PackageBenefit"
+            },
+            "description": "Structured benefit rows. Null or absent for historical snapshots; display their saved features."
+          },
+          "required_category": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "cv for career; null otherwise. Display career as the fifth standalone choice and switch category to cv when selected."
           }
         }
       },
@@ -1397,6 +1414,21 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "benefits": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "$ref": "#/components/schemas/PackageBenefit"
+                }
+              },
+              "required_category": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             }
           },
@@ -1936,6 +1968,29 @@
             "type": "boolean"
           }
         }
+      },
+      "PackageBenefit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "included": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "value",
+          "included"
+        ]
       }
     }
   }

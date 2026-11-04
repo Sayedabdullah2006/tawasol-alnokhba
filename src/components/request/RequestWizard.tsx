@@ -159,6 +159,7 @@ export default function RequestWizard() {
   const searchParams = useSearchParams()
   const membershipId = searchParams.get('membership')
   const resumeTokenParam = searchParams.get('resume')
+  const requestedPackage = searchParams.get('package')
   const membershipMode = !!membershipId
   const membershipPortalMode = membershipMode && pathname.startsWith('/dashboard/membership/request')
   const { showToast } = useToast()
@@ -424,6 +425,22 @@ export default function RequestWizard() {
     campaignSetup, campaignPosts, selectedPackage, basicChannel, reachChannels, career, selectedExtras, discountCode,
   ])
 
+  useEffect(() => {
+    const pkg = getIndividualPackage(requestedPackage ?? '')
+    if (!hydrated || membershipMode || !pkg) return
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      setRequestType('single')
+      setClientType('individual')
+      setSelectedPackage(pkg.id)
+      setSelectedExtras([])
+      if (pkg.requiredCategory) { setCategory(pkg.requiredCategory); setSubOption(null); setCompetitionSelection(null) }
+      setOpenSection(pkg.requiredCategory ? 2 : 0)
+    })
+    return () => { cancelled = true }
+  }, [hydrated, membershipMode, requestedPackage])
+
   // ملاحظة: بيانات التواصل تُحمَّل تلقائياً من بروفايل الحساب وتُرسَل مع الطلب،
   // دون عرض حقول إدخال — لأنها مُسجّلة مسبقاً عند إنشاء الحساب.
 
@@ -454,13 +471,13 @@ export default function RequestWizard() {
   const showPackages = !membershipMode && clientType === 'individual' && !isOtherCategory
   // الباقة الأساسية تتطلّب اختيار قناة واحدة للنشر
   const basicNeedsChannel = showPackages && (selectedPackage === 'basic' || selectedPackage === 'v2_basic')
-  const offeredPackages = requestType === 'campaign' ? ORDERABLE_PACKAGES : packagesForCategory(category ?? '')
+  const offeredPackages = requestType === 'campaign' ? ORDERABLE_PACKAGES : packagesForCategory()
   const chosenV2 = getIndividualPackage(selectedPackage ?? '')
   const chosenChannels = chosenV2?.id === 'v2_basic' ? (basicChannel ? [basicChannel] : []) : chosenV2?.id === 'v2_reach' ? reachChannels : [...(chosenV2?.channels ?? [])]
   let validV2Channels = true
   if (chosenV2) { try { resolvePackageChannels(chosenV2, chosenChannels, availableChannels) } catch { validV2Channels = false } }
   const careerComplete = chosenV2?.id !== 'v2_career' || [career.goal, career.experience, career.education].every(v => v.trim().length > 0)
-  const packagesComplete = !showPackages || (careerComplete && !!selectedPackage && offeredPackages.some(p => p.id === selectedPackage) && (!basicNeedsChannel || !!basicChannel) && validV2Channels)
+  const packagesComplete = !showPackages || (careerComplete && (!chosenV2?.requiredCategory || category === chosenV2.requiredCategory) && !!selectedPackage && offeredPackages.some(p => p.id === selectedPackage) && (!basicNeedsChannel || !!basicChannel) && validV2Channels)
 
   // السعر الديناميكي للباقة الأساسية = سعر التسعير التلقائي حسب نوع الخبر
   const basicDynamicPrice: number | null = (() => {
@@ -519,7 +536,7 @@ export default function RequestWizard() {
   const emailValid = /^\S+@\S+\.\S+$/.test(contact.email.trim())
   const checkoutSubtotal = estimatedTotal != null ? estimatedTotal + extrasTotal : null
   const recoveryDiscountAmount = recoveryOffer && checkoutSubtotal != null && discountCode === recoveryOffer.code
-    ? Math.min(Math.round(checkoutSubtotal * recoveryOffer.discountPct / 100), recoveryOffer.maxDiscountAmount)
+    ? Math.min(Math.round(Math.max(0, checkoutSubtotal - (requestType === 'single' ? chosenV2?.sponsoredCampaignBudget ?? 0 : 0)) * recoveryOffer.discountPct / 100), recoveryOffer.maxDiscountAmount)
     : 0
   const checkoutTotalAfterRecovery = checkoutSubtotal == null ? null : checkoutSubtotal - recoveryDiscountAmount
   const contactComplete = isLoggedIn || (
@@ -1119,6 +1136,7 @@ export default function RequestWizard() {
                       value={category ?? ''}
                       onChange={e => {
                         setCategory(e.target.value || null)
+                        if (selectedPackage === 'v2_career' && e.target.value !== 'cv') setSelectedPackage(null)
                         setSubOption(null)
                         setCompetitionSelection(null)
                       }}
@@ -1333,6 +1351,7 @@ export default function RequestWizard() {
                   } else if (basicDynamicPrice != null) {
                     pkgPrice = getIndividualPackage(pkg.id) ? packagePrice(basicDynamicPrice, getIndividualPackage(pkg.id)!) : Math.round(basicDynamicPrice * pkg.priceMultiplier)
                   }
+                  if (getIndividualPackage(pkg.id)?.fixedPrice != null) pkgPrice = getIndividualPackage(pkg.id)!.fixedPrice!
                   const priceLabel = pkgPrice != null ? `${pkgPrice} ر.س` : 'حسب نوع الخبر'
                   const postPrice = pkgPrice == null
                     ? null
@@ -1345,6 +1364,7 @@ export default function RequestWizard() {
                       onClick={() => {
                         setSelectedPackage(pkg.id)
                         if (pkg.id !== 'basic' && pkg.id !== 'v2_basic') setSelectedExtras([])
+                        if (pkg.id === 'v2_career') { setCategory('cv'); setSubOption(null); setCompetitionSelection(null) }
                       }}
                       className={cn(
                         'relative text-right rounded-2xl border-2 p-4 transition-all flex flex-col',
@@ -1400,6 +1420,7 @@ export default function RequestWizard() {
               </div>
 
               {chosenV2?.id === 'v2_career' && <fieldset className="mt-4 border border-border rounded-xl p-4 space-y-4"><legend className="font-bold">بيانات الحضور المهني</legend>
+                <p className="text-xs leading-6 text-muted">مسار مهني مستقل. يشمل إعداد سيرة ATS ونشر 5 إعلانات في مواقع توظيف، دون ضمان التوظيف.</p>
                 <label className="block text-sm">لغة السيرة<select value={career.language} onChange={e => setCareer(v => ({ ...v, language: e.target.value }))} className="block w-full border border-border rounded-lg p-3 mt-2"><option value="ar">العربية</option><option value="en">الإنجليزية</option></select></label>
                 {([['goal','الهدف المهني'],['experience','الخبرات أو الأنشطة والمشاريع'],['education','المؤهلات والتعليم']] as const).map(([key,label]) => <label className="block text-sm" key={key}>{label} *<textarea maxLength={6000} value={career[key]} onChange={e => setCareer(v => ({ ...v, [key]: e.target.value }))} className="block w-full border border-border rounded-lg p-3 mt-2" /></label>)}
               </fieldset>}

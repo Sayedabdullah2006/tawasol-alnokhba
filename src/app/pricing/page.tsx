@@ -37,10 +37,10 @@ export default function PricingPage() {
                   <h2 className="text-xl font-black text-dark mb-1">{t.name}</h2>
                   <p className="text-xs text-muted mb-5">{t.blurb}</p>
                   <span className="mb-4 inline-flex items-center gap-1 rounded-lg border border-pink-200 bg-pink-50 px-2 py-1 text-[10px] font-bold text-pink-600">
-                    ميزانية الإعلان مشمولة إن وجدت
+                    {t.sponsoredCampaignBudget > 0 ? `ميزانية إعلان ${t.sponsoredCampaignBudget} ريال مشمولة` : 'لا تشمل ميزانية إعلان ممول'}
                   </span>
                   <div className="mb-5">
-                    <div className="text-xs text-muted">تبدأ من</div>
+                    <div className="text-xs text-muted">{t.fixedPrice ? 'سعر ثابت' : 'تبدأ من'}</div>
                     <div className="flex items-baseline gap-1">
                       <span className="text-4xl font-black text-gold">{t.startsFrom.toLocaleString('ar-SA')}</span>
                       <span className="text-sm text-muted">ر.س</span>
@@ -65,13 +65,13 @@ export default function PricingPage() {
                       )
                     })}
                   </ul>
-                  <Link href="/request"
+                  <Link href={`/request?package=${t.id}`}
                     className={`block text-center py-3 rounded-xl font-bold text-sm transition-all ${
                       t.highlighted
                         ? 'bg-green text-white hover:bg-green/90'
                         : 'border-2 border-green text-green hover:bg-green/5'
                     }`}>
-                    اختر نوع خبرك
+                    {t.requiredCategory ? 'اختر الحضور المهني' : 'اختر نوع خبرك'}
                   </Link>
                 </div>
               ))}

@@ -430,7 +430,7 @@ export async function POST(request: Request) {
     const effectiveScope = effectiveChannels.length > 1 ? 'all' : 'single'
 
     // الإضافات المضمَّنة في الباقة (مدمجة في السعر الثابت — لا تُضاف فوقه)
-    const effectivePkg = pkg?.id === 'v2_reach' && effectiveChannels.includes('tk') ? { ...pkg, includedExtras: [...pkg.includedExtras, 'video'] } : pkg
+    const effectivePkg = pkg
     if (pkg && selectedExtras.some(id => !EXTRAS.some(e => e.id === id))) return NextResponse.json({ error: 'إضافة غير صالحة' }, { status: 400 })
     const packageIncludedExtras: string[] = effectivePkg ? effectivePkg.includedExtras : []
 
