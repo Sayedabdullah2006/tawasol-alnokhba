@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Tawasol al Nukhba Partner API",
-    "version": "1.1.0",
-    "description": "Signed server-to-server API. Catalog version 2026-11-04.v3 implements the approved five-package table. Existing package IDs, endpoints, HMAC and checkout remain compatible. Public money fields are integer halalas."
+    "version": "1.2.0",
+    "description": "Dynamic published catalog managed centrally in Tawasol al Nukhba. Treat catalog.version as an opaque string. Cache catalog display for at most cache_ttl_seconds; use fresh server quotes for purchases. Package IDs, HMAC and checkout remain compatible. All partner money fields are integer halalas."
   },
   "servers": [
     {
@@ -1335,6 +1335,10 @@
                   "type": "integer",
                   "minimum": 0,
                   "description": "Integer halalas; divide by 100 to display SAR"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Purchased extra name retained in the quote/order snapshot."
                 }
               },
               "required": [
@@ -1535,6 +1539,14 @@
           },
           "limits": {
             "type": "object"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cache_ttl_seconds": {
+            "type": "integer",
+            "const": 60
           }
         }
       },
@@ -1596,6 +1608,11 @@
           },
           "discount_code": {
             "type": "string"
+          },
+          "catalog_version": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Send the version shown to the customer. A mismatch returns 409 CATALOG_CHANGED; refresh the catalog, show the updated quote, then let the customer continue. Optional only for backward compatibility."
           }
         },
         "required": [
@@ -1983,6 +2000,12 @@
           },
           "included": {
             "type": "boolean"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "Optional number of separate deliverable links."
           }
         },
         "required": [

@@ -1,14 +1,14 @@
+import { getPublishedCatalog } from '@/lib/catalog/server'
+import { activePackages, newsPrice } from '@/lib/catalog/model'
 import { partnerPaymentMode, partnerGateway } from './payment-mode'
 import { validateNews } from '@/lib/individual-news'
 import { createServiceRoleClient } from '@/lib/supabase-server'
-import { CATEGORIES, EXTRAS } from '@/lib/constants'
-import { calculateAutoQuote, parseSubOption } from '@/lib/auto-quote'
-import { PACKAGE_VERSION, type IndividualPackage, SINGLE_PACKAGES, getIndividualPackage, priceIndividualPackage, resolvePackageChannels } from '@/lib/individual-packages'
+import { CATEGORIES } from '@/lib/constants'
+import { type IndividualPackage, getIndividualPackage, priceIndividualPackage, resolvePackageChannels } from '@/lib/individual-packages'
 import { PartnerContext, PartnerError, parseBody, sha256, text, uuid } from './auth'
 import { checkoutOrigin, checkoutToken } from './checkout'
 
 const UUID = /^[a-f0-9-]{36}$/i
-const ALLOWED_EXTRAS = EXTRAS.filter(e => !['website', 'media', 'plan'].includes(e.id))
 const MIME = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
 const ORDER_FIELDS = 'id,request_number,partner_id,external_customer_id,external_order_id,source_site,category,title,content,channels,status,payment_status,final_total,package_snapshot,created_at,updated_at,proposed_content,proposed_images,post_reviews,content_sent_at,content_approved_at,user_feedback,admin_info_request,partner_deliverables,refund_amount,refund_timing,paid_at'
 function dbError(error: { message: string } | null) {
@@ -70,22 +70,26 @@ export async function partnerOperation(request: Request, ctx: PartnerContext, pa
   const db = await createServiceRoleClient()
   const method = request.method
   if (method === 'GET' && path.join('/') === 'catalog') {
+    const catalog = await getPublishedCatalog()
     const { data, error } = await db.from('influencers').select('id,name_ar,x_followers,ig_followers,li_followers,tk_followers').in('id', ctx.client.influencer_ids.filter(id => UUID.test(id))).eq('is_active', true)
     dbError(error)
-    return { version: PACKAGE_VERSION, currency: 'SAR', money_unit: 'halala', seller: 'شركة تواصل النخبة للدعاية والإعلان',
-      packages: SINGLE_PACKAGES.map(p => ({ id: p.id, name: p.name, blurb: p.blurb, surcharge: p.surcharge * 100, fixed_price: p.fixedPrice ? p.fixedPrice * 100 : null, starts_from: (p.fixedPrice ?? 499 + p.surcharge) * 100, advertising: p.sponsoredCampaignBudget * 100, channel_count: p.channelCount, channels: p.channels ?? null, features: p.features, benefits: p.benefits, required_category: p.requiredCategory ?? null, included_extras: p.includedExtras })), extras: ALLOWED_EXTRAS.map(e => ({ id: e.id, name: e.nameAr, price: e.price * 100 })),
-      categories: CATEGORIES.filter(c => !c.clientTypes || c.clientTypes.includes('individual')).map(c => ({ id: c.id, name: c.nameAr, requires_sub_option: !!c.hasSubOption,
-        base_price: c.hasSubOption ? null : calculateAutoQuote({ category: c.id, clientType: 'individual', selectedExtras: [] }).singleChannelBase * 100 })),
+    return { version: catalog.version, published_at: catalog.published_at, cache_ttl_seconds: 60, currency: 'SAR', money_unit: 'halala', seller: 'شركة تواصل النخبة للدعاية والإعلان',
+      packages: activePackages(catalog).map(p => ({ id: p.id, name: p.name, blurb: p.blurb, surcharge: Math.round(p.surcharge * 100), fixed_price: p.fixedPrice ? Math.round(p.fixedPrice * 100) : null, starts_from: Math.round((p.fixedPrice ?? (p.requiredCategory ? newsPrice(catalog,p.requiredCategory) : Math.min(...catalog.newsRates.map(r=>r.price))) + p.surcharge) * 100), advertising: Math.round(p.sponsoredCampaignBudget * 100), channel_count: p.channelCount, channels: p.channels ?? null, features: p.features, benefits: p.benefits, required_category: p.requiredCategory ?? null, included_extras: p.includedExtras })), extras: catalog.extras.filter(e=>e.enabled).map(e => ({ id: e.id, name: e.name, price: Math.round(e.price * 100) })),
+      categories: CATEGORIES.filter(c => c.id !== 'Others' && (!c.clientTypes || c.clientTypes.includes('individual'))).map(c => ({ id: c.id, name: c.nameAr, requires_sub_option: !!c.hasSubOption,
+        base_price: c.hasSubOption ? null : Math.round(newsPrice(catalog,c.id) * 100) })),
       sub_options: {
-        inventions: ['with_patent','no_patent'].map(id => ({ id, base_price: calculateAutoQuote({ category: 'inventions', subOption: id, selectedExtras: [] }).singleChannelBase * 100 })),
-        competitions: Object.fromEntries(Object.entries({ international: ['first','second','third','top_10','top_50','participation'], local: ['first','second','third','top_10','top_50','participation'], hackathon: ['first','second','third','finalist','participation'] }).map(([subcategory, positions]) => [subcategory, positions.map(position => ({ position, base_price: calculateAutoQuote({ category: 'competitions', subOption: { subcategory, position }, selectedExtras: [] }).singleChannelBase * 100 }))])),
+        inventions: ['with_patent','no_patent'].map(id => ({ id, base_price: Math.round(newsPrice(catalog,'inventions',id) * 100) })),
+        competitions: Object.fromEntries(Object.entries({ international: ['first','second','third','top_10','top_50','participation'], local: ['first','second','third','top_10','top_50','participation'], hackathon: ['first','second','third','finalist','participation'] }).map(([subcategory, positions]) => [subcategory, positions.map(position => ({ position, base_price: Math.round(newsPrice(catalog,'competitions',{subcategory,position}) * 100) }))])),
       }, publishers: (data ?? []).map(p => ({ id: p.id, name: p.name_ar, channels: channelsOf(p) })),
       career_fields: ['language', 'goal', 'experience', 'education'], tax_policy: 'existing_no_added_vat',
       limits: { file_bytes: 20971520, files_per_order: 10, quote_seconds: 1800, checkout_seconds: 1800 } }
   }
   if (method === 'POST' && path.join('/') === 'quotes') {
     const body = parseBody(ctx)
-    const pkg = getIndividualPackage(text(body.package_id, 40))
+    const catalog = await getPublishedCatalog()
+    if (body.catalog_version !== undefined && body.catalog_version !== catalog.version) throw new PartnerError('CATALOG_CHANGED',409)
+    const ALLOWED_EXTRAS = catalog.extras.filter(e=>e.enabled)
+    const pkg = getIndividualPackage(text(body.package_id, 40),activePackages(catalog))
     if (!pkg) throw new PartnerError('INVALID_PACKAGE')
     const category = text(body.category, 40)
     try { validateNews(category, body.sub_option) } catch (error) { throw new PartnerError(error instanceof Error ? error.message : 'INVALID_CATEGORY') }
@@ -99,12 +103,12 @@ export async function partnerOperation(request: Request, ctx: PartnerContext, pa
     const extras = ALLOWED_EXTRAS.filter(e => ids.includes(e.id))
     if (extras.some(e => e.id === 'infographic') && category !== 'cv') throw new PartnerError('INVALID_EXTRAS')
     const deal = await discount(body.discount_code)
-    const base = calculateAutoQuote({ category, subOption: parseSubOption(body.sub_option as string), selectedExtras: [] }).singleChannelBase
+    const base = newsPrice(catalog,category,body.sub_option)
     const effectivePkg = pkg
     const pricing = priceIndividualPackage(base, effectivePkg, extras, deal.pct)
     if (deal.cap !== null) { pricing.discount = Math.min(pricing.discount, Math.round(deal.cap * 100)); pricing.total = pricing.subtotal - pricing.discount }
     if (pricing.total <= 0) throw new PartnerError('ZERO_PAYMENT_UNSUPPORTED')
-    const snapshot = { version: PACKAGE_VERSION, package: effectivePkg, pricing }
+    const snapshot = { version: catalog.version, package: effectivePkg, pricing }
     const payload = { category, sub_option: typeof body.sub_option === 'object' ? JSON.stringify(body.sub_option) : body.sub_option ?? null,
       influencer_id: pub.id, channels, discount_code: deal.code }
     const { data, error } = await db.from('partner_quotes').insert({ partner_id: ctx.client.id, customer_id: ctx.customer, snapshot, payload, expires_at: new Date(Date.now() + 1800000).toISOString() }).select('id,expires_at,snapshot,payload').single()

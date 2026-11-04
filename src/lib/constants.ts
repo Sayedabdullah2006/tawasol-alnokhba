@@ -1,4 +1,3 @@
-import { SINGLE_PACKAGES } from './individual-packages'
 // ─── Platform Info ───
 export const PLATFORM = {
   nameAr: 'تواصل النخبة',
@@ -229,7 +228,7 @@ export const PACKAGES: Package[] = [
   },
 ]
 
-PACKAGES.push(...SINGLE_PACKAGES)
+// New individual packages are loaded from the published catalog, never this legacy list.
 
 // «الصدارة» محفوظة لعرض الطلبات القديمة فقط، ولا تتاح للطلبات الجديدة.
 export const ORDERABLE_PACKAGES = PACKAGES.filter((pkg) => ['basic', 'pro', 'elite'].includes(pkg.id))

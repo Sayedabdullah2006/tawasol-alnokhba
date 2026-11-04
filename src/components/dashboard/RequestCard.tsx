@@ -17,6 +17,7 @@ interface Props {
     receipt_url?: string | null
     admin_notes?: string | null
     auto_quote_tier?: string | null
+    package_snapshot?: {package:{name:string}} | null
     selected_package?: string | null
     billing_source?: string | null
     payment_status?: string | null
@@ -31,7 +32,7 @@ export default function RequestCard({ request: r }: Props) {
   const priceToShow = r.final_total ?? r.admin_quoted_price
   const showPrice = r.status !== 'pending' && priceToShow != null
   const effectiveStatus = (r.status === 'approved' && r.receipt_url) ? 'payment_review' : r.status
-  const selectedPackage = PACKAGES.find(pkg => pkg.id === (r.auto_quote_tier ?? r.selected_package))
+  const selectedPackage = r.package_snapshot?.package ?? PACKAGES.find(pkg => pkg.id === (r.auto_quote_tier ?? r.selected_package))
   const invoiceAvailable = r.billing_source !== 'membership'
     && Number(priceToShow ?? 0) > 0
     && Boolean(r.payment_status === 'paid' || r.paid_at || r.moyasar_payment_id || r.tamara_order_id)

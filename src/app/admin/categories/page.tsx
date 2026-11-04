@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Modal from '@/components/ui/Modal'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import Link from 'next/link'
 
 type Tab = 'categories' | 'extras'
 type CategoryRow = {
@@ -205,7 +206,7 @@ export default function AdminCategoriesPage() {
             <h1 className="text-2xl font-black text-dark">المزايا الإضافية</h1>
             <Button onClick={openAddExt}>+ إضافة ميزة</Button>
           </div>
-          <p className="text-sm text-muted mb-6">أضف أو عدّل أو أخفِ المزايا — التغييرات تنعكس فوراً في نموذج الطلب</p>
+          <p className="text-sm text-muted mb-6">هذه إعدادات المزايا للمسارات اليدوية. لإدارة باقات الأفراد وأسعارها ومزاياها والربط مع أول سعودي، انتقل إلى <Link href="/admin/packages" className="underline">الباقات والأسعار</Link>.</p>
 
           <div className="space-y-3">
             {extras.map(e => (

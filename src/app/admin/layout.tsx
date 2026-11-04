@@ -40,6 +40,7 @@ const adminNav: NavEntry[] = [
     label: 'المبيعات والتسعير',
     icon: '🛒',
     children: [
+      { href: '/admin/packages', label: 'الباقات والأسعار', icon: '▦' },
       { href: '/admin/categories', label: 'الفئات والمزايا', icon: '⚙️' },
       { href: '/admin/discounts', label: 'أكواد الخصم', icon: '🏷️' },
     ],

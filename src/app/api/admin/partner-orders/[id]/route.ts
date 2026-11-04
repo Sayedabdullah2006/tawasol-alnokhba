@@ -8,9 +8,9 @@ async function handle(request: Request, ctx: { params: Promise<{ id: string }> }
     if (!order) throw new PartnerError('ORDER_NOT_FOUND', 404)
     if (request.method === 'POST') {
       const body = await request.json()
-      if (!Array.isArray(body.deliverables) || body.deliverables.length > 40) throw new PartnerError('INVALID_DELIVERABLES')
+      if (!Array.isArray(body.deliverables) || body.deliverables.length > 100) throw new PartnerError('INVALID_DELIVERABLES')
       const deliverables = body.deliverables.map((item: Record<string, unknown>) => {
-        const label = text(item.label, 160); const status = text(item.status, 20); const url = text(item.url, 2048, false)
+        const label = text(item.label, 500); const status = text(item.status, 20); const url = text(item.url, 2048, false)
         if (!['pending','in_progress','completed'].includes(status)) throw new PartnerError('INVALID_STATUS')
         if (url && new URL(url).protocol !== 'https:') throw new PartnerError('INVALID_URL')
         return { label, status, url }

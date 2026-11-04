@@ -138,19 +138,20 @@ function resolvePaymentProvider(request: JsonObject, overrides: PaymentInvoiceOv
   return 'دفع معتمد من الإدارة'
 }
 
-function createSnapshot(request: JsonObject, overrides: PaymentInvoiceOverrides): ServiceInvoiceSnapshot {
+export function createServiceInvoiceSnapshot(request: JsonObject, overrides: PaymentInvoiceOverrides): ServiceInvoiceSnapshot {
+  const purchase = request.package_snapshot && typeof request.package_snapshot==='object' ? request.package_snapshot as JsonObject : null
+  const savedPackage = purchase?.package && typeof purchase.package==='object' ? purchase.package as JsonObject : null
+  const savedPricing = purchase?.pricing && typeof purchase.pricing==='object' ? purchase.pricing as JsonObject : null
   const selectedPackageId = stringValue(request.auto_quote_tier) ?? stringValue(request.selected_package)
   const selectedPackage = PACKAGES.find(item => item.id === selectedPackageId)
   const category = CATEGORIES.find(item => item.id === request.category)
   const selectedExtras = stringArray(request.user_selected_extras)
-  const extraFeatures = selectedExtras
-    .map(id => EXTRAS.find(item => item.id === id)?.nameAr)
-    .filter((item): item is string => Boolean(item))
+  const extraFeatures = Array.isArray(savedPricing?.extras) ? savedPricing.extras.map(raw=>{const e=raw as JsonObject;return stringValue(e.name)??EXTRAS.find(v=>v.id===e.id)?.nameAr}).filter((v):v is string=>Boolean(v)) : selectedExtras.map(id=>EXTRAS.find(item=>item.id===id)?.nameAr).filter((v):v is string=>Boolean(v))
   const total = numberValue(request.final_total ?? request.admin_quoted_price)
   const campaignPostCount = Array.isArray(request.campaign_posts) && request.campaign_posts.length > 0
     ? request.campaign_posts.length
     : 1
-  const packageFeatures = selectedPackage
+  const packageFeatures = savedPackage ? stringArray(savedPackage.features) : selectedPackage
     ? getPackageFeaturesForPostPrice(selectedPackage, total / campaignPostCount)
     : []
   const features = Array.from(new Set([...packageFeatures, ...extraFeatures]))
@@ -195,7 +196,7 @@ function createSnapshot(request: JsonObject, overrides: PaymentInvoiceOverrides)
       title: stringValue(request.title) ?? fallbackTitle,
       type: requestType,
       category: category?.nameAr ?? stringValue(request.category) ?? 'خدمة نشر',
-      packageName: selectedPackage?.name ?? null,
+      packageName: stringValue(savedPackage?.name) ?? selectedPackage?.name ?? null,
       accountName: 'أول سعودي First1Saudi',
       postCount: Math.max(1, numberValue(request.num_posts ?? request.campaign_post_count, 1)),
       channels: stringArray(request.channels).map(channelLabel),
@@ -480,7 +481,7 @@ export async function ensureServiceInvoice(requestId: string, overrides: Payment
       || Boolean(stringValue(requestRecord.tamara_order_id))
     if (!paid || total <= 0) throw new Error('invoice_request_not_paid')
 
-    const snapshot = createSnapshot(requestRecord, overrides)
+    const snapshot = createServiceInvoiceSnapshot(requestRecord, overrides)
     const insertPayload = {
       request_id: requestId,
       user_id: stringValue(requestRecord.user_id),

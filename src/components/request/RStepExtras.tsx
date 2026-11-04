@@ -9,9 +9,10 @@ interface Props {
   basePrice: number
   baseLabel?: string
   included?: string[]
+  options?: {id:string;name:string;price:number}[]
 }
 
-export default function RStepExtras({ selected, onChange, basePrice, baseLabel, included = [] }: Props) {
+export default function RStepExtras({ selected, onChange, basePrice, baseLabel, included = [], options }: Props) {
   const toggle = (id: string) => {
     // pin6 و pin12 متعارضان
     if (id === 'pin6' && !selected.includes('pin6')) {
@@ -27,7 +28,8 @@ export default function RStepExtras({ selected, onChange, basePrice, baseLabel, 
     )
   }
 
-  const extrasTotal = selected.filter(id => !included.includes(id)).reduce((s, id) => s + (AQ_EXTRAS_PRICES[id] ?? 0), 0)
+  const available = options ?? AQ_EXTRAS_LIST.map(id=>({id,name:AQ_EXTRAS_NAMES[id],price:AQ_EXTRAS_PRICES[id]}))
+  const extrasTotal = selected.filter(id => !included.includes(id)).reduce((s, id) => s + (available.find(e=>e.id===id)?.price??0), 0)
   const total       = basePrice + extrasTotal
 
   return (
@@ -40,7 +42,8 @@ export default function RStepExtras({ selected, onChange, basePrice, baseLabel, 
       </p>
 
       <div className="grid grid-cols-2 gap-3 mb-4">
-        {AQ_EXTRAS_LIST.filter(id => !included.includes(id)).map(id => {
+        {available.filter(e => !included.includes(e.id)).map(extra => {
+          const {id}=extra
           const isSelected = selected.includes(id)
           return (
             <button
@@ -62,10 +65,10 @@ export default function RStepExtras({ selected, onChange, basePrice, baseLabel, 
               )}
               <div className="text-xl mb-1">{AQ_EXTRAS_ICONS[id]}</div>
               <div className="text-sm font-semibold text-dark leading-tight mb-1">
-                {AQ_EXTRAS_NAMES[id]}
+                {extra.name}
               </div>
               <div className="text-xs font-bold text-green">
-                +{formatNumber(AQ_EXTRAS_PRICES[id])} ر.س
+                +{formatNumber(extra.price)} ر.س
               </div>
             </button>
           )

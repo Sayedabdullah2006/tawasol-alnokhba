@@ -1,4 +1,4 @@
-export interface PackageBenefit { id: string; label: string; value: string; included: boolean }
+export interface PackageBenefit { id: string; label: string; value: string; included: boolean; quantity?: number }
 export const PACKAGE_BENEFIT_ROWS: { id: string; label: string; values: string[] }[] = [
   {
     "id": "purpose",

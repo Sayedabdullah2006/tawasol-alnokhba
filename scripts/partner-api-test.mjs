@@ -37,6 +37,7 @@ function load(file) {
       return Response.json(providerPayment)
     },
     require(name) {
+      if (name === 'server-only') return {}
       if (name === '@/lib/supabase-server') return { createServiceRoleClient: async () => db }
       if (name === '@/lib/email') return { notifyPaymentConfirmedToClient: async () => { notificationCount++ }, notifyContentApprovedToAdmin: async () => {}, notifyContentChangesRequested: async () => {} }
       if (name === '@/lib/auto-studio') return { autoRunRequestStudio: async () => { studioCount++ } }
@@ -47,7 +48,9 @@ function load(file) {
   }, { filename: file })
   return result
 }
-const packages = load('src/lib/individual-packages.ts')
+const pricingModule=load('src/lib/individual-packages.ts')
+const seedModule=load('src/lib/catalog/bootstrap.ts')
+const packages={...pricingModule,SINGLE_PACKAGES:seedModule.INITIAL_SINGLE_PACKAGES,PACKAGE_VERSION:seedModule.INITIAL_PACKAGE_VERSION,getIndividualPackage:id=>pricingModule.getIndividualPackage(id,seedModule.INITIAL_SINGLE_PACKAGES),packagesForCategory:()=>seedModule.INITIAL_SINGLE_PACKAGES}
 const oldCalc = load('src/lib/auto-quote.ts')
 assert.deepEqual(Array.from(packages.SINGLE_PACKAGES, p => packages.packagePrice(799, p)), [799,1199,2199,3599,1799])
 assert.equal(oldCalc.calculateAutoQuote({ category: 'product', selectedExtras: [] }).total, 3000)
@@ -81,6 +84,11 @@ assert.equal(initialPartnerDeliverables(career).filter(d=>d.label.startsWith('إ
 assert.deepEqual(Array.from(initialPartnerDeliverables({features:['ميزة قديمة']}),d=>d.label),['ميزة قديمة'])
 assert.throws(() => packages.resolvePackageChannels(packages.getIndividualPackage('v2_reach'), ['x','x'], ['x','li']))
 assert.throws(() => packages.resolvePackageChannels(presence, [], ['x','li']))
+const fractional=packages.priceIndividualPackage(.29,{...packages.getIndividualPackage('v2_basic'),sponsoredCampaignBudget:.01,surcharge:0},[{id:'video',name:'إضافة سعر كسري',price:.29}],10)
+assert.equal(fractional.total,52);assert.equal(fractional.advertising,1);assert.equal(fractional.base,29);assert.equal(fractional.extras[0].price,29)
+const {createServiceInvoiceSnapshot}=load('src/lib/service-invoice.ts')
+const invoice=createServiceInvoiceSnapshot({id:crypto.randomUUID(),request_number:1,category:'graduation',final_total:799,package_snapshot:{version:'old-release',package:{name:'اسم باقة محفوظ',features:['ميزة محفوظة']},pricing:{extras:[{id:'video',name:'اسم إضافة محفوظ',price:40000}]}}},{paidAt:'2026-11-04T00:00:00Z'})
+assert.equal(invoice.request.packageName,'اسم باقة محفوظ');assert.deepEqual(Array.from(invoice.request.features),['ميزة محفوظة','اسم إضافة محفوظ'])
 const { GET, POST } = load('src/app/api/partners/v1/[...path]/route.ts')
 const auth = load('src/lib/partners/auth.ts')
 const { settlePartnerPayment } = load('src/lib/partners/checkout.ts')
@@ -100,7 +108,7 @@ assert.ifError(legacyError)
 let filePath
 try {
   let r = await call('catalog'); assert.equal(r.status,200); assert.equal(r.data.packages.length,5)
-  assert.equal(r.data.version,packages.PACKAGE_VERSION)
+  const catalogVersion=r.data.version; assert(catalogVersion.startsWith('catalog-'))
   assert.deepEqual(Array.from(r.data.packages,p=>p.advertising),[0,0,0,30000,40000])
   assert.equal(r.data.packages[4].required_category,'cv')
   assert(r.data.packages.every(p=>p.benefits.length===21))
@@ -139,7 +147,7 @@ try {
     const priced = await call('quotes',{method:'POST',body:{package_id,category,influencer_id:publisher,channels}})
     assert.equal(priced.status,200)
     assert.equal(priced.data.snapshot.pricing.advertising,advertising)
-    assert.equal(priced.data.snapshot.version,packages.PACKAGE_VERSION)
+    assert.equal(priced.data.snapshot.version,catalogVersion)
   }
   const reachVideo=await call('quotes',{method:'POST',body:{package_id:'v2_reach',category:'graduation',influencer_id:publisher,channels:['x','tk'],extras:['video','mention']}})
   assert.equal(reachVideo.data.snapshot.pricing.total,179900,'TikTok does not silently include production or mention in the updated reach package')

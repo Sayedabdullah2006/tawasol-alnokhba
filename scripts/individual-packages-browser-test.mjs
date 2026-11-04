@@ -53,21 +53,21 @@ try{
  await new Promise(r=>setTimeout(r,300))
  await waitFor(()=>JSON.parse(localStorage.getItem('tn_request_draft_v1')??'{}').category==='cv')
  assert.equal(await page.eval(()=>JSON.parse(localStorage.getItem('tn_request_draft_v1')).category),'cv')
- assert(await page.eval(()=>document.body.innerText.includes('بيانات الحضور المهني')))
+ assert(await page.eval(()=>document.body.innerText.includes('البيانات المهنية المطلوبة')))
  await page.setViewport({width:1440,height:1000});await page.screenshot({path:path.join(out,'career-selected.png'),format:'png',fullPage:true})
  await page.goto(base+'/request?package=v2_career',{timeoutMs:45000,settleMs:1700})
  await waitFor(()=>JSON.parse(localStorage.getItem('tn_request_draft_v1')??'{}').category==='cv')
  assert.equal(await page.eval(()=>JSON.parse(localStorage.getItem('tn_request_draft_v1')).category),'cv')
- const response=await page.eval(async email=>{const r=await fetch('/api/submit-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_type:'single',client_type:'individual',influencer_id:'a91880b6-2252-4aa7-807d-a53eb734771f',category:'cv',selected_package:'v2_career',channels:['x','li'],title:'QA باقة مهنية',content:'طلب اختبار فني فقط لا ينفذ.',client_name:'QA Package',client_phone:'+966500000000',client_email:email,selected_extras:[],career:{language:'ar',goal:'هدف تجريبي',experience:'خبرة تجريبية',education:'تعليم تجريبي'}})});return {status:r.status,data:await r.json()}},email)
+ const response=await page.eval(async email=>{const r=await fetch('/api/submit-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_type:'single',client_type:'individual',influencer_id:'a91880b6-2252-4aa7-807d-a53eb734771f',category:'cv',selected_package:'v2_career',catalog_version:(await(await fetch('/api/individual-catalog')).json()).version,channels:['x','li'],title:'QA باقة مهنية',content:'طلب اختبار فني فقط لا ينفذ.',client_name:'QA Package',client_phone:'+966500000000',client_email:email,selected_extras:[],career:{language:'ar',goal:'هدف تجريبي',experience:'خبرة تجريبية',education:'تعليم تجريبي'}})});return {status:r.status,data:await r.json()}},email)
  assert.equal(response.status,200,JSON.stringify(response))
  const saved=await db.from('publish_requests').select('final_total,package_snapshot').eq('user_id',userId).single();assert.ifError(saved.error)
- assert.equal(saved.data.final_total,1799);assert.equal(saved.data.package_snapshot.version,'2026-11-04.v3');assert.equal(saved.data.package_snapshot.pricing.advertising,40000)
+ assert.equal(saved.data.final_total,1799);assert(saved.data.package_snapshot.version.startsWith('catalog-'));assert.equal(saved.data.package_snapshot.pricing.advertising,40000)
  assert(saved.data.package_snapshot.package.features.some(f=>f.includes('5 إعلانات')))
  const result={passed:true,origin:base,viewports:[1440,768,390],desktop_full_width:true,desktop_columns:5,all_five_for_graduation:true,career_switches_category:true,career_deep_link:true,native_order_snapshot:true,career_total:1799,career_advertising:400,provider_payment_submitted:false}
  writeFileSync(path.join(out,'browser-results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result))
 }catch(e){if(qaPage){console.error(await qaPage.eval(()=>({path:location.pathname,text:document.body.innerText})));await qaPage.screenshot({path:path.join(out,'failure.png'),format:'png',fullPage:true})}console.error(logs.slice(-1500));throw e}
 finally{
  if(browser)await browser.close()
- if(userId){await db.from('publish_requests').delete().eq('user_id',userId);await db.from('request_drafts').delete().eq('user_id',userId);if(ssr)await ssr.auth.signOut();await db.auth.admin.deleteUser(userId)}
+ if(userId){await db.from('publish_requests').delete().eq('user_id',userId);await db.from('request_recovery_drafts').delete().eq('user_id',userId);if(ssr)await ssr.auth.signOut();await db.auth.admin.deleteUser(userId)}
  if(server&&server.exitCode===null)spawnSync('taskkill',['/pid',String(server.pid),'/T','/F'],{windowsHide:true,stdio:'ignore'})
 }
