@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Tawasol al Nukhba Partner API",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "description": "Dynamic published catalog managed centrally in Tawasol al Nukhba. Treat catalog.version as an opaque string. Cache catalog display for at most cache_ttl_seconds; use fresh server quotes for purchases. Package IDs, HMAC and checkout remain compatible. All partner money fields are integer halalas."
   },
   "servers": [
@@ -1371,6 +1371,303 @@
           }
         }
       }
+    },
+    "/identity/session": {
+      "post": {
+        "summary": "Verify OAuth identity and live session; resolve the established external identity without email matching",
+        "operationId": "post__identity_session",
+        "description": "Main awwal-saudi HMAC channel only. Access token is kept in the relying-party server. See SSO-CONTRACT.md.",
+        "parameters": [
+          {
+            "name": "X-Partner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Key-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Nonce",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Customer-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verified identity operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/IdentitySession"
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see error.code and trace_id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/identity/link": {
+      "post": {
+        "summary": "Bind a proved WordPress customer to the OAuth subject; preserve orders and reject conflicting owners",
+        "operationId": "post__identity_link",
+        "description": "Main awwal-saudi HMAC channel only. Access token is kept in the relying-party server. See SSO-CONTRACT.md.",
+        "parameters": [
+          {
+            "name": "X-Partner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Key-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Nonce",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Customer-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verified identity operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/IdentityLink"
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see error.code and trace_id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/identity/logout": {
+      "post": {
+        "summary": "Revoke the current OAuth session only, preserving native and other-device sessions",
+        "operationId": "post__identity_logout",
+        "description": "Main awwal-saudi HMAC channel only. Access token is kept in the relying-party server. See SSO-CONTRACT.md.",
+        "parameters": [
+          {
+            "name": "X-Partner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Key-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Nonce",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Customer-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verified identity operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/IdentityLogout"
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error; see error.code and trace_id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2510,6 +2807,126 @@
               15,
               60
             ]
+          }
+        }
+      },
+      "IdentityInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "access_token"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "writeOnly": true,
+            "format": "password",
+            "description": "Server-only native OAuth access token for the registered First1Saudi client; never a password or ID token."
+          }
+        }
+      },
+      "IdentitySession": {
+        "type": "object",
+        "properties": {
+          "issuer": {
+            "type": "string",
+            "format": "uri"
+          },
+          "subject": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "email_verified": {
+            "type": "boolean",
+            "const": true
+          },
+          "profile": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "full_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "city": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "x_handle": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "link": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "external_customer_id": {
+                "type": "string"
+              },
+              "linked_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "IdentityLink": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "external_customer_id": {
+            "type": "string"
+          },
+          "linked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "linked_orders": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "IdentityLogout": {
+        "type": "object",
+        "properties": {
+          "logged_out": {
+            "type": "boolean",
+            "const": true
+          },
+          "scope": {
+            "type": "string",
+            "const": "oauth_session"
           }
         }
       }

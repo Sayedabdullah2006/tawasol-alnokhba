@@ -1,0 +1,7 @@
+{
+  "name": "first1saudi-private-sso-runtime",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "dependencies": { "openid-client": "6.8.9" }
+}

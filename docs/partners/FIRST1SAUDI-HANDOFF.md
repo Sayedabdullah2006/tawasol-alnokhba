@@ -1,5 +1,7 @@
 > التحديث الحالي: الكتالوج أصبح ديناميكيًا من قاعدة البيانات، وتدار نسخته المنشورة من /admin/packages. اقرأ DYNAMIC-CATALOG.md وFIRST1SAUDI-DYNAMIC-CATALOG-PROMPT.txt. لا تثبّت الإصدار v3 أو أي أسعار أو أعداد قنوات في الكود.
 
+> الدخول الموحد: الحسابات المركزية مجهّزة عبر OAuth/OIDC. اقرأ SSO-CONTRACT.md وFIRST1SAUDI-SSO-PROMPT.txt. لا تنقل كلمات المرور أو تغيّر معرفات العملاء القديمة. سر OIDC منفصل عن HMAC ولا يرفق بالتوثيق.
+
 > مرجع التهيئة السابق هو `2026-11-04.v3`. ملفا PACKAGES-2026-11-04-V3.md وFIRST1SAUDI-V3-PROMPT.txt للتاريخ فقط؛ التعديل الحالي في FIRST1SAUDI-DYNAMIC-CATALOG-PROMPT.txt. معرّفات الباقات ومسارات الربط والتوقيع لم تتغير.
 
 > نُشر الخادم المركزي على https://nukhba.media واختُبر ميسر Sandbox فعليًا في 4 نوفمبر 2026. مفاتيح العميل تُسلّم في ملف خاص بالخادم. توثيق التنفيذ والنتائج في IMPLEMENTATION-AND-QA.md وsandbox-results.json.
@@ -89,6 +91,9 @@ SHA256_OF_EXACT_UTF8_BODY
 | POST orders/{id}/files/{file_id}/complete | التحقق من اكتمال الملف وحجمه ونوعه؛ body={} |
 | POST orders/{id}/review | اعتماد النسخة الحالية أو طلب تعديل |
 | POST orders/{id}/information | تزويد النص الكامل المحدّث عند طلب الإدارة معلومات |
+| POST identity/session | التحقق من جلسة OAuth وحل الربط القائم بالهوية المركزية |
+| POST identity/link | ربط حساب WordPress مثبت الملكية مع الحفاظ على الطلبات والمعرّف الخارجي |
+| POST identity/logout | إلغاء جلسة OAuth الحالية فقط دون جلسات تواصل النخبة الأصلية |
 
 ### عرض السعر
 

@@ -6,7 +6,7 @@ export function createNukhbaClient({ origin, partnerId, keyId, secret }) {
   if (root.protocol !== 'https:' && !['localhost','127.0.0.1'].includes(root.hostname)) throw new Error('HTTPS required')
   return async function call(path, { customerId, body, idempotencyKey = body ? randomUUID() : '', responseType = 'json' } = {}) {
     if (!/^[a-zA-Z0-9_.:@-]{1,128}$/.test(customerId ?? '')) throw new Error('A server-authenticated customer id is required')
-    if (!/^(catalog|quotes|orders)(\/|\?|$)/.test(path)) throw new Error('Invalid API path')
+    if (!/^(catalog|quotes|orders|identity)(\/|\?|$)/.test(path)) throw new Error('Invalid API path')
     const invoicePath = /^orders\/[a-f0-9-]{36}\/invoice$/i.test(path)
     if (!['json', 'pdf'].includes(responseType) || (responseType === 'pdf' && (!invoicePath || body !== undefined))) throw new Error('Invalid response type')
     if (invoicePath && responseType !== 'pdf') throw new Error('Use responseType: pdf for invoices')

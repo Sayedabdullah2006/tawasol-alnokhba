@@ -1,0 +1,6 @@
+@font-face{font-family:First1Almarai;src:url('/fonts/first1-almarai-regular.woff2') format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:First1Almarai;src:url('/fonts/first1-almarai-bold.woff2') format('woff2');font-weight:700;font-display:swap}
+.sso-first1{font-family:First1Almarai,Arial,sans-serif;color-scheme:light;line-height:1.8}
+.sso-first1 button,.sso-first1 input{font:inherit}
+.sso-first1 input::placeholder{color:#53655a;opacity:1}
+.sso-first1 button:focus-visible,.sso-first1 a:focus-visible,.sso-first1 input:focus-visible{outline:3px solid #14754e;outline-offset:3px}

@@ -4,6 +4,7 @@ import { partnerOperation } from '@/lib/partners/service'
 import { partnerInvoice } from '@/lib/partners/invoice'
 import { enrichPartnerOrderStates, readPartnerOrderState } from '@/lib/partners/status'
 import { partnerStatusDefinitions } from '@/lib/partners/status-view'
+import { partnerIdentity } from '@/lib/partners/identity'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -16,7 +17,9 @@ async function handle(request: Request, context: { params: Promise<{ path: strin
       return await partnerInvoice(ctx, path[1], trace)
     }
     let data
-    if (request.method === 'GET' && path.length === 3 && path[0] === 'orders' && path[2] === 'state') {
+    if (request.method === 'POST' && path.length === 2 && path[0] === 'identity') {
+      data = await partnerIdentity(ctx, path[1])
+    } else if (request.method === 'GET' && path.length === 3 && path[0] === 'orders' && path[2] === 'state') {
       data = await readPartnerOrderState(ctx, path[1])
     } else {
       const result = await partnerOperation(request, ctx, path)
