@@ -10,7 +10,7 @@ export async function sandboxInvoice(order: Record<string, unknown>) {
   const existing = await db.from('partner_sandbox_invoices').select('pdf_base64').eq('request_id', id).maybeSingle()
   if (existing.error) throw existing.error
   if (existing.data) return { pdf: Buffer.from(existing.data.pdf_base64, 'base64'), filename: `${number}.pdf` }
-  const snapshot = createServiceInvoiceSnapshot(order, { provider: 'Moyasar SANDBOX', paidAt: String(order.paid_at), reference: String(order.moyasar_payment_id) })
+  const snapshot = createServiceInvoiceSnapshot(order, { provider: order.tamara_order_id?'Tamara SANDBOX':order.moyasar_payment_id?'Moyasar SANDBOX':order.receipt_url?'Bank transfer SANDBOX':'SANDBOX', paidAt: String(order.paid_at), reference: String(order.tamara_order_id??order.moyasar_payment_id??order.id) })
   const pdf = await PDFDocument.load(await generateServiceInvoicePdf(snapshot, number))
   const font = await pdf.embedFont(StandardFonts.HelveticaBold)
   for (const page of pdf.getPages()) {
