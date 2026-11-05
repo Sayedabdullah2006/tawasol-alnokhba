@@ -6,6 +6,8 @@ import { sendEnhancedEmail, htmlToText } from './email-deliverability'
 import { generateRequestNumber } from './utils'
 import { waitingForClient } from './admin-actions'
 import type { RequestStatus } from './constants'
+import { customerEmailContext } from './customer-email'
+import { partnerReminderEmail } from './email-brand'
 
 // إعدادات التذكيرات
 const REMINDER_SETTINGS = {
@@ -550,12 +552,16 @@ export async function sendReminder(data: ReminderData): Promise<boolean> {
         return false
     }
 
+    const context=await customerEmailContext({requestId:data.requestId,email:data.clientEmail})
+    if(!context)return false
+    reminderContent=partnerReminderEmail(reminderContent.subject,reminderContent.html,context)
     // إرسال البريد الإلكتروني مع نسخة للإدارة
     const emailSent = await sendEnhancedEmail({
       to: data.clientEmail,
       subject: reminderContent.subject,
       html: reminderContent.html,
       text: htmlToText(reminderContent.html),
+      brand:context.brand,
       cc: 'first1saudi@gmail.com', // نسخة للإدارة لجميع التذكيرات
       options: {
         category: 'notification',

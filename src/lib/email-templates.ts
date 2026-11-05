@@ -1,11 +1,10 @@
 // HTML email templates — all RTL Arabic, brand-aligned (navy + gold).
 // Each generator returns { subject, html } ready for Resend.
 
-const BRAND_NAVY = '#0E2855'
-const BRAND_GOLD = '#C9A961'
+import { emailBrand, emailContext, customerEmailLinks } from './email-brand'
 const SITE_URL = 'https://nukhba.media'
 
-const wrap = (innerHtml: string): string => `<!DOCTYPE html>
+const wrap = (innerHtml: string): string => customerEmailLinks(`<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -15,7 +14,7 @@ const wrap = (innerHtml: string): string => `<!DOCTYPE html>
 <meta name="format-detection" content="telephone=no">
 <meta name="color-scheme" content="light">
 <meta name="supported-color-schemes" content="light">
-<title>تواصل النخبة - Tawasol Al-Nokhba</title>
+<title>${emailBrand().name} - ${emailBrand().english}</title>
 <!--[if mso]>
 <noscript>
 <xml>
@@ -41,14 +40,14 @@ img { border:0; height:auto; line-height:100%; outline:none; text-decoration:non
 a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !important; }
 </style>
 </head>
-<body dir="rtl" style="direction:rtl; text-align:right; margin:0 !important; padding:0 !important; width:100% !important; min-width:100% !important; background-color:#F7F4ED; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:${BRAND_NAVY}; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
+<body dir="rtl" style="direction:rtl; text-align:right; margin:0 !important; padding:0 !important; width:100% !important; min-width:100% !important; background-color:${emailBrand().background}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:${emailBrand().primary}; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
   <!-- Preheader text for better inbox preview -->
-  <div style="display:none; font-size:1px; color:#F7F4ED; line-height:1px; max-height:0px; max-width:0px; opacity:0; overflow:hidden; mso-hide:all;">
-    تحديث من منصة تواصل النخبة للتسويق والإعلان
+  <div style="display:none; font-size:1px; color:${emailBrand().background}; line-height:1px; max-height:0px; max-width:0px; opacity:0; overflow:hidden; mso-hide:all;">
+    تحديث من ${emailBrand().name}
   </div>
 
   <!-- 100% background wrapper -->
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="background-color:#F7F4ED; min-width:100%;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="background-color:${emailBrand().background}; min-width:100%;">
     <tr>
       <td align="center" valign="top" dir="rtl" style="direction:rtl; text-align:right; padding:24px 12px;">
         <!-- Main container -->
@@ -56,9 +55,9 @@ a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !impo
 
           <!-- Header with logo and branding -->
           <tr>
-            <td style="background-color:${BRAND_NAVY}; padding:24px; text-align:center;">
-              <h1 style="margin:0; color:#FFFFFF; font-size:22px; font-weight:900; letter-spacing:0.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">تواصل النخبة</h1>
-              <p style="margin:4px 0 0 0; color:${BRAND_GOLD}; font-size:11px; letter-spacing:2px; font-weight:bold; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">TAWASOL ALNOKHBA</p>
+            <td style="background-color:${emailBrand().primary}; padding:24px; text-align:center;">
+              <h1 style="margin:0; color:#FFFFFF; font-size:22px; font-weight:900; letter-spacing:0.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">${emailBrand().name}</h1>
+              <p style="margin:4px 0 0 0; color:${emailBrand().id==='first1saudi'?'#FFFFFF':emailBrand().accent}; font-size:11px; letter-spacing:2px; font-weight:bold; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">${emailBrand().english}</p>
             </td>
           </tr>
 
@@ -71,17 +70,17 @@ a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !impo
 
           <!-- Footer with contact info and unsubscribe -->
           <tr>
-            <td style="background-color:#F7F4ED; padding:18px; text-align:center; border-top:1px solid #E3DCC9;">
+            <td style="background-color:${emailBrand().background}; padding:18px; text-align:center; border-top:1px solid #E3DCC9;">
               <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation">
                 <tr>
                   <td style="text-align:center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-                    <p style="margin:0 0 6px 0; color:${BRAND_NAVY}; font-size:12px; font-weight:bold;">تواصل النخبة · Tawasol Al-Nokhba</p>
-                    <p style="margin:0 0 8px 0; color:#6B7C99; font-size:11px;">منصة متخصصة في التسويق والإعلان الرقمي</p>
+                    <p style="margin:0 0 6px 0; color:${emailBrand().primary}; font-size:12px; font-weight:bold;">${emailBrand().name} · ${emailBrand().english}</p>
+                    <p style="margin:0 0 8px 0; color:#6B7C99; font-size:11px;">${emailBrand().description}</p>
                     <p style="margin:0 0 8px 0; color:#6B7C99; font-size:11px;">هذه رسالة من نظام آلي، يرجى عدم الرد عليها مباشرة</p>
                     <p style="margin:8px 0 0 0; font-size:11px;">
-                      <a href="${SITE_URL}" style="color:${BRAND_GOLD}; text-decoration:none;">${SITE_URL.replace('https://','')}</a>
+                      <a href="${SITE_URL}" style="color:${emailBrand().accent}; text-decoration:none;">${emailBrand().site.replace('https://','')}</a>
                       <span style="color:#6B7C99; margin:0 8px;">|</span>
-                      <a href="mailto:support@nukhba.media" style="color:${BRAND_GOLD}; text-decoration:none;">دعم العملاء</a>
+                      <a href="mailto:${emailBrand().supportEmail}" style="color:${emailBrand().accent}; text-decoration:none;">دعم العملاء</a>
                     </p>
                   </td>
                 </tr>
@@ -95,9 +94,9 @@ a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !impo
           <tr>
             <td style="text-align:center; padding:8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
               <p style="margin:0; color:#9CA3AF; font-size:10px; line-height:1.4;">
-                هذه رسالة تجارية من تواصل النخبة، المملكة العربية السعودية<br>
+                هذه رسالة تجارية من ${emailBrand().name}، المملكة العربية السعودية<br>
                 تم إرسال هذه الرسالة إليك كونك عميل أو مهتم بخدماتنا<br>
-                <a href="mailto:unsubscribe@nukhba.media?subject=إلغاء الاشتراك" style="color:#9CA3AF; text-decoration:underline;">إلغاء الاشتراك</a>
+                <a href="mailto:${emailBrand().unsubscribeEmail}?subject=إلغاء الاشتراك" style="color:#9CA3AF; text-decoration:underline;">إلغاء الاشتراك</a>
               </p>
             </td>
           </tr>
@@ -106,16 +105,16 @@ a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !impo
     </tr>
   </table>
 </body>
-</html>`
+</html>`, emailContext())
 
 const button = (label: string, href: string): string =>
-  `<a href="${href}" style="display:inline-block; background:${BRAND_GOLD}; color:${BRAND_NAVY}; text-decoration:none; padding:12px 28px; border-radius:10px; font-weight:bold; font-size:14px; margin-top:8px;">${label}</a>`
+  `<a href="${href}" style="display:inline-block; background:${emailBrand().accent}; color:${emailBrand().id==='first1saudi'?'#FFFFFF':emailBrand().primary}; text-decoration:none; padding:12px 28px; border-radius:10px; font-weight:bold; font-size:14px; margin-top:8px;">${label}</a>`
 
 const greeting = (name: string): string =>
   `<p style="margin:0 0 16px 0; font-size:15px;">مرحباً <strong>${escapeHtml(name)}</strong> 👋</p>`
 
 const note = (text: string): string =>
-  `<div style="background:#F7F4ED; border-right:3px solid ${BRAND_GOLD}; padding:12px 14px; border-radius:8px; margin:14px 0; font-size:13px; line-height:1.7; white-space:pre-line;">${escapeHtml(text)}</div>`
+  `<div style="background:${emailBrand().background}; border-right:3px solid ${emailBrand().accent}; padding:12px 14px; border-radius:8px; margin:14px 0; font-size:13px; line-height:1.7; white-space:pre-line;">${escapeHtml(text)}</div>`
 
 function escapeHtml(s: string): string {
   return (s ?? '').replace(/[&<>"']/g, c => ({
@@ -164,7 +163,7 @@ export function requestReceivedToClient(d: ClientRequestData) {
     html: wrap(`
       ${greeting(d.clientName)}
       <p style="margin:0 0 16px 0; font-size:15px;">✅ <strong>تم استلام طلبك بنجاح</strong></p>
-      <p style="margin:0 0 8px 0; font-size:13px; color:#6B7C99;">رقم الطلب: <strong style="color:${BRAND_NAVY};">${escapeHtml(d.requestNumber)}</strong></p>
+      <p style="margin:0 0 8px 0; font-size:13px; color:#6B7C99;">رقم الطلب: <strong style="color:${emailBrand().primary};">${escapeHtml(d.requestNumber)}</strong></p>
       <p style="margin:0 0 18px 0; font-size:13px; line-height:1.8;">
         فريقنا الآن يراجع المحتوى وسنتواصل معك خلال 24 ساعة بـ:
       </p>
@@ -184,13 +183,13 @@ export function newRequestToAdmin(d: ClientRequestData) {
     subject: `📩 طلب نشر جديد · ${d.requestNumber}`,
     html: wrap(`
       <p style="margin:0 0 16px 0; font-size:16px; font-weight:bold;">📩 طلب نشر جديد يحتاج مراجعة</p>
-      <div style="background:#F7F4ED; border-radius:10px; padding:14px; margin-bottom:14px;">
+      <div style="background:${emailBrand().background}; border-radius:10px; padding:14px; margin-bottom:14px;">
         <p style="margin:0 0 8px 0; font-size:13px;"><strong>رقم الطلب:</strong> ${escapeHtml(d.requestNumber)}</p>
         <p style="margin:4px 0; font-size:13px;"><strong>العميل:</strong> ${escapeHtml(d.clientName)}</p>
         <p style="margin:4px 0; font-size:13px;"><strong>البريد:</strong> <span dir="ltr">${escapeHtml(d.clientEmail ?? '')}</span></p>
         <p style="margin:4px 0; font-size:13px;"><strong>الجوال:</strong> <span dir="ltr">${escapeHtml(d.clientPhone ?? '')}</span></p>
       </div>
-      <div style="background:#F7F4ED; border-radius:10px; padding:14px; margin-bottom:18px;">
+      <div style="background:${emailBrand().background}; border-radius:10px; padding:14px; margin-bottom:18px;">
         <p style="margin:4px 0; font-size:13px;"><strong>الفئة:</strong> ${escapeHtml(d.category)}</p>
         <p style="margin:4px 0; font-size:13px;"><strong>القنوات:</strong> ${d.channels.map(c => CHANNEL_LABELS[c] ?? c).join('، ')}</p>
         <p style="margin:8px 0 4px 0; font-size:13px;"><strong>العنوان:</strong> ${escapeHtml(d.title)}</p>
@@ -207,13 +206,13 @@ export function adminIntakeNotification(d: AdminIntakeNotificationData) {
     subject: `${d.subject} · ${d.referenceNumber}`,
     html: wrap(`
       <p style="margin:0 0 16px 0; font-size:16px; font-weight:bold;">${escapeHtml(d.heading)}</p>
-      <div style="background:#F7F4ED; border-radius:10px; padding:14px; margin-bottom:14px;">
+      <div style="background:${emailBrand().background}; border-radius:10px; padding:14px; margin-bottom:14px;">
         <p style="margin:0 0 8px 0; font-size:13px;"><strong>${escapeHtml(d.referenceLabel ?? 'الرقم المرجعي')}:</strong> ${escapeHtml(d.referenceNumber)}</p>
         <p style="margin:4px 0; font-size:13px;"><strong>العميل:</strong> ${escapeHtml(d.clientName)}</p>
         <p style="margin:4px 0; font-size:13px;"><strong>البريد:</strong> <span dir="ltr">${escapeHtml(d.clientEmail)}</span></p>
         ${d.clientPhone ? `<p style="margin:4px 0; font-size:13px;"><strong>الجوال:</strong> <span dir="ltr">${escapeHtml(d.clientPhone)}</span></p>` : ''}
       </div>
-      <div style="background:#F7F4ED; border-radius:10px; padding:14px; margin-bottom:18px;">
+      <div style="background:${emailBrand().background}; border-radius:10px; padding:14px; margin-bottom:18px;">
         <p style="margin:4px 0; font-size:13px;"><strong>${escapeHtml(d.itemLabel)}:</strong> ${escapeHtml(d.itemName)}</p>
         <p style="margin:4px 0; font-size:13px;"><strong>الحالة:</strong> ${escapeHtml(d.statusLabel)}</p>
         ${typeof d.amount === 'number' ? `<p style="margin:4px 0; font-size:13px;"><strong>القيمة:</strong> ${d.amount.toLocaleString('ar-SA')} ر.س</p>` : ''}
@@ -255,12 +254,12 @@ export function quoteReadyToClient(d: {
         فريقنا من الصياغة والتصميم والنشر انتهى من مراجعة طلبك <strong>${escapeHtml(d.requestNumber)}</strong> وأعد العرض المخصص.
       </p>
       ${adminBlock}
-      <div style="background:#F7F4ED; border-radius:12px; padding:18px; text-align:center; margin-bottom:14px;">
+      <div style="background:${emailBrand().background}; border-radius:12px; padding:18px; text-align:center; margin-bottom:14px;">
         <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">المطلوب دفعه</p>
-        <p style="margin:0 0 6px 0; font-size:28px; font-weight:900; color:${BRAND_GOLD};">${d.price.toLocaleString('ar-SA')} ر.س</p>
+        <p style="margin:0 0 6px 0; font-size:28px; font-weight:900; color:${emailBrand().accent};">${d.price.toLocaleString('ar-SA')} ر.س</p>
         <p style="margin:0 0 12px 0; font-size:11px; color:#9CA3AF;">هذا كل ما تدفعه — لا رسوم إضافية</p>
         <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">الوصول المتوقع</p>
-        <p style="margin:0; font-size:18px; font-weight:bold; color:${BRAND_NAVY};">${formatReach(d.reach)} متابع</p>
+        <p style="margin:0; font-size:18px; font-weight:bold; color:${emailBrand().primary};">${formatReach(d.reach)} متابع</p>
       </div>
       ${expiryBlock}
       <p style="margin:0 0 14px 0; font-size:13px; line-height:1.8;">
@@ -282,12 +281,12 @@ export function freeGiftToClient(d: {
   adminMessage: string
 }) {
   return {
-    subject: `🎁 منشور مجاني من تواصل النخبة · ${d.requestNumber}`,
+    subject: `🎁 منشور مجاني من ${emailBrand().name} · ${d.requestNumber}`,
     html: wrap(`
       ${greeting(d.clientName)}
       <div style="text-align:center; margin-bottom:20px;">
         <div style="font-size:48px;">🎁</div>
-        <p style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${BRAND_GOLD};">منشور مجاني</p>
+        <p style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${emailBrand().accent};">منشور مجاني</p>
       </div>
       <p style="margin:0 0 16px 0; font-size:14px; line-height:1.8;">
         يسعدنا إخبارك أن طلبك <strong>${escapeHtml(d.requestNumber)}</strong> سيُنشر بدون مقابل.
@@ -318,9 +317,9 @@ export function quoteApprovedAwaitingPaymentToClient(d: {
         شكراً لاعتمادك عرض طلب <strong>${escapeHtml(d.requestNumber)}</strong>.
         فريقنا سيبدأ العمل فور تأكيد الدفع.
       </p>
-      <div style="background:#F7F4ED; border-radius:10px; padding:14px; margin-bottom:16px; text-align:center;">
+      <div style="background:${emailBrand().background}; border-radius:10px; padding:14px; margin-bottom:16px; text-align:center;">
         <p style="margin:0 0 4px 0; font-size:12px; color:#6B7C99;">المطلوب دفعه</p>
-        <p style="margin:0 0 6px 0; font-size:24px; font-weight:900; color:${BRAND_GOLD};">${d.total.toLocaleString('ar-SA')} ر.س</p>
+        <p style="margin:0 0 6px 0; font-size:24px; font-weight:900; color:${emailBrand().accent};">${d.total.toLocaleString('ar-SA')} ر.س</p>
         <p style="margin:0; font-size:11px; color:#9CA3AF;">هذا كل ما تدفعه — لا رسوم إضافية</p>
       </div>
       <p style="margin:0 0 14px 0; font-size:13px; line-height:1.8;">
@@ -346,13 +345,13 @@ export function freeApprovedToClient(d: {
       ${greeting(d.clientName)}
       <div style="text-align:center; margin-bottom:18px;">
         <div style="font-size:48px;">✅</div>
-        <p style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${BRAND_GOLD};">تمت الموافقة على طلبك</p>
+        <p style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${emailBrand().accent};">تمت الموافقة على طلبك</p>
       </div>
       <p style="margin:0 0 16px 0; font-size:14px; line-height:1.8;">
         🗓️ <strong>جاري جدولة المنشور</strong>
       </p>
       <p style="margin:0 0 18px 0; font-size:13px; line-height:1.8; color:#6B7C99;">
-        طلبك <strong style="color:${BRAND_NAVY};">${escapeHtml(d.requestNumber)}</strong> اعتُمد ودخل قائمة الجدولة.
+        طلبك <strong style="color:${emailBrand().primary};">${escapeHtml(d.requestNumber)}</strong> اعتُمد ودخل قائمة الجدولة.
         سنبدأ التنفيذ قريباً ونبلغك فور اكتمال النشر.
       </p>
       <p style="margin:0; text-align:center;">${button('عرض الطلب', `${SITE_URL}/dashboard`)}</p>
@@ -373,7 +372,7 @@ export function paymentConfirmedToClient(d: {
     html: wrap(`
       ${greeting(d.clientName)}
       <p style="margin:0 0 16px 0; font-size:15px;">✅ <strong>استلمنا دفعك واعتمدناه</strong></p>
-      <div style="background:#F7F4ED; border-radius:10px; padding:14px; margin-bottom:16px; font-size:13px;">
+      <div style="background:${emailBrand().background}; border-radius:10px; padding:14px; margin-bottom:16px; font-size:13px;">
         <p style="margin:4px 0;"><strong>طلب:</strong> ${escapeHtml(d.requestNumber)}</p>
         <p style="margin:4px 0;"><strong>المبلغ:</strong> ${d.total.toLocaleString('ar-SA')} ر.س</p>
         ${d.invoiceNumber ? `<p style="margin:4px 0;"><strong>رقم الفاتورة:</strong> <span dir="ltr">${escapeHtml(d.invoiceNumber)}</span></p>` : ''}
@@ -382,7 +381,7 @@ export function paymentConfirmedToClient(d: {
         طلبك الآن في قائمة التنفيذ. أرفقنا فاتورة الخدمة بصيغة PDF، ويمكنك تحميلها في أي وقت من صفحة طلباتك.
         سنبدأ النشر قريباً وسنخبرك فور الانتهاء.
       </p>
-      <p style="margin:0; text-align:center;">${button(d.invoiceDownloadUrl ? 'تحميل الفاتورة' : 'عرض الطلب', d.invoiceDownloadUrl ?? `${SITE_URL}/dashboard`)}</p>
+      <p style="margin:0; text-align:center;">${button(d.invoiceDownloadUrl ? (emailBrand().id==='first1saudi'?'عرض الطلب والفاتورة':'تحميل الفاتورة') : 'عرض الطلب', d.invoiceDownloadUrl ?? `${SITE_URL}/dashboard`)}</p>
     `),
   }
 }
@@ -398,14 +397,14 @@ export function requestAutoClosedToClient(d: {
       ${greeting(d.clientName)}
       <div style="text-align:center; margin-bottom:20px;">
         <div style="font-size:48px;">📋</div>
-        <h2 style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${BRAND_NAVY};">تم إغلاق طلبك تلقائياً</h2>
+        <h2 style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${emailBrand().primary};">تم إغلاق طلبك تلقائياً</h2>
       </div>
       <p style="margin:0 0 16px 0; font-size:14px; line-height:1.8;">
         طلبك <strong>${escapeHtml(d.requestNumber)}</strong> كان تحت المراجعة لأكثر من أسبوع دون معالجة،
         لذلك أُغلق تلقائياً للحفاظ على تنظيم قائمة الطلبات.
       </p>
-      <div style="background:#F7F4ED; border-radius:12px; padding:16px; margin-bottom:18px;">
-        <p style="margin:0 0 8px 0; font-size:13px; font-weight:bold; color:${BRAND_NAVY};">📌 هل ترغب في المتابعة؟</p>
+      <div style="background:${emailBrand().background}; border-radius:12px; padding:16px; margin-bottom:18px;">
+        <p style="margin:0 0 8px 0; font-size:13px; font-weight:bold; color:${emailBrand().primary};">📌 هل ترغب في المتابعة؟</p>
         <p style="margin:0; font-size:13px; line-height:1.8; color:#4B5563;">
           يسعدنا استقبال طلبك مجدداً — ما عليك سوى الدخول للموقع ورفع طلب جديد
           وسيتم مراجعته بأولوية.
@@ -416,7 +415,7 @@ export function requestAutoClosedToClient(d: {
       </p>
       <p style="margin:0; font-size:12px; color:#6B7C99; text-align:center;">
         إذا كان الإغلاق خطأً أو تحتاج مساعدة، تواصل معنا عبر
-        <a href="${SITE_URL}/contact" style="color:${BRAND_GOLD};">صفحة التواصل</a>.
+        <a href="${SITE_URL}/contact" style="color:${emailBrand().accent};">صفحة التواصل</a>.
       </p>
     `),
   }
@@ -452,22 +451,22 @@ export function completedToClient(d: {
       ${greeting(d.clientName)}
       <div style="text-align:center; margin-bottom:18px;">
         <div style="font-size:48px;">🎉</div>
-        <p style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${BRAND_GOLD};">اكتمل النشر</p>
+        <p style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${emailBrand().accent};">اكتمل النشر</p>
       </div>
       <p style="margin:0 0 16px 0; font-size:14px; line-height:1.8;">
         تم نشر محتواك بنجاح — طلب <strong>${escapeHtml(d.requestNumber)}</strong> اكتمل ووصل لجمهوره المستهدف.
       </p>
       <p style="margin:0 0 20px 0; font-size:13px; line-height:1.8; color:#6B7C99;">
-        شكراً لاختيارك تواصل النخبة لإيصال صوتك.
+        شكراً لاختيارك ${emailBrand().name} لإيصال صوتك.
       </p>
       ${d.reviewUrl ? `
         <div style="margin:22px 0; padding:20px; border:1px solid #E5D5A7; border-radius:12px; background:#FFFCF4; text-align:center;">
-          <div style="font-size:34px; letter-spacing:3px; color:${BRAND_GOLD};">★★★★★</div>
-          <p style="margin:8px 0 6px 0; font-size:17px; font-weight:900; color:${BRAND_NAVY};">كيف كانت تجربتك؟</p>
+          <div style="font-size:34px; letter-spacing:3px; color:${emailBrand().accent};">★★★★★</div>
+          <p style="margin:8px 0 6px 0; font-size:17px; font-weight:900; color:${emailBrand().primary};">كيف كانت تجربتك؟</p>
           <p style="margin:0 0 16px 0; font-size:13px; line-height:1.8; color:#6B7C99;">تقييمك لا يستغرق دقيقة، ويساعدنا على تحسين الخدمة والاهتمام بالتفاصيل التي تهمك.</p>
           ${button('تقييم التجربة', d.reviewUrl)}
         </div>
-        <p style="margin:0 0 20px 0; font-size:14px; line-height:1.8; color:${BRAND_NAVY}; font-weight:700; text-align:center;">ونتطلع لأن نكون جزءاً من إنجازك القادم.</p>
+        <p style="margin:0 0 20px 0; font-size:14px; line-height:1.8; color:${emailBrand().primary}; font-weight:700; text-align:center;">ونتطلع لأن نكون جزءاً من إنجازك القادم.</p>
       ` : ''}
       <p style="margin:0; text-align:center;">${button('عرض تفاصيل الطلب', `${SITE_URL}/dashboard`)}</p>
     `),
@@ -481,7 +480,7 @@ export function registrationCodeToClient(d: {
   ttlMinutes: number
 }) {
   const codeDigits = d.code.split('').map(c =>
-    `<span style="display:inline-block; width:40px; height:50px; line-height:50px; background:${BRAND_NAVY}; color:${BRAND_GOLD}; font-size:24px; font-weight:900; border-radius:8px; margin:0 3px;">${c}</span>`
+    `<span style="display:inline-block; width:40px; height:50px; line-height:50px; background:${emailBrand().primary}; color:${emailBrand().accent}; font-size:24px; font-weight:900; border-radius:8px; margin:0 3px;">${c}</span>`
   ).join('')
 
   return {
@@ -518,19 +517,19 @@ export function welcomeToClient(d: {
   clientName: string
 }) {
   return {
-    subject: `🎉 مرحباً بك في تواصل النخبة`,
+    subject: `🎉 مرحباً بك في ${emailBrand().name}`,
     html: wrap(`
       ${greeting(d.clientName)}
       <div style="text-align:center; margin-bottom:20px;">
         <div style="font-size:48px;">🎉</div>
-        <p style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${BRAND_GOLD};">تم إنشاء حسابك بنجاح</p>
+        <p style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${emailBrand().accent};">تم إنشاء حسابك بنجاح</p>
       </div>
       <p style="margin:0 0 16px 0; font-size:14px; line-height:1.8;">
-        يسعدنا انضمامك إلى <strong>تواصل النخبة</strong> — منصتك المتخصصة في التسويق والإعلان الرقمي.
+        يسعدنا انضمامك إلى <strong>${emailBrand().name}</strong> — منصتك المتخصصة في التسويق والإعلان الرقمي.
         حسابك جاهز الآن ويمكنك البدء فوراً.
       </p>
-      <div style="background:#F7F4ED; border-radius:12px; padding:18px; margin-bottom:18px;">
-        <p style="margin:0 0 10px 0; font-size:14px; font-weight:bold; color:${BRAND_NAVY};">🚀 ابدأ من هنا</p>
+      <div style="background:${emailBrand().background}; border-radius:12px; padding:18px; margin-bottom:18px;">
+        <p style="margin:0 0 10px 0; font-size:14px; font-weight:bold; color:${emailBrand().primary};">🚀 ابدأ من هنا</p>
         <ul style="margin:0; padding-right:20px; font-size:13px; line-height:1.9; color:#4A5568;">
           <li>قدّم طلب نشر جديد بكل سهولة</li>
           <li>تابع حالة طلباتك من لوحة التحكم</li>
@@ -540,7 +539,7 @@ export function welcomeToClient(d: {
       <p style="margin:0; text-align:center;">${button('انتقل إلى لوحة التحكم', `${SITE_URL}/dashboard`)}</p>
       <p style="margin:20px 0 0 0; font-size:13px; color:#6B7C99; line-height:1.8; text-align:center;">
         لأي استفسار، فريق الدعم في خدمتك عبر
-        <a href="mailto:support@nukhba.media" style="color:${BRAND_GOLD};">support@nukhba.media</a>.
+        <a href="mailto:${emailBrand().supportEmail}" style="color:${emailBrand().accent};">${emailBrand().supportEmail}</a>.
       </p>
     `),
   }
@@ -556,12 +555,12 @@ export function newAccountToAdmin(d: {
     html: wrap(`
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">🆕</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">تسجيل حساب جديد</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">تسجيل حساب جديد</h2>
       </div>
       <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
         تم إنشاء حساب جديد على المنصة.
       </p>
-      <div style="background:#F7F4ED; border-radius:10px; padding:14px; margin-bottom:18px;">
+      <div style="background:${emailBrand().background}; border-radius:10px; padding:14px; margin-bottom:18px;">
         <p style="margin:4px 0; font-size:13px;"><strong>الاسم:</strong> ${escapeHtml(d.clientName)}</p>
         <p style="margin:4px 0; font-size:13px;"><strong>البريد:</strong> <span dir="ltr">${escapeHtml(d.clientEmail)}</span></p>
         <p style="margin:4px 0; font-size:13px;"><strong>التاريخ:</strong> ${formatDateAr(new Date().toISOString())}</p>
@@ -577,7 +576,7 @@ export function resetPasswordCodeToClient(d: {
   ttlMinutes: number
 }) {
   const codeDigits = d.code.split('').map(c =>
-    `<span style="display:inline-block; width:40px; height:50px; line-height:50px; background:${BRAND_NAVY}; color:${BRAND_GOLD}; font-size:24px; font-weight:900; border-radius:8px; margin:0 3px;">${c}</span>`
+    `<span style="display:inline-block; width:40px; height:50px; line-height:50px; background:${emailBrand().primary}; color:${emailBrand().accent}; font-size:24px; font-weight:900; border-radius:8px; margin:0 3px;">${c}</span>`
   ).join('')
 
   return {
@@ -615,14 +614,14 @@ export function loginCodeToClient(d: {
   ttlMinutes: number
 }) {
   return {
-    subject: `رمز الدخول · تواصل النخبة`,
+    subject: `رمز الدخول · ${emailBrand().name}`,
     html: wrap(`
       <p style="margin:0 0 16px 0; font-size:15px;">🔑 <strong>رمز تسجيل الدخول</strong></p>
       <p style="margin:0 0 18px 0; font-size:13px; line-height:1.8;">
-        استخدم الرمز التالي لتسجيل الدخول إلى حسابك في تواصل النخبة:
+        استخدم الرمز التالي لتسجيل الدخول إلى حسابك في ${emailBrand().name}:
       </p>
-      <div style="background:#F7F4ED; border-radius:12px; padding:18px; margin:0 0 16px 0; text-align:center;">
-        <p style="margin:0; font-size:34px; font-weight:900; letter-spacing:8px; color:${BRAND_NAVY}; font-family:monospace;">${escapeHtml(d.code)}</p>
+      <div style="background:${emailBrand().background}; border-radius:12px; padding:18px; margin:0 0 16px 0; text-align:center;">
+        <p style="margin:0; font-size:34px; font-weight:900; letter-spacing:8px; color:${emailBrand().primary}; font-family:monospace;">${escapeHtml(d.code)}</p>
       </div>
       <p style="margin:0; font-size:12px; color:#9CA3AF; text-align:center;">
         ينتهي الرمز خلال ${d.ttlMinutes} دقيقة. إن لم تطلب الدخول، تجاهل هذه الرسالة.
@@ -676,17 +675,17 @@ export function statusUpdateToClient(d: {
   const emoji = statusEmojis[d.status] || '📋'
 
   return {
-    subject: `تحديث حالة طلب ${d.requestNumber} · تواصل النخبة`,
+    subject: `تحديث حالة طلب ${d.requestNumber} · ${emailBrand().name}`,
     html: wrap(`
       ${greeting(d.clientName)}
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">${emoji}</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">تم تحديث حالة طلبك</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">تم تحديث حالة طلبك</h2>
         <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
       </div>
       <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:20px; margin:20px 0; text-align:center;">
         <p style="margin:0 0 8px 0; color:#6B7C99; font-size:14px;">الحالة الجديدة:</p>
-        <p style="margin:0; color:${BRAND_NAVY}; font-size:18px; font-weight:bold;">${d.statusLabel}</p>
+        <p style="margin:0; color:${emailBrand().primary}; font-size:18px; font-weight:bold;">${d.statusLabel}</p>
       </div>
       ${d.adminNotes ? `
         <div style="background:#F0F9FF; border:1px solid #BAE6FD; border-radius:12px; padding:16px; margin:20px 0;">
@@ -695,7 +694,7 @@ export function statusUpdateToClient(d: {
         </div>
       ` : ''}
       <p style="margin:20px 0 0 0; font-size:13px; color:#6B7C99; line-height:1.8; text-align:center;">
-        يمكنك متابعة تفاصيل طلبك من خلال <a href="${SITE_URL}/dashboard" style="color:${BRAND_NAVY};">لوحة التحكم</a>.
+        يمكنك متابعة تفاصيل طلبك من خلال <a href="${SITE_URL}/dashboard" style="color:${emailBrand().primary};">لوحة التحكم</a>.
       </p>
     `),
   }
@@ -726,13 +725,13 @@ export function contentReadyForReview(d: {
 }) {
   return {
     subject: d.edited
-      ? `تم تعديل المحتوى - طلب ${d.requestNumber} · تواصل النخبة`
-      : `المحتوى جاهز للمراجعة - طلب ${d.requestNumber} · تواصل النخبة`,
+      ? `تم تعديل المحتوى - طلب ${d.requestNumber} · ${emailBrand().name}`
+      : `المحتوى جاهز للمراجعة - طلب ${d.requestNumber} · ${emailBrand().name}`,
     html: wrap(`
       ${greeting(d.clientName)}
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">${d.edited ? '✏️' : '👁️'}</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">${d.edited ? 'تم تعديل المحتوى' : 'المحتوى جاهز للمراجعة'}</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">${d.edited ? 'تم تعديل المحتوى' : 'المحتوى جاهز للمراجعة'}</h2>
         <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
       </div>
 
@@ -743,15 +742,15 @@ export function contentReadyForReview(d: {
       </p>
 
       <div style="background:#F8FAFC; border-radius:12px; padding:20px; margin:24px 0;">
-        <h3 style="margin:0 0 12px 0; color:${BRAND_NAVY}; font-size:16px;">النص المقترح</h3>
-        <div style="background:#FFFFFF; border-radius:8px; padding:16px; border-right:4px solid ${BRAND_GOLD};">
-          <p style="margin:0; color:${BRAND_NAVY}; font-size:14px; line-height:1.8; white-space:pre-line;">${d.proposedContent}</p>
+        <h3 style="margin:0 0 12px 0; color:${emailBrand().primary}; font-size:16px;">النص المقترح</h3>
+        <div style="background:#FFFFFF; border-radius:8px; padding:16px; border-right:4px solid ${emailBrand().accent};">
+          <p style="margin:0; color:${emailBrand().primary}; font-size:14px; line-height:1.8; white-space:pre-line;">${d.proposedContent}</p>
         </div>
       </div>
 
       ${d.proposedImages && Array.isArray(d.proposedImages) && d.proposedImages.length > 0 ? `
         <div style="background:#F8FAFC; border-radius:12px; padding:20px; margin:24px 0;">
-          <h3 style="margin:0 0 12px 0; color:${BRAND_NAVY}; font-size:16px;">
+          <h3 style="margin:0 0 12px 0; color:${emailBrand().primary}; font-size:16px;">
             📸 التصاميم المقترحة (${d.proposedImages.length})
           </h3>
           <p style="margin:0 0 12px 0; font-size:12px; color:#6B7C99;">
@@ -786,7 +785,7 @@ export function contentReadyForReview(d: {
           </div>
           <p style="margin:12px 0 0 0; font-size:11px; color:#6B7C99; text-align:center;">
             💡 إذا لم تظهر الصور، اضغط هنا لعرضها في متصفحك:
-            <a href="${SITE_URL}/dashboard" style="color:${BRAND_NAVY};">عرض في لوحة التحكم</a>
+            <a href="${SITE_URL}/dashboard" style="color:${emailBrand().primary};">عرض في لوحة التحكم</a>
           </p>
         </div>
       ` : `
@@ -826,12 +825,12 @@ export function requestReviewToClient(d: {
   reviewUrl: string
 }) {
   return {
-    subject: `⭐ قيّم تجربتك مع تواصل النخبة · ${d.requestNumber}`,
+    subject: `⭐ قيّم تجربتك مع ${emailBrand().name} · ${d.requestNumber}`,
     html: wrap(`
       ${greeting(d.clientName)}
       <div style="text-align:center; margin-bottom:18px;">
-        <div style="font-size:40px; letter-spacing:3px; color:${BRAND_GOLD};">★★★★★</div>
-        <p style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${BRAND_NAVY};">كيف كانت تجربتك؟</p>
+        <div style="font-size:40px; letter-spacing:3px; color:${emailBrand().accent};">★★★★★</div>
+        <p style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${emailBrand().primary};">كيف كانت تجربتك؟</p>
       </div>
       <p style="margin:0 0 16px 0; font-size:14px; line-height:1.8;">
         اكتمل طلبك <strong>${escapeHtml(d.requestNumber)}</strong>، ويسعدنا أن تمنحنا دقيقة من وقتك لتقييم الخدمة.
@@ -839,7 +838,7 @@ export function requestReviewToClient(d: {
       <p style="margin:0 0 20px 0; font-size:13px; line-height:1.8; color:#6B7C99;">
         تقييمك يساعدنا على تحسين التجربة والاهتمام بالتفاصيل التي تهمك.
       </p>
-      <p style="margin:0 0 20px 0; font-size:14px; line-height:1.8; color:${BRAND_NAVY}; font-weight:700; text-align:center;">
+      <p style="margin:0 0 20px 0; font-size:14px; line-height:1.8; color:${emailBrand().primary}; font-weight:700; text-align:center;">
         ونتطلع لأن نكون جزءاً من إنجازك القادم.
       </p>
       <p style="margin:0; text-align:center;">${button('تقييم التجربة', d.reviewUrl)}</p>
@@ -861,10 +860,10 @@ export function refundUpdateToClient(d: {
       ${greeting(d.clientName)}
       <div style="text-align:center; margin-bottom:18px;">
         <div style="font-size:42px;">${d.isPending ? '⏳' : '↩'}</div>
-        <p style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${BRAND_NAVY};">${d.isPending ? 'طلب الاسترجاع قيد المعالجة' : 'تم تنفيذ الاسترجاع'}</p>
+        <p style="margin:8px 0 0 0; font-size:18px; font-weight:900; color:${emailBrand().primary};">${d.isPending ? 'طلب الاسترجاع قيد المعالجة' : 'تم تنفيذ الاسترجاع'}</p>
       </div>
       <p style="margin:0 0 14px 0; font-size:14px; line-height:1.8;">${d.isPending ? 'تم رفع طلب استرداد مبلغ' : 'تم تنفيذ استرداد مبلغ'} <strong>${amount} ر.س</strong> لطلبك <strong dir="ltr">${escapeHtml(d.requestNumber)}</strong>.</p>
-      <div style="background:#F7F4ED; border-right:3px solid ${BRAND_GOLD}; padding:12px 14px; border-radius:8px; margin:14px 0; font-size:13px; line-height:1.8;">${d.isPending ? 'أحالت إدارة تواصل النخبة طلب الاسترداد إلى مزود خدمة الدفع، وهو الآن قيد المعالجة.' : 'أكّد مزود خدمة الدفع إتمام عملية الاسترداد.'}<br /><br />من المتوقع أن ينعكس المبلغ في وسيلة الدفع خلال <strong>${escapeHtml(d.timing)}</strong>، بحسب البنك أو مزود الدفع.${d.isPending ? '<br /><br />تخضع عملية الاسترداد، بعد رفع الطلب، لإجراءات ومدد المعالجة الخاصة بمزود خدمة الدفع والبنوك أو الجهات المالية ذات العلاقة. ولا تتحمل الإدارة مسؤولية أي تأخير ناتج عن تلك الجهات أو عن أسباب خارجة عن نطاق سيطرتها، وذلك في حدود ما تجيزه الأنظمة واللوائح المعمول بها.' : ''}</div>
+      <div style="background:${emailBrand().background}; border-right:3px solid ${emailBrand().accent}; padding:12px 14px; border-radius:8px; margin:14px 0; font-size:13px; line-height:1.8;">${d.isPending ? 'أحالت إدارة ${emailBrand().name} طلب الاسترداد إلى مزود خدمة الدفع، وهو الآن قيد المعالجة.' : 'أكّد مزود خدمة الدفع إتمام عملية الاسترداد.'}<br /><br />من المتوقع أن ينعكس المبلغ في وسيلة الدفع خلال <strong>${escapeHtml(d.timing)}</strong>، بحسب البنك أو مزود الدفع.${d.isPending ? '<br /><br />تخضع عملية الاسترداد، بعد رفع الطلب، لإجراءات ومدد المعالجة الخاصة بمزود خدمة الدفع والبنوك أو الجهات المالية ذات العلاقة. ولا تتحمل الإدارة مسؤولية أي تأخير ناتج عن تلك الجهات أو عن أسباب خارجة عن نطاق سيطرتها، وذلك في حدود ما تجيزه الأنظمة واللوائح المعمول بها.' : ''}</div>
       <p style="margin:18px 0 0 0; font-size:13px; line-height:1.8; color:#6B7C99;">لأي استفسار، يسعد فريقنا بخدمتك.</p>
     `),
   }
@@ -879,22 +878,22 @@ export function campaignReadyForReview(d: {
 }) {
   const postCards = d.posts.map((post, index) => `
     <div style="background:#F8FAFC; border:1px solid #E5E7EB; border-radius:12px; padding:18px; margin:16px 0;">
-      <div style="font-size:15px; font-weight:900; color:${BRAND_NAVY}; margin:0 0 10px;">المنشور ${index + 1}: ${escapeHtml(post.title)}</div>
-      <div style="background:#FFFFFF; border-right:4px solid ${BRAND_GOLD}; border-radius:8px; padding:12px; color:${BRAND_NAVY}; font-size:13px; line-height:1.8; white-space:pre-line;">${escapeHtml(post.content)}</div>
-      <div style="margin:14px 0 8px; font-size:13px; font-weight:bold; color:${BRAND_NAVY};">التصاميم المقترحة للاعتماد (${post.images.length})</div>
+      <div style="font-size:15px; font-weight:900; color:${emailBrand().primary}; margin:0 0 10px;">المنشور ${index + 1}: ${escapeHtml(post.title)}</div>
+      <div style="background:#FFFFFF; border-right:4px solid ${emailBrand().accent}; border-radius:8px; padding:12px; color:${emailBrand().primary}; font-size:13px; line-height:1.8; white-space:pre-line;">${escapeHtml(post.content)}</div>
+      <div style="margin:14px 0 8px; font-size:13px; font-weight:bold; color:${emailBrand().primary};">التصاميم المقترحة للاعتماد (${post.images.length})</div>
       <div style="text-align:center; line-height:0;">
         ${post.images.map((image, imageIndex) => `<a href="${image}" target="_blank" style="display:inline-block; margin:4px; text-decoration:none;"><img src="${image}" alt="تصميم ${imageIndex + 1}" style="width:120px; max-width:30%; height:150px; object-fit:cover; border-radius:7px; border:1px solid #D1D5DB;" /></a>`).join('')}
       </div>
-      <div style="margin-top:14px; background:#EAF4F1; border-radius:8px; padding:10px; font-size:13px; color:${BRAND_NAVY};"><strong>موعد النشر المتوقع:</strong> ${post.proposedDate ? formatDateAr(post.proposedDate) : 'يُحدّد لاحقاً'}</div>
+      <div style="margin-top:14px; background:#EAF4F1; border-radius:8px; padding:10px; font-size:13px; color:${emailBrand().primary};"><strong>موعد النشر المتوقع:</strong> ${post.proposedDate ? formatDateAr(post.proposedDate) : 'يُحدّد لاحقاً'}</div>
     </div>`).join('')
 
   return {
-    subject: `محتوى حملتك جاهز للمراجعة · ${d.requestNumber} · تواصل النخبة`,
+    subject: `محتوى حملتك جاهز للمراجعة · ${d.requestNumber} · ${emailBrand().name}`,
     html: wrap(`
       ${greeting(d.clientName)}
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:44px; margin-bottom:12px;">📣</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">حملتك جاهزة للمراجعة</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">حملتك جاهزة للمراجعة</h2>
         <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${escapeHtml(d.requestNumber)}</p>
       </div>
       <p style="font-size:14px; color:#6B7C99; line-height:1.8; margin:16px 0;">
@@ -914,16 +913,16 @@ export function contentApprovedToAdmin(d: {
     html: wrap(`
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">✅</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">تم اعتماد المحتوى</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">تم اعتماد المحتوى</h2>
         <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
       </div>
 
       <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
-        قام العميل <strong style="color:${BRAND_NAVY};">${d.clientName}</strong> بالموافقة على المحتوى المقترح. يمكنك الآن المتابعة مع عملية النشر.
+        قام العميل <strong style="color:${emailBrand().primary};">${d.clientName}</strong> بالموافقة على المحتوى المقترح. يمكنك الآن المتابعة مع عملية النشر.
       </p>
 
       <div style="margin:32px 0; text-align:center;">
-        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${emailBrand().primary}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
           عرض الطلب
         </a>
       </div>
@@ -935,12 +934,12 @@ export function contentApprovedToClient(d: {
   email: string; requestNumber: string; clientName: string
 }) {
   return {
-    subject: `تم استلام موافقتك - طلب ${d.requestNumber} · تواصل النخبة`,
+    subject: `تم استلام موافقتك - طلب ${d.requestNumber} · ${emailBrand().name}`,
     html: wrap(`
       ${greeting(d.clientName)}
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">🎉</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">تم استلام موافقتك</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">تم استلام موافقتك</h2>
         <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
       </div>
 
@@ -958,7 +957,7 @@ export function contentApprovedToClient(d: {
       </div>
 
       <div style="margin:32px 0; text-align:center;">
-        <a href="${SITE_URL}/dashboard" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+        <a href="${SITE_URL}/dashboard" style="display:inline-block; background:${emailBrand().primary}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
           متابعة الطلب
         </a>
       </div>
@@ -974,12 +973,12 @@ export function contentChangesRequested(d: {
     html: wrap(`
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">✏️</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">طلب تعديلات على المحتوى</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">طلب تعديلات على المحتوى</h2>
         <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
       </div>
 
       <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
-        طلب العميل <strong style="color:${BRAND_NAVY};">${d.clientName}</strong> تعديلات على المحتوى المقترح.
+        طلب العميل <strong style="color:${emailBrand().primary};">${d.clientName}</strong> تعديلات على المحتوى المقترح.
       </p>
 
       <div style="background:#FFF3CD; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid #856404;">
@@ -988,14 +987,14 @@ export function contentChangesRequested(d: {
       </div>
 
       <div style="background:#F8FAFC; border-radius:12px; padding:20px; margin:24px 0;">
-        <h3 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:16px;">المحتوى الأصلي المقترح</h3>
+        <h3 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:16px;">المحتوى الأصلي المقترح</h3>
         <div style="background:#FFFFFF; border-radius:8px; padding:16px;">
           <p style="margin:0; color:#6B7C99; font-size:14px; line-height:1.6; white-space:pre-line;">${d.proposedContent}</p>
         </div>
       </div>
 
       <div style="margin:32px 0; text-align:center;">
-        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${emailBrand().primary}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
           عرض الطلب وإرسال المحتوى المعدل
         </a>
       </div>
@@ -1013,12 +1012,12 @@ export function quoteApprovedToAdmin(d: {
     html: wrap(`
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">✅</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">تم اعتماد العرض</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">تم اعتماد العرض</h2>
         <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
       </div>
 
       <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
-        قام العميل <strong style="color:${BRAND_NAVY};">${d.clientName}</strong> بالموافقة على العرض المقدم.
+        قام العميل <strong style="color:${emailBrand().primary};">${d.clientName}</strong> بالموافقة على العرض المقدم.
       </p>
 
       <div style="background:#E8F5E8; border-radius:12px; padding:20px; margin:24px 0;">
@@ -1038,7 +1037,7 @@ export function quoteApprovedToAdmin(d: {
       </div>
 
       ${d.totalAmount > 0 ? `
-        <div style="background:#FFF8E1; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${BRAND_GOLD};">
+        <div style="background:#FFF8E1; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${emailBrand().accent};">
           <h3 style="margin:0 0 8px 0; color:#856404; font-size:16px;">💳 الخطوة التالية</h3>
           <p style="margin:0; color:#856404; font-size:14px; line-height:1.6;">
             العميل الآن في مرحلة الدفع. راقب الطلب لاستلام إيصال التحويل البنكي.
@@ -1054,7 +1053,7 @@ export function quoteApprovedToAdmin(d: {
       `}
 
       <div style="margin:32px 0; text-align:center;">
-        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${emailBrand().primary}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
           عرض تفاصيل الطلب
         </a>
       </div>
@@ -1070,15 +1069,15 @@ export function bankTransferReceivedToAdmin(d: {
     html: wrap(`
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">🧾</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">إيصال تحويل بانتظار المراجعة</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">إيصال تحويل بانتظار المراجعة</h2>
         <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
       </div>
 
       <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
-        قام العميل <strong style="color:${BRAND_NAVY};">${d.clientName}</strong> برفع إيصال التحويل البنكي.
+        قام العميل <strong style="color:${emailBrand().primary};">${d.clientName}</strong> برفع إيصال التحويل البنكي.
       </p>
 
-      <div style="background:#FFF8E1; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${BRAND_GOLD};">
+      <div style="background:#FFF8E1; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${emailBrand().accent};">
         <h3 style="margin:0 0 12px 0; color:#856404; font-size:16px;">تفاصيل المبلغ</h3>
         <table width="100%" cellpadding="0" cellspacing="0" border="0">
           <tr>
@@ -1096,7 +1095,7 @@ export function bankTransferReceivedToAdmin(d: {
       </div>
 
       <div style="margin:32px 0; text-align:center;">
-        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${emailBrand().primary}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
           مراجعة الإيصال وتأكيد الدفع
         </a>
       </div>
@@ -1114,12 +1113,12 @@ export function quoteRejectedByClient(d: {
     html: wrap(`
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">❌</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">رفض العميل للعرض</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">رفض العميل للعرض</h2>
         <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
       </div>
 
       <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
-        قام العميل <strong style="color:${BRAND_NAVY};">${d.clientName}</strong> برفض العرض المقدم.
+        قام العميل <strong style="color:${emailBrand().primary};">${d.clientName}</strong> برفض العرض المقدم.
       </p>
 
       <div style="background:#FFEBEE; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid #F44336;">
@@ -1128,17 +1127,17 @@ export function quoteRejectedByClient(d: {
       </div>
 
       <div style="background:#F8FAFC; border-radius:12px; padding:20px; margin:24px 0;">
-        <h3 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:16px;">العرض المرفوض</h3>
+        <h3 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:16px;">العرض المرفوض</h3>
         <table width="100%" cellpadding="0" cellspacing="0" border="0">
           <tr>
             <td style="padding:4px 0; color:#6B7C99; font-size:14px;">المبلغ المقترح:</td>
-            <td style="padding:4px 0; color:${BRAND_NAVY}; font-weight:bold; font-size:14px; text-align:left;">${d.quotedPrice} ر.س</td>
+            <td style="padding:4px 0; color:${emailBrand().primary}; font-weight:bold; font-size:14px; text-align:left;">${d.quotedPrice} ر.س</td>
           </tr>
         </table>
       </div>
 
       <div style="margin:32px 0; text-align:center;">
-        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${emailBrand().primary}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
           مراجعة الطلب
         </a>
       </div>
@@ -1150,12 +1149,12 @@ export function quoteRejectionToClient(d: {
   email: string; requestNumber: string; clientName: string
 }) {
   return {
-    subject: `تم استلام رفضك للعرض - طلب ${d.requestNumber} · تواصل النخبة`,
+    subject: `تم استلام رفضك للعرض - طلب ${d.requestNumber} · ${emailBrand().name}`,
     html: wrap(`
       ${greeting(d.clientName)}
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">📝</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">تم استلام رفضك للعرض</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">تم استلام رفضك للعرض</h2>
         <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
       </div>
 
@@ -1171,7 +1170,7 @@ export function quoteRejectionToClient(d: {
       </div>
 
       <div style="margin:32px 0; text-align:center;">
-        <a href="${SITE_URL}/dashboard" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+        <a href="${SITE_URL}/dashboard" style="display:inline-block; background:${emailBrand().primary}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
           لوحة التحكم
         </a>
       </div>
@@ -1187,30 +1186,30 @@ export function negotiationRequestedByClient(d: {
     html: wrap(`
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">💬</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">طلب تفاوض على السعر</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">طلب تفاوض على السعر</h2>
         <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
       </div>
 
       <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
-        طلب العميل <strong style="color:${BRAND_NAVY};">${d.clientName}</strong> التفاوض على سعر العرض.
+        طلب العميل <strong style="color:${emailBrand().primary};">${d.clientName}</strong> التفاوض على سعر العرض.
       </p>
 
-      <div style="background:#FFF8E1; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${BRAND_GOLD};">
+      <div style="background:#FFF8E1; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${emailBrand().accent};">
         <h3 style="margin:0 0 8px 0; color:#856404; font-size:16px;">رسالة العميل</h3>
         <p style="margin:0; color:#856404; font-size:14px; line-height:1.6; white-space:pre-line;">${d.negotiationReason}</p>
       </div>
 
       <div style="background:#F8FAFC; border-radius:12px; padding:20px; margin:24px 0;">
-        <h3 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:16px;">تفاصيل السعر</h3>
+        <h3 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:16px;">تفاصيل السعر</h3>
         <table width="100%" cellpadding="0" cellspacing="0" border="0">
           <tr>
             <td style="padding:4px 0; color:#6B7C99; font-size:14px;">السعر الأصلي:</td>
-            <td style="padding:4px 0; color:${BRAND_NAVY}; font-weight:bold; font-size:14px; text-align:left;">${d.originalPrice} ر.س</td>
+            <td style="padding:4px 0; color:${emailBrand().primary}; font-weight:bold; font-size:14px; text-align:left;">${d.originalPrice} ر.س</td>
           </tr>
           ${d.proposedPrice !== undefined && d.proposedPrice !== null ? `
           <tr>
             <td style="padding:4px 0; color:#6B7C99; font-size:14px;">السعر المقترح من العميل:</td>
-            <td style="padding:4px 0; color:${BRAND_GOLD}; font-weight:bold; font-size:14px; text-align:left;">${d.proposedPrice} ر.س</td>
+            <td style="padding:4px 0; color:${emailBrand().accent}; font-weight:bold; font-size:14px; text-align:left;">${d.proposedPrice} ر.س</td>
           </tr>` : ''}
         </table>
       </div>
@@ -1228,7 +1227,7 @@ export function negotiationRequestedByClient(d: {
       </div>
 
       <div style="margin:32px 0; text-align:center;">
-        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${emailBrand().primary}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
           إرسال عرض معدل
         </a>
       </div>
@@ -1240,12 +1239,12 @@ export function negotiationRequestToClient(d: {
   email: string; requestNumber: string; clientName: string
 }) {
   return {
-    subject: `تم استلام طلب التفاوض - طلب ${d.requestNumber} · تواصل النخبة`,
+    subject: `تم استلام طلب التفاوض - طلب ${d.requestNumber} · ${emailBrand().name}`,
     html: wrap(`
       ${greeting(d.clientName)}
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">💬</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">تم استلام طلب التفاوض</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">تم استلام طلب التفاوض</h2>
         <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
       </div>
 
@@ -1263,7 +1262,7 @@ export function negotiationRequestToClient(d: {
       </div>
 
       <div style="margin:32px 0; text-align:center;">
-        <a href="${SITE_URL}/dashboard" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+        <a href="${SITE_URL}/dashboard" style="display:inline-block; background:${emailBrand().primary}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
           متابعة الطلب
         </a>
       </div>
@@ -1280,12 +1279,12 @@ export function negotiatedQuoteToClient(d: {
   const emoji = isClientAccepted ? '✅' : '🎯'
 
   return {
-    subject: `${title} - طلب ${d.requestNumber} · تواصل النخبة`,
+    subject: `${title} - طلب ${d.requestNumber} · ${emailBrand().name}`,
     html: wrap(`
       ${greeting(d.clientName)}
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">${emoji}</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">${title}</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">${title}</h2>
         <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
       </div>
 
@@ -1321,14 +1320,14 @@ export function negotiatedQuoteToClient(d: {
       </div>
 
       ${d.adminMessage ? `
-        <div style="background:#FFF8E1; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${BRAND_GOLD};">
+        <div style="background:#FFF8E1; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${emailBrand().accent};">
           <h3 style="margin:0 0 8px 0; color:#856404; font-size:16px;">رسالة من الإدارة</h3>
           <p style="margin:0; color:#856404; font-size:14px; line-height:1.6; white-space:pre-line;">${d.adminMessage}</p>
         </div>
       ` : ''}
 
       <div style="margin:32px 0; text-align:center;">
-        <a href="${SITE_URL}/dashboard/${d.requestNumber.replace('ATH-', '')}" style="display:inline-block; background:${BRAND_GOLD}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+        <a href="${SITE_URL}/dashboard/${d.requestNumber.replace('ATH-', '')}" style="display:inline-block; background:${emailBrand().accent}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
           مراجعة العرض الجديد
         </a>
       </div>
@@ -1355,7 +1354,7 @@ export function discountCodeToClient(d: {
   })
 
   return {
-    subject: `🎁 هدية خاصة لك — خصم ${d.discountPct}% على طلبك · تواصل النخبة`,
+    subject: `🎁 هدية خاصة لك — خصم ${d.discountPct}% على طلبك · ${emailBrand().name}`,
     html: wrap(`
       ${greeting(d.clientName)}
 
@@ -1364,16 +1363,16 @@ export function discountCodeToClient(d: {
       </p>
 
       <!-- بطاقة كود الخصم -->
-      <div style="background:${BRAND_NAVY}; border-radius:16px; padding:32px 24px; text-align:center; margin:28px 0;">
-        <p style="margin:0 0 14px 0; color:${BRAND_GOLD}; font-size:13px; font-weight:bold; letter-spacing:1.5px; text-transform:uppercase;">كود الخصم الخاص بك</p>
+      <div style="background:${emailBrand().primary}; border-radius:16px; padding:32px 24px; text-align:center; margin:28px 0;">
+        <p style="margin:0 0 14px 0; color:${emailBrand().accent}; font-size:13px; font-weight:bold; letter-spacing:1.5px; text-transform:uppercase;">كود الخصم الخاص بك</p>
 
-        <div style="background:#FFFFFF; border-radius:12px; padding:16px 32px; display:inline-block; margin:0 0 18px 0; border:2px solid ${BRAND_GOLD};">
-          <span style="font-size:30px; font-weight:900; color:${BRAND_NAVY}; letter-spacing:6px; font-family:'Courier New',Courier,monospace;">${escapeHtml(d.code)}</span>
+        <div style="background:#FFFFFF; border-radius:12px; padding:16px 32px; display:inline-block; margin:0 0 18px 0; border:2px solid ${emailBrand().accent};">
+          <span style="font-size:30px; font-weight:900; color:${emailBrand().primary}; letter-spacing:6px; font-family:'Courier New',Courier,monospace;">${escapeHtml(d.code)}</span>
         </div>
 
         <p style="margin:0; color:#FFFFFF; font-size:26px; font-weight:900;">${d.discountPct}%&nbsp;خصم</p>
 
-        ${d.occasion ? `<p style="margin:10px 0 0 0; color:${BRAND_GOLD}; font-size:14px; font-weight:bold;">بمناسبة ${escapeHtml(d.occasion)}</p>` : ''}
+        ${d.occasion ? `<p style="margin:10px 0 0 0; color:${emailBrand().accent}; font-size:14px; font-weight:bold;">بمناسبة ${escapeHtml(d.occasion)}</p>` : ''}
 
         <p style="margin:14px 0 0 0; color:rgba(255,255,255,0.65); font-size:12px;">
           صالح حتى: ${escapeHtml(expiryFormatted)}
@@ -1381,8 +1380,8 @@ export function discountCodeToClient(d: {
       </div>
 
       <!-- كيفية الاستخدام -->
-      <div style="background:#F7F4ED; border-radius:12px; padding:20px; margin:0 0 24px 0; border-right:4px solid ${BRAND_GOLD};">
-        <p style="margin:0 0 10px 0; color:${BRAND_NAVY}; font-size:14px; font-weight:bold;">🛈 كيف تستخدم الكود؟</p>
+      <div style="background:${emailBrand().background}; border-radius:12px; padding:20px; margin:0 0 24px 0; border-right:4px solid ${emailBrand().accent};">
+        <p style="margin:0 0 10px 0; color:${emailBrand().primary}; font-size:14px; font-weight:bold;">🛈 كيف تستخدم الكود؟</p>
         <ol style="margin:0; padding-right:20px; font-size:13px; color:#4A5568; line-height:2;">
           <li>افتح طلبك من لوحة التحكم</li>
           <li>ادخل الكود في خانة «لديك كود خصم؟» ثم اضغط <strong>تطبيق</strong></li>
@@ -1414,18 +1413,18 @@ export function welcomeIncentiveToClient(d: {
   })
 
   return {
-    subject: `🎁 خصم ${d.discountPct}% على طلبك الأول معنا · تواصل النخبة`,
+    subject: `🎁 خصم ${d.discountPct}% على طلبك الأول معنا · ${emailBrand().name}`,
     html: wrap(`
       ${greeting(d.clientName)}
 
       <p style="margin:0 0 20px 0; font-size:15px; line-height:1.9; white-space:pre-line;">${escapeHtml(d.adminMessage)}</p>
 
       <!-- بطاقة كود الخصم -->
-      <div style="background:${BRAND_NAVY}; border-radius:16px; padding:32px 24px; text-align:center; margin:28px 0;">
-        <p style="margin:0 0 14px 0; color:${BRAND_GOLD}; font-size:13px; font-weight:bold; letter-spacing:1.5px;">كود الخصم الترحيبي</p>
+      <div style="background:${emailBrand().primary}; border-radius:16px; padding:32px 24px; text-align:center; margin:28px 0;">
+        <p style="margin:0 0 14px 0; color:${emailBrand().accent}; font-size:13px; font-weight:bold; letter-spacing:1.5px;">كود الخصم الترحيبي</p>
 
-        <div style="background:#FFFFFF; border-radius:12px; padding:16px 32px; display:inline-block; margin:0 0 18px 0; border:2px solid ${BRAND_GOLD};">
-          <span style="font-size:30px; font-weight:900; color:${BRAND_NAVY}; letter-spacing:6px; font-family:'Courier New',Courier,monospace;">${escapeHtml(d.code)}</span>
+        <div style="background:#FFFFFF; border-radius:12px; padding:16px 32px; display:inline-block; margin:0 0 18px 0; border:2px solid ${emailBrand().accent};">
+          <span style="font-size:30px; font-weight:900; color:${emailBrand().primary}; letter-spacing:6px; font-family:'Courier New',Courier,monospace;">${escapeHtml(d.code)}</span>
         </div>
 
         <p style="margin:0; color:#FFFFFF; font-size:26px; font-weight:900;">${d.discountPct}%&nbsp;خصم</p>
@@ -1436,8 +1435,8 @@ export function welcomeIncentiveToClient(d: {
       </div>
 
       <!-- كيفية الاستخدام -->
-      <div style="background:#F7F4ED; border-radius:12px; padding:20px; margin:0 0 24px 0; border-right:4px solid ${BRAND_GOLD};">
-        <p style="margin:0 0 10px 0; color:${BRAND_NAVY}; font-size:14px; font-weight:bold;">🛈 كيف تستفيد من الخصم؟</p>
+      <div style="background:${emailBrand().background}; border-radius:12px; padding:20px; margin:0 0 24px 0; border-right:4px solid ${emailBrand().accent};">
+        <p style="margin:0 0 10px 0; color:${emailBrand().primary}; font-size:14px; font-weight:bold;">🛈 كيف تستفيد من الخصم؟</p>
         <ol style="margin:0; padding-right:20px; font-size:13px; color:#4A5568; line-height:2;">
           <li>اضغط زر «ابدأ طلبك الآن» بالأسفل</li>
           <li>اختر نوع المحتوى الذي تريد نشره وأكمل بياناتك</li>
@@ -1460,12 +1459,12 @@ export function negotiationRejectedToClient(d: {
   email: string; requestNumber: string; clientName: string; originalPrice: number; adminMessage?: string
 }) {
   return {
-    subject: `بخصوص طلب التفاوض - طلب ${d.requestNumber} · تواصل النخبة`,
+    subject: `بخصوص طلب التفاوض - طلب ${d.requestNumber} · ${emailBrand().name}`,
     html: wrap(`
       ${greeting(d.clientName)}
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">📋</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">السعر النهائي غير قابل للتعديل</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">السعر النهائي غير قابل للتعديل</h2>
         <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
       </div>
 
@@ -1473,16 +1472,16 @@ export function negotiationRejectedToClient(d: {
         شكراً لتواصلك معنا. بعد مراجعة طلب التفاوض، لا يمكننا تعديل السعر المقترح في الوقت الحالي.
       </p>
 
-      <div style="background:#FEF3C7; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${BRAND_GOLD};">
+      <div style="background:#FEF3C7; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${emailBrand().accent};">
         <h3 style="margin:0 0 8px 0; color:#856404; font-size:16px;">💰 السعر المعتمد النهائي</h3>
         <p style="margin:0; color:#856404; font-size:24px; font-weight:bold;">${d.originalPrice} ر.س</p>
         <p style="margin:8px 0 0 0; color:#856404; font-size:13px;">هذا هو السعر النهائي لهذا الطلب</p>
       </div>
 
       ${d.adminMessage ? `
-        <div style="background:#F0F4FF; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${BRAND_NAVY};">
-          <h3 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:16px;">رسالة من الإدارة</h3>
-          <p style="margin:0; color:${BRAND_NAVY}; font-size:14px; line-height:1.6; white-space:pre-line;">${d.adminMessage}</p>
+        <div style="background:#F0F4FF; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${emailBrand().primary};">
+          <h3 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:16px;">رسالة من الإدارة</h3>
+          <p style="margin:0; color:${emailBrand().primary}; font-size:14px; line-height:1.6; white-space:pre-line;">${d.adminMessage}</p>
         </div>
       ` : ''}
 
@@ -1491,7 +1490,7 @@ export function negotiationRejectedToClient(d: {
       </p>
 
       <div style="margin:32px 0; text-align:center;">
-        <a href="${SITE_URL}/dashboard" style="display:inline-block; background:${BRAND_GOLD}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+        <a href="${SITE_URL}/dashboard" style="display:inline-block; background:${emailBrand().accent}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
           مراجعة العرض
         </a>
       </div>
@@ -1503,23 +1502,23 @@ export function infoRequestedToClient(d: {
   requestNumber: string; clientName: string; message: string
 }) {
   return {
-    subject: `مطلوب تعديل على طلبك ${d.requestNumber} · تواصل النخبة`,
+    subject: `مطلوب تعديل على طلبك ${d.requestNumber} · ${emailBrand().name}`,
     html: wrap(`
       ${greeting(d.clientName)}
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">📩</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">يحتاج فريقنا إلى تعديل بسيط على طلبك</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">يحتاج فريقنا إلى تعديل بسيط على طلبك</h2>
         <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
       </div>
       <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
         لإكمال تحضير المحتوى على أكمل وجه، نحتاج منك تعديل طلبك (مثل إضافة صورة أوضح أو تفاصيل أكثر عن الخبر):
       </p>
-      <div style="background:#FEF3C7; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${BRAND_GOLD};">
+      <div style="background:#FEF3C7; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid ${emailBrand().accent};">
         <h3 style="margin:0 0 8px 0; color:#856404; font-size:15px;">المطلوب</h3>
         <p style="margin:0; color:#856404; font-size:14px; line-height:1.8; white-space:pre-line;">${d.message}</p>
       </div>
       <div style="margin:32px 0; text-align:center;">
-        <a href="${SITE_URL}/dashboard/${d.requestNumber.replace('ATH-', '')}" style="display:inline-block; background:${BRAND_GOLD}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+        <a href="${SITE_URL}/dashboard/${d.requestNumber.replace('ATH-', '')}" style="display:inline-block; background:${emailBrand().accent}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
           تعديل الطلب الآن
         </a>
       </div>
@@ -1531,18 +1530,18 @@ export function infoResubmittedToAdmin(d: {
   requestNumber: string; clientName: string
 }) {
   return {
-    subject: `العميل عدّل طلبه ${d.requestNumber} · تواصل النخبة`,
+    subject: `العميل عدّل طلبه ${d.requestNumber} · ${emailBrand().name}`,
     html: wrap(`
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">✅</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:20px;">قام العميل بتعديل طلبه</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">قام العميل بتعديل طلبه</h2>
         <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
       </div>
       <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
         قام <strong>${d.clientName}</strong> بتحديث المحتوى/الصور بناءً على طلبكم. عاد الطلب إلى مرحلة «قيد التنفيذ» لمتابعة تحضير المحتوى.
       </p>
       <div style="margin:32px 0; text-align:center;">
-        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${emailBrand().primary}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
           فتح الطلب
         </a>
       </div>
@@ -1553,24 +1552,24 @@ export function infoResubmittedToAdmin(d: {
 export function motivateUserToSubmit(d: { clientName?: string }) {
   const name = d.clientName?.trim() || 'عزيزنا'
   return {
-    subject: 'نتطلّع لسماع إنجازك · تواصل النخبة',
+    subject: 'نتطلّع لسماع إنجازك · ${emailBrand().name}',
     html: wrap(`
-      <p style="font-size:15px; color:${BRAND_NAVY}; margin:0 0 16px 0;">مرحباً ${name}،</p>
+      <p style="font-size:15px; color:${emailBrand().primary}; margin:0 0 16px 0;">مرحباً ${name}،</p>
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:12px;">🤍</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:21px;">نتطلّع لسماع إنجازك</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:21px;">نتطلّع لسماع إنجازك</h2>
       </div>
       <p style="font-size:15px; color:#5A6B85; line-height:1.9; margin:16px 0; text-align:center;">
         مرّ وقتٌ منذ انضمامك إلينا، وصدقًا نتطلّع لسماع قصتك.<br/>
         ما حقّقته يهمّنا، ويسعدنا أن نساعدك في إيصاله للناس بأجمل صورة — متى ما كنت مستعدّاً.
       </p>
-      <div style="background:#F8FAFC; border-radius:12px; padding:18px; margin:24px 0; border-right:4px solid ${BRAND_GOLD};">
-        <p style="margin:0; font-size:14px; color:${BRAND_NAVY}; line-height:1.8;">
+      <div style="background:#F8FAFC; border-radius:12px; padding:18px; margin:24px 0; border-right:4px solid ${emailBrand().accent};">
+        <p style="margin:0; font-size:14px; color:${emailBrand().primary}; line-height:1.8;">
           نحن نتكفّل بالباقي: صياغة احترافية، وتصميم مميّز، ونشر يليق بإنجازك. كل ما عليك هو أن تبدأ.
         </p>
       </div>
       <div style="margin:32px 0; text-align:center;">
-        <a href="${SITE_URL}/request" style="display:inline-block; background:${BRAND_GOLD}; color:#FFFFFF; padding:14px 32px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:15px;">
+        <a href="${SITE_URL}/request" style="display:inline-block; background:${emailBrand().accent}; color:#FFFFFF; padding:14px 32px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:15px;">
           ابدأ قصتك الآن
         </a>
       </div>
@@ -1600,8 +1599,8 @@ function recoverySummary(d: RequestRecoveryEmailData): string {
   const total = d.estimatedTotal != null
     ? `<p style="margin:6px 0 0; color:#5A6B85; font-size:13px;">القيمة التقديرية: <strong>${Number(d.estimatedTotal).toLocaleString('ar-SA')} ر.س</strong></p>`
     : ''
-  return `<div style="background:#F8FAFC; border-right:4px solid ${BRAND_GOLD}; border-radius:10px; padding:16px; margin:20px 0;">
-    <p style="margin:0; color:${BRAND_NAVY}; font-size:14px;">اختيارك المحفوظ: <strong>${escapeHtml(packageName)}</strong></p>${total}
+  return `<div style="background:#F8FAFC; border-right:4px solid ${emailBrand().accent}; border-radius:10px; padding:16px; margin:20px 0;">
+    <p style="margin:0; color:${emailBrand().primary}; font-size:14px;">اختيارك المحفوظ: <strong>${escapeHtml(packageName)}</strong></p>${total}
   </div>`
 }
 
@@ -1610,7 +1609,7 @@ export function requestRecoveryFirst(d: RequestRecoveryEmailData) {
     subject: 'اختيارك محفوظ، أكمل ظهور إنجازك من حيث توقفت',
     html: wrap(`
       ${greeting(d.clientName)}
-      <h2 style="margin:0 0 12px; color:${BRAND_NAVY}; font-size:21px; text-align:center;">إنجازك يستحق أن يصل بالصورة التي تليق به</h2>
+      <h2 style="margin:0 0 12px; color:${emailBrand().primary}; font-size:21px; text-align:center;">إنجازك يستحق أن يصل بالصورة التي تليق به</h2>
       <p style="font-size:15px; color:#5A6B85; line-height:1.9; text-align:center;">حفظنا الباقة التي اخترتها حتى لا تبدأ من جديد. أكمل بياناتك، وسيتولى فريقنا الصياغة والتصميم والنشر على حساب «أول سعودي».</p>
       ${recoverySummary(d)}
       <div style="text-align:center; margin:26px 0;">${button('أكمل طلبي الآن', d.resumeUrl)}</div>
@@ -1624,7 +1623,7 @@ export function requestRecoverySecond(d: RequestRecoveryEmailData) {
     subject: 'بقيت خطوة واحدة ليبدأ فريقنا تجهيز حضورك',
     html: wrap(`
       ${greeting(d.clientName)}
-      <h2 style="margin:0 0 12px; color:${BRAND_NAVY}; font-size:21px; text-align:center;">لا تدع تفاصيل الطلب تؤخر وصول قصتك</h2>
+      <h2 style="margin:0 0 12px; color:${emailBrand().primary}; font-size:21px; text-align:center;">لا تدع تفاصيل الطلب تؤخر وصول قصتك</h2>
       <p style="font-size:15px; color:#5A6B85; line-height:1.9; text-align:center;">بمجرد إكمال الطلب نراجع المواد، نصوغ الخبر بصياغة صحفية، ونبني له تصميماً يبرز الإنجاز بوضوح. اختيارك ما زال محفوظاً وجاهزاً للاستكمال.</p>
       ${recoverySummary(d)}
       <div style="text-align:center; margin:26px 0;">${button('العودة إلى طلبي', d.resumeUrl)}</div>
@@ -1637,11 +1636,11 @@ export function requestRecoveryOffer(d: RequestRecoveryEmailData & { code: strin
     subject: 'عرض خاص لإكمال طلبك خلال 24 ساعة',
     html: wrap(`
       ${greeting(d.clientName)}
-      <h2 style="margin:0 0 12px; color:${BRAND_NAVY}; font-size:21px; text-align:center;">لنحوّل اختيارك إلى حضور فعلي</h2>
+      <h2 style="margin:0 0 12px; color:${emailBrand().primary}; font-size:21px; text-align:center;">لنحوّل اختيارك إلى حضور فعلي</h2>
       <p style="font-size:15px; color:#5A6B85; line-height:1.9; text-align:center;">خصصنا لك خصماً بنسبة <strong>5%</strong> بحد أقصى <strong>150 ر.س</strong> لتكمل طلبك الآن. العرض مرتبط بمسودتك ويُطبّق تلقائياً عند إرسالها.</p>
       ${recoverySummary(d)}
-      <div style="background:${BRAND_NAVY}; color:#FFFFFF; border-radius:12px; padding:18px; text-align:center; margin:20px 0;">
-        <p style="margin:0 0 6px; font-size:12px; color:${BRAND_GOLD};">رمز العرض</p>
+      <div style="background:${emailBrand().primary}; color:#FFFFFF; border-radius:12px; padding:18px; text-align:center; margin:20px 0;">
+        <p style="margin:0 0 6px; font-size:12px; color:${emailBrand().accent};">رمز العرض</p>
         <strong dir="ltr" style="font-size:22px; letter-spacing:1px;">${escapeHtml(d.code)}</strong>
         <p style="margin:8px 0 0; font-size:11px; color:#DCE4F2;">صالح لمدة 24 ساعة ولا يجمع مع خصم آخر</p>
       </div>
@@ -1655,19 +1654,19 @@ export function postCompletedToClient(d: {
 }) {
   const name = d.clientName?.trim() || 'عزيزنا'
   return {
-    subject: `تم نشر أحد أخبار حملتك ${d.requestNumber} · تواصل النخبة`,
+    subject: `تم نشر أحد أخبار حملتك ${d.requestNumber} · ${emailBrand().name}`,
     html: wrap(`
-      <p style="font-size:15px; color:${BRAND_NAVY}; margin:0 0 16px 0;">مرحباً ${name}،</p>
+      <p style="font-size:15px; color:${emailBrand().primary}; margin:0 0 16px 0;">مرحباً ${name}،</p>
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:12px;">🎉</div>
-        <h2 style="margin:0 0 8px 0; color:${BRAND_NAVY}; font-size:21px;">تم نشر أحد أخبار حملتك</h2>
+        <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:21px;">تم نشر أحد أخبار حملتك</h2>
         <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
       </div>
       <p style="font-size:15px; color:#5A6B85; line-height:1.9; margin:16px 0; text-align:center;">
         يسعدنا إبلاغك بأنه تم إكمال ونشر الخبر التالي ضمن حملتك:
       </p>
       <div style="background:#E8F5E8; border-radius:12px; padding:18px; margin:24px 0; border-right:4px solid #2D8B3F;">
-        <p style="margin:0; font-size:15px; color:${BRAND_NAVY}; font-weight:bold; line-height:1.8;">
+        <p style="margin:0; font-size:15px; color:${emailBrand().primary}; font-weight:bold; line-height:1.8;">
           📣 المنشور رقم ${d.postIndex + 1}: ${d.postTitle}
         </p>
         <p style="margin:8px 0 0 0; font-size:13px; color:#5A6B85;">الحالة: ✅ مكتمل / منشور</p>
@@ -1676,7 +1675,7 @@ export function postCompletedToClient(d: {
         بقية أخبار الحملة قيد التنفيذ، وسنوافيك بكل خبر فور نشره. شكراً لثقتك بنا 🌿
       </p>
       <div style="margin:28px 0; text-align:center;">
-        <a href="${SITE_URL}/dashboard/${d.requestNumber.replace('ATH-', '')}" style="display:inline-block; background:${BRAND_NAVY}; color:#FFFFFF; padding:12px 26px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+        <a href="${SITE_URL}/dashboard/${d.requestNumber.replace('ATH-', '')}" style="display:inline-block; background:${emailBrand().primary}; color:#FFFFFF; padding:12px 26px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
           متابعة الحملة
         </a>
       </div>

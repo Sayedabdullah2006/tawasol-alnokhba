@@ -21,7 +21,7 @@ export async function POST(request:Request){
    if(user.data.user?.email_confirmed_at){
     const link=await db.auth.admin.generateLink({type:'magiclink',email})
     if(link.error||!link.data.properties?.email_otp)throw Error('unavailable')
-    if(!await sendLoginCode({email,code:link.data.properties.email_otp,ttlMinutes:60}))throw Error('unavailable')
+    if(!await sendLoginCode({email,code:link.data.properties.email_otp,ttlMinutes:60,brand:'first1saudi'}))throw Error('unavailable')
    }
   }
   return NextResponse.json({success:true,message:'إن كان الحساب مؤكدًا، سيصلك رمز الدخول.'},{headers:{'Cache-Control':'no-store'}})

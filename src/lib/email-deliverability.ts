@@ -2,6 +2,7 @@
 // Implements best practices for email authentication, content filtering, and sender reputation
 
 import { createServiceRoleClient } from './supabase-server'
+import type { CustomerEmailBrandId } from './email-brand'
 
 interface DeliverabilityOptions {
   priority?: 'high' | 'normal' | 'low'
@@ -11,6 +12,7 @@ interface DeliverabilityOptions {
 }
 
 interface EnhancedEmailPayload {
+  brand?: CustomerEmailBrandId
   to: string | string[]
   subject: string
   html: string
@@ -132,7 +134,7 @@ export function validateEmailContent(subject: string, html: string, text?: strin
     }
 
     // Check for mismatched domains
-    if (url.startsWith('http') && !url.includes('nukhba.media')) {
+    if (url.startsWith('http') && !['nukhba.media','first1saudi.net'].includes((()=>{try{return new URL(url).hostname}catch{return ''}})())) {
       score += 1
       warnings.push(`رابط خارجي: ${url}`)
     }
@@ -191,11 +193,11 @@ export async function sendEnhancedEmail(payload: EnhancedEmailPayload): Promise<
     let enhancedHtml = payload.html
     const options = payload.options || {}
 
-    if (options.trackOpens !== false) {
+    if (payload.brand!=='first1saudi' && options.trackOpens !== false) {
       enhancedHtml += generateTrackingPixel(emailId)
     }
 
-    if (options.trackClicks !== false) {
+    if (payload.brand!=='first1saudi' && options.trackClicks !== false) {
       enhancedHtml = wrapLinksForTracking(enhancedHtml, emailId)
     }
 
@@ -215,6 +217,7 @@ export async function sendEnhancedEmail(payload: EnhancedEmailPayload): Promise<
 
     // Prepare enhanced email payload
     const enhancedPayload = {
+      brand:payload.brand,
       to: payload.to,
       subject: payload.subject,
       html: enhancedHtml,

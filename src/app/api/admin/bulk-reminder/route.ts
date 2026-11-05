@@ -116,6 +116,7 @@ export async function POST(request: NextRequest) {
       // by retrying with exponential backoff. Basic mode skips the spam-scoring
       // pre-flight which would over-flag reminder content.
       const result = await sendEmailWithRetry({
+        requestId:r.id,
         to: r.client_email,
         subject,
         html,

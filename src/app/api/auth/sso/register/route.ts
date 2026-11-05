@@ -32,7 +32,7 @@ export async function POST(request:Request){
    const generated=await db.auth.admin.generateLink({type:'signup',email,password,options:{data:{full_name:name,phone}}})
    if(generated.error||!generated.data.properties?.email_otp)throw Error('unavailable')
    if(!existing.data){const profile=await db.from('profiles').update({full_name:name,phone}).eq('id',generated.data.user.id);if(profile.error)throw Error('unavailable')}
-   if(!await sendLoginCode({email,code:generated.data.properties.email_otp,ttlMinutes:60}))throw Error('unavailable')
+   if(!await sendLoginCode({email,code:generated.data.properties.email_otp,ttlMinutes:60,brand:'first1saudi'}))throw Error('unavailable')
   }
   // Same response for registered addresses. Existing credentials and profiles are never overwritten.
   return NextResponse.json({success:true,message:'إن أمكن إنشاء الحساب، سيصلك رمز التحقق. للحساب الموجود استخدم تسجيل الدخول.'},{headers:{'Cache-Control':'no-store'}})

@@ -3,10 +3,10 @@
 // throw, so a missing key or transient network blip never blocks the request
 // pipeline that triggered the email.
 
-import { partnerFollowUpHtml } from './partners/notifications'
+import { customerEmailContext, type CustomerMailReference } from './customer-email'
+import { withEmailBrand, type CustomerEmailBrandId, type CustomerEmailContext } from './email-brand'
 import { createServiceRoleClient } from './supabase-server'
 import * as templates from './email-templates'
-import { sendEnhancedEmail, htmlToText } from './email-deliverability'
 import { ensureServiceInvoice, markServiceInvoiceEmailed, type PaymentInvoiceOverrides } from './service-invoice'
 
 const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL?.trim() || 'first1saudi@gmail.com'
@@ -14,7 +14,7 @@ const ADMIN_CC_EMAIL = process.env.ADMIN_CC_EMAIL?.trim() || ADMIN_EMAIL // نس
 
 export type EmailAttachment = { filename: string; content: string; contentType?: string }
 
-export async function sendEmail(to: string | string[], subject: string, html: string, attachments?: EmailAttachment[]): Promise<boolean> {
+export async function sendEmail(to: string | string[], subject: string, html: string, attachments?: EmailAttachment[], brand: CustomerEmailBrandId = 'nukhba'): Promise<boolean> {
   if (!to || (Array.isArray(to) && to.length === 0)) return false
 
   try {
@@ -33,6 +33,7 @@ export async function sendEmail(to: string | string[], subject: string, html: st
         html,
         cc,
         attachments,
+        brand,
       },
     })
 
@@ -49,6 +50,20 @@ export async function sendEmail(to: string | string[], subject: string, html: st
   }
 }
 
+type MailTemplate = {subject:string;html:string}
+async function sendTemplateEmail(to:string,context:CustomerEmailContext,render:()=>MailTemplate,attachments?:EmailAttachment[]){
+  const t=withEmailBrand(context,render)
+  const subject=context.brand==='first1saudi'&&!t.subject.includes('شبكة أول سعودي')?t.subject+' · شبكة أول سعودي':t.subject
+  return sendEmail(to,subject,t.html,attachments,context.brand)
+}
+async function sendCustomerEmail(reference:CustomerMailReference,render:()=>MailTemplate){
+  try {
+    const context=await customerEmailContext(reference)
+    if(!context)return false
+    return sendTemplateEmail(reference.email??reference.clientEmail??'',context,render)
+  } catch { console.error('[EMAIL] Customer notification context unavailable; sending skipped');return false }
+}
+
 // ─── Convenience wrappers per event ────────────────────────────────────
 
 export async function notifyNewRequestToAdmin(d: templates.ClientRequestData) {
@@ -63,38 +78,37 @@ export async function notifyAdminIntake(d: templates.AdminIntakeNotificationData
 
 export async function notifyRequestReceivedToClient(d: templates.ClientRequestData) {
   if (!d.clientEmail) return false
-  const t = templates.requestReceivedToClient(d)
-  return sendEmail(d.clientEmail, t.subject, t.html)
+  return sendCustomerEmail(d,()=>templates.requestReceivedToClient(d))
 }
 
 export async function notifyQuoteReadyToClient(args: {
   email: string; requestNumber: string; clientName: string; price: number; reach: number
   quoteExpiresAt?: string | null; adminMessage?: string
 }) {
-  const t = templates.quoteReadyToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendCustomerEmail(args,()=>templates.quoteReadyToClient(args))
 }
 
 export async function notifyFreeGiftToClient(args: {
   email: string; requestNumber: string; clientName: string; adminMessage: string
 }) {
-  const t = templates.freeGiftToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendCustomerEmail(args,()=>templates.freeGiftToClient(args))
 }
 
 export async function notifyPaymentConfirmedToClient(args: {
   email: string; requestId: string; requestNumber: string; clientName: string; total: number
   payment?: PaymentInvoiceOverrides
 }) {
+  let context:CustomerEmailContext|null
+  try {context=await customerEmailContext(args)} catch {return false}
+  if(!context)return false
   try {
     const invoice = await ensureServiceInvoice(args.requestId, args.payment)
     const invoiceDownloadUrl = `${process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') || 'https://nukhba.media'}/api/invoices/request/${args.requestId}`
-    const t = templates.paymentConfirmedToClient({
+    const sent = await sendTemplateEmail(args.email,context,()=>templates.paymentConfirmedToClient({
       ...args,
       invoiceNumber: invoice.invoiceNumber,
       invoiceDownloadUrl,
-    })
-    const sent = await sendEmail(args.email, t.subject, await partnerFollowUpHtml(t.html, args.requestId), [{
+    }), [{
       filename: invoice.filename,
       content: invoice.pdf.toString('base64'),
       contentType: 'application/pdf',
@@ -103,65 +117,56 @@ export async function notifyPaymentConfirmedToClient(args: {
     return sent
   } catch (error) {
     console.error('[INVOICE] Failed to create or attach payment invoice:', error)
-    const t = templates.paymentConfirmedToClient(args)
-    return sendEmail(args.email, t.subject, await partnerFollowUpHtml(t.html, args.requestId))
+    return sendTemplateEmail(args.email,context,()=>templates.paymentConfirmedToClient(args))
   }
 }
 
 export async function notifyFreeApprovedToClient(args: {
   email: string; requestNumber: string; clientName: string
 }) {
-  const t = templates.freeApprovedToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendCustomerEmail(args,()=>templates.freeApprovedToClient(args))
 }
 
 export async function notifyQuoteApprovedAwaitingPaymentToClient(args: {
   email: string; requestNumber: string; clientName: string; total: number; requestId?: string
 }) {
-  const t = templates.quoteApprovedAwaitingPaymentToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendCustomerEmail(args,()=>templates.quoteApprovedAwaitingPaymentToClient(args))
 }
 
 export async function notifyInProgressToClient(args: {
   requestId?: string; email: string; requestNumber: string; clientName: string
 }) {
-  const t = templates.inProgressToClient(args)
-  return sendEmail(args.email, t.subject, await partnerFollowUpHtml(t.html, args.requestId))
+  return sendCustomerEmail(args,()=>templates.inProgressToClient(args))
 }
 
 export async function notifyCompletedToClient(args: {
   requestId?: string; email: string; requestNumber: string; clientName: string; reviewUrl?: string
 }) {
-  const t = templates.completedToClient(args)
-  return sendEmail(args.email, t.subject, await partnerFollowUpHtml(t.html, args.requestId))
+  return sendCustomerEmail(args,()=>templates.completedToClient(args))
 }
 
 export async function notifyRejectedToClient(args: {
   requestId?: string; email: string; requestNumber: string; clientName: string; reason: string
 }) {
-  const t = templates.rejectedToClient(args)
-  return sendEmail(args.email, t.subject, await partnerFollowUpHtml(t.html, args.requestId))
+  return sendCustomerEmail(args,()=>templates.rejectedToClient(args))
 }
 
 export async function sendRegistrationCode(args: {
-  email: string; code: string; clientName?: string; ttlMinutes: number
+  email: string; code: string; clientName?: string; ttlMinutes: number; brand?: CustomerEmailBrandId
 }) {
-  const t = templates.registrationCodeToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendTemplateEmail(args.email,{brand:args.brand??'nukhba'},()=>templates.registrationCodeToClient(args))
 }
 
 export async function sendLoginCode(args: {
-  email: string; code: string; ttlMinutes: number
+  email: string; code: string; ttlMinutes: number; brand?: CustomerEmailBrandId
 }) {
-  const t = templates.loginCodeToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendTemplateEmail(args.email,{brand:args.brand??'nukhba'},()=>templates.loginCodeToClient(args))
 }
 
 export async function sendWelcomeEmail(args: {
-  email: string; clientName: string
+  email: string; clientName: string; brand?: CustomerEmailBrandId
 }) {
-  const t = templates.welcomeToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendTemplateEmail(args.email,{brand:args.brand??'nukhba'},()=>templates.welcomeToClient(args))
 }
 
 export async function notifyNewAccountToAdmin(args: {
@@ -172,17 +177,15 @@ export async function notifyNewAccountToAdmin(args: {
 }
 
 export async function sendResetPasswordCode(args: {
-  email: string; code: string; ttlMinutes: number
+  email: string; code: string; ttlMinutes: number; brand?: CustomerEmailBrandId
 }) {
-  const t = templates.resetPasswordCodeToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendTemplateEmail(args.email,{brand:args.brand??'nukhba'},()=>templates.resetPasswordCodeToClient(args))
 }
 
 export async function notifyStatusUpdateToClient(args: {
   requestId?: string; email: string; requestNumber: string; clientName: string; status: string; statusLabel: string; adminNotes?: string
 }) {
-  const t = templates.statusUpdateToClient(args)
-  return sendEmail(args.email, t.subject, await partnerFollowUpHtml(t.html, args.requestId))
+  return sendCustomerEmail(args,()=>templates.statusUpdateToClient(args))
 }
 
 // ─── Content Review Email Functions ───
@@ -190,22 +193,19 @@ export async function notifyStatusUpdateToClient(args: {
 export async function notifyContentReadyForReview(args: {
   email: string; requestNumber: string; clientName: string; proposedContent: string; proposedImages: string[]; edited?: boolean; requestId?: string
 }) {
-  const t = templates.contentReadyForReview(args)
-  return sendEmail(args.email, t.subject, await partnerFollowUpHtml(t.html, args.requestId))
+  return sendCustomerEmail(args,()=>templates.contentReadyForReview(args))
 }
 
 export async function sendRequestReviewEmail(args: {
   email: string; requestNumber: string; clientName: string; reviewUrl: string
 }) {
-  const t = templates.requestReviewToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendCustomerEmail(args,()=>templates.requestReviewToClient(args))
 }
 
 export async function notifyRefundUpdateToClient(args: {
   requestId?: string; email: string; requestNumber: string; clientName: string; amount: number; timing: string; isPending: boolean
 }) {
-  const t = templates.refundUpdateToClient(args)
-  return sendEmail(args.email, t.subject, await partnerFollowUpHtml(t.html, args.requestId))
+  return sendCustomerEmail(args,()=>templates.refundUpdateToClient(args))
 }
 
 export async function notifyCampaignReadyForReview(args: {
@@ -215,8 +215,7 @@ export async function notifyCampaignReadyForReview(args: {
   email: string
   posts: Array<{ title: string; content: string; proposedDate?: string | null; images: string[] }>
 }) {
-  const t = templates.campaignReadyForReview(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendCustomerEmail(args,()=>templates.campaignReadyForReview(args))
 }
 
 export async function notifyContentApprovedToAdmin(args: {
@@ -229,8 +228,7 @@ export async function notifyContentApprovedToAdmin(args: {
 export async function notifyContentApprovedToClient(args: {
   email: string; requestNumber: string; clientName: string
 }) {
-  const t = templates.contentApprovedToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendCustomerEmail(args,()=>templates.contentApprovedToClient(args))
 }
 
 export async function notifyContentChangesRequested(args: {
@@ -243,35 +241,29 @@ export async function notifyContentChangesRequested(args: {
 export async function notifyInfoRequestedToClient(args: {
   requestId?: string; email: string; requestNumber: string; clientName: string; message: string
 }) {
-  const t = templates.infoRequestedToClient(args)
-  return sendEmail(args.email, t.subject, await partnerFollowUpHtml(t.html, args.requestId))
+  return sendCustomerEmail(args,()=>templates.infoRequestedToClient(args))
 }
 
 export async function notifyMotivateUser(args: { email: string; clientName?: string }) {
-  const t = templates.motivateUserToSubmit(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendCustomerEmail(args,()=>templates.motivateUserToSubmit(args))
 }
 
 export async function notifyRequestRecoveryFirst(args: templates.RequestRecoveryEmailData) {
-  const t = templates.requestRecoveryFirst(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendCustomerEmail(args,()=>templates.requestRecoveryFirst(args))
 }
 
 export async function notifyRequestRecoverySecond(args: templates.RequestRecoveryEmailData) {
-  const t = templates.requestRecoverySecond(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendCustomerEmail(args,()=>templates.requestRecoverySecond(args))
 }
 
 export async function notifyRequestRecoveryOffer(args: templates.RequestRecoveryEmailData & { code: string; expiresAt: string }) {
-  const t = templates.requestRecoveryOffer(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendCustomerEmail(args,()=>templates.requestRecoveryOffer(args))
 }
 
 export async function notifyPostCompletedToClient(args: {
   email: string; requestNumber: string; clientName: string; postTitle: string; postIndex: number
 }) {
-  const t = templates.postCompletedToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendCustomerEmail(args,()=>templates.postCompletedToClient(args))
 }
 
 export async function notifyInfoResubmittedToAdmin(args: {
@@ -307,8 +299,7 @@ export async function notifyQuoteRejectedByClient(args: {
 export async function notifyQuoteRejectionToClient(args: {
   email: string; requestNumber: string; clientName: string
 }) {
-  const t = templates.quoteRejectionToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendCustomerEmail(args,()=>templates.quoteRejectionToClient(args))
 }
 
 export async function notifyNegotiationRequestedByClient(args: {
@@ -321,22 +312,19 @@ export async function notifyNegotiationRequestedByClient(args: {
 export async function notifyNegotiationRequestToClient(args: {
   email: string; requestNumber: string; clientName: string
 }) {
-  const t = templates.negotiationRequestToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendCustomerEmail(args,()=>templates.negotiationRequestToClient(args))
 }
 
 export async function notifyNegotiatedQuoteToClient(args: {
   email: string; requestNumber: string; clientName: string; originalPrice: number; newPrice: number; discountPercentage: number; adminMessage: string; priceSource?: string
 }) {
-  const t = templates.negotiatedQuoteToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendCustomerEmail(args,()=>templates.negotiatedQuoteToClient(args))
 }
 
 export async function notifyNegotiationRejectedToClient(args: {
   email: string; requestNumber: string; clientName: string; originalPrice: number; adminMessage?: string
 }) {
-  const t = templates.negotiationRejectedToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendCustomerEmail(args,()=>templates.negotiationRejectedToClient(args))
 }
 
 export async function notifyDiscountCodeToClient(args: {
@@ -349,8 +337,7 @@ export async function notifyDiscountCodeToClient(args: {
   adminMessage: string
   requestId: string
 }) {
-  const t = templates.discountCodeToClient(args)
-  return sendEmail(args.email, t.subject, t.html)
+  return sendCustomerEmail(args,()=>templates.discountCodeToClient(args))
 }
 
 // Old name kept for compatibility with the existing submit-request route.

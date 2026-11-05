@@ -1,3 +1,4 @@
+import {serviceMailRequest,mailIdentity,prepareCustomerMail,customerMailStatus} from '../_shared/customer-email-transport.ts'
 // Supabase Edge Function: send-email
 // Sends transactional emails through Resend.
 // Reads `Resend_Key` from function secrets — set with:
@@ -45,6 +46,9 @@ function htmlToPlainText(html: string): string {
 }
 
 interface Payload {
+  brand?: 'nukhba'|'first1saudi'
+  requestId?: string
+  action?: 'preview'|'brand_status'
   to: string | string[]
   subject: string
   html: string
@@ -71,7 +75,7 @@ Deno.serve(async (req) => {
       headers: { 'Content-Type': 'application/json' },
     })
   }
-  console.log('API key found:', apiKey.substring(0, 10) + '...')
+
 
   let payload: Payload
   try {
@@ -90,6 +94,12 @@ Deno.serve(async (req) => {
     })
   }
 
+  const internal=serviceMailRequest(req,key=>Deno.env.get(key))
+  if((payload.brand==='first1saudi'||payload.requestId||payload.action)&&!internal)return Response.json({error:'UNAUTHORIZED'},{status:401})
+  if(payload.action==='brand_status')return Response.json(await customerMailStatus(payload.brand==='first1saudi'?'first1saudi':'nukhba',key=>Deno.env.get(key)))
+  try {payload=await prepareCustomerMail(payload as unknown as Record<string,unknown>,key=>Deno.env.get(key)) as unknown as typeof payload} catch {return Response.json({error:'EMAIL_ORDER_CONTEXT_UNAVAILABLE'},{status:409})}
+  const identity=mailIdentity(payload.brand==='first1saudi'?'first1saudi':'nukhba',key=>Deno.env.get(key))
+
   if (!payload.to || !payload.subject || !payload.html) {
     return new Response(JSON.stringify({ error: 'Missing to/subject/html' }), {
       status: 400,
@@ -101,12 +111,12 @@ Deno.serve(async (req) => {
   const plainText = htmlToPlainText(payload.html)
 
   const requestBody = {
-    from: FROM_EMAIL,
+    from: identity.from,
     to: payload.to,
     subject: payload.subject,
     html: payload.html,
     text: plainText, // إضافة النسخة النصية البسيطة
-    reply_to: payload.replyTo || REPLY_TO_EMAIL,
+    reply_to: identity.brand.id==='first1saudi'?identity.replyTo:payload.replyTo || REPLY_TO_EMAIL,
     cc: payload.cc, // إضافة CC للرسائل
     attachments: payload.attachments?.map(item => ({
       filename: item.filename,
@@ -135,16 +145,27 @@ Deno.serve(async (req) => {
   }
 
   console.log('Resend API request:', {
-    from: FROM_EMAIL,
+    from: identity.from,
     to: payload.to,
     subject: payload.subject,
-    apiKeyPrefix: apiKey.substring(0, 10) + '...'
+
   })
+
+  if(identity.brand.id==='first1saudi'){
+    requestBody.headers={
+      'Auto-Submitted':'auto-generated','X-Auto-Response-Suppress':'All',
+      'Organization':identity.brand.name,'X-Mailer':'FirstSaudi-Notifications/1.0',
+      'List-Help':'<https://first1saudi.net/contact>',
+      'List-Unsubscribe':'<mailto:info@first1saudi.net>',
+      'Message-ID':`<${crypto.randomUUID()}@first1saudi.net>`,
+    } as unknown as typeof requestBody.headers
+  }
+  if(payload.action==='preview')return Response.json({ok:true,preview:true,brand:identity.brand.id,request:requestBody})
 
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${identity.key}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(requestBody),

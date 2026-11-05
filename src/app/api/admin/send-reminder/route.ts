@@ -118,6 +118,7 @@ export async function POST(request: NextRequest) {
 
     // Retry-aware send to ride out transient rate limits
     const result = await sendEmailWithRetry({
+      requestId:requestData.id,
       to: requestData.client_email,
       subject,
       html,

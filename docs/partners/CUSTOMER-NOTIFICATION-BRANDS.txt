@@ -1,0 +1,37 @@
+Customer notification identities
+
+Order source, not customer account or email, selects identity:
+- publish_requests.partner_id = awwal-saudi: شبكة أول سعودي; info@first1saudi.net; first1saudi.net; green identity.
+- Native orders without partner_id: existing تواصل النخبة / noreply@nukhba.media / support@nukhba.media / nukhba.media identity.
+- Unknown partner or missing order context fails closed. Sandbox and notifications=false remain suppressed.
+- Legacy wrappers with only ATH request numbers resolve the same stored order; recipient must match that order.
+- FirstSaudi SSO code/register routes select FirstSaudi identity explicitly; native auth remains native.
+
+Customer links:
+- Follow-up, payment, reviews, feedback and original-invoice links lead to https://first1saudi.net/services/orders?order_id=<id>.
+- Actual payment/invoice/review authorization still runs through the existing FirstSaudi portal and central API.
+- New request links go to /services; account links to /services/account; contact/help to /contact.
+- Central review/auth tokens are never copied into a FirstSaudi link.
+- Private image URLs and external publication destinations stay intact.
+- Central open/click tracking redirects are disabled for FirstSaudi messages.
+- PDF invoice contents, seller, accounting numbering and payment state logic are unchanged.
+
+Coverage:
+22 order email wrappers; quote acceptance/rejection/negotiation; payment confirmation and original invoice attachment; content review/change/approval; additional information; completion/refund/review invitation; individual/bulk/admin reminders and daily scheduled reminders.
+Daily reminder source was reconciled to the actual deployed v16 baseline before adding order references. Its closing/status/scheduling rules were not changed.
+
+Transport:
+send-email v25, send-enhanced-email v14, daily-reminders v17 deployed.
+Preview and status actions require service-role authentication (Authorization or privileged apikey). They do not submit email.
+Sender identity is fixed by server policy; no customer-supplied sender/return destination is accepted.
+Optional dedicated FIRST1SAUDI_RESEND_API_KEY can be configured as an Edge secret; otherwise the existing provider key is used with the FirstSaudi sender. There is no retry under the native identity when FirstSaudi delivery fails.
+
+Validation:
+- 74 isolated checks across both identities, including a customer with orders on both sites, old number-only callers, private link routing, Sandbox suppression and unchanged original attachment bytes.
+- Both deployed senders passed authenticated preview for each brand and reject anonymous preview.
+- Next production build passed; scoped ESLint has zero errors and three pre-existing unused-variable warnings.
+- Desktop/mobile HTML previews rendered and inspected.
+- No test email sent, no real invoice generated, no production order/payment/status changed by tests.
+
+Delivery limit:
+The production provider key permits sending but rejects domain-list inspection with restricted_api_key. The live preview proves selected sender/content/headers, not mailbox delivery or the key's allowed-domain scope. Independent existing FirstSaudi delivery records show info@first1saudi.net with passing SPF/DKIM/DMARC. A real controlled mailbox delivery remains a separate acceptance check; no such message was sent in this task.

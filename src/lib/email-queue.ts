@@ -1,8 +1,12 @@
 // Enhanced email notification system with better error handling and logging
 import { sendEmail } from './email'
 import { sendEnhancedEmail, validateEmailContent, htmlToText } from './email-deliverability'
+import { customerEmailContext } from './customer-email'
+import { partnerReminderEmail, type CustomerEmailBrandId } from './email-brand'
 
 export interface EmailJob {
+  requestId?: string
+  brand?: CustomerEmailBrandId
   to: string | string[]
   subject: string
   html: string
@@ -25,6 +29,14 @@ const failedEmails: (EmailJob & { lastAttempt: Date; attempts: number })[] = []
 
 // Enhanced email sending with retry logic, deliverability validation, and better logging
 export async function sendEmailWithRetry(job: EmailJob): Promise<EmailResult> {
+  if(job.requestId&&!job.brand){
+    try {
+      const identity=await customerEmailContext({requestId:job.requestId,email:typeof job.to==='string'?job.to:job.to.length===1?job.to[0]:''})
+      if(!identity)return {success:false,error:'NOTIFICATIONS_DISABLED',attemptedAt:new Date()}
+      const rendered=partnerReminderEmail(job.subject,job.html,identity)
+      job={...job,...rendered,text:htmlToText(rendered.html),brand:identity.brand}
+    } catch {return {success:false,error:'EMAIL_ORDER_CONTEXT_UNAVAILABLE',attemptedAt:new Date()}}
+  }
   const maxRetries = job.retries ?? 3
   const context = job.context ?? 'unknown'
   const useEnhanced = job.enhanced !== false // Default to enhanced unless explicitly disabled
@@ -57,6 +69,7 @@ export async function sendEmailWithRetry(job: EmailJob): Promise<EmailResult> {
       if (useEnhanced) {
         // Use enhanced email with deliverability improvements
         success = await sendEnhancedEmail({
+          brand:job.brand,
           to: job.to,
           subject: job.subject,
           html: job.html,
@@ -70,7 +83,7 @@ export async function sendEmailWithRetry(job: EmailJob): Promise<EmailResult> {
         })
       } else {
         // Fallback to basic email
-        success = await sendEmail(job.to, job.subject, job.html)
+        success = await sendEmail(job.to, job.subject, job.html, undefined, job.brand)
       }
 
       if (success) {
@@ -96,7 +109,7 @@ export async function sendEmailWithRetry(job: EmailJob): Promise<EmailResult> {
       if (useEnhanced && attempt === maxRetries) {
         console.log(`[EMAIL] 🔄 Final attempt with basic email fallback...`)
         try {
-          const basicSuccess = await sendEmail(job.to, job.subject, job.html)
+          const basicSuccess = await sendEmail(job.to, job.subject, job.html, undefined, job.brand)
           if (basicSuccess) {
             console.log(`[EMAIL] ✅ Fallback email sent successfully: ${job.subject} [Context: ${context}]`)
             return { success: true, attemptedAt: new Date() }
