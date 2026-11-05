@@ -56,3 +56,8 @@
 .first1-receipt{display:grid;gap:10px;margin-top:24px;padding:18px;border:1px dashed #8ca292;border-radius:8px;background:#f7f9f4}.first1-receipt span{font-size:12px;color:#53655a}.first1-receipt input{width:100%;max-width:100%;font-size:14px}.first1-receipt input::file-selector-button{background:#15432f;color:white;border:0;border-radius:5px;padding:10px;margin-inline-end:10px}
 .first1-payment-error{margin-top:20px;padding:12px;background:#fff2ea;color:#8b3525;border-inline-start:3px solid #b35c34;line-height:1.8}.first1-checkout-button:disabled,.first1-method:disabled{opacity:.55;cursor:wait}.first1-checkout-button:focus-visible,.first1-method:focus-visible{outline:3px solid #829037;outline-offset:3px}
 @media(max-width:480px){.first1-payment-methods{gap:6px}.first1-method{padding:10px 4px}.first1-method strong{font-size:14px}.first1-method span{font-size:11px}}
+
+    .f1-whatsapp{position:fixed;left:18px;bottom:calc(64px + env(safe-area-inset-bottom,0px));z-index:99990;display:flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:50%;background:#25d366;color:#fff;box-shadow:0 3px 12px #0003;text-decoration:none}
+    .f1-whatsapp:hover{background:#128c4a;color:#fff}
+    .f1-whatsapp:focus-visible{outline:3px solid #123d2f;outline-offset:4px}
+    .f1-whatsapp svg{display:block;width:32px;height:32px;fill:currentColor}
