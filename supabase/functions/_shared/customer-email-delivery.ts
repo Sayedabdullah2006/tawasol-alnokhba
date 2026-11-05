@@ -18,7 +18,8 @@ export async function deliverCustomerMail(body:Record<string,unknown>,env:(key:s
  let claim
  try {claim=await rpc('customer_mail_claim',{p_delivery_key:key,p_payload_hash:payloadHash})}catch{return Response.json({error:'EMAIL_DELIVERY_STORAGE_UNAVAILABLE'},{status:503})}
  if(claim.action==='already_sent')return Response.json({id:claim.provider_id,suppressed:true})
- if(claim.action==='in_flight')return Response.json({suppressed:true,in_flight:true},{status:202})
+ // A concurrent attempt is suppressed, but must not be recorded as a delivered invoice/reminder.
+ if(claim.action==='in_flight')return Response.json({error:'EMAIL_DELIVERY_IN_FLIGHT',suppressed:true},{status:409})
  if(claim.action!=='send')return Response.json({error:'EMAIL_DELIVERY_REVIEW_REQUIRED'},{status:409})
  headers['Idempotency-Key']='customer-mail/'+key
  try {
