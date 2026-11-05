@@ -12,6 +12,7 @@ export async function POST(request:Request){
   const raw=await request.text();if(raw.length>2048)return NextResponse.json({error:'INVALID_REQUEST'},{status:400,headers})
   const id=authorizationId(JSON.parse(raw).authorization_id)
   const db=await createServerSupabaseClient(),{data:{user},error}=await db.auth.getUser()
+  if(error&&(error.status??0)>=500)return NextResponse.json({error:'AUTH_UNAVAILABLE'},{status:503,headers})
   if(error||!user)return NextResponse.json({error:'LOGIN_REQUIRED'},{status:401,headers})
   const details=await db.auth.oauth.getAuthorizationDetails(id)
   if(details.error||!details.data)return NextResponse.json({error:(details.error?.status??503)>=500?'AUTH_UNAVAILABLE':'AUTH_EXPIRED'},{status:(details.error?.status??503)>=500?503:409,headers})

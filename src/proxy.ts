@@ -56,6 +56,7 @@ export async function proxy(request: NextRequest) {
     // إعادة العميل إلى وجهته بعد تسجيل الدخول
     url.search = ''
     url.searchParams.set('next', pathname + request.nextUrl.search)
+    if(error&&(error.status??0)>=500)url.searchParams.set('retry','1')
     const redirect=NextResponse.redirect(url)
     supabaseResponse.cookies.getAll().forEach(cookie=>redirect.cookies.set(cookie))
     redirect.headers.set('Cache-Control','private, no-store, max-age=0')

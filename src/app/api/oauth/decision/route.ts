@@ -9,7 +9,8 @@ export async function POST(request:Request){
  try{
   const form=await request.formData(),id=authorizationId(form.get('authorization_id')),decision=form.get('decision')
   if(!['approve','deny','switch'].includes(String(decision)))return NextResponse.json({error:'INVALID_DECISION'},{status:400})
-  const db=await createServerSupabaseClient(),{data:{user}}=await db.auth.getUser()
+  const db=await createServerSupabaseClient(),{data:{user},error}=await db.auth.getUser()
+  if(error&&(error.status??0)>=500)return privateRedirect(publicAuthUrl('/oauth/consent?recovery=unavailable'))
   if(!user)return privateRedirect(publicAuthUrl('/auth/sso?authorization_id='+encodeURIComponent(id)))
   const details=await db.auth.oauth.getAuthorizationDetails(id)
   if(details.error||!details.data)return privateRedirect(publicAuthUrl('/oauth/consent?recovery='+((details.error?.status??503)>=500?'unavailable':'expired')))

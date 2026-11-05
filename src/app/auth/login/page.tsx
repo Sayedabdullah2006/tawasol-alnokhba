@@ -102,6 +102,7 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-card rounded-2xl p-6 md:p-8 border border-border space-y-4">
+          {searchParams.get('retry')==='1'&&<div role="alert" className="rounded-xl bg-amber-50 p-4 text-sm leading-7 text-amber-900"><p>تعذر التحقق من جلستك مؤقتًا. أعد المحاولة دون إعادة إدخال بياناتك.</p><Link className="font-bold underline" href={portalLoginDestination(undefined,requestedNext)}>إعادة المحاولة</Link></div>}
           {/* تبديل طريقة الدخول */}
           <div className="grid grid-cols-2 gap-1 bg-cream rounded-xl p-1 text-sm font-bold">
             <button type="button" disabled={loading||sending} onClick={() => { setMode('password'); setError('') }}
