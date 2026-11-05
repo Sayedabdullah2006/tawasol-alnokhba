@@ -6,7 +6,7 @@ for(const name of ['send-email','send-enhanced-email']){
   const html=fs.readFileSync(out+'/'+brand+'-review.html','utf8'),payload={action:'preview',brand,to:'qa@example.invalid',subject:brand==='first1saudi'?'مراجعة طلب · شبكة أول سعودي':'مراجعة طلب · تواصل النخبة',html};
   const result=await db.functions.invoke(name,{body:payload});if(result.error)throw Error('Preview failed: '+name+' '+brand+' '+result.error.message);
   assert.equal(result.data.preview,true);assert.equal(result.data.brand,brand);const mail=result.data.request;
-  if(brand==='first1saudi'){assert.equal(mail.from,'شبكة أول سعودي <info@first1saudi.net>');assert.equal(mail.reply_to,'info@first1saudi.net');assert(!mail.html.includes('nukhba.media'));assert(!JSON.stringify(mail.headers).includes('nukhba'));assert(mail.text.includes('شبكة أول سعودي'));}
+  if(brand==='first1saudi'){assert.equal(mail.from,'شبكة أول سعودي <noreply@nukhba.media>');assert.equal(mail.reply_to,'info@first1saudi.net');assert(!mail.html.includes('nukhba.media'));assert(!JSON.stringify(mail.headers).includes('nukhba'));assert(mail.text.includes('شبكة أول سعودي'));}
   else {assert.equal(mail.from,'Nukhba Platform <noreply@nukhba.media>');assert(mail.html.includes('تواصل النخبة'));}
   checks.push({function:name,brand,preview:true,sender:mail.from,reply_to:mail.reply_to});
  }

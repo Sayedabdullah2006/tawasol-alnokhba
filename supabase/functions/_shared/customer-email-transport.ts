@@ -7,7 +7,7 @@ export function serviceMailRequest(req:Request,env:(key:string)=>string|undefine
 }
 export function mailIdentity(brand:CustomerEmailBrandId,env:(key:string)=>string|undefined){
  const identity=CUSTOMER_EMAIL_BRANDS[brand]
- const key=(brand==='first1saudi'?env('FIRST1SAUDI_RESEND_API_KEY'):undefined)||env('Resend_Key')||env('RESEND_KEY')||env('RESEND_API_KEY')
+ const key=env('Resend_Key')||env('RESEND_KEY')||env('RESEND_API_KEY')
  return {brand:identity,key,from:identity.from,replyTo:identity.supportEmail}
 }
 /** Request references are resolved from the database, never by matching a user's other orders. */
@@ -31,7 +31,7 @@ export async function customerMailStatus(brand:CustomerEmailBrandId,env:(key:str
  const identity=mailIdentity(brand,env)
  if(!identity.key)return {brand,from:identity.from,configured:false}
  const response=await fetch('https://api.resend.com/domains',{headers:{Authorization:'Bearer '+identity.key}})
- const body=await response.json(),host=brand==='first1saudi'?'first1saudi.net':'nukhba.media'
+ const body=await response.json(),host=identity.from.match(/@([^>]+)>$/)?.[1]??'nukhba.media'
  const domain=body.data?.find((d:{name:string})=>d.name===host)
  return {brand,from:identity.from,replyTo:identity.replyTo,configured:true,provider_status:response.status,provider_error:typeof body.name==='string'?body.name:null,domain:host,verified:response.ok?domain?.status==='verified':null,domain_status:domain?.status??null}
 }

@@ -3,7 +3,7 @@ export type CustomerEmailBrandId = 'nukhba' | 'first1saudi'
 export type CustomerEmailBrand = { id: CustomerEmailBrandId; name: string; english: string; site: string; primary: string; accent: string; background: string; supportEmail: string; unsubscribeEmail: string; from: string; description: string }
 export const CUSTOMER_EMAIL_BRANDS: Record<CustomerEmailBrandId, CustomerEmailBrand> = {
   nukhba: { id:'nukhba',name:'تواصل النخبة',english:'TAWASOL ALNOKHBA',site:'https://nukhba.media',primary:'#0E2855',accent:'#C9A961',background:'#F7F4ED',supportEmail:'support@nukhba.media',unsubscribeEmail:'unsubscribe@nukhba.media',from:'Nukhba Platform <noreply@nukhba.media>',description:'منصة متخصصة في التسويق والإعلان الرقمي' },
-  first1saudi: { id:'first1saudi',name:'شبكة أول سعودي',english:'FIRST SAUDI',site:'https://first1saudi.net',primary:'#175b40',accent:'#175b40',background:'#f5f8f3',supportEmail:'info@first1saudi.net',unsubscribeEmail:'info@first1saudi.net',from:'شبكة أول سعودي <info@first1saudi.net>',description:'متابعة طلبات النشر عبر شبكة أول سعودي' },
+  first1saudi: { id:'first1saudi',name:'شبكة أول سعودي',english:'FIRST SAUDI',site:'https://first1saudi.net',primary:'#175b40',accent:'#175b40',background:'#f5f8f3',supportEmail:'info@first1saudi.net',unsubscribeEmail:'info@first1saudi.net',from:'شبكة أول سعودي <noreply@nukhba.media>',description:'متابعة طلبات النشر عبر شبكة أول سعودي' },
 }
 export type CustomerEmailContext = { brand: CustomerEmailBrandId; requestId?: string }
 export function escapeEmailHtml(value: string) { return value.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!)) }
