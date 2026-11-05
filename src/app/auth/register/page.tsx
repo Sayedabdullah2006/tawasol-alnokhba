@@ -1,7 +1,6 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Input from '@/components/ui/Input'
@@ -16,7 +15,6 @@ export default function RegisterPage() {
   const submitting=useRef(false)
   const [captchaAttempt,setCaptchaAttempt]=useState(0)
   const searchParams = useSearchParams()
-  const supabase = createClient()
 
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -73,9 +71,8 @@ export default function RegisterPage() {
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'تعذّر إنشاء الحساب'); setLoading(false); return }
 
-      // Auto-login then return to the intended destination (e.g. /request) or dashboard
-      const result=await supabase.auth.signInWithPassword({ email, password })
-      if(result.error||!result.data.user){setError('تم إنشاء حسابك. استخدم تسجيل الدخول للمتابعة.');return}
+      // The registration handler has already established the authenticated cookie.
+      if(data.authenticated!==true){setError('تم إنشاء حسابك. استخدم تسجيل الدخول للمتابعة.');return}
       window.location.replace(portalLoginDestination('client',nextParam))
     } catch {
       setError('حدث خطأ، حاول مرة أخرى')
