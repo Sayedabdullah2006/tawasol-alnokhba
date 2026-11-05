@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
@@ -10,9 +10,11 @@ import TurnstileWidget from '@/components/ui/TurnstileWidget'
 import { turnstileEnabled } from '@/lib/turnstile'
 import { validateEmail } from '@/lib/email-validation'
 import { COUNTRIES, countryByCode, flagEmoji } from '@/lib/countries'
+import {portalLoginDestination} from '@/lib/portal-login'
 
 export default function RegisterPage() {
-  const router = useRouter()
+  const submitting=useRef(false)
+  const [captchaAttempt,setCaptchaAttempt]=useState(0)
   const searchParams = useSearchParams()
   const supabase = createClient()
 
@@ -36,6 +38,7 @@ export default function RegisterPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
+    if(submitting.current)return
     setError('')
     setEmailSuggestion(null)
 
@@ -59,24 +62,25 @@ export default function RegisterPage() {
     if (password !== confirmPassword) { setError('كلمة المرور وتأكيدها غير متطابقتين'); return }
     if (captchaOn && !captchaToken) { setError('يرجى إكمال التحقق الأمني أولاً'); return }
 
-    setLoading(true)
+    submitting.current=true;setLoading(true)
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal:AbortSignal.timeout(20000),
         body: JSON.stringify({ email, password, fullName, phone: fullPhone, captchaToken }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'تعذّر إنشاء الحساب'); setLoading(false); return }
 
       // Auto-login then return to the intended destination (e.g. /request) or dashboard
-      await supabase.auth.signInWithPassword({ email, password })
-      router.push(nextParam || '/dashboard')
-      router.refresh()
+      const result=await supabase.auth.signInWithPassword({ email, password })
+      if(result.error||!result.data.user){setError('تم إنشاء حسابك. استخدم تسجيل الدخول للمتابعة.');return}
+      window.location.replace(portalLoginDestination('client',nextParam))
     } catch {
       setError('حدث خطأ، حاول مرة أخرى')
       setLoading(false)
-    }
+    }finally{setLoading(false);submitting.current=false;setCaptchaToken(null);setCaptchaAttempt(n=>n+1)}
   }
 
   return (
@@ -126,12 +130,12 @@ export default function RegisterPage() {
             onChange={e => setConfirmPassword(e.target.value)} required />
 
           {captchaOn && (
-            <TurnstileWidget onVerify={setCaptchaToken} onExpire={() => setCaptchaToken(null)} />
+            <TurnstileWidget key={captchaAttempt} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken(null)} />
           )}
 
           {error && (
             <div className="text-sm text-center space-y-2">
-              <p className="text-red-500">{error}</p>
+              <p role="alert" className="text-red-500">{error}</p>
               {emailSuggestion && (
                 <button type="button"
                   onClick={() => { setEmail(emailSuggestion); setEmailSuggestion(null); setError('') }}

@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { APPLE_PAY_DOMAIN_ASSOCIATION } from '@/lib/apple-pay-domain'
+import {publicAuthUrl} from '@/lib/auth-origin'
 
 export async function proxy(request: NextRequest) {
   // ملف ربط نطاق Apple Pay — يُخدَم هنا لأن هذا البناء لا يخدم public/.well-known
@@ -17,11 +18,12 @@ export async function proxy(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key',
     {
+      cookieOptions:{sameSite:'lax',secure:process.env.NODE_ENV==='production'},
       cookies: {
         getAll() {
           return request.cookies.getAll()
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet, headers) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           )
@@ -29,6 +31,7 @@ export async function proxy(request: NextRequest) {
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           )
+          Object.entries(headers??{}).forEach(([name,value])=>supabaseResponse.headers.set(name,value))
         },
       },
     }
@@ -47,19 +50,26 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/payment')
 
   if (protectedPath && !user) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/auth/login'
+    const url = publicAuthUrl('/auth/login')
     // إعادة العميل إلى وجهته بعد تسجيل الدخول
     url.search = ''
     url.searchParams.set('next', pathname + request.nextUrl.search)
-    return NextResponse.redirect(url)
+    const redirect=NextResponse.redirect(url)
+    supabaseResponse.cookies.getAll().forEach(cookie=>redirect.cookies.set(cookie))
+    redirect.headers.set('Cache-Control','private, no-store, max-age=0')
+    return redirect
   }
 
+  supabaseResponse.headers.set('Cache-Control','private, no-store, max-age=0')
+  supabaseResponse.headers.set('Pragma','no-cache')
+  supabaseResponse.headers.set('Expires','0')
   return supabaseResponse
 }
 
 export const config = {
   matcher: [
+    '/auth/:path*',
+    '/oauth/consent',
     '/dashboard/:path*',
     '/admin/:path*',
     '/employee/:path*',

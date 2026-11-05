@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
@@ -23,7 +23,8 @@ export default function LoginPage() {
   const [codeSent, setCodeSent] = useState(false)
   const [sending, setSending] = useState(false)
   const captchaOn = turnstileEnabled()
-  const router = useRouter()
+  const submitting=useRef(false)
+  const [captchaAttempt,setCaptchaAttempt]=useState(0)
   const searchParams = useSearchParams()
   const supabase = createClient()
 
@@ -34,49 +35,49 @@ export default function LoginPage() {
 
   const finishLogin = async (userId: string) => {
     beginPortalVisit()
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).single()
+    const { data: profile,error:profileError } = await supabase.from('profiles').select('role').eq('id', userId).single()
+    if(profileError||!profile)throw Error('تعذر تحميل حسابك الآن. أعد المحاولة.')
     const nextParam = new URLSearchParams(window.location.search).get('next')
-    router.push(portalLoginDestination(profile?.role,nextParam))
-    router.refresh()
+    window.location.replace(portalLoginDestination(profile.role,nextParam))
   }
 
   // إرسال رمز الدخول للبريد (دخول بلا كلمة مرور)
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault()
+    if(submitting.current)return;submitting.current=true
     setError(''); setSending(true)
     try {
       const res = await fetch('/api/auth/login-start', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
+        signal:AbortSignal.timeout(20000),
         body: JSON.stringify({ email, captchaToken }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'تعذّر إرسال الرمز'); return }
       setCodeSent(true)
     } catch { setError('تعذّر إرسال الرمز — أعد المحاولة') }
-    finally { setSending(false) }
+    finally { setSending(false);submitting.current=false;setCaptchaToken(null);setCaptchaAttempt(n=>n+1) }
   }
 
   // التحقق من الرمز وإنشاء الجلسة (verifyOtp الأصلي — دون تغيير كلمة المرور)
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault()
+    if(submitting.current)return;submitting.current=true
     setError(''); setLoading(true)
+    try{
     const { data, error: vErr } = await supabase.auth.verifyOtp({ email, token: code.trim(), type: 'email' })
     if (vErr || !data.user) { setError('الرمز غير صحيح أو منتهي الصلاحية'); setLoading(false); return }
     await finishLogin(data.user.id)
+    }catch{setError('تعذر إكمال الدخول الآن. أعد المحاولة.')}finally{setLoading(false);submitting.current=false}
   }
-
-  // Debug logging
-  console.log('Login Page Debug:', {
-    captchaOn,
-    turnstileSiteKey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ? 'SET' : 'NOT SET'
-  })
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    if(submitting.current)return;submitting.current=true
     setError('')
     setLoading(true)
 
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    try{const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
       options: captchaToken ? { captchaToken } : undefined,
@@ -87,6 +88,7 @@ export default function LoginPage() {
       return
     }
     await finishLogin(authData.user.id)
+    }catch{setError('تعذر إكمال الدخول الآن. أعد المحاولة.')}finally{setLoading(false);submitting.current=false;setCaptchaToken(null);setCaptchaAttempt(n=>n+1)}
   }
 
   return (
@@ -102,11 +104,11 @@ export default function LoginPage() {
         <div className="bg-card rounded-2xl p-6 md:p-8 border border-border space-y-4">
           {/* تبديل طريقة الدخول */}
           <div className="grid grid-cols-2 gap-1 bg-cream rounded-xl p-1 text-sm font-bold">
-            <button type="button" onClick={() => { setMode('password'); setError('') }}
+            <button type="button" disabled={loading||sending} onClick={() => { setMode('password'); setError('') }}
               className={`py-2 rounded-lg transition ${mode === 'password' ? 'bg-card text-green shadow-sm' : 'text-muted'}`}>
               كلمة المرور
             </button>
-            <button type="button" onClick={() => { setMode('code'); setShowPassword(false); setError('') }}
+            <button type="button" disabled={loading||sending} onClick={() => { setMode('code'); setShowPassword(false); setError('') }}
               className={`py-2 rounded-lg transition ${mode === 'code' ? 'bg-card text-green shadow-sm' : 'text-muted'}`}>
               رمز عبر البريد
             </button>
@@ -132,8 +134,8 @@ export default function LoginPage() {
                   </svg>
                 </button>
               </div>
-              {captchaOn && <TurnstileWidget onVerify={setCaptchaToken} onExpire={() => setCaptchaToken(null)} />}
-              {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+              {captchaOn && <TurnstileWidget key={captchaAttempt} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken(null)} />}
+              {error && <p role="alert" className="text-sm text-red-500 text-center">{error}</p>}
               <Button type="submit" loading={loading} className="w-full" disabled={captchaOn && !captchaToken}>
                 تسجيل الدخول
               </Button>
@@ -145,8 +147,8 @@ export default function LoginPage() {
               {!codeSent ? (
                 <>
                   <p className="text-xs text-muted leading-relaxed">سنرسل لك رمز دخول لمرة واحدة على بريدك — بلا كلمة مرور.</p>
-                  {captchaOn && <TurnstileWidget onVerify={setCaptchaToken} onExpire={() => setCaptchaToken(null)} />}
-                  {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+                  {captchaOn && <TurnstileWidget key={captchaAttempt} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken(null)} />}
+                  {error && <p role="alert" className="text-sm text-red-500 text-center">{error}</p>}
                   <Button type="submit" loading={sending} className="w-full" disabled={captchaOn && !captchaToken}>
                     أرسل الرمز
                   </Button>
@@ -156,7 +158,7 @@ export default function LoginPage() {
                   <Input id="code" label="رمز الدخول" type="text" dir="ltr" inputMode="numeric" placeholder="------"
                     value={code} onChange={e => setCode(e.target.value)} required />
                   <p className="text-xs text-green-700">✅ أرسلنا رمزاً إلى {email}. تحقّق من بريدك (والمهملات).</p>
-                  {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+                  {error && <p role="alert" className="text-sm text-red-500 text-center">{error}</p>}
                   <Button type="submit" loading={loading} className="w-full">دخول</Button>
                   <button type="button" onClick={() => { setCodeSent(false); setCode(''); setError('') }}
                     className="w-full text-xs text-muted hover:text-dark">تغيير البريد / إعادة الإرسال</button>
