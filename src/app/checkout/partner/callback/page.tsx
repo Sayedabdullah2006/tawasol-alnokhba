@@ -7,11 +7,12 @@ export default function PartnerPaymentResult() {
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     const query = new URLSearchParams(window.location.search)
-    const id = query.get('id')
+    const tamara=query.get('provider')==='tamara'
+    const id = tamara?'tamara':query.get('id')
     const endpoint = `/api/partner-checkout?session=${encodeURIComponent(query.get('session') ?? '')}`
     fetch(endpoint, { cache: 'no-store' }).then(r => r.json()).then(d => { if (d.return_url) setBack(d.return_url); if (!id) setMessage('لم نتلقَّ رقم عملية دفع. راجع حالة طلبك قبل إعادة المحاولة.') }).catch(() => undefined)
     if (!id) return
-    fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payment_id: id }) }).then(async r => {
+    fetch(endpoint+(tamara?'&action=tamara-verify':''), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payment_id: id }) }).then(async r => {
       const data = await r.json()
       if (data.return_url) setBack(data.return_url)
       setMessage(!r.ok ? 'تعذر تأكيد الدفع الآن. راجع حالة طلبك قبل إجراء دفعة جديدة.' : data.paid ? 'تم تأكيد السداد. طلبك لدى فريق تواصل النخبة.' : data.review_required ? 'وصلت العملية وتحتاج مراجعة مالية. لا تكرر الدفع.' : ['failed','voided'].includes(data.status) ? 'لم تكتمل عملية الدفع. يمكنك العودة إلى طلبك للمحاولة.' : 'لم يتأكد السداد بعد. يمكنك تحديث الحالة.')

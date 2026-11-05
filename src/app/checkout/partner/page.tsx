@@ -1,8 +1,8 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import PaymentForm from '@/components/payment/PaymentForm'
+import PartnerPaymentMethods,{type CheckoutPayment} from './payment-methods'
 
-interface Checkout { publishable_key: string; payment_mode: string; amount: number; title: string; package_name: string; request_number: number; status: string; return_url: string; metadata: Record<string, string> }
+interface Checkout extends CheckoutPayment { publishable_key: string; payment_mode: string; amount: number; title: string; package_name: string; request_number: number; status: string; return_url: string; metadata: Record<string, string> }
 export default function PartnerCheckoutPage() {
   const [data, setData] = useState<Checkout | null>(null)
   const [error, setError] = useState('')
@@ -32,7 +32,7 @@ export default function PartnerCheckoutPage() {
       {data.payment_mode === 'sandbox' && <p role="status" className="first1-checkout-test">دفع تجريبي — لا يُخصم مبلغ فعلي</p>}
       <div className="first1-checkout-grid">
         <aside className="first1-checkout-order"><span className="first1-checkout-number">طلب #{data.request_number}</span><h2>{data.title}</h2><dl><div><dt>الخدمة</dt><dd>{data.package_name || 'طلب نشر'}</dd></div><div className="first1-checkout-total"><dt>الإجمالي</dt><dd>{new Intl.NumberFormat('ar-SA', {style:'currency',currency:'SAR'}).format(data.amount / 100)}</dd></div></dl><p className="first1-checkout-seller">تُقدَّم هذه الخدمة وتُباع بواسطة شركة تواصل النخبة للدعاية والإعلان، ويُعالج الدفع عبر ميسر لحساب الشركة. يمكنك متابعة طلبك من خلال أول سعودي.</p></aside>
-        <div className="first1-checkout-form"><h2>بيانات الدفع</h2>{data.status === 'payable' ? <PaymentForm publishableKey={data.publishable_key} className="partner-payment" compact amount={data.amount / 100} description={`طلب ${data.request_number} — ${data.package_name || 'نشر خبر'}`} metadata={data.metadata} /> : <p role="status" className="first1-checkout-state">{data.status === 'paid' ? 'تم تأكيد السداد' : 'الطلب غير متاح للدفع حاليًا'}</p>}</div>
+        <div className="first1-checkout-form"><h2>بيانات الدفع</h2>{data.status === 'payable' ? <PartnerPaymentMethods data={data} onReceived={()=>setData({...data,status:'payment_review'})}/> : <p role="status" className="first1-checkout-state">{data.status === 'paid' ? 'تم تأكيد السداد' : data.status==='payment_review'?'تم استلام إيصالك. بانتظار مراجعة التحويل.':'الطلب غير متاح للدفع حاليًا'}</p>}</div>
       </div>
     </>}
   </section>

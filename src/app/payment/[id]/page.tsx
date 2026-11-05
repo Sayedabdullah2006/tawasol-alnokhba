@@ -12,11 +12,7 @@ import ReceiptUploader from '@/components/request/ReceiptUploader'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
-const BANK_INFO = {
-  bankName: 'بنك إس تي سي (stc pay)',
-  accountName: 'شركة تواصل النخبة للدعاية والإعلان',
-  iban: 'SA4678000000001258622215',
-}
+import { BANK_INFO } from '@/lib/bank-info'
 
 type Method = 'bank' | 'online' | 'tamara'
 

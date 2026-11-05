@@ -56,6 +56,10 @@ export async function POST(request: NextRequest) {
       return ok()
     }
 
+    const {partnerTamaraWebhook}=await import('@/lib/partners/checkout-methods')
+    const partnerResult=await partnerTamaraWebhook(order_id,order_reference_id??'')
+    if(partnerResult.handled)return ok()
+
     const service = await createServiceRoleClient()
     const { data: topupByOrder } = await service.from('membership_topups').select('id').eq('provider_payment_id', order_id).limit(1).maybeSingle()
     const { data: topupByReference } = !topupByOrder && order_reference_id

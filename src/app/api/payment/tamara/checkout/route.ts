@@ -26,13 +26,15 @@ export async function POST(request: NextRequest) {
 
     const { data: order } = await supabase
       .from('publish_requests')
-      .select('id, user_id, status')
+      .select('id, user_id, status, partner_id')
       .eq('id', requestId)
       .single()
 
     if (!order || order.user_id !== user.id) {
       return NextResponse.json({ success: false, error: 'الطلب غير موجود' }, { status: 404 })
     }
+
+    if(order.partner_id)return NextResponse.json({success:false,error:'افتح الدفع من صفحة الطلب في أول سعودي'},{status:409})
 
     if (order.status !== 'approved') {
       return NextResponse.json({ success: false, error: 'الطلب غير جاهز للدفع' }, { status: 400 })
