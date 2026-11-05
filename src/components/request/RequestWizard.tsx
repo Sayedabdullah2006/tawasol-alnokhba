@@ -537,7 +537,7 @@ export default function RequestWizard() {
       return packageTotal - Math.round(packageTotal * CAMPAIGN_DISCOUNT / 100)
     }
     if (requestType === 'single' && basicDynamicPrice != null) {
-      return chosenV2 ? packagePrice(basicDynamicPrice, chosenV2) : Math.round(basicDynamicPrice * selectedPackageData.priceMultiplier)
+      return chosenV2 ? packagePrice(basicDynamicPrice, chosenV2, category) : Math.round(basicDynamicPrice * selectedPackageData.priceMultiplier)
     }
     return null
   })()
@@ -1255,7 +1255,7 @@ export default function RequestWizard() {
               {requestType==='single' ? <PackageComparison
                 packages={singlePackages.filter(p=>!p.requiredCategory || p.requiredCategory===category)}
                 selected={selectedPackage}
-                prices={Object.fromEntries(singlePackages.map(p=>[p.id,basicDynamicPrice==null?null:packagePrice(basicDynamicPrice,p)]))}
+                prices={Object.fromEntries(singlePackages.map(p=>[p.id,basicDynamicPrice==null?null:packagePrice(basicDynamicPrice,p,category)]))}
                 availableChannels={availableChannels}
                 onSelect={id=>{setSelectedPackage(id);if(id!=='v2_basic')setSelectedExtras([])}}
               /> : (
@@ -1272,7 +1272,7 @@ export default function RequestWizard() {
                       pkgPrice = withPkg - Math.round(withPkg * CAMPAIGN_DISCOUNT / 100)
                     }
                   } else if (basicDynamicPrice != null) {
-                    pkgPrice = getIndividualPackage(pkg.id,singlePackages) ? packagePrice(basicDynamicPrice, getIndividualPackage(pkg.id,singlePackages)!) : Math.round(basicDynamicPrice * pkg.priceMultiplier)
+                    pkgPrice = getIndividualPackage(pkg.id,singlePackages) ? packagePrice(basicDynamicPrice, getIndividualPackage(pkg.id,singlePackages)!, category) : Math.round(basicDynamicPrice * pkg.priceMultiplier)
                   }
                   if (getIndividualPackage(pkg.id,singlePackages)?.fixedPrice != null) pkgPrice = getIndividualPackage(pkg.id,singlePackages)!.fixedPrice!
                   const priceLabel = pkgPrice != null ? `${pkgPrice} ر.س` : 'يُحسب بعد تفاصيل الحملة'

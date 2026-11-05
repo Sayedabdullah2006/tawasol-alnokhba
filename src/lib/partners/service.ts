@@ -1,5 +1,5 @@
 import { getPublishedCatalog } from '@/lib/catalog/server'
-import { activePackages, newsPrice } from '@/lib/catalog/model'
+import { activePackages, newsPrice, packageStartingPrice } from '@/lib/catalog/model'
 import { partnerPaymentMode, partnerGateway } from './payment-mode'
 import { validateNews } from '@/lib/individual-news'
 import { partnerData } from './data'
@@ -81,7 +81,7 @@ export async function partnerOperation(request: Request, ctx: PartnerContext, pa
     return { version: catalog.version, published_at: catalog.published_at, cache_ttl_seconds: 60, currency: 'SAR', money_unit: 'halala', seller: 'شركة تواصل النخبة للدعاية والإعلان',
       content_requirements: { terms_text: conditions?.terms_text ?? '', news_conditions_general: conditions?.news_conditions_general ?? [], news_conditions_footer: conditions?.news_conditions_footer ?? '', category_conditions: conditions?.category_conditions ?? CATEGORY_CONDITIONS },
       client_types: clientDefinitions(), request_types: ['single'], categories_by_client_type: Object.fromEntries(clientDefinitions().map(t => [t.id, CATEGORIES.filter(c => t.category_ids.includes(c.id)).map(c => ({ id: c.id, name: c.nameAr, requires_sub_option: !!c.hasSubOption, pricing_mode: t.pricing_mode }))])),
-      packages: activePackages(catalog).map(p => ({ id: p.id, name: p.name, blurb: p.blurb, surcharge: Math.round(p.surcharge * 100), fixed_price: p.fixedPrice ? Math.round(p.fixedPrice * 100) : null, starts_from: Math.round((p.fixedPrice ?? (p.requiredCategory ? newsPrice(catalog,p.requiredCategory) : Math.min(...catalog.newsRates.map(r=>r.price))) + p.surcharge) * 100), advertising: Math.round(p.sponsoredCampaignBudget * 100), channel_count: p.channelCount, channels: p.channels ?? null, features: p.features, benefits: p.benefits, required_category: p.requiredCategory ?? null, included_extras: p.includedExtras })), extras: catalog.extras.filter(e=>e.enabled).map(e => ({ id: e.id, name: e.name, price: Math.round(e.price * 100) })),
+      packages: activePackages(catalog).map(p => ({ id: p.id, name: p.name, blurb: p.blurb, surcharge: Math.round(p.surcharge * 100), fixed_price: p.fixedPrice ? Math.round(p.fixedPrice * 100) : null, starts_from: Math.round(packageStartingPrice(catalog,p) * 100), category_prices: Object.fromEntries(Object.entries(p.categoryPrices??{}).map(([category,price])=>[category,Math.round(price*100)])), advertising: Math.round(p.sponsoredCampaignBudget * 100), channel_count: p.channelCount, channels: p.channels ?? null, features: p.features, benefits: p.benefits, required_category: p.requiredCategory ?? null, included_extras: p.includedExtras })), extras: catalog.extras.filter(e=>e.enabled).map(e => ({ id: e.id, name: e.name, price: Math.round(e.price * 100) })),
       categories: CATEGORIES.filter(c => c.id !== 'Others' && (!c.clientTypes || c.clientTypes.includes('individual'))).map(c => ({ id: c.id, name: c.nameAr, requires_sub_option: !!c.hasSubOption,
         base_price: c.hasSubOption ? null : Math.round(newsPrice(catalog,c.id) * 100) })),
       sub_options: {
@@ -114,7 +114,7 @@ export async function partnerOperation(request: Request, ctx: PartnerContext, pa
     const deal = await discount(ctx, body.discount_code)
     const base = newsPrice(catalog,category,body.sub_option)
     const effectivePkg = pkg
-    const pricing = priceIndividualPackage(base, effectivePkg, extras, deal.pct)
+    const pricing = priceIndividualPackage(base, effectivePkg, extras, deal.pct, category)
     if (deal.cap !== null) { pricing.discount = Math.min(pricing.discount, Math.round(deal.cap * 100)); pricing.total = pricing.subtotal - pricing.discount }
     if (pricing.total <= 0) throw new PartnerError('ZERO_PAYMENT_UNSUPPORTED')
     const snapshot = { version: catalog.version, package: effectivePkg, pricing }

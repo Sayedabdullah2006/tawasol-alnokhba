@@ -1,12 +1,11 @@
 'use client'
 import Link from 'next/link'
 import {useIndividualCatalog} from '@/hooks/useIndividualCatalog'
-import {activePackages,newsPrice,type PublishedCatalog} from '@/lib/catalog/model'
+import {activePackages,packageStartingPrice,type PublishedCatalog} from '@/lib/catalog/model'
 export default function IndividualPricing({initial}:{initial:PublishedCatalog|null}){
   const {catalog,error,refresh}=useIndividualCatalog(initial)
   if(!catalog)return <main dir="rtl" className="mx-auto max-w-3xl p-8"><h1 className="text-xl font-bold">الأسعار</h1><p className="mt-4">{error?'تعذر تحميل الباقات الحالية.':'جارٍ تحميل الباقات…'}</p><button onClick={()=>refresh()} className="mt-4 underline">تحديث الباقات</button></main>
-  const newsMinimum=Math.min(...catalog.newsRates.map(r=>r.price))
-  const tiers=activePackages(catalog).map(pkg=>({...pkg,startsFrom:pkg.fixedPrice??(pkg.requiredCategory?newsPrice(catalog,pkg.requiredCategory):newsMinimum)+pkg.surcharge}))
+  const tiers=activePackages(catalog).map(pkg=>({...pkg,startsFrom:packageStartingPrice(catalog,pkg)}))
   const minimum=Math.min(...tiers.map(p=>p.startsFrom))
   return (
     <div className="flex-1 bg-cream">

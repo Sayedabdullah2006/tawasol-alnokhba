@@ -1,6 +1,6 @@
 import { CATEGORIES, EXTRAS } from '../constants'
 import { parseSubOption } from '../auto-quote'
-import type { IndividualPackage, IndividualPackageId } from '../individual-packages'
+import { packagePrice, type IndividualPackage, type IndividualPackageId } from '../individual-packages'
 export interface ManagedPackage extends IndividualPackage { enabled: boolean }
 export interface NewsRate { key: string; label: string; category: string; sub_option: string | { subcategory: string; position: string } | null; price: number }
 export interface CatalogExtra { id: string; name: string; price: number; enabled: boolean }
@@ -29,6 +29,9 @@ export function newsPrice(catalog:CatalogDocument,category:string,sub:unknown=nu
  const rate=catalog.newsRates.find(r=>r.key===key);if(!rate)throw new CatalogError('INVALID_CATEGORY');return rate.price
 }
 export function activePackages(catalog:CatalogDocument){return catalog.packages.filter(p=>p.enabled)}
+export function packageStartingPrice(catalog:CatalogDocument,pkg:IndividualPackage){
+ return Math.min(...catalog.newsRates.filter(r=>!pkg.requiredCategory||r.category===pkg.requiredCategory).map(r=>packagePrice(r.price,pkg,r.category)))
+}
 /** Reconstruct the document: derived features and compatibility flags cannot be forged. */
 export function validateCatalog(input:unknown):CatalogDocument{
  const root=record(input);if(!Array.isArray(root.packages)||root.packages.length!==5)fail('packages')
@@ -46,13 +49,20 @@ export function validateCatalog(input:unknown):CatalogDocument{
    return {id:bid,label,value,included,...(quantity!==undefined?{quantity}:{})}
   });if(outputs>100)fail('deliverable_count')
   const fixedPrice=p.fixedPrice==null?undefined:amount(p.fixedPrice,'fixedPrice',true)
-  return {id,name:str(p.name,'name',80),blurb:str(p.blurb,'blurb',200),enabled:bool(p.enabled,'enabled'),surcharge:amount(p.surcharge,'surcharge'),...(fixedPrice!==undefined?{fixedPrice}:{}),channelCount:count,...(channels?{channels:channels as ('x'|'li'|'ig'|'tk')[]}:{}),benefits,features:benefits.filter(b=>b.included).map(b=>`${b.label}: ${b.value}`),includedExtras:p.includedExtras as string[],allChannels:channels?.length===4,sponsoredCampaignBudget:amount(p.sponsoredCampaignBudget,'advertising'),highlighted:bool(p.highlighted??false,'highlighted'),...(id==='v2_career'?{requiredCategory:'cv'}:{}),priceMultiplier:1} satisfies ManagedPackage
+  let categoryPrices:Record<string,number>|undefined
+  if(p.categoryPrices!=null){
+   const entries=Object.entries(record(p.categoryPrices))
+   if(fixedPrice!==undefined&&entries.length)fail('categoryPrices.fixedPrice')
+   const allowed=new Set(newsRateDefinitions().filter(r=>r.sub_option===null&&(id!=='v2_career'||r.category==='cv')).map(r=>r.category))
+   categoryPrices=Object.fromEntries(entries.map(([category,price])=>{if(!allowed.has(category))fail('categoryPrices.category');return [category,amount(price,'categoryPrices.price',true)]}))
+  }
+  return {id,name:str(p.name,'name',80),blurb:str(p.blurb,'blurb',200),enabled:bool(p.enabled,'enabled'),surcharge:amount(p.surcharge,'surcharge'),...(fixedPrice!==undefined?{fixedPrice}:{}),...(categoryPrices&&Object.keys(categoryPrices).length?{categoryPrices}:{}),channelCount:count,...(channels?{channels:channels as ('x'|'li'|'ig'|'tk')[]}:{}),benefits,features:benefits.filter(b=>b.included).map(b=>`${b.label}: ${b.value}`),includedExtras:p.includedExtras as string[],allChannels:channels?.length===4,sponsoredCampaignBudget:amount(p.sponsoredCampaignBudget,'advertising'),highlighted:bool(p.highlighted??false,'highlighted'),...(id==='v2_career'?{requiredCategory:'cv'}:{}),priceMultiplier:1} satisfies ManagedPackage
  })
  if(!packages.some(p=>p.enabled))fail('enabled')
  const defs=newsRateDefinitions();if(!Array.isArray(root.newsRates)||root.newsRates.length!==defs.length)fail('newsRates')
  const newsRates=defs.map(def=>{const found=(root.newsRates as unknown[]).filter(r=>record(r).key===def.key);if(found.length!==1)fail('newsRate.key');return {...def,price:amount(record(found[0]).price,'newsRate.price',true)}})
  if(!Array.isArray(root.extras)||root.extras.length!==EXTRA_IDS.length)fail('extras')
  const extras=EXTRA_IDS.map(id=>{const found=(root.extras as unknown[]).filter(r=>record(r).id===id);if(found.length!==1)fail('extra.id');const e=record(found[0]);return {id,name:str(e.name,'extra.name',120),price:amount(e.price,'extra.price'),enabled:bool(e.enabled,'extra.enabled')}})
- const min=Math.min(...newsRates.map(r=>r.price));for(const p of packages){if(p.sponsoredCampaignBudget>(p.fixedPrice??min+p.surcharge))fail('advertising_exceeds_price')}
+ for(const p of packages){if(p.sponsoredCampaignBudget>packageStartingPrice({packages,newsRates,extras},p))fail('advertising_exceeds_price')}
  return {packages,newsRates,extras}
 }

@@ -409,7 +409,7 @@ export async function POST(request: Request) {
     // سعر الباقة = سعر الباقة الأساسية (الديناميكي حسب نوع الخبر) × معامل الباقة
     //  - الأساسية: المعامل 1.0  → السعر التلقائي للخبر
     //  - الاحتراف: ×1.46 ، التميز: ×1.60
-    const v2Price = effectivePkg ? priceIndividualPackage(newsPrice(catalog!,body.category,subOptionForCalc), effectivePkg, catalog!.extras.filter(e=>e.enabled && selectedExtras.includes(e.id)), discountRow ? Number(discountRow.discount_pct) : 0) : null
+    const v2Price = effectivePkg ? priceIndividualPackage(newsPrice(catalog!,body.category,subOptionForCalc), effectivePkg, catalog!.extras.filter(e=>e.enabled && selectedExtras.includes(e.id)), discountRow ? Number(discountRow.discount_pct) : 0, body.category) : null
     const packagePrice = v2Price ? v2Price.subtotal / 100 : priceCalc.total
 
     // تطبيق كود الخصم على سعر الباقة النهائي
