@@ -8,14 +8,14 @@ export async function POST(request:Request){
   const form=await request.formData(),id=authorizationId(form.get('authorization_id')),decision=form.get('decision')
   if(!['approve','deny','switch'].includes(String(decision)))return NextResponse.json({error:'INVALID_DECISION'},{status:400})
   const db=await createServerSupabaseClient(),{data:{user}}=await db.auth.getUser()
-  if(!user)return NextResponse.json({error:'UNAUTHORIZED'},{status:401})
+  if(!user)return NextResponse.redirect(new URL('/auth/sso?authorization_id='+encodeURIComponent(id),request.url),303)
   const details=await db.auth.oauth.getAuthorizationDetails(id)
-  if(details.error||!details.data)return NextResponse.json({error:'AUTHORIZATION_EXPIRED'},{status:400})
+  if(details.error||!details.data)return NextResponse.redirect(new URL('/oauth/consent?recovery='+((details.error?.status??503)>=500?'unavailable':'expired'),request.url),303)
   if('redirect_url'in details.data)return NextResponse.redirect(safeSsoRedirect(details.data.redirect_url),303)
   validConsentDetails(details.data)
   if(decision==='switch'){await db.auth.signOut({scope:'local'});return NextResponse.redirect(new URL('/auth/sso?authorization_id='+id,request.url),303)}
   const result=decision==='approve'?await db.auth.oauth.approveAuthorization(id,{skipBrowserRedirect:true}):await db.auth.oauth.denyAuthorization(id,{skipBrowserRedirect:true})
-  if(result.error||!result.data)return NextResponse.json({error:'AUTHORIZATION_FAILED'},{status:400})
+  if(result.error||!result.data)return NextResponse.redirect(new URL('/oauth/consent?recovery='+((result.error?.status??503)>=500?'unavailable':'expired'),request.url),303)
   return NextResponse.redirect(safeSsoRedirect(result.data.redirect_url),303)
- }catch{return NextResponse.json({error:'INVALID_AUTHORIZATION'},{status:400})}
+ }catch{return NextResponse.redirect(new URL('/oauth/consent?recovery=invalid',request.url),303)}
 }
