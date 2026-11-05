@@ -730,35 +730,11 @@ export default function RequestWizard() {
         return
       }
 
-      // ── تسجيل دخول تلقائي للضيف الجديد حتى يتابع طلبه ويدفع بلا حاجز ──
-      let signedIn = false
-      if (data.autoLogin?.email && data.autoLogin?.password) {
-        const supabase = createClient()
-        const { error: siErr } = await supabase.auth.signInWithPassword({
-          email: data.autoLogin.email,
-          password: data.autoLogin.password,
-        })
-        signedIn = !siErr
-        if (signedIn) router.refresh()
-      }
-      // جلسة متاحة؟ (سجّلناه الآن، أو كان مسجّلاً مسبقاً). الحساب الموجود لزائر غير مسجّل يحتاج دخولاً.
-      const hasSession = signedIn || (!data.autoLogin && !data.existingAccount)
-
-      // فرد معتمد مباشرةً — تحويله للدفع
-      if (data.readyForPayment && data.id) {
-        if (hasSession) {
-          // جلسة جاهزة (سجّلناه الآن أو كان مسجّلاً) → للدفع مباشرة
-          showToast('تم إنشاء طلبك — أكمل الدفع')
-          router.push(`/payment/${data.id}`)
-          return
-        }
-        if (data.existingAccount) {
-          // حساب موجود لزائر غير مسجّل → دخول ثم عودة للدفع
-          showToast('لديك حساب — سجّل دخولك لإكمال الدفع ومتابعة طلبك')
-          router.push(`/auth/login?next=${encodeURIComponent(`/payment/${data.id}`)}`)
-          return
-        }
-        // ضيف جديد تعذّر تسجيله تلقائياً (نادر) → شاشة نجاح + رابط المتابعة في الإيميل
+      // The server only accepts authenticated orders and derives ownership there.
+      if(data.readyForPayment&&data.id){
+        showToast('تم إنشاء طلبك — أكمل الدفع')
+        router.push(`/payment/${data.id}`)
+        return
       }
 
       setRequestNumber(data.requestNumber)

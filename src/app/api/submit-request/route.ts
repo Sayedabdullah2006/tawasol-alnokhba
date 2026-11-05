@@ -3,6 +3,7 @@ import {activePackages, newsPrice, CatalogError} from '@/lib/catalog/model'
 import { validateNews } from '@/lib/individual-news'
 import { getIndividualPackage, priceIndividualPackage, resolvePackageChannels } from '@/lib/individual-packages'
 import { NextResponse } from 'next/server'
+import {validSsoOrigin} from '@/lib/sso'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { generateRequestNumber } from '@/lib/utils'
 import { notifyRequestReceivedToClient } from '@/lib/email'
@@ -18,7 +19,13 @@ const OPEN_BLOCKING_STATUSES = [
 ] as const
 
 export async function POST(request: Request) {
+  if(!validSsoOrigin(request))return NextResponse.json({error:'طلب غير مسموح'},{status:403})
   try {
+    const userClient=await createServerSupabaseClient(),{data:{user},error:identityError}=await userClient.auth.getUser()
+    if(identityError&&(identityError.status??0)>=500)return NextResponse.json({error:'تعذر التحقق من جلستك مؤقتًا. أعد المحاولة.'},{status:503})
+    if(!user)return NextResponse.json({error:'سجّل الدخول لإرسال طلبك.',code:'LOGIN_REQUIRED'},{status:401})
+    const userId=user.id
+
     const body = await request.json()
     const catalog = body.request_type !== 'campaign' && (body.client_type ?? 'individual') === 'individual' && body.category !== 'Others' ? await getPublishedCatalog() : null
     const individualPackages = catalog ? activePackages(catalog) : []
@@ -41,54 +48,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'الباقة المختارة لم تعد متاحة' }, { status: 400 })
     }
 
-    // ── تحديد المستخدم ───────────────────────────────────────────
-    let userId: string | null = null
-    let wasLoggedIn = false
-    // بيانات تسجيل دخول الضيف الجديد (تُعاد للواجهة لتسجيله تلقائياً)، أو إشارة لحساب موجود.
-    let newUserCreds: { email: string; password: string } | null = null
-    let existingGuestAccount = false
-    try {
-      const userClient = await createServerSupabaseClient()
-      const { data: { user } } = await userClient.auth.getUser()
-      if (user) { userId = user.id; wasLoggedIn = true }
-    } catch { /* not logged in */ }
-
-    if (!userId) {
-      try {
-        const { data: users } = await serviceClient.auth.admin.listUsers()
-        const existing = users?.users?.find(u => u.email === body.client_email)
-        if (existing) {
-          userId = existing.id
-          existingGuestAccount = true
-        } else {
-          const tempPassword = Math.random().toString(36).slice(-10) + 'A1!'
-          const { data: newUser } = await serviceClient.auth.admin.createUser({
-            email: body.client_email,
-            password: tempPassword,
-            email_confirm: true,
-            user_metadata: { full_name: body.client_name },
-          })
-          if (newUser?.user) {
-            userId = newUser.user.id
-            newUserCreds = { email: body.client_email, password: tempPassword }
-            await serviceClient.from('profiles').upsert({
-              id:        newUser.user.id,
-              full_name: body.client_name,
-              phone:     body.client_phone,
-              city:      body.client_city,
-              x_handle:  body.x_handle,
-            })
-          }
-        }
-      } catch (e) {
-        console.error('User lookup/creation error:', e)
-      }
-    }
-
-    // حمولة الجلسة المُعادة للواجهة: تسجيل تلقائي للضيف الجديد، أو طلب دخول لحساب موجود.
-    const sessionPayload: { autoLogin?: { email: string; password: string }; existingAccount?: boolean } =
-      newUserCreds ? { autoLogin: newUserCreds }
-      : (!wasLoggedIn && existingGuestAccount ? { existingAccount: true } : {})
+    // Ownership follows the verified session, never a contact email.
 
     // ── منع تقديم طلب جديد ما دام للعميل طلب قائم لم يُدفع ولم يكتمل ──────
     // لا يحق للعميل رفع أكثر من طلب واحد في الحالات التالية (قبل الدفع/الاكتمال).
@@ -391,7 +351,6 @@ export async function POST(request: Request) {
         id: data.id,
         quotedTotal: isIndividual ? campaignFinalPrice : null,
         readyForPayment: isIndividual,
-        ...sessionPayload,
       })
     }
 
@@ -590,7 +549,6 @@ export async function POST(request: Request) {
       id: data.id,
       quotedTotal: needsManualQuote ? null : singleFinalPrice,
       readyForPayment: !needsManualQuote,
-      ...sessionPayload,
     })
 
   } catch (err) {

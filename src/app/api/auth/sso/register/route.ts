@@ -5,7 +5,7 @@ import { verifyTurnstileToken } from '@/lib/turnstile'
 import { validateEmail } from '@/lib/email-validation'
 import { validSsoOrigin } from '@/lib/sso'
 import { consumeSsoAttempt } from '@/lib/sso-attempt'
-import { createClient } from '@supabase/supabase-js'
+import {provePassword} from '@/lib/auth-password-proof'
 export async function POST(request:Request){
  if(!validSsoOrigin(request))return NextResponse.json({error:'طلب غير مسموح'},{status:403})
  try{
@@ -23,9 +23,8 @@ export async function POST(request:Request){
    if(!account.data.user?.email_confirmed_at){
     // Resend signup codes only after the pending account's password is proved.
     // Confirmed accounts never pass through signup or have credentials replaced.
-    const verifier=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,{auth:{persistSession:false,autoRefreshToken:false}})
-    const proof=await verifier.auth.signInWithPassword({email,password})
-    issueCode=proof.error?.code==='email_not_confirmed'
+    const proof=await provePassword(email,password)
+    issueCode=proof.code==='email_not_confirmed'
    }
   }
   if(issueCode){
