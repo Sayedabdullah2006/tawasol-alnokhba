@@ -25,7 +25,7 @@ export default function SsoLogin({authorizationId,initialMode='login'}:{authoriz
   const endpoint=mode==='register'?'/api/auth/sso/register':'/api/auth/sso/code'
   const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(20000),body:JSON.stringify({email:email.trim(),password,fullName:name,phone,captchaToken:captcha})});const result=await response.json();if(!response.ok)throw Error(result.error??'تعذر إرسال الرمز. أعد المحاولة.');setSent(true);setMessage(result.message??'إن أمكن إتمام العملية، سيصلك رمز على بريدك. أدخله للمتابعة.');
  }catch(error){setMessage(error instanceof Error&&/^[\u0600-\u06ff]/u.test(error.message)?error.message:'لم يكتمل الاتصال. أعد المحاولة.');if(!sent){setCaptcha(null);setCaptchaAttempt(n=>n+1)}}finally{submitting.current=false;setBusy(false)}}
- function changeMode(next:typeof mode){if(submitting.current)return;setMode(next);setSent(false);setMessage('');setCode('');setPassword('')}
+ function changeMode(next:typeof mode){if(submitting.current)return;setMode(next);setSent(false);setMessage('');setCode('');setPassword('');setCaptcha(null);setCaptchaAttempt(n=>n+1)}
  return <First1Shell>
   <section className="first1-login-layout"><aside className="first1-login-intro"><h1>بوابة موحدة لخدمات النشر الإلكتروني</h1><p>سجل دخولك مرة واحدة عبر الدخول الموحد لشركة تواصل النخبة</p></aside><div className="first1-login-fields"><header className="mb-8"><h2 className="text-2xl font-semibold">{sent?'تأكيد البريد الإلكتروني':mode==='register'?'إنشاء حساب':'تسجيل الدخول'}</h2></header>
    <form onSubmit={submit} className="space-y-5 rounded-xl border border-[#d7e1d7] bg-white p-6">

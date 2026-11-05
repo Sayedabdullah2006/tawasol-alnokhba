@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { APPLE_PAY_DOMAIN_ASSOCIATION } from '@/lib/apple-pay-domain'
 import {publicAuthUrl} from '@/lib/auth-origin'
+import {requireActiveAuthSession} from '@/lib/active-auth-session'
 
 export async function proxy(request: NextRequest) {
   // ملف ربط نطاق Apple Pay — يُخدَم هنا لأن هذا البناء لا يخدم public/.well-known
@@ -14,7 +15,7 @@ export async function proxy(request: NextRequest) {
 
   let supabaseResponse = NextResponse.next({ request })
 
-  const supabase = createServerClient(
+  const supabase = requireActiveAuthSession(createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key',
     {
@@ -35,9 +36,10 @@ export async function proxy(request: NextRequest) {
         },
       },
     }
-  )
+  ))
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user },error } = await supabase.auth.getUser()
+  if(error?.code==='session_not_found')await supabase.auth.signOut({scope:'local'})
   const pathname = request.nextUrl.pathname
 
   // Protected routes — require login.

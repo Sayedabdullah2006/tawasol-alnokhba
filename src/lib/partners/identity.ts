@@ -1,12 +1,13 @@
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { first1SaudiClientId } from '@/lib/sso'
 import { PartnerError, parseBody, uuid, type PartnerContext } from './auth'
+import {globalLogoutTicket} from '@/lib/global-logout'
 
 export async function partnerIdentity(ctx: PartnerContext, action: string) {
   if (ctx.client.id !== 'awwal-saudi') throw new PartnerError('IDENTITY_CLIENT_NOT_ALLOWED',403)
   if (!['session','link','logout'].includes(action)) throw new PartnerError('NOT_FOUND',404)
   const body = parseBody(ctx)
-  if (Object.keys(body).some(key => key !== 'access_token') || typeof body.access_token !== 'string' || body.access_token.length > 16000) throw new PartnerError('INVALID_IDENTITY')
+  if (Object.keys(body).some(key => key !== 'access_token' && !(action==='logout'&&key==='scope')) || typeof body.access_token !== 'string' || body.access_token.length > 16000 || (body.scope!==undefined&&!['local','global'].includes(String(body.scope)))) throw new PartnerError('INVALID_IDENTITY')
   const db = await createServiceRoleClient()
   // Auth validates the signed JWT before any decoded claims are used. Email never selects an owner.
   const { data: { user }, error } = await db.auth.getUser(body.access_token)
@@ -22,9 +23,15 @@ export async function partnerIdentity(ctx: PartnerContext, action: string) {
   if (valid.error) throw new PartnerError('IDENTITY_UNAVAILABLE',503)
   if (valid.data !== true) throw new PartnerError('IDENTITY_SESSION_INVALID',401)
   if (action === 'logout') {
-    const result = await db.auth.admin.signOut(body.access_token,'local')
+    const global=body.scope==='global'
+    if(global){
+      const link=await db.from('partner_identity_links').select('external_customer_id').eq('partner_id',ctx.client.id).eq('auth_user_id',user.id).maybeSingle()
+      if(link.error)throw new PartnerError('IDENTITY_UNAVAILABLE',503)
+      if(link.data?.external_customer_id!==ctx.customer)throw new PartnerError('IDENTITY_LINK_CONFLICT',409)
+    }
+    const result = await db.auth.admin.signOut(body.access_token,global?'global':'local')
     if (result.error) throw new PartnerError('IDENTITY_UNAVAILABLE',503)
-    return { logged_out:true, scope:'oauth_session' }
+    return global?{logged_out:true,scope:'global',logout_url:'https://nukhba.media/api/oauth/logout?ticket='+encodeURIComponent(globalLogoutTicket(user.id))}:{ logged_out:true, scope:'oauth_session' }
   }
   if (action === 'link') {
     const result = await db.rpc('partner_link_identity',{p_partner:ctx.client.id,p_customer:ctx.customer,p_user:user.id,p_session:session,p_client:client})
