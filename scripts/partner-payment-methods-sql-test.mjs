@@ -5,6 +5,7 @@ create table partner_checkout_sessions(id uuid primary key,request_id uuid,statu
 create table partner_payment_receipts(payment_id text primary key,request_id uuid,session_id uuid,amount bigint,status text);
 create table partner_sandbox_orders(like publish_requests including all);create table partner_sandbox_checkout_sessions(like partner_checkout_sessions including all);`);
 await db.exec(fs.readFileSync('supabase/migrations/20261105115647_partner_checkout_payment_methods.sql','utf8'));
+await db.exec(fs.readFileSync('supabase/migrations/20261105122105_partner_bank_review_state.sql','utf8'));
 const a='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',b='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',s='11111111-1111-4111-8111-111111111111',t='22222222-2222-4222-8222-222222222222';
 await db.query(`insert into publish_requests(id,status,payment_status,final_total) values($1,'approved','pending',100),($2,'approved','pending',100)`,[a,b]);await db.query(`insert into partner_checkout_sessions(id,request_id,status,amount,payment_mode,expires_at)values($1,$2,'pending',10000,'live',now()+interval '30 minutes'),($3,$4,'pending',10000,'live',now()+interval '30 minutes')`,[s,a,t,b]);
 const action=async(id,key,d={})=>(await db.query('select partner_checkout_method($1,$2,$3) as v',[id,key,JSON.stringify(d)])).rows[0].v;

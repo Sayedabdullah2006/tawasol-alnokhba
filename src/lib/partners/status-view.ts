@@ -16,6 +16,7 @@ export const PAYMENT_LABELS: Record<string, Label> = {
 const CHECKOUT_LABELS: Record<string, Label> = {
   pending: { label: 'جلسة دفع بانتظار التأكيد', description: 'وجود جلسة دفع ليس تأكيدًا للسداد', color: 'orange' },
   paid: PAYMENT_LABELS.paid,
+  bank_review: {label:'إيصال التحويل قيد المراجعة',description:'بانتظار تأكيد استلام التحويل من الإدارة',color:'orange'},
   review_required: { label: 'عملية تحتاج مراجعة مالية', description: 'لا تكرر الدفع؛ تتولى الإدارة مراجعة العملية', color: 'orange' },
 }
 const terminal = new Set(['completed', 'rejected', 'client_rejected', 'auto_closed', 'cancelled', 'refunded'])
@@ -30,6 +31,7 @@ export function partnerStatusDefinitions() {
 }
 export interface CheckoutState { status: string; expires_at: string; created_at: string; paid_at: string | null }
 export function orderStateView(order: Record<string, unknown>, checkout: CheckoutState | null, requiresReview: boolean, now = Date.now()) {
+  if(checkout?.status==='bank_review'&&order.payment_status==='paid')checkout={...checkout,status:'paid',paid_at:typeof order.paid_at==='string'?order.paid_at:checkout.paid_at}
   const statusInfo = stateLabel(order.status, CLIENT_STATUS_LABELS)
   const paymentInfo = stateLabel(order.payment_status, PAYMENT_LABELS)
   const refund = ['refund_pending', 'partially_refunded', 'refunded'].includes(String(order.payment_status))
