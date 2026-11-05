@@ -17,6 +17,6 @@ export async function POST(request:Request){
   if(details.error||!details.data)return NextResponse.json({error:(details.error?.status??503)>=500?'AUTH_UNAVAILABLE':'AUTH_EXPIRED'},{status:(details.error?.status??503)>=500?503:409,headers})
   if('redirect_url'in details.data)return NextResponse.json({redirect:safeSsoRedirect(details.data.redirect_url)},{headers})
   validConsentDetails(details.data)
-  return NextResponse.json({redirect:'/oauth/consent?authorization_id='+encodeURIComponent(id)},{headers})
+  return NextResponse.json({redirect:'/oauth/consent?authorization_id='+encodeURIComponent(id),consent:{email:user.email??'',scope:details.data.scope}},{headers})
  }catch{return NextResponse.json({error:'AUTH_UNAVAILABLE'},{status:503,headers})}
 }

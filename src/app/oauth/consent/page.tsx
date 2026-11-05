@@ -1,23 +1,17 @@
 import SsoRecovery from '@/app/auth/sso/sso-recovery'
-import First1Shell from '@/app/auth/sso/first1-shell'
-import { redirect } from 'next/navigation'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { authorizationId, validConsentDetails, safeSsoRedirect } from '@/lib/sso'
+import SsoConsent from '@/app/auth/sso/sso-consent'
+import {redirect} from 'next/navigation'
+import {createServerSupabaseClient} from '@/lib/supabase-server'
+import {authorizationId} from '@/lib/sso'
 import '@/app/auth/sso/sso.css'
 export const dynamic='force-dynamic'
-export const metadata={title:'أول سعودي | السماح بالدخول',robots:{index:false,follow:false}}
-const scopeNames:Record<string,string>={openid:'التعرف على حسابك الموحد',email:'البريد الإلكتروني وحالة تأكيده',profile:'الاسم والملف الشخصي',offline_access:'إبقاء جلسة الدخول مع إمكانية تسجيل الخروج'}
-export default async function ConsentPage({searchParams}:{searchParams:Promise<{authorization_id?:string;recovery?:string}>}) {
- let id
+export const metadata={title:'أول سعودي | الدخول الموحد',robots:{index:false,follow:false}}
+export default async function ConsentPage({searchParams}:{searchParams:Promise<{authorization_id?:string;recovery?:string}>}){
  const params=await searchParams
  if(['expired','unavailable','invalid'].includes(params.recovery??''))return <SsoRecovery reason={params.recovery as 'expired'|'unavailable'|'invalid'}/>
- try{id=authorizationId(params.authorization_id)}catch{return <SsoRecovery reason="invalid"/>}
+ let id;try{id=authorizationId(params.authorization_id)}catch{return <SsoRecovery reason="invalid"/>}
  const db=await createServerSupabaseClient(),{data:{user}}=await db.auth.getUser()
  if(!user)redirect('/auth/sso?authorization_id='+id)
- const result=await db.auth.oauth.getAuthorizationDetails(id)
- if(result.error||!result.data){const status=result.error?.status??503;return <SsoRecovery reason={status>=500?'unavailable':status===400?'expired':'invalid'} retryHref={'/oauth/consent?authorization_id='+encodeURIComponent(id)}/>}
- const details=result.data
- if('redirect_url'in details){let target;try{target=safeSsoRedirect(details.redirect_url)}catch{return <SsoRecovery reason="invalid"/>}redirect(target)}
- try{validConsentDetails(details)}catch{return <SsoRecovery reason="invalid"/>}
- return <First1Shell><section className="w-full max-w-md rounded-xl border border-[#d7e1d7] bg-white p-6 sm:p-8"><h1 className="mt-7 text-2xl font-semibold">المتابعة بحسابك الموحد</h1><p className="mt-4 break-words text-sm" dir="ltr">{user.email}</p><p className="mt-4 text-sm leading-7">سيستخدم أول سعودي البيانات التالية من حساب تواصل النخبة لتسجيل دخولك:</p><ul className="mt-4 list-inside list-disc space-y-3 text-sm">{details.scope.split(' ').filter(Boolean).map(scope=><li key={scope}>{scopeNames[scope]??scope}</li>)}</ul><p className="mt-6 text-sm leading-7 text-[#53655a]">لن تُشارك كلمة مرورك، ولن تتغير حساباتك أو طلباتك السابقة تلقائيًا.</p><form action="/api/oauth/decision" method="post" className="mt-6 flex flex-wrap gap-3"><input type="hidden" name="authorization_id" value={id}/><button name="decision" value="approve" className="rounded-lg bg-[#155e3f] px-5 py-3 text-sm font-semibold text-white">السماح والمتابعة</button><button name="decision" value="deny" className="rounded-lg border border-[#8ca292] px-5 py-3 text-sm">إلغاء</button><button name="decision" value="switch" className="py-3 text-sm underline underline-offset-4">استخدام حساب آخر</button></form></section></First1Shell>
+ // Rendering must never consume an authorization or issue a one-use code.
+ return <SsoConsent authorizationId={id}/>
 }
