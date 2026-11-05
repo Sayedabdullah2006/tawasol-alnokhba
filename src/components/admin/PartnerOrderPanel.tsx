@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { initialPartnerDeliverables } from '@/lib/partners/deliverables'
 import type { PackageBenefit } from '@/lib/individual-package-benefits'
 interface Deliverable { label: string; status: string; url: string }
-interface Panel { source_site: string; external_customer_id: string; files: { id: string; name: string }[]; partner_deliverables: Deliverable[]; package_snapshot: { package: { name: string; features: string[]; benefits?: PackageBenefit[] }; pricing: { advertising: number } } | null; payments: { id: string; status: string }[] }
+interface Panel { source_site: string; external_customer_id: string; files: { id: string; name: string; purpose?: string; preview_url?: string | null }[]; partner_deliverables: Deliverable[]; package_snapshot: { package: { name: string; features: string[]; benefits?: PackageBenefit[] }; pricing: { advertising: number } } | null; payments: { id: string; status: string }[] }
 export default function PartnerOrderPanel({ id }: { id: string }) {
   const [data, setData] = useState<Panel | null>(null); const [items, setItems] = useState<Deliverable[]>([]); const [message, setMessage] = useState(''); const [saving, setSaving] = useState(false)
   useEffect(() => { fetch(`/api/admin/partner-orders/${id}`).then(async r => {
@@ -21,7 +21,10 @@ export default function PartnerOrderPanel({ id }: { id: string }) {
     <h2 className="font-bold">مخرجات الطلب ومصدره</h2>
     {data && <><p className="text-sm">المصدر: {data.source_site === 'awwal-saudi' ? 'أول سعودي' : data.source_site || 'تواصل النخبة'} · {data.package_snapshot ? <>الباقة: {data.package_snapshot.package.name} · ميزانية الإعلان المشمولة: {data.package_snapshot.pricing.advertising / 100} ريال</> : 'طلب جهة — تسعير يدوي'}</p>
       {data.payments.some(p => p.status === 'review_required') && <p role="alert" className="text-red-700">توجد دفعة تحتاج مراجعة مالية. راجع جلسات الدفع قبل إغلاق الطلب.</p>}
-      {data.files.length > 0 && <ul className="space-y-2">{data.files.map(file => <li key={file.id}><a href={`/api/admin/partner-files/${file.id}`} className="underline" target="_blank" rel="noreferrer">{file.name}</a></li>)}</ul>}
+      {(['news','supporting','legacy'] as const).map(purpose => {
+        const files = data.files.filter(file => (file.purpose || 'legacy') === purpose)
+        return files.length > 0 && <section key={purpose} className="border-t border-border pt-4"><h3 className="font-bold mb-3">{purpose === 'news' ? 'صور الخبر للتصميم' : purpose === 'supporting' ? 'مرفقات داعمة — غير مخصصة للنشر' : 'مرفقات الطلب'}</h3><ul className={purpose === 'news' ? 'grid grid-cols-2 sm:grid-cols-3 gap-3' : 'space-y-2'}>{files.map(file => <li key={file.id}><a href={`/api/admin/partner-files/${file.id}`} className="underline break-all" target="_blank" rel="noreferrer">{file.preview_url && <img src={file.preview_url} alt={file.name} referrerPolicy="no-referrer" className="w-full h-32 object-cover rounded-lg border border-border mb-2"/>}{file.name}</a></li>)}</ul></section>
+      })}
       <div className="space-y-3">{items.map((item, index) => <div key={index} className="grid gap-2 border-t border-border pt-3 sm:grid-cols-[1fr_150px]">
         <p className="text-sm leading-7">{item.label}</p><select aria-label={`حالة ${item.label}`} value={item.status} onChange={e => setItems(prev => prev.map((v, i) => i === index ? { ...v, status: e.target.value } : v))} className="border border-border rounded-lg p-2"><option value="pending">بانتظار التنفيذ</option><option value="in_progress">قيد التنفيذ</option><option value="completed">مكتمل</option></select>
         <input type="url" dir="ltr" aria-label={`رابط ${item.label}`} placeholder="https://" value={item.url} onChange={e => setItems(prev => prev.map((v, i) => i === index ? { ...v, url: e.target.value } : v))} className="sm:col-span-2 border border-border rounded-lg px-3 py-2" />

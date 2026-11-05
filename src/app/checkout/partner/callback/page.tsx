@@ -17,5 +17,5 @@ export default function PartnerPaymentResult() {
       setMessage(!r.ok ? 'تعذر تأكيد الدفع الآن. راجع حالة طلبك قبل إجراء دفعة جديدة.' : data.paid ? 'تم تأكيد السداد. طلبك لدى فريق تواصل النخبة.' : data.review_required ? 'وصلت العملية وتحتاج مراجعة مالية. لا تكرر الدفع.' : ['failed','voided'].includes(data.status) ? 'لم تكتمل عملية الدفع. يمكنك العودة إلى طلبك للمحاولة.' : 'لم يتأكد السداد بعد. يمكنك تحديث الحالة.')
     }).catch(() => setMessage('تعذر الاتصال للتحقق. قد تكون العملية تمت؛ راجع حالة طلبك قبل إعادة الدفع.'))
   }, [attempt])
-  return <main dir="rtl" className="mx-auto max-w-xl px-5 py-12"><h1 className="text-2xl font-bold">نتيجة الدفع</h1><p role="status" className="my-6 leading-8">{message}</p><button type="button" onClick={() => setAttempt(n => n + 1)} className="rounded-lg border border-border px-5 py-3">تحديث حالة الدفع</button>{back && <a href={back} className="block mt-6 py-3 underline">العودة إلى طلبك في أول سعودي</a>}</main>
+  return <section className="first1-checkout"><header className="first1-checkout-title"><h1>نتيجة الدفع</h1></header><div className="first1-checkout-state"><p role="status">{message}</p><button type="button" onClick={() => setAttempt(n => n + 1)} className="first1-checkout-button">تحديث حالة الدفع</button>{back && <a href={back} className="block mt-6 py-3 underline">العودة إلى الطلب</a>}</div></section>
 }

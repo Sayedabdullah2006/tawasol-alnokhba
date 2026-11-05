@@ -21,6 +21,8 @@ interface PaymentFormProps {
   metadata?: PaymentMetadata;
   /** CSS classes to apply to container */
   className?: string;
+  /** Partner checkout supplies its own summary and brand. */
+  compact?: boolean;
 }
 
 export default function PaymentForm({
@@ -29,6 +31,7 @@ export default function PaymentForm({
   description,
   metadata,
   className = '',
+  compact = false,
 }: PaymentFormProps) {
   const { isLoaded, isLoading, error, initPayment } = useMoyasar();
   // نتذكّر المبلغ الذي هُيِّئ به الفورم — فلا نُعيد بناءه إلا إذا تغيّر المبلغ فعلاً
@@ -39,13 +42,13 @@ export default function PaymentForm({
   useEffect(() => {
     if (!isLoaded || amount <= 0 || !formRef.current) return;
     if (initedAmountRef.current === amount) return; // مُهيّأ بالفعل لهذا المبلغ
-    initedAmountRef.current = amount;
 
     const el = formRef.current;
     el.innerHTML = ''; // تنظيف أي محتوى سابق
 
     // تأخير قصير لضمان تحديث DOM قبل تهيئة Moyasar
     const timer = setTimeout(() => {
+      initedAmountRef.current = amount;
       initPayment(amount, description, metadata, el, publishableKey).catch((err) => {
         console.error('Failed to initialize payment:', err);
         initedAmountRef.current = null; // السماح بإعادة المحاولة
@@ -61,7 +64,7 @@ export default function PaymentForm({
       <div className={`bg-card rounded-xl border border-border p-6 text-center ${className}`}>
         <LoadingSpinner size="md" />
         <p className="text-sm text-muted mt-3">جارٍ تحميل نموذج الدفع الآمن...</p>
-        <p className="text-xs text-muted mt-1">مدعوم بتقنية Moyasar 🔒</p>
+        {!compact && <p className="text-xs text-muted mt-1">مدعوم بتقنية Moyasar 🔒</p>}
       </div>
     );
   }
@@ -87,7 +90,7 @@ export default function PaymentForm({
   return (
     <div className={`bg-card rounded-xl border border-border overflow-hidden ${className}`}>
       {/* Payment Methods Info */}
-      <div className="p-4 bg-cream/50 border-b border-border">
+      {!compact && <div className="p-4 bg-cream/50 border-b border-border">
         <div className="flex items-center justify-center gap-4 text-xs text-muted">
           <div className="flex items-center gap-1">
             <span>💳</span>
@@ -104,20 +107,20 @@ export default function PaymentForm({
             <span>SSL مشفر</span>
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Moyasar Payment Form Container */}
       <div className="p-5">
         <div id="moyasar-form" ref={formRef}></div>
 
         {/* Payment info */}
-        <div className="mt-4 p-3 bg-cream rounded-lg">
+        {!compact && <div className="mt-4 p-3 bg-cream rounded-lg">
           <div className="flex justify-between items-center text-sm">
             <span className="text-muted">المبلغ المستحق:</span>
             <span className="font-bold text-gold">{amount.toFixed(2)} ر.س</span>
           </div>
           <p className="text-xs text-muted mt-2">{description}</p>
-        </div>
+        </div>}
 
       </div>
     </div>
