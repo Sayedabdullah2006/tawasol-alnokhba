@@ -1,0 +1,9 @@
+ 'use client'
+import {use,useEffect,useState} from 'react'
+export default function SandboxOrder({params}:{params:Promise<{id:string}>}){
+ const {id}=use(params),[order,setOrder]=useState<{request_number:number;title:string;receipt_url:string|null;status:string;payment_status:string}|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false)
+ async function load(){const r=await fetch('/api/admin/partner-sandbox/'+id,{cache:'no-store'}),d=await r.json();if(!r.ok)throw Error('تعذر تحميل طلب الاختبار.');setOrder(d)}
+ useEffect(()=>{load().catch(e=>setError(e.message))},[id])
+ async function confirm(){if(busy)return;setBusy(true);setError('');try{const r=await fetch('/api/admin/partner-sandbox/'+id,{method:'POST'});if(!r.ok)throw Error('تعذر تأكيد التحويل التجريبي.');await load()}catch(e){setError(e instanceof Error?e.message:'تعذر الاتصال.')}finally{setBusy(false)}}
+ return <main className="mx-auto max-w-3xl space-y-6 p-6"><header><h1 className="text-2xl font-bold">مراجعة إيصال التحويل — Sandbox</h1><p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-4">اختبار معزول: لا يثبت سدادًا حقيقيًا ولا يصدر فاتورة مالية.</p></header>{error&&<p role="alert">{error}</p>}{order&&<section className="space-y-5 rounded-xl border border-border bg-white p-6"><h2 className="text-xl font-bold">طلب الاختبار #{order.request_number}</h2><p>{order.title}</p><p role="status">{order.payment_status==='paid'?'تم تأكيد التحويل التجريبي — قيد التنفيذ':'بانتظار مراجعة إيصال التحويل'}</p>{order.receipt_url?<a className="inline-block rounded-lg border border-green px-5 py-3 text-green" href={order.receipt_url} target="_blank" rel="noreferrer">فتح إيصال التحويل</a>:<p>لم يرفع إيصال بعد.</p>}<div>{order.status==='payment_review'&&<button type="button" onClick={confirm} disabled={busy} className="rounded-lg bg-green px-6 py-3 font-bold text-white">{busy?'جارٍ التأكيد…':'تأكيد التحويل التجريبي'}</button>}</div></section>}</main>
+}

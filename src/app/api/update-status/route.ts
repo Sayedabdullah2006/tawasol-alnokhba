@@ -1,3 +1,4 @@
+import {bankConfirmationFields} from '@/lib/bank-confirmation'
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import {
@@ -151,7 +152,7 @@ export async function POST(request: Request) {
           updated_at:         now,
           // سجّل وقت تأكيد الدفع عند انتقال الطلب إلى "مدفوع" (تحويل بنكي)
           ...(targetStatus === 'paid' || (current.status === 'payment_review' && targetStatus === 'in_progress')
-            ? { paid_at: now, payment_status: 'paid' }
+            ? bankConfirmationFields(now)
             : {}),
         })
         .eq('id', requestId)

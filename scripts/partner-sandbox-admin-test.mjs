@@ -1,0 +1,16 @@
+import fs from 'node:fs';import ts from 'typescript';import assert from 'node:assert/strict';
+let row={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',partner_id:'qa',request_number:1,title:'Sandbox',status:'payment_review',payment_status:'pending',receipt_url:'partner/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/session/receipt',updated_at:'old'},denied=false,reads=0,updates=0,expired=false;class PartnerError extends Error{constructor(code,status=400){super(code);this.code=code;this.status=status}}
+const db={
+ from(table){assert.equal(table,'partner_sandbox_orders');let update;
+  const chain={select(){return update?Promise.resolve({data:[{id:row.id}]}):chain},eq(){return chain},maybeSingle:async()=>{reads++;return {data:{...row}}},update(v){update=v;updates++;row={...row,...v};return chain}};
+  return chain;
+ },
+ storage:{from(bucket){assert.equal(bucket,'partner-sandbox-files');return {info:async()=>({data:{size:100}}),createSignedUrl:async()=>({data:{signedUrl:'https://private.example.invalid/receipt'}})};}}
+};
+const exp={};new Function('require','exports',ts.transpileModule(fs.readFileSync('src/app/api/admin/partner-sandbox/[id]/route.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(n=>n.endsWith('/admin')?{partnerAdmin:async()=>{if(denied)throw new PartnerError('UNAUTHORIZED',401);return db}}:n.endsWith('/auth')?{PartnerError,uuid:x=>x,configuredClients:()=>[{id:'qa',sandbox_only:true}],validateSandboxClient:()=>{if(expired)throw new PartnerError('SANDBOX_EXPIRED',503)}}:n.endsWith('/checkout')?{checkoutOrigin:()=> 'https://nukhba.media'}:{bankConfirmationFields:now=>({paid_at:now,payment_status:'paid'})},exp);
+const call=(method='GET',origin='https://nukhba.media')=>exp[method](new Request('https://nukhba.media/api/admin/partner-sandbox/'+row.id,{method,headers:method==='POST'?{Origin:origin}:{}}),{params:Promise.resolve({id:row.id})});const checks=[];
+denied=true;assert.equal((await call()).status,401);assert.equal(reads,0);denied=false;assert.equal((await call('POST','https://evil.invalid')).status,403);assert.equal(updates,0);checks.push('Anonymous and foreign-Origin administrator actions cannot read or mutate sandbox data');
+let r=await call();assert.equal(r.status,200);assert.equal((await r.json()).sandbox,true);assert.match(r.headers.get('cache-control'),/private, no-store/);checks.push('Verified administrator receives private receipt from isolated storage only');
+expired=true;assert.equal((await call('POST')).status,503);assert.equal(updates,0);expired=false;checks.push('Expired sandbox configuration cannot confirm payment');
+r=await call('POST');assert.equal((await r.json()).applied,true);assert.equal(row.status,'in_progress');assert.equal(row.payment_status,'paid');assert(row.paid_at);assert.equal(updates,1);r=await call('POST');assert.equal((await r.json()).applied,false);assert.equal(updates,1);checks.push('Administrator confirmation uses shared native paid fields and repeated submit applies once');
+fs.mkdirSync('output/partners/payment-e2e-20261105',{recursive:true});fs.writeFileSync('output/partners/payment-e2e-20261105/admin-route-tests.json',JSON.stringify({success:true,checks,live_table_accesses:0},null,2));console.log(JSON.stringify({success:true,checks:checks.length}));
