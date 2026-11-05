@@ -354,6 +354,17 @@
               "minimum": 0,
               "default": 0
             }
+          },
+          {
+            "name": "open",
+            "in": "query",
+            "description": "Optional creation preflight for this partner/customer only. Value 1 filters pending, quoted, negotiation, approved, payment_review and info_requested before pagination; omitting it preserves normal history. No ownership or rate-limit changes.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            }
           }
         ],
         "responses": {

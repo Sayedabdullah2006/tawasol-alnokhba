@@ -170,7 +170,10 @@ export async function partnerOperation(request: Request, ctx: PartnerContext, pa
     const query = new URL(request.url).searchParams
     const page = Math.max(0, Math.min(10000, Number(query.get('page') ?? 0)))
     if (!Number.isInteger(page)) throw new PartnerError('INVALID_PAGE')
-    const { data, error } = await db.from('publish_requests').select(ORDER_FIELDS).eq('partner_id', ctx.client.id).eq('external_customer_id', ctx.customer).order('created_at', { ascending: false }).range(page * 20, page * 20 + 19)
+    if (query.has('open') && query.get('open') !== '1') throw new PartnerError('INVALID_INPUT')
+    let listing = db.from('publish_requests').select(ORDER_FIELDS).eq('partner_id', ctx.client.id).eq('external_customer_id', ctx.customer)
+    if (query.get('open') === '1') listing = listing.in('status', ['pending','quoted','negotiation','approved','payment_review','info_requested'])
+    const { data, error } = await listing.order('created_at', { ascending: false }).range(page * 20, page * 20 + 19)
     dbError(error); return { orders: (data ?? []).map(expose), page }
   }
   if (path[0] !== 'orders' || !path[1]) throw new PartnerError('NOT_FOUND', 404)
