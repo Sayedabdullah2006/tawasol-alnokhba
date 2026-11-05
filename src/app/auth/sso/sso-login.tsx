@@ -27,7 +27,7 @@ export default function SsoLogin({authorizationId,initialMode='login'}:{authoriz
     {message&&<p role="status" className="text-sm leading-7">{message}</p>}
     <button disabled={busy||(!sent&&captchaOn&&!captcha)} className="w-full rounded-lg bg-[#155e3f] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{busy?'جارٍ التحقق…':sent?'تأكيد ومتابعة':mode==='login'?'دخول ومتابعة':'إرسال رمز التحقق'}</button>
    </form>
-   <nav aria-label="خيارات الدخول" className="mt-5 flex flex-wrap gap-5 text-sm underline underline-offset-4">{mode!=='login'&&<button onClick={()=>changeMode('login')}>لدي حساب</button>}{mode!=='code'&&<button onClick={()=>changeMode('code')}>الدخول برمز البريد</button>}{mode!=='register'&&<button onClick={()=>changeMode('register')}>إنشاء حساب</button>}</nav>
+   <nav aria-label="خيارات الدخول" className="first1-login-options">{mode!=='login'&&<button type="button" className="first1-login-option first1-login-option-code" onClick={()=>changeMode('login')}>لدي حساب</button>}{mode!=='code'&&<button type="button" className="first1-login-option first1-login-option-code" onClick={()=>changeMode('code')}>الدخول برمز البريد</button>}{mode!=='register'&&<button type="button" className="first1-login-option first1-login-option-register" onClick={()=>changeMode('register')}>إنشاء حساب</button>}</nav>
   </div></section>
  </First1Shell>
 }
