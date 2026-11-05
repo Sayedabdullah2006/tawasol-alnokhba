@@ -1,0 +1,14 @@
+import fs from 'node:fs';import assert from 'node:assert/strict';import crypto from 'node:crypto';import dotenv from 'dotenv';import {createClient} from '@supabase/supabase-js';
+dotenv.config({path:'.env.local',quiet:true});const db=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY),anon=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),key=crypto.createHash('sha256').update('qa-mail-ledger-'+crypto.randomUUID()).digest('hex'),hash='a'.repeat(64);let checks=0;
+try{
+ const claims=await Promise.all([1,2].map(()=>db.rpc('customer_mail_claim',{p_delivery_key:key,p_payload_hash:hash})));claims.forEach(r=>assert.ifError(r.error));assert.deepEqual(claims.map(r=>r.data.action).sort(),['in_flight','send']);checks++;
+ const winner=claims.find(r=>r.data.action==='send').data;
+ let finish=await db.rpc('customer_mail_finish',{p_delivery_key:key,p_attempt_id:crypto.randomUUID(),p_state:'sent',p_provider_id:'QA-NOT-A-REAL-EMAIL'});assert.equal(finish.data,false);checks++;
+ finish=await db.rpc('customer_mail_finish',{p_delivery_key:key,p_attempt_id:winner.attempt_id,p_state:'sent',p_provider_id:'QA-NOT-A-REAL-EMAIL'});assert.ifError(finish.error);assert.equal(finish.data,true);checks++;
+ let replay=await db.rpc('customer_mail_claim',{p_delivery_key:key,p_payload_hash:'b'.repeat(64)});assert.equal(replay.data.action,'already_sent');checks++;
+ assert((await anon.from('customer_email_deliveries').select('delivery_key').eq('delivery_key',key)).error);assert((await anon.rpc('customer_mail_claim',{p_delivery_key:key,p_payload_hash:hash})).error);checks+=2;
+ await db.from('customer_email_deliveries').update({state:'unknown',first_attempt_at:'2020-01-01',updated_at:'2020-01-01'}).eq('delivery_key',key);replay=await db.rpc('customer_mail_claim',{p_delivery_key:key,p_payload_hash:hash});assert.equal(replay.data.action,'needs_review');checks++;
+ await db.from('customer_email_deliveries').update({state:'failed',first_attempt_at:new Date().toISOString()}).eq('delivery_key',key);replay=await db.rpc('customer_mail_claim',{p_delivery_key:key,p_payload_hash:'b'.repeat(64)});assert.equal(replay.data.action,'payload_conflict');checks++;
+ replay=await db.rpc('customer_mail_claim',{p_delivery_key:key,p_payload_hash:hash});assert.equal(replay.data.action,'send');checks++;
+ const report={passed:true,checks,parallel_claim_single_winner:true,durable_sent_replay_suppressed:true,wrong_claim_token_rejected:true,private_ledger_and_rpcs:true,unknown_outcome_after_provider_window_needs_review:true,payload_conflict_rejected:true,emails_sent:0,production_orders_changed:0};fs.mkdirSync('output/partners/email-brand',{recursive:true});fs.writeFileSync('output/partners/email-brand/dedupe-db.json',JSON.stringify(report,null,2));console.log(report);
+}finally{const cleaned=await db.from('customer_email_deliveries').delete().eq('delivery_key',key);assert.ifError(cleaned.error)}

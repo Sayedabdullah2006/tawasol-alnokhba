@@ -1,4 +1,5 @@
-import {serviceMailRequest,mailIdentity,prepareCustomerMail,customerMailStatus} from '../_shared/customer-email-transport.ts'
+import {deliverCustomerMail} from '../_shared/customer-email-delivery.ts'
+import {serviceMailRequest,mailIdentity,prepareCustomerMail,customerMailStatus,customerMailAttachments} from '../_shared/customer-email-transport.ts'
 // Supabase Edge Function: send-email
 // Sends transactional emails through Resend.
 // Reads `Resend_Key` from function secrets — set with:
@@ -48,6 +49,7 @@ function htmlToPlainText(html: string): string {
 interface Payload {
   brand?: 'nukhba'|'first1saudi'
   requestId?: string
+  notificationKey?: string
   action?: 'preview'|'brand_status'
   to: string | string[]
   subject: string
@@ -95,7 +97,7 @@ Deno.serve(async (req) => {
   }
 
   const internal=serviceMailRequest(req,key=>Deno.env.get(key))
-  if((payload.brand==='first1saudi'||payload.requestId||payload.action)&&!internal)return Response.json({error:'UNAUTHORIZED'},{status:401})
+  if((payload.brand==='first1saudi'||payload.requestId||payload.notificationKey||payload.action)&&!internal)return Response.json({error:'UNAUTHORIZED'},{status:401})
   if(payload.action==='brand_status')return Response.json(await customerMailStatus(payload.brand==='first1saudi'?'first1saudi':'nukhba',key=>Deno.env.get(key)))
   try {payload=await prepareCustomerMail(payload as unknown as Record<string,unknown>,key=>Deno.env.get(key)) as unknown as typeof payload} catch {return Response.json({error:'EMAIL_ORDER_CONTEXT_UNAVAILABLE'},{status:409})}
   const identity=mailIdentity(payload.brand==='first1saudi'?'first1saudi':'nukhba',key=>Deno.env.get(key))
@@ -118,11 +120,11 @@ Deno.serve(async (req) => {
     text: plainText, // إضافة النسخة النصية البسيطة
     reply_to: identity.brand.id==='first1saudi'?identity.replyTo:payload.replyTo || REPLY_TO_EMAIL,
     cc: payload.cc, // إضافة CC للرسائل
-    attachments: payload.attachments?.map(item => ({
+    attachments: customerMailAttachments(identity.brand.id,payload.attachments?.map(item => ({
       filename: item.filename,
       content: item.content,
       content_type: item.contentType,
-    })),
+    }))),
     headers: {
       'X-Mailer': 'Nukhba-Platform/2.0',
       'X-Priority': '3',
@@ -162,14 +164,7 @@ Deno.serve(async (req) => {
   }
   if(payload.action==='preview')return Response.json({ok:true,preview:true,brand:identity.brand.id,request:requestBody})
 
-  const r = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${identity.key}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(requestBody),
-  })
+  const r = await deliverCustomerMail(requestBody,key=>Deno.env.get(key),identity.key!,payload.notificationKey)
 
   const data = await r.json().catch(() => ({}))
 

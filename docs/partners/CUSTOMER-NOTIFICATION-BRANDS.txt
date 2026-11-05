@@ -1,5 +1,15 @@
 Customer notification identities
 
+Logo/footer and duplicate protection update:
+- FirstSaudi emails embed a PNG rasterization of the approved original logo using CID. It is carried inside the message, not fetched through a protected page. PDF invoice attachments remain separate and unchanged.
+- Commercial boilerplate, the customer/interest explanation, and the redundant automatic-message footer are removed from both brands. Existing already-delivered messages cannot be rewritten.
+- Order events use stable notification keys. Payment and request-received notifications have one event key per order; different review/offer/business content is a new event.
+- customer_email_deliveries stores only digests, outcome, claim token, provider ID and timestamps; no addresses, bodies, codes or invoice data. The table and claim/finish RPCs are service-role-only.
+- Concurrent attempts share an atomic claim and provider Idempotency-Key. A sent receipt suppresses repeats even when a template/logo changes. Unknown outcomes older than 23 hours require review instead of blind resend beyond the provider's idempotency window.
+- Daily reminders and the central reminder helper use the same order/status/reminder-round key. Admin reminders preserve their retry key. A legitimately new notice or reminder round remains deliverable.
+- FirstSaudi order integration currently sends no parallel order emails; its password-recovery mail is a separate account event. No FirstSaudi frontend/API change is needed for this update. Keep central order notifications as the sole sender for order lifecycle events.
+- Validation: 74 template/source tests, 9 live isolated receipt/RPC checks and 5 transport/concurrency/lost-response checks. No new real customer/admin test email was sent for this update.
+
 Order source, not customer account or email, selects identity:
 - publish_requests.partner_id = awwal-saudi: شبكة أول سعودي; existing noreply@nukhba.media sender transport; info@first1saudi.net reply-to; first1saudi.net customer links; green identity.
 - Native orders without partner_id: existing تواصل النخبة / noreply@nukhba.media / support@nukhba.media / nukhba.media identity.

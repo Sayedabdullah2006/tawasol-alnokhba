@@ -1,7 +1,7 @@
 // HTML email templates — all RTL Arabic, brand-aligned (navy + gold).
 // Each generator returns { subject, html } ready for Resend.
 
-import { emailBrand, emailContext, customerEmailLinks } from './email-brand'
+import { emailBrand, emailContext, customerEmailLinks, customerEmailLogo } from './email-brand'
 const SITE_URL = 'https://nukhba.media'
 
 const wrap = (innerHtml: string): string => customerEmailLinks(`<!DOCTYPE html>
@@ -56,6 +56,7 @@ a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !impo
           <!-- Header with logo and branding -->
           <tr>
             <td style="background-color:${emailBrand().primary}; padding:24px; text-align:center;">
+              ${customerEmailLogo(emailContext().brand)}
               <h1 style="margin:0; color:#FFFFFF; font-size:22px; font-weight:900; letter-spacing:0.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">${emailBrand().name}</h1>
               <p style="margin:4px 0 0 0; color:${emailBrand().id==='first1saudi'?'#FFFFFF':emailBrand().accent}; font-size:11px; letter-spacing:2px; font-weight:bold; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">${emailBrand().english}</p>
             </td>
@@ -76,7 +77,6 @@ a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !impo
                   <td style="text-align:center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
                     <p style="margin:0 0 6px 0; color:${emailBrand().primary}; font-size:12px; font-weight:bold;">${emailBrand().name} · ${emailBrand().english}</p>
                     <p style="margin:0 0 8px 0; color:#6B7C99; font-size:11px;">${emailBrand().description}</p>
-                    <p style="margin:0 0 8px 0; color:#6B7C99; font-size:11px;">هذه رسالة من نظام آلي، يرجى عدم الرد عليها مباشرة</p>
                     <p style="margin:8px 0 0 0; font-size:11px;">
                       <a href="${SITE_URL}" style="color:${emailBrand().accent}; text-decoration:none;">${emailBrand().site.replace('https://','')}</a>
                       <span style="color:#6B7C99; margin:0 8px;">|</span>
@@ -85,19 +85,6 @@ a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !impo
                   </td>
                 </tr>
               </table>
-            </td>
-          </tr>
-        </table>
-
-        <!-- Additional footer for deliverability -->
-        <table width="560" cellpadding="0" cellspacing="0" border="0" role="presentation" style="max-width:560px; width:100%; margin-top:12px;">
-          <tr>
-            <td style="text-align:center; padding:8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-              <p style="margin:0; color:#9CA3AF; font-size:10px; line-height:1.4;">
-                هذه رسالة تجارية من ${emailBrand().name}، المملكة العربية السعودية<br>
-                تم إرسال هذه الرسالة إليك كونك عميل أو مهتم بخدماتنا<br>
-                <a href="mailto:${emailBrand().unsubscribeEmail}?subject=إلغاء الاشتراك" style="color:#9CA3AF; text-decoration:underline;">إلغاء الاشتراك</a>
-              </p>
             </td>
           </tr>
         </table>

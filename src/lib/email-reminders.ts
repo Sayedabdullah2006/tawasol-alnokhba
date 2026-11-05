@@ -562,6 +562,7 @@ export async function sendReminder(data: ReminderData): Promise<boolean> {
       html: reminderContent.html,
       text: htmlToText(reminderContent.html),
       brand:context.brand,
+      notificationKey:`reminder:${data.requestId}:${data.status}:${reminderNumber}`,
       cc: 'first1saudi@gmail.com', // نسخة للإدارة لجميع التذكيرات
       options: {
         category: 'notification',

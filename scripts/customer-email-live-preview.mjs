@@ -8,7 +8,9 @@ for(const name of ['send-email','send-enhanced-email']){
   assert.equal(result.data.preview,true);assert.equal(result.data.brand,brand);const mail=result.data.request;
   if(brand==='first1saudi'){assert.equal(mail.from,'شبكة أول سعودي <noreply@nukhba.media>');assert.equal(mail.reply_to,'info@first1saudi.net');assert(!mail.html.includes('nukhba.media'));assert(!JSON.stringify(mail.headers).includes('nukhba'));assert(mail.text.includes('شبكة أول سعودي'));}
   else {assert.equal(mail.from,'Nukhba Platform <noreply@nukhba.media>');assert(mail.html.includes('تواصل النخبة'));}
-  checks.push({function:name,brand,preview:true,sender:mail.from,reply_to:mail.reply_to});
+  assert(!mail.html.includes('هذه رسالة تجارية'));assert(!mail.html.includes('تم إرسال هذه الرسالة إليك'));
+  if(brand==='first1saudi'){assert(mail.html.includes('cid:first1saudi-email-logo'));const logo=mail.attachments.find(a=>a.content_id==='first1saudi-email-logo');assert(logo);assert.equal(Buffer.from(logo.content,'base64').subarray(1,4).toString(),'PNG');}
+  checks.push({function:name,brand,preview:true,sender:mail.from,reply_to:mail.reply_to,footer_removed:true,inline_logo:brand==='first1saudi'});
  }
  const forbidden=await fetch(process.env.NEXT_PUBLIC_SUPABASE_URL+'/functions/v1/'+name,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'preview',brand:'first1saudi'})});assert.equal(forbidden.status,401);
  const status=await db.functions.invoke(name,{body:{action:'brand_status',brand:'first1saudi'}});assert.ifError(status.error);statuses.push({function:name,...status.data});

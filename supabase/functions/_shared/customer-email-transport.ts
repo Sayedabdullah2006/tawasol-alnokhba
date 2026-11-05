@@ -1,4 +1,10 @@
-import { CUSTOMER_EMAIL_BRANDS, type CustomerEmailBrandId, partnerReminderEmail } from './customer-email-brand.ts'
+import { CUSTOMER_EMAIL_BRANDS, type CustomerEmailBrandId, partnerReminderEmail, customerEmailLogo, customerEmailPlainText } from './customer-email-brand.ts'
+import { FIRST1SAUDI_EMAIL_LOGO_BASE64 } from './first1saudi-email-logo.ts'
+
+export function customerMailAttachments(brand:CustomerEmailBrandId,attachments:Record<string,unknown>[]=[]){
+ if(brand!=='first1saudi')return attachments.length?attachments:undefined
+ return [...attachments.filter(a=>a.content_id!=='first1saudi-email-logo'),{filename:'first1saudi-logo.png',content:FIRST1SAUDI_EMAIL_LOGO_BASE64,content_type:'image/png',content_id:'first1saudi-email-logo'}]
+}
 
 export function serviceMailRequest(req:Request,env:(key:string)=>string|undefined){
  const key=env('SUPABASE_SERVICE_ROLE_KEY')
@@ -25,7 +31,15 @@ export async function prepareCustomerMail(payload:Record<string,unknown>,env:(ke
   const content=partnerReminderEmail(String(payload.subject),String(payload.html),{brand,requestId:order.id})
   payload={...payload,...content,text:undefined}
  }
- return {...payload,brand}
+ const originalHtml=String(payload.html??'')
+ let html=originalHtml.replace(/\s*<!-- Additional footer for deliverability -->[\s\S]*?<\/table>/i,'').replace(/\s*<p[^>]*>هذه رسالة من نظام آلي، يرجى عدم الرد عليها مباشرة<\/p>/gi,'')
+ if(brand==='first1saudi'&&!html.includes('cid:first1saudi-email-logo')){
+  const logo=customerEmailLogo(brand)
+  if(html.includes('<h1'))html=html.replace('<h1',logo+'<h1')
+  else if(/<header\b/.test(html))html=html.replace(/(<header\b[^>]*>)/,'$1'+logo)
+  else html=html.replace(/(<body\b[^>]*>)/,'$1'+'<div style="background:#175b40;padding:20px;text-align:center">'+logo+'</div>')
+ }
+ return {...payload,brand,html,...(html!==originalHtml&&payload.text?{text:customerEmailPlainText(html)}:{})}
 }
 export async function customerMailStatus(brand:CustomerEmailBrandId,env:(key:string)=>string|undefined){
  const identity=mailIdentity(brand,env)

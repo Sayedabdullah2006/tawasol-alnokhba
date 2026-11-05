@@ -84,6 +84,7 @@ Deno.serve(async (req) => {
             body: {
               to: req.client_email,
               requestId:req.id,
+              notificationKey:`auto-closed:${req.id}`,
               subject: `📋 تم إغلاق طلبك تلقائياً · ${requestNumber}`,
               html: createAutoClosedHTML(req.client_name, requestNumber),
               cc: 'first1saudi@gmail.com',
@@ -165,7 +166,7 @@ Deno.serve(async (req) => {
         } else { continue }
 
         const emailResponse = await supabase.functions.invoke('send-enhanced-email', {
-          body: { requestId:request.id,to: request.client_email, subject, html: htmlContent, cc: 'first1saudi@gmail.com', options: { category: 'notification', priority: 'normal', trackOpens: true, trackClicks: true } }
+          body: { notificationKey:`reminder:${request.id}:${request.status}:${reminderNumber}`,requestId:request.id,to: request.client_email, subject, html: htmlContent, cc: 'first1saudi@gmail.com', options: { category: 'notification', priority: 'normal', trackOpens: true, trackClicks: true } }
         })
 
         if (emailResponse.error || !emailResponse.data?.ok) {

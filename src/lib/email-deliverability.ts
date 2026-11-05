@@ -13,6 +13,7 @@ interface DeliverabilityOptions {
 
 interface EnhancedEmailPayload {
   brand?: CustomerEmailBrandId
+  notificationKey?: string
   to: string | string[]
   subject: string
   html: string
@@ -193,11 +194,11 @@ export async function sendEnhancedEmail(payload: EnhancedEmailPayload): Promise<
     let enhancedHtml = payload.html
     const options = payload.options || {}
 
-    if (payload.brand!=='first1saudi' && options.trackOpens !== false) {
+    if (!payload.notificationKey && payload.brand!=='first1saudi' && options.trackOpens !== false) {
       enhancedHtml += generateTrackingPixel(emailId)
     }
 
-    if (payload.brand!=='first1saudi' && options.trackClicks !== false) {
+    if (!payload.notificationKey && payload.brand!=='first1saudi' && options.trackClicks !== false) {
       enhancedHtml = wrapLinksForTracking(enhancedHtml, emailId)
     }
 
@@ -218,6 +219,7 @@ export async function sendEnhancedEmail(payload: EnhancedEmailPayload): Promise<
     // Prepare enhanced email payload
     const enhancedPayload = {
       brand:payload.brand,
+      notificationKey:payload.notificationKey,
       to: payload.to,
       subject: payload.subject,
       html: enhancedHtml,
