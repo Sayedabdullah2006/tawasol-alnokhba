@@ -3,12 +3,12 @@ import { useEffect, useState } from 'react'
 import { initialPartnerDeliverables } from '@/lib/partners/deliverables'
 import type { PackageBenefit } from '@/lib/individual-package-benefits'
 interface Deliverable { label: string; status: string; url: string }
-interface Panel { source_site: string; external_customer_id: string; files: { id: string; name: string; purpose?: string; preview_url?: string | null }[]; partner_deliverables: Deliverable[]; package_snapshot: { package: { name: string; features: string[]; benefits?: PackageBenefit[] }; pricing: { advertising: number } } | null; payments: { id: string; status: string }[] }
+interface Panel { source_site: string; external_customer_id: string; channels?: string[]; files: { id: string; name: string; purpose?: string; preview_url?: string | null }[]; partner_deliverables: Deliverable[]; package_snapshot: { package: { name: string; features: string[]; benefits?: PackageBenefit[] }; pricing: { advertising: number; extras?: {id:string}[] } } | null; payments: { id: string; status: string }[] }
 export default function PartnerOrderPanel({ id }: { id: string }) {
   const [data, setData] = useState<Panel | null>(null); const [items, setItems] = useState<Deliverable[]>([]); const [message, setMessage] = useState(''); const [saving, setSaving] = useState(false)
   useEffect(() => { fetch(`/api/admin/partner-orders/${id}`).then(async r => {
     if (!r.ok) throw new Error(); const d = await r.json(); setData(d)
-    setItems(d.partner_deliverables?.length ? d.partner_deliverables : d.package_snapshot ? initialPartnerDeliverables(d.package_snapshot.package) : [{label:'رابط النشر',status:'pending',url:''}])
+    setItems(d.partner_deliverables?.length ? d.partner_deliverables : initialPartnerDeliverables(d.package_snapshot?.package ?? {features:[]},d.channels ?? [],d.package_snapshot?.pricing?.extras ?? []))
   }).catch(() => setMessage('تعذر تحميل تفاصيل الطلب.')) }, [id])
   async function save() {
     setSaving(true); setMessage('')
@@ -18,7 +18,7 @@ export default function PartnerOrderPanel({ id }: { id: string }) {
     } catch { setMessage('تعذر الحفظ؛ تحقق من الروابط وأعد المحاولة.') } finally { setSaving(false) }
   }
   return <section className="rounded-xl border border-border bg-card p-5 space-y-4">
-    <h2 className="font-bold">مخرجات الطلب ومصدره</h2>
+    <h2 className="font-bold">ملفات الطلب ومخرجات التنفيذ</h2>
     {data && <><p className="text-sm">المصدر: {data.source_site === 'awwal-saudi' ? 'أول سعودي' : data.source_site || 'تواصل النخبة'} · {data.package_snapshot ? <>الباقة: {data.package_snapshot.package.name} · ميزانية الإعلان المشمولة: {data.package_snapshot.pricing.advertising / 100} ريال</> : 'طلب جهة — تسعير يدوي'}</p>
       {data.payments.some(p => p.status === 'review_required') && <p role="alert" className="text-red-700">توجد دفعة تحتاج مراجعة مالية. راجع جلسات الدفع قبل إغلاق الطلب.</p>}
       {(['news','supporting','legacy'] as const).map(purpose => {

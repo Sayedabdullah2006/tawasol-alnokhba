@@ -5,7 +5,7 @@ import { partnerMedia } from '@/lib/partners/media'
 async function handle(request: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
     const db = await partnerAdmin(); const { id } = await ctx.params; uuid(id)
-    const { data: order } = await db.from('publish_requests').select('id,partner_id,source_site,external_customer_id,package_snapshot,partner_deliverables').eq('id', id).single()
+    const { data: order } = await db.from('publish_requests').select('id,partner_id,source_site,external_customer_id,channels,package_snapshot,partner_deliverables').eq('id', id).single()
     if (!order) throw new PartnerError('ORDER_NOT_FOUND', 404)
     if (request.method === 'POST') {
       const body = await request.json()
