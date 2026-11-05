@@ -11,7 +11,7 @@ export async function partnerData(client?: Pick<PartnerClient, 'sandbox_only'> |
     partner_checkout_sessions: 'partner_sandbox_checkout_sessions', partner_files: 'partner_sandbox_files',
     partner_payment_receipts: 'partner_sandbox_payment_receipts', discount_codes: 'partner_sandbox_discounts', partner_order_actions: 'partner_sandbox_order_actions',
   }
-  const rpcs = new Set(['partner_create_order', 'partner_create_checkout', 'partner_settle_payment', 'partner_reserve_file', 'partner_cancel_order', 'partner_create_organization_order', 'partner_offer_action', 'partner_checkout_method'])
+  const rpcs = new Set(['partner_create_order', 'partner_create_checkout', 'partner_settle_payment', 'partner_settle_tamara', 'partner_reserve_file', 'partner_cancel_order', 'partner_create_organization_order', 'partner_offer_action', 'partner_checkout_method'])
   return new Proxy(db, { get(target, key) {
     if (key === 'from') return (table: string) => {
       if (!tables[table] && !['influencers','extras','pricing_config'].includes(table)) throw new PartnerError('SANDBOX_RESOURCE_NOT_ALLOWED', 503)

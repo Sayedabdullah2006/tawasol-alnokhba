@@ -3,7 +3,7 @@ import {createServiceRoleClient} from '@/lib/supabase-server'
 import {PartnerError,configuredClients} from './auth'
 import {partnerData} from './data'
 import {checkoutOrigin,storedCheckout} from './checkout'
-import {normalizeSaudiPhone,splitName,TAMARA_API_LIVE} from '@/lib/tamara'
+import {normalizeSaudiPhone,splitName,TAMARA_API_LIVE,TAMARA_API_SANDBOX} from '@/lib/tamara'
 
 import {BANK_INFO} from '@/lib/bank-info'
 export const PARTNER_BANK=BANK_INFO
@@ -36,17 +36,24 @@ export async function submitPartnerReceipt(session:Session,file:File){
  if(result.applied&&!session.sandbox){const {data:o}=await db.from('publish_requests').select('request_number,client_name,final_total,partner_id').eq('id',session.request_id).single();const partner=configuredClients().find(p=>p.id===o?.partner_id);if(o&&partner?.notifications!==false){const mail=await import('@/lib/email');await mail.notifyBankTransferReceivedToAdmin({requestNumber:String(o.request_number),clientName:o.client_name??'العميل',totalAmount:Number(o.final_total)}).catch(()=>undefined)}}
  return {received:true,status:'payment_review',return_url:session.return_url}
 }
-function tamaraToken(){const key=process.env.TAMARA_API_TOKEN;if(!key)throw new PartnerError('PAYMENT_METHOD_UNAVAILABLE',503);return key}
-export function tamaraAvailable(session:Session){return !session.sandbox&&session.payment_mode==='live'&&!!process.env.TAMARA_API_TOKEN}
+export function partnerTamaraGateway(session:Pick<Session,'sandbox'|'payment_mode'>){
+ const sandbox=session.sandbox===true
+ if((sandbox&&session.payment_mode!=='sandbox')||(!sandbox&&session.payment_mode!=='live'))throw new PartnerError('PAYMENT_METHOD_UNAVAILABLE',503)
+ const key=sandbox?process.env.TAMARA_API_TOKEN_SANDBOX:process.env.TAMARA_API_TOKEN
+ if(!key)throw new PartnerError('PAYMENT_METHOD_UNAVAILABLE',503)
+ return {origin:sandbox?TAMARA_API_SANDBOX:TAMARA_API_LIVE,authorization:`Bearer ${key}`}
+}
+export function tamaraAvailable(session:Session){try{partnerTamaraGateway(session);return true}catch{return false}}
 export async function startPartnerTamara(session:Session){
  if(!tamaraAvailable(session))throw new PartnerError('PAYMENT_METHOD_UNAVAILABLE',503)
  const claim=await methodAction(session,'tamara_claim');if(claim.tamara_url)return {checkout_url:claim.tamara_url}
- const db=await partnerData(false),{data:o,error}=await db.from('publish_requests').select('id,request_number,client_name,client_email,client_phone,client_city').eq('id',session.request_id).single()
+ const gateway=partnerTamaraGateway(session)
+ const db=await partnerData(session.sandbox),{data:o,error}=await db.from('publish_requests').select('id,request_number,client_name,client_email,client_phone,client_city').eq('id',session.request_id).single()
  if(error||!o)throw new PartnerError('CHECKOUT_UNAVAILABLE',503)
  const {first,last}=splitName(o.client_name||'عميل'),amount=session.amount/100,base=`${checkoutOrigin()}/checkout/partner/callback?session=${session.id}&provider=tamara`
  const body={order_reference_id:session.id,order_number:String(o.request_number),total_amount:{amount,currency:'SAR'},shipping_amount:{amount:0,currency:'SAR'},tax_amount:{amount:0,currency:'SAR'},description:`طلب نشر ${o.request_number}`,country_code:'SA',payment_type:'PAY_BY_INSTALMENTS',instalments:3,locale:'ar_SA',items:[{reference_id:session.id,type:'Digital',name:`طلب نشر ${o.request_number}`,sku:`SVC-${o.request_number}`,quantity:1,total_amount:{amount,currency:'SAR'}}],consumer:{first_name:first,last_name:last,phone_number:normalizeSaudiPhone(o.client_phone||''),email:o.client_email},shipping_address:{first_name:first,last_name:last,line1:'خدمة رقمية',city:o.client_city||'الرياض',country_code:'SA'},merchant_url:{success:base,failure:base,cancel:base}}
  // One durable claim: a timeout never triggers another provider creation.
- const response=await fetch(`${TAMARA_API_LIVE}/checkout`,{method:'POST',headers:{Authorization:`Bearer ${tamaraToken()}`,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(20000)})
+ const response=await fetch(`${gateway.origin}/checkout`,{method:'POST',headers:{Authorization:gateway.authorization,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(20000)})
  const data=await response.json();if(!response.ok)throw new PartnerError('TAMARA_UNAVAILABLE',503)
  const url=new URL(data.checkout_url)
  if(url.protocol!=='https:'||url.username||url.password||!(url.hostname==='tamara.co'||url.hostname.endsWith('.tamara.co'))||typeof data.order_id!=='string'||!data.order_id)throw new PartnerError('TAMARA_UNAVAILABLE',503)
@@ -55,17 +62,20 @@ export async function startPartnerTamara(session:Session){
 }
 export async function settlePartnerTamara(session:Session){
  const provider=session.method_details?.tamara_id
- if(!provider||session.sandbox||session.payment_mode!=='live')throw new PartnerError('PAYMENT_BINDING_MISMATCH',409)
- const response=await fetch(`${TAMARA_API_LIVE}/orders/${encodeURIComponent(provider)}`,{headers:{Authorization:`Bearer ${tamaraToken()}`},cache:'no-store',signal:AbortSignal.timeout(15000)})
+ if(!provider)throw new PartnerError('PAYMENT_BINDING_MISMATCH',409)
+ const gateway=partnerTamaraGateway(session)
+ const response=await fetch(`${gateway.origin}/orders/${encodeURIComponent(provider)}`,{headers:{Authorization:gateway.authorization},cache:'no-store',signal:AbortSignal.timeout(15000)})
  if(!response.ok)throw new PartnerError('TAMARA_UNAVAILABLE',503)
  const detail=await response.json(),amount=Math.round(Number(detail.total_amount?.amount)*100)
  if(detail.order_reference_id!==session.id||detail.total_amount?.currency!=='SAR'||amount!==session.amount)throw new PartnerError('PAYMENT_BINDING_MISMATCH',409)
  if(!['approved','authorised','authorized','fully_captured'].includes(String(detail.status).toLowerCase()))return {paid:false,status:detail.status}
- const {authorizeTamaraOrder}=await import('@/lib/tamara-server')
- if(String(detail.status).toLowerCase()==='approved'&&!await authorizeTamaraOrder(provider))throw new PartnerError('TAMARA_UNAVAILABLE',503)
- const db=await partnerData(false),{data,error}=await db.rpc('partner_settle_tamara',{p_session:session.id,p_provider:provider,p_amount:amount,p_currency:'SAR'})
+ if(String(detail.status).toLowerCase()==='approved'){
+  if(session.sandbox){const authorized=await fetch(`${gateway.origin}/orders/${encodeURIComponent(provider)}/authorise`,{method:'POST',headers:{Authorization:gateway.authorization,'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(15000)});if(!authorized.ok)throw new PartnerError('TAMARA_UNAVAILABLE',503)}
+  else {const {authorizeTamaraOrder}=await import('@/lib/tamara-server');if(!await authorizeTamaraOrder(provider))throw new PartnerError('TAMARA_UNAVAILABLE',503)}
+ }
+ const db=await partnerData(session.sandbox),{data,error}=await db.rpc('partner_settle_tamara',{p_session:session.id,p_provider:provider,p_amount:amount,p_currency:'SAR'})
  if(error)throw new PartnerError('PAYMENT_RECONCILIATION_REQUIRED',409)
- if(data.applied)await notifyPartnerPaid(session)
+ if(data.applied&&!session.sandbox)await notifyPartnerPaid(session)
  return {...data,paid:!!data.paid,status:data.review_required?'review_required':data.paid?'paid':'pending'}
 }
 export async function partnerTamaraWebhook(provider:string,reference:string){
