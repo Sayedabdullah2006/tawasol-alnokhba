@@ -17,7 +17,7 @@ export default function SsoLogin({authorizationId,initialMode='login'}:{authoriz
  }catch(error){setMessage(error instanceof Error?error.message:'تعذر الاتصال. أعد المحاولة.')}finally{setBusy(false)}}
  function changeMode(next:typeof mode){setMode(next);setSent(false);setMessage('');setCode('');setPassword('')}
  return <First1Shell>
-  <section className="w-full max-w-md"><header className="mb-8"><h1 className="text-2xl font-semibold">{sent?'تأكيد البريد الإلكتروني':mode==='register'?'إنشاء حساب موحد':'تسجيل الدخول'}</h1><p className="mt-3 text-sm leading-7 text-[#53655a]">الدخول الموحد لخدمات شركة تواصل النخبة للنشر الإلكتروني</p></header>
+  <section className="first1-login-layout"><aside className="first1-login-intro"><h1>بوابة موحدة لخدمات النشر الإلكتروني</h1><p>سجل دخولك مرة واحدة عبر الدخول الموحد لشركة تواصل النخبة</p></aside><div className="first1-login-fields"><header className="mb-8"><h2 className="text-2xl font-semibold">{sent?'تأكيد البريد الإلكتروني':mode==='register'?'إنشاء حساب':'تسجيل الدخول'}</h2></header>
    <form onSubmit={submit} className="space-y-5 rounded-xl border border-[#d7e1d7] bg-white p-6">
     {!sent&&<label className="block text-sm">البريد الإلكتروني<input autoComplete="email" type="email" dir="ltr" required className={field} value={email} onChange={e=>setEmail(e.target.value)}/></label>}
     {!sent&&mode==='register'&&<><label className="block text-sm">الاسم الكامل<input autoComplete="name" required maxLength={160} className={field} value={name} onChange={e=>setName(e.target.value)}/></label><label className="block text-sm">الجوال مع مفتاح الدولة<input autoComplete="tel" type="tel" dir="ltr" placeholder="+9665XXXXXXXX" required className={field} value={phone} onChange={e=>setPhone(e.target.value)}/></label></>}
@@ -28,6 +28,6 @@ export default function SsoLogin({authorizationId,initialMode='login'}:{authoriz
     <button disabled={busy||(!sent&&captchaOn&&!captcha)} className="w-full rounded-lg bg-[#155e3f] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{busy?'جارٍ التحقق…':sent?'تأكيد ومتابعة':mode==='login'?'دخول ومتابعة':'إرسال رمز التحقق'}</button>
    </form>
    <nav aria-label="خيارات الدخول" className="mt-5 flex flex-wrap gap-5 text-sm underline underline-offset-4">{mode!=='login'&&<button onClick={()=>changeMode('login')}>لدي حساب</button>}{mode!=='code'&&<button onClick={()=>changeMode('code')}>الدخول برمز البريد</button>}{mode!=='register'&&<button onClick={()=>changeMode('register')}>إنشاء حساب</button>}</nav>
-  </section>
+  </div></section>
  </First1Shell>
 }
