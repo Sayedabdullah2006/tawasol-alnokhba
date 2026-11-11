@@ -173,7 +173,15 @@ export async function POST(request: Request) {
         clientName: updated.client_name ?? 'عزيزنا',
       }
       let p: Promise<boolean> | null = null
-      if (!isResume && targetStatus !== 'suspended') switch (targetStatus) {
+      if (isResume || targetStatus === 'suspended') {
+        p = notifyStatusUpdateToClient({
+          ...base,
+          status: targetStatus,
+          statusLabel: isResume ? `تم استئناف الطلب — ${REQUEST_STATUSES[targetStatus as keyof typeof REQUEST_STATUSES]?.label || targetStatus}` : 'تم تعليق الطلب مؤقتًا',
+          adminNotes: typeof adminNotes === 'string' ? adminNotes.trim() : undefined,
+          statusChangedAt: now,
+        })
+      } else switch (targetStatus) {
         case 'paid':
           p = notifyPaymentConfirmedToClient({
             ...base,
@@ -205,7 +213,7 @@ export async function POST(request: Request) {
             ...base,
             reason: membershipReject
               ? `${adminNotes?.trim() ? `${adminNotes.trim()}\n\n` : ''}تمت إعادة رصيد المنشور وأي مزايا محجوزة إلى عضويتك تلقائياً.`
-              : adminNotes ?? '',
+              : resolvedAdminNotes ?? '',
           })
           break
         case 'content_review':
@@ -217,6 +225,7 @@ export async function POST(request: Request) {
             status:      targetStatus,
             statusLabel: REQUEST_STATUSES[targetStatus as keyof typeof REQUEST_STATUSES]?.label || targetStatus,
             adminNotes: resolvedAdminNotes,
+            statusChangedAt: now,
           })
           break
         // "quoted" مقصود عدم إرسال إيميل هنا — send-quote يتولاه
@@ -227,11 +236,12 @@ export async function POST(request: Request) {
               status:      targetStatus,
               statusLabel: REQUEST_STATUSES[targetStatus as keyof typeof REQUEST_STATUSES].label,
               adminNotes: resolvedAdminNotes,
+              statusChangedAt: now,
             })
           }
           break
       }
-      if (p) p.catch(e => console.error('Status email failed:', e))
+      if (p) await p.catch(e => console.error('Status email failed:', e))
 
     }
 

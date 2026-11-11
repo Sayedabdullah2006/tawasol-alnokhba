@@ -1,15 +1,13 @@
-import { STUDIO_BRAND_RULES, STUDIO_NEWS_LAYOUT_RULES, STUDIO_LOGO_RESERVATION, STUDIO_NO_SOURCE_IMAGE_RULES } from './studio-design-guidelines'
+import { STUDIO_BRAND_RULES, STUDIO_NEWS_LAYOUT_RULES, STUDIO_LOGO_RESERVATION, STUDIO_FACT_RULES, FACE_LOCK, PRINT_BOUNDARY, STUDIO_NO_SOURCE_IMAGE_RULES } from './studio-design-guidelines'
 import { buildGreetingPosterPrompt, greetingCopyFromNewsText, type StudioGreetingCopy } from './studio-print-copy'
 
 export type VideoOrientation = 'landscape' | 'portrait'
 
 export function videoLayoutFor(orientation: VideoOrientation = 'landscape'): string {
   if (orientation === 'portrait') {
-    return '=== VIDEO LAYOUT OVERRIDE — PORTRAIT 9:16 (highest priority) ===\n' +
-      'This post contains a vertical video. On the 1080×1350 portrait canvas, reserve one large empty 9:16 video window, approximately 56% of canvas width and 80% of its height, with its lower edge above the bottom 220-pixel digital-asset pocket, aligned to the right side. Keep this video window visibly dominant with a slim gold outline, subtle play icon on the outer border, and a continuous integrated background; it must be empty inside with no person, image, words, numbers, or icons. Arrange the Arabic headline, factual callouts, and any reference photo in a clear vertical information column on the left, without covering the video window. Do not convert the 9:16 window into a horizontal frame or place a video inside it.'
+    return 'VIDEO LAYOUT — PORTRAIT 9:16: Keep the full name and complete news together at the top. Reserve one empty 405×720 vertical video window at x=619..1024, y=420..1140 on the 1080×1350 canvas, ending above the digital footer y=1205. Its interior has no person, photo, text, numbers or icons. Use a thin forest/citron outline and optional play mark on the outer border only. Integrate any actual reference photo and supporting icon facts in the left column without covering the window or changing the person. Never draw the video or convert it to 16:9.'
   }
-  return '=== VIDEO LAYOUT OVERRIDE — LANDSCAPE 16:9 (highest priority) ===\n' +
-    'This post contains a horizontal video. On the 1080×1350 portrait canvas, reserve one large empty 16:9 video window spanning almost the full width across the upper half. Keep it visibly dominant with a slim gold outline, subtle play icon on the outer border, and a continuous integrated background; it must be empty inside with no person, image, words, numbers, or icons. Place the Arabic headline, factual callouts, and any reference photo below or around the video window without covering it. Do not convert the 16:9 window into a vertical frame or place a video inside it.'
+  return 'VIDEO LAYOUT — LANDSCAPE 16:9: Keep the full name then the complete news together above the video. Reserve one empty 960×540 horizontal 16:9 video window at x=60..1020, y=430..970. Its interior has no person, photo, text, numbers or icons. A thin forest/citron outline and optional play mark belong on the outer border only. Supporting icon facts follow below the window and end before the digital footer y=1205. Do not cover the window or convert it to 9:16.'
 }
 
 
@@ -83,47 +81,45 @@ export function buildCompactImagePrompt(args: {
     return `${prompt}\n\n${sourcePhotoRequirement(args.sourceImageCount)}`.trim()
   }
   const name = finalPrintCopy(record.name, Number.MAX_SAFE_INTEGER)
-  const achievement = finalPrintCopy(record.achievement_sentence, 360) || finalPrintCopy(record.achievement_core, 360) || finalPrintCopy(record.headline, 160)
-  const seen = [name, achievement].filter(Boolean).map(copyKey)
-  const subtitle = uniqueCopy(seen, finalPrintCopy(record.subtitle, 220))
-  const subtitleEn = textValue(record.subtitle_en, 180)
-  const label = uniqueCopy(seen, finalPrintCopy(record.header_label, 120) || finalPrintCopy(record.context_label, 120))
-  const phrases = textList(record.info_phrases, 4, 220)
-  const legacyFacts = [...textList(record.key_facts, 4, 220), ...textList(record.awards, 1, 220)]
-  const facts = (phrases.length ? phrases : legacyFacts.length ? legacyFacts : textList(record.info_labels, 4, 220))
-    .map(fact => uniqueCopy(seen, finalPrintCopy(fact, 220)))
-    .filter(Boolean)
+  const honorific = finalPrintCopy(record.honorific, 200)
+  const displayName = name && honorific && !name.startsWith(honorific) ? `${honorific} ${name}` : name
+  const achievement = finalPrintCopy(record.poster_headline, Number.MAX_SAFE_INTEGER) || finalPrintCopy(record.achievement_core, Number.MAX_SAFE_INTEGER) || finalPrintCopy(record.headline, Number.MAX_SAFE_INTEGER)
+  const label = finalPrintCopy(record.context_label, 120)
+  const metricCandidates = 'standout_metric' in record
+    ? [record.standout_metric]
+    : [...textList(record.info_labels, 4, 220), ...textList(record.key_facts, 4, 220)]
+  const metric = metricCandidates.map(value => finalPrintCopy(value, 220))
+    .find(value => /[\p{N}]/u.test(value) && value !== name && !achievement.includes(value)) || ''
   const direction = textValue(args.chosenConcept, 1100)
   const note = textValue(args.note, 500)
   const extra = textValue(args.extra, 500)
   const displayContent = [
-    name ? `PRIMARY NAME (largest text, full name exactly once, first in reading order): "${name}"` : '',
-    achievement ? `CONNECTED ACHIEVEMENT (immediately below the name; adapt legacy copy into a factual grammatical continuation without repeating the name): "${achievement}"` : '',
-    label ? `STORY-SPECIFIC HEADER (secondary context only, never larger than or before the primary name): "${label}"` : '',
-    subtitle ? `ARABIC SUBTITLE: "${subtitle}"` : '',
-    subtitleEn ? `SINGLE SMALL ENGLISH SUBTITLE: "${subtitleEn}"` : '',
-    ...facts.slice(0, 4).map(fact => `INFO PHRASE (under its topic icon; a meaningful achievement detail, not a bare word; expand legacy labels only from verified context): "${fact}"`),
+    displayName ? `TOP FULL NAME (first, exactly once): "${displayName}"` : '',
+    achievement ? `COHERENT NEWS (second, action + achievement): "${achievement}"` : '',
+    metric ? `ONE PROMINENT VERIFIED METRIC (third, with unit/context): "${metric}"` : '',
   ].filter(Boolean).join('\n')
 
   return [
-    'Create a premium 1080×1350 portrait 4:5 Arabic achievement poster for First1Saudi.',
+    'Create ONE complete 1080×1350 portrait 4:5 Arabic editorial poster for the selected direction. Integrate the actual attached source photo, typography and minimal approved copy together in this image-generation step. No background-only or pasted-person workflow, no triptych.',
+    STUDIO_FACT_RULES,
     STUDIO_BRAND_RULES,
     STUDIO_NEWS_LAYOUT_RULES,
     STUDIO_LOGO_RESERVATION,
     `News category: ${textValue(record.news_type, 80) || 'Classify from the verified achievement below; do not assume a competition.'}`,
-    'Use each supplied reference image as an intact documentary photograph. Do not redraw, replace, alter, or synthesize people, clothing, faces, or poses. Build the composition around the real photographs.',
-    `Creative direction: ${direction || 'Classic Celebration with the established achievement hierarchy.'}`,
-    'Choose a story-specific top label only from the approved copy below. If none is supplied, omit the label instead of printing the same generic إنجاز سعودي on every design.',
-    `Visible copy and placements (name first, then its connected achievement sentence; turn legacy fact labels into meaningful phrases without inventing relationships, never shorten full names):\n${displayContent || 'Create a concise Arabic headline from the verified source.'}`,
+    FACE_LOCK,
+    'If no actual source photo is attached, use an honest typographic or abstract non-human treatment, NEVER a fake human face. Do not infer a photograph from analysis metadata alone.',
+    `Creative direction, arrangement only: ${direction || 'Choose a content-appropriate integrated editorial composition from this story and its real photos.'}`,
+    label ? `Internal visual context only: ${label}` : '',
+    `VISIBLE_COPY — complete allowlist, in reading order:\n${displayContent || 'No approved visible copy is available; leave text areas empty. Do not invent copy.'}`,
     'Set the quoted Arabic as finished news copy: direct, human, clear, and declarative. Never print field labels, analysis summaries, source-image descriptions, or explanatory metadata.',
-    'Use strict RTL hierarchy: the full name is the dominant headline, its factual achievement sentence follows immediately, then up to four meaningful fact phrases under their icons. Prefer concise 3–7-word phrases over isolated keywords. Each fact must add new information not stated in the achievement sentence, context, tag or another icon; do not repeat facts even in different wording. Omit redundant blocks instead of filling space. Do not invent missing facts or relationships.',
+    'Read naturally from top to bottom: full name → one concise complete achievement line → at most one useful verified metric → original digital footer. Do not shorten, rewrite or paraphrase the approved copy in the image stage. Show only available facts; never fill gaps by inventing facts. No mandatory plaque, names box or four-icon row.',
     args.templateDirective ?? '',
     args.hasVideo ? videoLayoutFor(args.videoOrientation) : '',
     note ? `Apply this additional visual direction: ${note}` : '',
-    extra ? `Additional verified context: ${extra}` : '',
-    'Avoid flags, politics, weapons, military content, danger symbols, and violence.',
-    'FINAL PRIORITY: absolute unchanged photographic fidelity overrides every instruction; never add medals, trophies or objects to people. Preserve full verified names; apply the shared name-first reading order and emerald/gold hierarchy and digital-logo exclusions and mandatory generated social footer even if an old concept or optional template asks otherwise.',
+    extra ? `Internal additional context, not automatically verified or printable: ${extra}` : '',
+    'FINAL PRIORITY: source facts, approved copy, original person and v3 identity/footer override an old saved concept or optional template. The model integrates the photo and renders the text now; only original logo/social branding is composited afterward.',
     sourcePhotoRequirement(args.sourceImageCount),
+    PRINT_BOUNDARY,
   ].filter(Boolean).join('\n\n')
 }
 

@@ -8,6 +8,7 @@ import { buildCompactImagePrompt, buildStudioSafetyFallbackPrompt, prepareConcep
 import { compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
 import { completeGenerationJob, failGenerationJob, startGenerationJob, throwIfGenerationCancelled } from '@/lib/generation-jobs'
 import { selectEditorialTemplate } from '@/lib/editorial-template-selector'
+import { isPartnerStudioImage, isPartnerStudioImageRef, partnerStudioImageRef } from '@/lib/partners/studio-media'
 import { normalizeImageUrls, normalizeSupportingDocuments } from '@/lib/request-attachments'
 import { greetingCopyFromNewsText } from '@/lib/studio-print-copy'
 
@@ -54,13 +55,12 @@ export async function POST(req: Request) {
 
   // ── دعم اختيار أكثر من صورة مصدر تُضمَّن جميعها في التحليل والاتجاهات والتصميم ──
   // التوافق الخلفي: إن لم تُرسل sourceImages نستخدم sourceImage المفردة.
-  const requestedSourceImages: string[] = normalizeImageUrls(
-    Array.isArray(body.sourceImages) && body.sourceImages.length
-      ? body.sourceImages
-      : sourceImage
-        ? [sourceImage]
-        : [],
-  )
+  const sourceSelection = Array.isArray(body.sourceImages) && body.sourceImages.length
+    ? body.sourceImages
+    : sourceImage ? [sourceImage] : []
+  const requestedSourceImages = [...new Set(sourceSelection.flatMap(value =>
+    isPartnerStudioImageRef(value) ? [value] : normalizeImageUrls([value]),
+  ))].slice(0, 8)
   // معلومات إضافية يدخلها الأدمن قبل التحليل (تُدمج مع نص الخبر).
   const extraInfoText =
     typeof extraInfo === 'string' && extraInfo.trim()
@@ -107,11 +107,29 @@ export async function POST(req: Request) {
   )
   const supportingUrls = new Set(supportingDocuments.map(document => document.url))
   const allowedImages = new Set([...baseImages, ...adminUploads].filter(url => !supportingUrls.has(url)))
-  const sourceImages = requestedSourceImages.filter(url => allowedImages.has(url))
-  if (requestedSourceImages.length !== sourceImages.length) {
+  const partnerPaths = new Map<string, string>()
+  if (!isCampaignPost && reqRow.partner_id && requestedSourceImages.some(isPartnerStudioImageRef)) {
+    const { data: files, error } = await service.from('partner_files')
+      .select('id,path,name,mime_type').eq('request_id', requestId).eq('completed', true)
+    if (error) return NextResponse.json({ error: 'تعذر تحميل صور الخبر' }, { status: 503 })
+    for (const file of (files ?? []).filter(isPartnerStudioImage)) {
+      partnerPaths.set(partnerStudioImageRef(file.id), file.path)
+    }
+  }
+  if (requestedSourceImages.some(url => !allowedImages.has(url) && !partnerPaths.has(url))) {
     return NextResponse.json({ error: 'يمكن استخدام الصور الشخصية أو صور الاستوديو فقط كمراجع للتصميم' }, { status: 400 })
   }
-  const primarySource: string | null = sourceImages[0] ?? null
+  const resolvedImages = await Promise.all(requestedSourceImages.map(async url => {
+    const path = partnerPaths.get(url)
+    if (!path) return url
+    const { data, error } = await service.storage.from('partner-files').createSignedUrl(path, 600)
+    return error ? null : data?.signedUrl ?? null
+  }))
+  const sourceImages = resolvedImages.filter((url): url is string => url !== null)
+  if (sourceImages.length !== requestedSourceImages.length) {
+    return NextResponse.json({ error: 'تعذر فتح صور الخبر' }, { status: 503 })
+  }
+  const primarySource: string | null = requestedSourceImages[0] ?? null
 
   let newsText: string
   let priorAnalysis: unknown
@@ -396,7 +414,7 @@ export async function POST(req: Request) {
       const posterBase = await resizeToPoster(rawImage)
       const { buffer: finalImage, mimeType: finalMime } = logoUrl
         ? await compositeLogoBottomRight(posterBase, logoUrl)
-        : { buffer: posterBase, mimeType: 'image/png' }
+        : await compositeLogoBottomRight(posterBase, '')
 
       const ext = finalMime.includes('jpeg') || finalMime.includes('jpg') ? 'jpg' : 'png'
       const suffix = isCampaignPost ? `-p${postIndex}` : ''
@@ -432,7 +450,7 @@ export async function POST(req: Request) {
           content: post?.content ?? reqRow.content ?? null,
           category: reqRow.category ?? null,
           imageUrl,
-          sourceImageUrl: primarySource,
+          sourceImageUrl: isPartnerStudioImageRef(primarySource) ? null : primarySource,
           requestId,
         })
       }

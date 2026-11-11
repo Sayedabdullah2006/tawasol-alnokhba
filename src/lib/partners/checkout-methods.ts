@@ -33,7 +33,20 @@ export async function submitPartnerReceipt(session:Session,file:File){
  const upload=await bucket.upload(path,bytes,{contentType:mime,upsert:false})
  if(upload.error){const existing=await bucket.download(path);if(existing.error||!existing.data||createHash('sha256').update(Buffer.from(await existing.data.arrayBuffer())).digest('hex')!==hash)throw new PartnerError('RECEIPT_UPLOAD_FAILED',503)}
  const result=await methodAction(session,'bank_complete')
- if(result.applied&&!session.sandbox){const {data:o}=await db.from('publish_requests').select('request_number,client_name,final_total,partner_id').eq('id',session.request_id).single();const partner=configuredClients().find(p=>p.id===o?.partner_id);if(o&&partner?.notifications!==false){const mail=await import('@/lib/email');await mail.notifyBankTransferReceivedToAdmin({requestNumber:String(o.request_number),clientName:o.client_name??'العميل',totalAmount:Number(o.final_total)}).catch(()=>undefined)}}
+ // Replaying a completed upload can recover failed customer delivery. The stable
+ // session reference shares the durable mail claim, so it cannot send twice.
+ if(!session.sandbox&&session.payment_mode==='live'){
+  const {data:o,error}=await db.from('publish_requests').select('request_number,client_name,client_email,final_total,partner_id').eq('id',session.request_id).single()
+  if(error||!o)console.error('[RECEIPT_EMAIL] Order context unavailable',session.request_id)
+  const partner=configuredClients().find(p=>p.id===o?.partner_id)
+  if(o&&partner?.notifications!==false){
+   const mail=await import('@/lib/email')
+   await Promise.allSettled([
+    ...(result.applied?[mail.notifyBankTransferReceivedToAdmin({requestNumber:String(o.request_number),clientName:o.client_name??'العميل',totalAmount:Number(o.final_total)})]:[]),
+    ...(o.client_email?[mail.notifyBankTransferUnderReviewToClient({requestId:session.request_id,email:o.client_email,requestNumber:String(o.request_number),clientName:o.client_name??'العميل',receiptReference:session.id})]:[]),
+   ])
+  }
+ }
  return {received:true,status:'payment_review',return_url:session.return_url}
 }
 export function partnerTamaraGateway(session:Pick<Session,'sandbox'|'payment_mode'>){

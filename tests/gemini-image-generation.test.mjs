@@ -48,7 +48,7 @@ test('shared entry routes to Nano Banana 2.1 with all editorial protections', as
   })
   assert.deepEqual(await generateImageFromPartsWithOpenAI('اسم الخبر وعبارته', [image], { aspectRatio: '4:5' }), { b64: image.data, mimeType: image.mimeType })
   const prompt = body.contents[0].parts[0].text
-  for (const rule of ['FIRST1SAUDI', 'ABSOLUTE PHOTO FIDELITY', 'NO SOURCE PHOTO', 'FINAL ARTWORK TEXT RULE']) assert.ok(prompt.includes(rule))
+  for (const rule of ['FIRST1SAUDI — REFERENCE IDENTITY V3', 'REFERENCE PHOTO LOCK — DIRECT MODEL INTEGRATION', 'VISIBLE COPY AND FACT ICON RULES', 'PERMANENT EXCLUSION']) assert.ok(prompt.includes(rule))
   assert.equal(body.contents[0].parts[1].inlineData.data, image.data)
 })
 test('bad key fails once without exposing provider debug or silently switching', async t => {

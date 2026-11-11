@@ -8,11 +8,14 @@
  * نفس البرومبتات (SYS_*) ونفس النماذج — لا يوجد سلوك مختلف عن الواجهة.
  */
 import OpenAI from 'openai'
-import { STUDIO_BRAND_RULES, STUDIO_LOGO_RESERVATION, STUDIO_DESIGN_DIRECTIONS, STUDIO_PHOTO_FIDELITY_RULES, STUDIO_EXCLUDED_EMBLEM_RULE } from './studio-design-guidelines'
+import { STUDIO_BRAND_RULES, STUDIO_LOGO_RESERVATION, STUDIO_DESIGN_DIRECTIONS, STUDIO_EXCLUDED_EMBLEM_RULE } from './studio-design-guidelines'
 import sharp from 'sharp'
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
+import { FACE_LOCK, EVERGREEN_NOTE, TWEET_CAMPAIGN_NOTE } from './studio-reference-prompts'
 import { getOpenAI, chatComplete, SYS_ANALYZE, SYS_TWEETS, SYS_CONCEPTS, buildConceptDirectives, buildTweetDirectives } from './openai'
 import { generateImageWithOpenAI, generateImageFromPartsWithOpenAI } from './image-generation'
-import { compositeLogoBottomRight, resizeToPoster } from './logo-overlay'
+import { compositeLogoBottomRight, compositeCampaignLogos, resizeToPoster } from './logo-overlay'
 import { createServiceRoleClient } from './supabase-server'
 import { selectEditorialTemplate } from './editorial-template-selector'
 import { greetingCopyFromNewsText } from './studio-print-copy'
@@ -25,25 +28,7 @@ export const OPENAI_MODEL = 'gpt-5.5'
  * قفل الصورة المرجعية — تعليمة تحفظ اللقطة الأصلية داخل التكوين التحريري.
  * مكتوبة بالعربية والإنجليزية كي يتكيّف القالب مع الصورة بدلاً من إعادة رسمها.
  */
-export const FACE_LOCK = STUDIO_PHOTO_FIDELITY_RULES +
-  ' بالعربية: ضع الصور كقصاصات فوتوغرافية غير معدّلة، ولا تغيّر الوجوه أو التعابير أو الملابس أو الوضعيات، ولا تضف ميداليات أو كؤوساً أو أي عناصر إلى الأشخاص؛ الإبداع في الخلفية والتخطيط حول الصور فقط.'
-
-/**
- * توجيه "الصياغة الدائمة" — يُحقَن في الأتمتة (إعادة نشر الأرشيف) فقط.
- * يمنع أي إيحاء بأن الخبر حدثٌ آنيّ/عاجل، لأن الخبر قد يكون قديماً.
- */
-export const EVERGREEN_NOTE =
-  '‼️ مهم — صياغة دائمة (إعادة نشر): هذا المحتوى يُعاد نشره وقد يكون الخبر قديماً. ' +
-  'اكتب بأسلوب دائم يُبرز الإنجاز كقيمة ومصدر فخر مستمر، ولا توحِ إطلاقاً بأنه حدثٌ وقع الآن أو خبرٌ عاجل. ' +
-  'تجنّب تماماً كلمات الزمن الآني مثل: (اليوم، الآن، للتو، مؤخراً، أمس، هذا الأسبوع، حديثاً، أعلن اليوم، عاجل، خبر عاجل، تزامناً مع). ' +
-  'لا تذكر تاريخاً أو فترة توحي بأن الحدث جديد. ركّز على الإنجاز نفسه وقيمته لا على توقيت وقوعه.'
-
-/** إطار الحملة للتغريدات فقط — روح فخر سعودي + هاشتاق ثابت + إيموجي، بمطالع متنوّعة (لا عبارة افتتاح واحدة متكرّرة). */
-export const TWEET_CAMPAIGN_NOTE =
-  'أضِف روح الفخر السعودي في كل تغريدة لكن بصياغة مختلفة في كل مرة — ‼️ لا تبدأ التغريدات بعبارة افتتاحية واحدة ثابتة تتكرّر (تجنّب تكرار مطلع مثل «فخرٌ سعودي لا يُنسى» في كل توليد). ' +
-  'أدرِج الهاشتاق الثابت #ذاكرة_الإنجاز ضمن هاشتاقات كل تغريدة، إلى جانب #First1Saudi و#اسم_الشخص. ' +
-  '‼️ تجاوز قاعدة «إيموجي واحد كحد أقصى»: استخدم في كل تغريدة 3 إيموجي معبّرة على الأقل ' +
-  '(وبحدٍّ أقصى نحو 4) ذات صلة بمضمون الإنجاز وموزّعة بما يخدم المعنى — دون إكثار أو حشو أو تكرار.'
+export { FACE_LOCK, EVERGREEN_NOTE, TWEET_CAMPAIGN_NOTE } from './studio-reference-prompts'
 
 export interface Concept {
   title?: string
@@ -256,9 +241,9 @@ export async function generateDesign(
 /**
  * تعديل دقيق لتصميم جاهز: يأخذ صورة التصميم النهائي ويطبّق التعديل المطلوب فقط
  * (حذف/إضافة كلمة، حذف عنصر…) مع إبقاء نفس التصميم والصورة والتخطيط تماماً — بلا
- * إعادة توليد من معطيات الطلب. لا يُعيد تركيب الشعار (موجود أصلاً داخل الصورة).
+ * إعادة توليد من معطيات الطلب. يعيد تركيب الأصول الرقمية الأصلية في التذييل بعد التعديل.
  */
-export async function editDesign(args: { designImageUrl: string; note: string; exactText?: string; referenceImageUrls?: string[]; preserveEdits?: string[] }): Promise<{ imageUrl: string }> {
+export async function editDesign(args: { designImageUrl: string; note: string; exactText?: string; referenceImageUrls?: string[]; preserveEdits?: string[]; campaignBranding?: boolean }): Promise<{ imageUrl: string }> {
   const { designImageUrl, note, exactText = '', referenceImageUrls = [], preserveEdits = [] } = args
   if (!designImageUrl) throw new Error('لا يوجد تصميم للتعديل')
   if (!note.trim()) throw new Error('اكتب التعديل المطلوب')
@@ -266,12 +251,12 @@ export async function editDesign(args: { designImageUrl: string; note: string; e
 
   const prompt =
     'EDIT the attached social-media design image (this is an image-editing task, not generation).\n' +
-    STUDIO_PHOTO_FIDELITY_RULES + '\n' +
+    FACE_LOCK + '\n' +
     STUDIO_EXCLUDED_EMBLEM_RULE + '\n' +
     '‼️ APPLY THIS CHANGE NOW — it MUST be clearly and visibly applied to the image: ' + note.trim() + '\n' +
     'بالعربية — نفّذ هذا التعديل على الصورة المرفقة فوراً بحيث يظهر واضحاً: ' + note.trim() + '\n\n' +
     (exactText.trim() ? `EXACT NEW TEXT — Add this exact Arabic phrase in a small, readable line without changing any existing text: "${exactText.trim()}". Copy every character exactly as supplied, with correct connected RTL Arabic shaping. Do not invent, shorten, translate, spell-correct, or alter it.\n` : '') +
-    'TEXT LOCK — Treat every visible Arabic and English word, number, date, hashtag, handle, logo, and typographic treatment in the current design as immutable, pixel-accurate content. Do not redraw, retype, translate, paraphrase, spell-correct, move, crop, remove, reflow, or alter any existing text, even by one letter. The only permitted text addition is the exact phrase supplied in the EXACT NEW TEXT instruction.\n' +
+    'TEXT LOCK — Treat every visible Arabic and English word, number, date, hashtag, handle, logo, and typographic treatment in the current design as immutable, pixel-accurate content. Do not redraw, retype, translate, paraphrase, spell-correct, move, crop, remove, reflow, or alter any existing text, even by one letter. Only the explicitly requested text change and exact supplied phrase are authorized; preserve every other word and its factual scope.\n' +
     'Then keep the REST of the design as close to the original as possible: same overall layout, same background and colors, ' +
     'the same person/photo and face (do not change or regenerate the person), the same footer/logo, and the same other text. ' +
     (preserveEdits.length
@@ -285,34 +270,35 @@ export async function editDesign(args: { designImageUrl: string; note: string; e
 
   const { b64 } = await generateImageWithOpenAI(prompt, [designImageUrl, ...referenceImageUrls], { allowSafetyFallback: false })
   const posterBase = await resizeToPoster(Buffer.from(b64, 'base64'))
-  const path = `studio-edit-${Date.now()}-${Math.random().toString(36).slice(2)}.png`
-  const { error } = await service.storage.from('content-images').upload(path, posterBase, { contentType: 'image/png' })
+  const { data: brand } = await service.from('brand_settings').select('first1saudi_logo_url').eq('id', 1).single()
+  const logoUrl = brand?.first1saudi_logo_url ?? ''
+  let posterWithFooter: Buffer
+  if (args.campaignBranding) {
+    const response = logoUrl ? await fetch(logoUrl) : null
+    if (response && !response.ok) throw new Error('تعذّر تحميل الشعار الأصلي')
+    const first1Logo = response ? Buffer.from(await response.arrayBuffer()) : await readFile(path.join(process.cwd(), 'public', 'brands', 'first1saudi-identity.svg'))
+    const mawhibaLogo = await readFile(path.join(process.cwd(), 'public', 'brands', 'mawhiba-inso-calligraphy.png'))
+    posterWithFooter = await compositeCampaignLogos(posterBase, [{ input: first1Logo, widthRatio: 235 / 1080 }, { input: mawhibaLogo, widthRatio: 0.145 }])
+  } else {
+    posterWithFooter = (await compositeLogoBottomRight(posterBase, logoUrl)).buffer
+  }
+  const imagePath = `studio-edit-${Date.now()}-${Math.random().toString(36).slice(2)}.png`
+  const { error } = await service.storage.from('content-images').upload(imagePath, posterWithFooter, { contentType: 'image/png' })
   if (error) throw new Error(`فشل رفع الصورة: ${error.message}`)
-  return { imageUrl: service.storage.from('content-images').getPublicUrl(path).data.publicUrl }
+  return { imageUrl: service.storage.from('content-images').getPublicUrl(imagePath).data.publicUrl }
 }
 
 export interface InfographicPerson { imageUrl: string; name: string; blurb: string }
 
-export const INFOGRAPHIC_DIRECTIONS = [
-  'الاحتفالي الكلاسيكي: بطاقات أشخاص متوازنة بإطارات ذهبية وأسماء كاملة وخلفية زمردية متوسطة أو فاتحة مرتبطة بالمجال',
-  'الدرامي الحماسي: خلفية زمردية داكنة وبطاقات صور حقيقية بحضور أكبر وإضاءة ذهبية سينمائية دون تغيير الوجوه أو ترتيب الأشخاص',
-  'الأنيق المختصر: خلفية عاجية أو بيضاء دافئة فاتحة بوضوح ونصوص زمردية؛ شبكة أشخاص هادئة بمساحات سالبة وتايبوغرافي راقٍ وزخارف قليلة',
-]
+export const INFOGRAPHIC_DIRECTIONS = STUDIO_DESIGN_DIRECTIONS.map(direction => `${direction.title}: ${direction.brief}`)
 
-/** يضيف رقماً دائرياً على زاوية صورة الشخص — مرساة ربط بصرية موثوقة للنموذج. */
+/** يحمّل المرجع الأصلي كاملًا؛ الربط بالاسم يعتمد على ترتيب المرفقات دون قص الصورة أو وضع رقم عليها. */
 async function badgePerson(url: string, n: number): Promise<{ mimeType: string; data: string }> {
   const resp = await fetch(url)
   if (!resp.ok) throw new Error(`تعذّر تحميل صورة الشخص ${n}`)
-  const base = await sharp(Buffer.from(await resp.arrayBuffer())).resize(560, 560, { fit: 'cover' }).png().toBuffer()
-  const badge = Buffer.from(
-    `<svg width="560" height="560" xmlns="http://www.w3.org/2000/svg">
-       <circle cx="78" cy="78" r="60" fill="#2D8B3F" stroke="#FFD700" stroke-width="6"/>
-       <text x="78" y="78" font-size="72" font-family="Arial" font-weight="bold" fill="#ffffff"
-             text-anchor="middle" dominant-baseline="central">${n}</text>
-     </svg>`,
-  )
-  const out = await sharp(base).composite([{ input: badge, top: 0, left: 0 }]).png().toBuffer()
-  return { mimeType: 'image/png', data: out.toString('base64') }
+  const buffer = Buffer.from(await resp.arrayBuffer())
+  const format = (await sharp(buffer).metadata()).format
+  return { mimeType: format === 'jpeg' ? 'image/jpeg' : `image/${format ?? 'png'}`, data: buffer.toString('base64') }
 }
 
 /**
@@ -334,25 +320,25 @@ export async function generateInfographic(
   const refs = await Promise.all(people.map((p, i) => badgePerson(p.imageUrl, i + 1)))
 
   const peopleList = people
-    .map((p, i) => `• الشخص رقم ${i + 1} (الصورة التي تحمل الرقم ${i + 1}): الاسم "${p.name}" — النبذة "${p.blurb}"`)
+    .map((p, i) => `• الشخص رقم ${i + 1} (الصورة المرفقة رقم ${i + 1}): الاسم "${p.name}" — النبذة "${p.blurb}"`)
     .join('\n')
 
   const prompt = [
     `صمّم إنفوجرافيك عمودي احترافي بهوية First1Saudi يعرض ${people.length} أشخاص — الاتجاه الإبداعي لهذا التصميم: «${direction}».`,
     `العنوان الرئيسي أعلى التصميم: "${title || 'إنفوجرافيك'}".`,
     ``,
-    `‼️ ربط إلزامي عبر الأرقام: كل صورة مرفقة عليها **رقم دائري** في زاويتها. ضع اسم ونبذة الشخص رقم N **بجانب/أسفل الصورة التي تحمل الرقم N نفسه حصراً**. لا تخلط بين الصور والأسماء إطلاقاً.`,
-    `‼️ استخدم كل صورة **مرّة واحدة فقط** بعدد ${people.length} بطاقة — لا تكرّر أي شخص أو صورة، ولا تدمج شخصين، ولا تُسقط أحداً. رتّبهم بترتيب الأرقام.`,
+    `ربط إلزامي: الصور المرفقة مرتبة بحسب قائمة الأشخاص. اربط الصورة رقم N بالاسم والنبذة رقم N فقط، دون التعرف إلى الشخص بالوجه أو خلط الأسماء. ادمج الصور داخل التكوين؛ لا تُلصق أشخاصًا بعد التوليد.`,
+    `‼️ استخدم كل صورة **مرّة واحدة فقط** بعدد ${people.length} مجموعات مترابطة دون فرض إطار صورة — لا تكرّر أي شخص أو صورة، ولا تدمج شخصين، ولا تُسقط أحداً. رتّبهم بترتيب الأرقام.`,
     `اكتب اسم كل شخص ونبذته **حرفياً كما وردا** بين علامتي الاقتباس.`,
     `⛔ استخدم الصور الحقيقية كما هي (نفس الوجه/الملامح)؛ لا تُولّد ولا تختلق وجوهاً، ولا تكتب نصاً غير الوارد أدناه.`,
-    `‼️ لا تُظهر الأرقام الدائرية في التصميم النهائي — هي للربط فقط؛ غطِّها بإطار البطاقة أو احذفها.`,
+    `لكل شخص: الاسم الكامل أولًا ثم خبره/نبذته ثم المعلومات المساندة بأيقونات، مع الحفاظ على ترتيب القائمة والصور دون ترتيب تنافسي مخترع.`,
     ``,
     `الأشخاص:`,
     peopleList,
     ``,
     STUDIO_BRAND_RULES,
     STUDIO_LOGO_RESERVATION,
-    `‼️ لا ترسم أي مربّع أبيض أو إطار فارغ للشعار في الزوايا — الشعار يُضاف برمجياً فوق التصميم، فاجعل الخلفية ممتدّة بلا فراغات بيضاء.`,
+    `اترك شريط التذييل العاجي فارغًا تمامًا لإضافة الشعار الأصلي والحسابات رقميًا. لا ترسم شعارًا أو أيقونات سوشال.`,
     `OUTPUT: عمودي 1080×1350، ultra-HD، نصوص عربية حادّة صحيحة الاتجاه (RTL)، بلا اختلاق نص ولا إيموجي.`,
     extraInfo && extraInfo.trim() ? `\nمعلومات إضافية تُراعى: ${extraInfo.trim()}` : '',
   ].filter(Boolean).join('\n')
@@ -367,7 +353,7 @@ export async function generateInfographic(
     'Use strict RTL Arabic hierarchy.',
     STUDIO_BRAND_RULES,
     STUDIO_LOGO_RESERVATION,
-    'Full-bleed artwork only, no white panel, no frame, no invented claims, flags, weapons, political or military imagery.',
+    'Use the v3 integrated-photo hierarchy and blank ivory footer; do not invent claims, people, logos or locations.',
   ].join('\n\n')
   const { b64 } = await generateImageFromPartsWithOpenAI(imagePrompt, refs, { safetyFallbackPrompt })
   const rawImage = Buffer.from(b64, 'base64')
@@ -443,6 +429,7 @@ export async function runStudioPipeline(input: {
   sourceImages: string[]
   extraInfo?: string
   note?: string
+  principalOnly?: boolean
   styleDirective?: string // نمط تصميم إلزامي لهذا المنشور (لتنويع الدفعة)
 }): Promise<StudioResult> {
   const openai = getOpenAI()
@@ -452,6 +439,9 @@ export async function runStudioPipeline(input: {
   const sourceImages = await Promise.all(input.sourceImages.map(rehostImage))
 
   const analysis = await analyzeNews(openai, { newsText, sourceImages })
+  if (input.principalOnly && (!analysis || typeof analysis !== 'object' || !('news_strength' in analysis) || analysis.news_strength !== 'A')) {
+    throw new Error('GENERAL_NEWS_DEFERRED: خبر عام أو غير مكتمل يؤجل ولا يحول إلى منشور رئيسي')
+  }
   const tweets = await generateTweets(openai, {
     analysis,
     newsText,

@@ -7,6 +7,7 @@
  */
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import sharp from 'sharp'
+import { isStudioReviewBundle, STUDIO_REVIEW_BUNDLE_ERROR } from './studio-review-bundle'
 
 const AUTH_BASE = 'https://auth.post-pulse.com'
 const API_BASE = 'https://api.post-pulse.com'
@@ -288,6 +289,7 @@ export async function publishNow(args: {
   scheduledTime?: string // ISO UTC — افتراضياً الآن (نشر فوري)
   mediaType?: 'video'
 }): Promise<{ result: unknown; accountIds: number[]; scheduleId: string | null }> {
+  if (isStudioReviewBundle(args.content)) throw new Error(STUDIO_REVIEW_BUNDLE_ERROR)
   const token = await getValidAccessToken()
 
   // نحتاج كائنات الحسابات كاملة (id + platform) لبناء إعدادات كل منصّة

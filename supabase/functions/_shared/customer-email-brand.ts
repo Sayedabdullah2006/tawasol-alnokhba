@@ -38,5 +38,15 @@ export function partnerReminderEmail(subject: string, html: string,context: Cust
   if(context.brand==='nukhba')return {subject,html}
   const brand=CUSTOMER_EMAIL_BRANDS[context.brand]
   const body=customerEmailLinks(html,context).replaceAll('#0E2855',brand.primary).replaceAll('#C9A961',brand.accent).replaceAll('مع تحيات فريق تواصل النخبة','مع تحيات فريق '+brand.name)
-  return {subject:subject+' · '+brand.name,html:`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${escapeEmailHtml(subject)}</title></head><body style="margin:0;background:${brand.background};font-family:Tahoma,Arial,sans-serif"><div style="max-width:600px;margin:24px auto;background:white"><header style="background:${brand.primary};color:white;padding:24px;text-align:center;font-size:22px;font-weight:bold">${customerEmailLogo(context.brand)}${brand.name}</header>${body}<footer style="padding:20px;text-align:center;font-size:13px"><a href="${brand.site}/contact" style="color:${brand.primary}">دعم ${brand.name}</a> · <a href="${brand.site}" style="color:${brand.primary}">first1saudi.net</a></footer></div></body></html>`}
+  return {subject:subject+' · '+brand.name,html:`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${escapeEmailHtml(subject)}</title></head><body style="margin:0;background:${brand.background};font-family:Tahoma,Arial,sans-serif"><div style="max-width:600px;margin:24px auto;background:white"><header style="background:${brand.primary};color:white;padding:24px;text-align:center;font-size:22px;font-weight:bold">${customerEmailLogo(context.brand)}</header>${body}<footer style="padding:18px;text-align:center"><a href="https://wa.me/966543278747" style="color:${brand.primary};font-size:13px">دعم العملاء</a></footer></div></body></html>`}
+}
+
+/** Also normalize already-rendered/legacy templates at the transport boundary. */
+export function customerEmailChrome(html: string, brand: CustomerEmailBrandId) {
+ if(brand!=='first1saudi')return html
+ return html
+  .replace(/<h1\b[^>]*>\s*شبكة أول سعودي\s*<\/h1>/gi,'')
+  .replace(/<p\b[^>]*>\s*FIRST SAUDI\s*<\/p>/gi,'')
+  .replace(/<!-- Footer with contact info and unsubscribe -->\s*<tr>[\s\S]*?<\/table>\s*<\/td>\s*<\/tr>/i,'<tr><td style="padding:18px;text-align:center"><a href="https://wa.me/966543278747" style="color:#175b40">دعم العملاء</a></td></tr>')
+  .replace(/<footer\b[^>]*>[\s\S]*?<\/footer>/gi,'<footer style="padding:18px;text-align:center"><a href="https://wa.me/966543278747" style="color:#175b40">دعم العملاء</a></footer>')
 }

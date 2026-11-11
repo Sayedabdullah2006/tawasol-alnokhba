@@ -10,18 +10,18 @@ type EditorialTemplate = {
 
 const TEMPLATES: Record<ImageShape, EditorialTemplate[]> = {
   portrait: [
-    { id: 'portrait-hero', label: 'بورتريه تحريري موثوق', direction: 'Use the real vertical photograph as the dominant documentary image. Preserve its exact crop logic and pose; build a restrained asymmetric editorial layout around it with typography and factual elements in the natural negative space.' },
-    { id: 'portrait-magazine', label: 'غلاف مجلة تحريري', direction: 'Treat the supplied vertical photograph as an intact magazine-cover photograph, not an AI portrait. Retain the original person, pose, clothing, and camera angle while using refined cover lines, an editorial frame, and restrained information hierarchy around it.' },
-    { id: 'portrait-framed', label: 'إطار وثائقي بسيط', direction: 'Keep the supplied portrait as one coherent, unchanged photograph in a clean rectangular frame. Place a concise RTL hierarchy beside it with generous breathing room and no effects crossing the person.' },
+    { id: 'portrait-hero', label: 'بورتريه تحريري بطولي', direction: 'Use the real vertical photograph as the dominant hero image. Preserve its exact crop logic and pose; build a confident asymmetric editorial layout around it with typography and factual elements in the natural negative space.' },
+    { id: 'portrait-magazine', label: 'غلاف مجلة تحريري', direction: 'Treat the supplied vertical photograph as an intact magazine-cover photograph, not an AI portrait. Retain the original person, pose, clothing, and camera angle while using refined cover lines, purposeful surrounding graphics, and restrained information hierarchy around it.' },
+    { id: 'portrait-depth', label: 'عمق طبقي', direction: 'Keep the supplied portrait photograph with unchanged identity, clothing and original pose. Integrate it through layered editorial depth, soft foreground geometry, and a strong RTL hierarchy without reconstructing or repainting the person.' },
   ],
   landscape: [
-    { id: 'landscape-feature', label: 'مشهد خبري واسع', direction: 'Use the supplied horizontal photograph as an intact documentary scene. Keep its viewpoint, people, architecture, and proportions faithful; place the editorial system around its existing horizon and natural empty areas only.' },
+    { id: 'landscape-cinematic', label: 'مشهد سينمائي تحريري', direction: 'Use the supplied horizontal photograph as an intact cinematic scene. Preserve its original people, clothing, pose and scene evidence while integrating it naturally with the complete editorial design.' },
     { id: 'landscape-panorama', label: 'بانوراما خبرية', direction: 'Make the original landscape photo the documentary panorama of the poster. Do not turn it into a synthetic scene; place concise RTL facts in the real visual breathing room of the photograph and use subtle editorial bands only around it.' },
-    { id: 'landscape-grid', label: 'شبكة تحريرية واسعة', direction: 'Use the supplied wide image as one untouched photographic panel within a premium editorial grid. Keep every real person and setting exactly as photographed, while other panels contain only abstract graphic texture and short factual hierarchy.' },
+    { id: 'landscape-grid', label: 'شبكة تحريرية واسعة', direction: 'Use the supplied wide image as an integrated original photograph within a content-appropriate editorial composition. Keep every real person and setting exactly as photographed, while other panels contain only abstract graphic texture and short factual hierarchy.' },
   ],
   square: [
-    { id: 'square-feature', label: 'صورة رئيسية في إطار تحريري', direction: 'Preserve the square reference as a single intact hero photograph. Build a sophisticated editorial frame and offset typography around it; never regenerate, restyle, or replace anything inside the photo.' },
-    { id: 'square-page', label: 'صفحة مجلة متوازنة', direction: 'Use the original square photograph as one intact documentary panel in a balanced editorial page. Keep it faithful and unaltered, with a separate concise text area and restrained rules around it.' },
+    { id: 'square-feature', label: 'صورة مدمجة في تكوين تحريري', direction: 'Preserve the square reference as a single intact hero photograph. Integrate the reference naturally with offset typography and surrounding graphic fields, no portrait frame or pasted sticker; never regenerate, restyle, or replace anything inside the photo.' },
+    { id: 'square-collage', label: 'كولاج تحريري منضبط', direction: 'Use the original square photograph within a coherent integrated editorial composition. It must remain a faithful, unaltered photograph while the surrounding layers are graphic and abstract.' },
   ],
   unknown: [
     { id: 'documentary-editorial', label: 'تحرير وثائقي', direction: 'Treat every supplied reference as a documentary photograph. Integrate it creatively but preserve all visible people, pose, clothing, setting, and camera perspective exactly as supplied.' },
@@ -63,6 +63,6 @@ export async function selectEditorialTemplate(args: { sourceImageUrls: string[];
   return [
     `OPTIONAL PHOTO INTEGRATION — subordinate to the selected design direction and shared news hierarchy; never replace them. Suggested photographic treatment: ${template.label} (${template.id}).`,
     template.direction,
-    'REFERENCE PHOTO LOCK — treat the supplied image as an authentic editorial photograph, not inspiration for a new portrait. Preserve the real people, clothing, pose, and setting faithfully. Integrate it naturally into the selected template; let the layout adapt to the photograph, never force the photograph to change for the layout.',
+    'REFERENCE PHOTO LOCK — integrate the actual reference inside the complete model-generated design; preserve faces, clothing and pose. No photo-card frame, floating sticker or person pasted after generation. Name first, coherent news second, topic-icon facts next. The direction and v3 identity override this optional hint.',
   ].join('\n')
 }

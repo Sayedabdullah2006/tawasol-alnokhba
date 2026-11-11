@@ -1,10 +1,9 @@
-import { STUDIO_BRAND_RULES } from './studio-design-guidelines'
+import { STUDIO_BRAND_RULES, studioFooterReservation } from './studio-design-guidelines'
 import { PDFDocument } from 'pdf-lib'
 import { readFile } from 'fs/promises'
 import path from 'path'
-import sharp from 'sharp'
 import { generateImageWithOpenAI } from '@/lib/image-generation'
-import { compositeCampaignLogos, compositeLogoBottomRight } from '@/lib/logo-overlay'
+import { compositeCampaignLogos, compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
 import { formatInsoDate, type InsoCoverageItem } from '@/lib/inso-2026'
 
 const WIDTH = 1600
@@ -27,8 +26,8 @@ function reportRules() {
     STUDIO_BRAND_RULES,
     'Report layout exception: keep the horizontal presentation hierarchy of the supplied slide title and content; do not add the news-poster plaque or force a 4:5 layout.',
     'Render every Arabic phrase quoted below accurately, connected, crisp and readable. Do not translate, paraphrase, omit, invent, or replace any quoted Arabic text or numeric fact.',
-    'Render the full-width curved footer, five equal white social icons (X, Instagram, LinkedIn, Facebook, TikTok) and the exact handle "@First1Saudi" at bottom left/center. Original First1Saudi and Mawhiba logos alone are composited after generation; never generate logos or URLs.',
-    'On the 1600×900 report slide reserve the lower-right 450×220-pixel pocket including the area underneath the digital logos. No text, labels, numbers, icons or people inside or below it; continue the surrounding background seamlessly without a distinct rectangle, rounded card or panel. Generate the full-width curved emerald footer with a gold-edged swoosh, all five equal white social icons (X, Instagram, LinkedIn, Facebook, TikTok) and the exact handle "@First1Saudi" in the left/center area; only the original logos are overlaid digitally.',
+    'Leave bottom-center empty for later digital social handles. Original First1Saudi and Mawhiba logos are composited after generation; never generate logos, social icons, handles or URLs.',
+    studioFooterReservation(WIDTH, HEIGHT),
   ].join('\n')
 }
 
@@ -56,9 +55,9 @@ async function createSlide(slide: ReportSlide, logoUrl: string | null, includeMa
     aspectRatio: '16:9', quality: 'medium', timeoutMs: 180_000, retries: 2,
     allowSafetyFallback: false,
   })
-  const base = await sharp(Buffer.from(b64, 'base64')).resize(WIDTH, HEIGHT, { fit: 'cover' }).png().toBuffer()
-  if (!logoUrl) return base
-  if (!includeMawhibaLogo) return (await compositeLogoBottomRight(base, logoUrl, { widthRatio: 0.10 })).buffer
+  const base = await resizeToPoster(Buffer.from(b64, 'base64'), WIDTH, HEIGHT)
+  if (!logoUrl) return (await compositeLogoBottomRight(base, '')).buffer
+  if (!includeMawhibaLogo) return (await compositeLogoBottomRight(base, logoUrl)).buffer
   try {
     const [first1Response, mawhibaLogo] = await Promise.all([
       fetch(logoUrl), readFile(path.join(process.cwd(), 'public', 'brands', 'mawhiba-colored-icon.svg')),
@@ -69,7 +68,7 @@ async function createSlide(slide: ReportSlide, logoUrl: string | null, includeMa
       { input: mawhibaLogo, widthRatio: 0.11 },
     ])
   } catch {
-    return (await compositeLogoBottomRight(base, logoUrl, { widthRatio: 0.10 })).buffer
+    return (await compositeLogoBottomRight(base, logoUrl)).buffer
   }
 }
 

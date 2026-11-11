@@ -12,7 +12,7 @@ import { createServiceRoleClient } from '@/lib/supabase-server'
 import { getOpenAI, chatComplete } from '@/lib/openai'
 import {
   analyzeNews, generateTweets, generateConcepts, generateDesign,
-  conceptToString, buildNewsText, rehostImage, shuffledPosterStyles, type Concept,
+  conceptToString, buildNewsText, rehostImage, type Concept,
 } from '@/lib/ai-studio'
 import { sendEmail } from '@/lib/email'
 
@@ -117,15 +117,13 @@ export async function autoRunRequestStudio(requestId: string): Promise<void> {
     const analysis = await analyzeNews(openai, { newsText, sourceImages })
     const tweets = await generateTweets(openai, { analysis, newsText })
     const concepts: Concept[] = await generateConcepts(openai, { analysis, newsText, sourceImages })
-
-    const styles = shuffledPosterStyles()
     const designs: { title: string; imageUrl: string; brief: string }[] = []
     let lastPrompt = ''
     for (let i = 0; i < concepts.length; i++) {
       const brief = concepts[i].brief ?? concepts[i].title ?? ''
       try {
         const { imageUrl, prompt } = await generateDesign(openai, {
-          analysis, chosenConcept: brief, sourceImages, sourceText: newsText, extra: styles[i % styles.length], preparedPrompt: concepts[i].imagePrompt,
+          analysis, chosenConcept: brief, sourceImages, sourceText: newsText, preparedPrompt: concepts[i].imagePrompt,
         })
         designs.push({ title: concepts[i].title ?? `اتجاه ${i + 1}`, imageUrl, brief })
         lastPrompt = prompt

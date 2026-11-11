@@ -6,10 +6,9 @@ import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
 import ContentImagesUploader from '@/components/request/ContentImagesUploader'
 import ImageLightbox from '@/components/ui/ImageLightbox'
-import type { PublishRequest } from '@/types/publish-request'
 
 interface ContentSenderProps {
-  request: PublishRequest
+  request: any
   onSent: () => void
   onCancel: () => void
   initialContent?: string
@@ -62,10 +61,14 @@ export default function ContentSender({ request, onSent, onCancel, initialConten
       console.log('📡 استجابة الخادم:', { status: res.status, data: responseData })
 
       if (res.ok) {
-        showToast(
-          `تم إرسال المحتوى للعميل (النص + ${proposedImages.length} صور)`,
-          'success'
-        )
+        if (responseData.notificationSent === false) {
+          showToast('المحتوى متاح للمراجعة، وتعذّر إرسال البريد الإلكتروني.', 'error')
+        } else {
+          showToast(
+            `تم إرسال المحتوى للعميل (النص + ${proposedImages.length} صور)`,
+            'success'
+          )
+        }
         onSent()
       } else {
         showToast(responseData.error ?? 'فشل إرسال المحتوى', 'error')

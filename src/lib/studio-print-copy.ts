@@ -1,4 +1,4 @@
-import { STUDIO_BRAND_RULES, STUDIO_LOGO_RESERVATION } from './studio-design-guidelines'
+import { STUDIO_BRAND_RULES, STUDIO_LOGO_RESERVATION, FACE_LOCK, PRINT_BOUNDARY } from './studio-design-guidelines'
 
 /** Text approved for display on a congratulatory poster, separate from analysis metadata. */
 export interface StudioGreetingCopy {
@@ -39,7 +39,8 @@ export function buildGreetingPosterPrompt(copy: StudioGreetingCopy, options: {
   return [
     'Create a premium 4:5 Arabic congratulatory poster for First1Saudi using the supplied reference image as the visual source.',
     'Greeting layout exception: do not add an achievement plaque, news headline, names box or fact row; use only the approved greeting copy below.',
-    'Preserve all pictured people, faces, clothing and their order. Keep the Arabic greeting large and readable in clear space away from faces.',
+    FACE_LOCK,
+    'Integrate the actual source photo and approved greeting typography together in one coherent design, not a portrait box or a person pasted afterward. Preserve the pictured people and keep approved greeting copy readable away from faces.',
     options.direction ? `Use this direction for visual arrangement only; its words must not appear on the artwork: ${options.direction}` : '',
     'The following quoted Arabic is the complete visible greeting copy; the mandatory social footer and exact "@First1Saudi" are additional required elements. Render it verbatim as finished celebratory text, without headings, field names, explanations, callouts, icons describing the occasion, or facts extracted from the analysis:',
     `"${copy.message}"`,
@@ -50,6 +51,7 @@ export function buildGreetingPosterPrompt(copy: StudioGreetingCopy, options: {
     options.templateDirective ?? '',
     options.videoDirective ?? '',
     options.note ? `Apply this visual editing note without printing its words: ${options.note}` : '',
-    'Do not print analysis keys, source descriptions, design instructions, or any additional Arabic copy. Always generate the mandatory curved social footer with the five social icons and exact "@First1Saudi".',
+    'Do not print analysis keys, source descriptions, design instructions, or any additional Arabic copy.',
+    PRINT_BOUNDARY,
   ].filter(Boolean).join('\n\n')
 }

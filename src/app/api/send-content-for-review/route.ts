@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     // Get request details for email
     const { data: existingRequest } = await supabase
       .from('publish_requests')
-      .select('request_number, client_name, client_email, status, post_reviews')
+      .select('request_number, client_name, client_email, status, post_reviews, partner_id')
       .eq('id', requestId)
       .single()
 
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
       .update({
         status: 'content_review',
         proposed_content: proposedContent.trim(),
-        proposed_images: proposedImages || [],
+        proposed_images: images,
         post_reviews: reviews,
         content_sent_at: new Date().toISOString(),
         user_feedback: null,
@@ -87,19 +87,24 @@ export async function POST(request: Request) {
     }
 
     // Send notification email to client
+    let notificationSent: boolean | null = null
     if (existingRequest.client_email) {
       const requestNumber = `ATH-${String(existingRequest.request_number).padStart(4, '0')}`
-      notifyContentReadyForReview({
+      notificationSent = await notifyContentReadyForReview({
         requestId,
         email: existingRequest.client_email,
         requestNumber,
         clientName: existingRequest.client_name ?? 'عزيزنا العميل',
         proposedContent,
-        proposedImages: proposedImages || [],
-      }).catch(e => console.error('Email notification failed:', e))
+        proposedImages: images,
+        edited: Boolean(previous),
+      }).catch(error => {
+        console.error('Email notification failed:', error)
+        return false
+      })
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, notificationSent })
   } catch (err) {
     console.error('Send content error:', err)
     return NextResponse.json({ error: 'حدث خطأ في الخادم' }, { status: 500 })

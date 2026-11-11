@@ -42,7 +42,7 @@ export async function POST(request: Request) {
 
     const { data: existingRequest } = await supabase
       .from('publish_requests')
-      .select('request_number, client_name, client_email, status, post_reviews')
+      .select('request_number, client_name, client_email, status, post_reviews, partner_id')
       .eq('id', requestId)
       .single()
 
@@ -86,8 +86,15 @@ export async function POST(request: Request) {
       .update({
         post_reviews: reviews,
         status: 'content_review', // إرسال محتوى للمراجعة يحوّل حالة الطلب إلى «مراجعة المحتوى»
-        content_sent_at: existingRequest.status === 'in_progress' ? new Date().toISOString() : undefined,
-        updated_at: new Date().toISOString(),
+        content_sent_at: existingRequest.status === 'in_progress' ? now : undefined,
+        ...(existingRequest.partner_id && postIndex === 0 ? {
+          proposed_content: proposedContent.trim(),
+          proposed_images: images,
+          content_sent_at: now,
+          user_feedback: null,
+          feedback_sent_at: null,
+        } : {}),
+        updated_at: now,
       })
       .eq('id', requestId)
 
@@ -96,20 +103,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'فشل تحديث الطلب' }, { status: 500 })
     }
 
+    let notificationSent: boolean | null = null
     if (existingRequest.client_email) {
       const requestNumber = `ATH-${String(existingRequest.request_number).padStart(4, '0')}`
-      notifyContentReadyForReview({
+      notificationSent = await notifyContentReadyForReview({
         requestId,
         email: existingRequest.client_email,
         requestNumber,
         clientName: existingRequest.client_name ?? 'عزيزنا العميل',
         proposedContent,
-        proposedImages: Array.isArray(proposedImages) ? proposedImages : [],
+        proposedImages: images,
         edited: isEdit,
-      }).catch(e => console.error('Email notification failed:', e))
+      }).catch(error => {
+        console.error('Email notification failed:', error)
+        return false
+      })
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, notificationSent })
   } catch (err) {
     console.error('Send post content error:', err)
     return NextResponse.json({ error: 'حدث خطأ في الخادم' }, { status: 500 })
