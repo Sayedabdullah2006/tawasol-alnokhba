@@ -5,10 +5,13 @@ export const STUDIO_PHOTO_FIDELITY_RULES = `ABSOLUTE PHOTO FIDELITY — HIGHEST 
 
 export const STUDIO_EXCLUDED_EMBLEM_RULE = 'PERMANENT EXCLUSION: never generate, approximate or introduce the Saudi national emblem (crossed swords and palm tree / السيفين والنخلة) anywhere in the artwork, background, decoration, badges or topic icons; no stylized substitutes or emblem-like silhouettes. The excluded national emblem must appear nowhere in the generated design.'
 
+export const STUDIO_SOURCE_FACT_RULES = 'تابع التوليد سواء وردت الجنسية في المادة أم لم ترد. اذكر الجنسية فقط إذا وردت في المادة صراحة وكانت ذات صلة بالخبر.'
+
 export const STUDIO_BRAND_RULES = `FIRST1SAUDI — SHARED DESIGN RULES
 Priority: absolute fidelity of people and reference photographs FIRST and above every other instruction; then verified source facts, exact user-approved copy and original digital logos; these brand rules; selected direction; optional photographic template. A historical direction or template must never override these rules.
 Brand: deep emerald green #0A3A2A and luxurious gold #D4AF37 with rich gradients; ivory #F8F5EC, warm white and pale emerald are allowed as dominant backgrounds for lighter directions. Emerald and gold remain the identifying accents; a dark background is NOT mandatory. Premium, celebratory Saudi aesthetic, lighting tailored to the direction: balanced warm light for Classic, cinematic spotlights for Dramatic, and soft daylight for Minimal; golden accents remain restrained and appropriate. Thin elegant curved gold dividers and subtle Islamic geometric background texture. Full-bleed artwork, never a white logo panel or empty logo frame.
 ${STUDIO_PHOTO_FIDELITY_RULES}
+${STUDIO_SOURCE_FACT_RULES}
 ${STUDIO_EXCLUDED_EMBLEM_RULE}
 Background: relate it to the actual topic (arena for sports, laboratory for science, digital environment for technology, relevant venue for culture). Use emerald/gold either as the background palette or as accents over a light ivory, warm-white or pale-emerald scene according to the selected direction; never darken every direction by default; keep it atmospheric and subordinate to the hero. Event branding may be non-readable atmosphere only.
 Typography: GE Dinar One Heavy, or Lomar/Din Next Arabic Heavy; crisp connected RTL Arabic, short correctly spelled copy, full verified names exactly once. No invented facts, ranks, dates, institutions or numbers. Internal analysis, image descriptions and design instructions must never appear as visible text. English is allowed only as one small event-subtitle translation line when supplied, plus the mandatory exact footer account "@First1Saudi".

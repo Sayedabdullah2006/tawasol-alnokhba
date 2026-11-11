@@ -1,6 +1,6 @@
 import OpenAI from 'openai'
 import https from 'https'
-import { STUDIO_BRAND_RULES, STUDIO_LOGO_RESERVATION, STUDIO_NEWS_LAYOUT_RULES, STUDIO_DESIGN_DIRECTIONS } from './studio-design-guidelines'
+import { STUDIO_BRAND_RULES, STUDIO_SOURCE_FACT_RULES, STUDIO_LOGO_RESERVATION, STUDIO_NEWS_LAYOUT_RULES, STUDIO_DESIGN_DIRECTIONS } from './studio-design-guidelines'
 
 /**
  * Returns a configured OpenAI client.
@@ -152,6 +152,7 @@ export function buildTweetDirectives(): string {
 
 /** الخطوة الأولى - محلل الخبر */
 export const SYS_ANALYZE = `أنت محلّل أخبار لحساب "First1Saudi" المتخصص في إبراز الإنجازات السعودية.
+${STUDIO_SOURCE_FACT_RULES}
 مهمتك: قراءة الخبر المُدخل واستخراج عناصره في صيغة JSON دقيقة، دون اختلاق أي معلومة غير موجودة.
 
 أخرج JSON بهذا الشكل فقط:
@@ -195,6 +196,7 @@ export const SYS_ANALYZE = `أنت محلّل أخبار لحساب "First1Saudi
 
 /** الخطوة الثانية - كاتب التغريدات */
 export const SYS_TWEETS = `أنت كاتب محتوى مبدع لحساب "First1Saudi" (حساب إنجازات سعودية).
+${STUDIO_SOURCE_FACT_RULES}
 مهمتك: صياغة 3 تغريدات إبداعية لافتة لنفس الخبر، كلٌّ بزاوية مختلفة، تشدّ القارئ من أول كلمة وتدفعه للتفاعل.
 
 أسلوب الكتابة:
