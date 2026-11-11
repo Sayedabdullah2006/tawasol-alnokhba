@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/Toast";
 import Button from "@/components/ui/Button";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import ImageLightbox from "@/components/ui/ImageLightbox";
+import { isPartnerStudioImageRef } from "@/lib/partners/studio-media";
 import { StepHead } from "@/components/admin/StudioStep";
 
 interface ConceptItem {
@@ -37,6 +38,7 @@ type StudioSavedState = {
 
 type StudioRequest = {
   id: string;
+  partner_id?: string | null;
   content_images?: string[] | null;
   ai_analysis?: unknown;
   ai_tweets?: { raw?: string } | null;
@@ -111,6 +113,8 @@ export default function AIStudioPanel({
   const supabase = createClient();
 
   const isPost = postIndex !== undefined;
+  const isPartnerOrder = !isPost && Boolean(request.partner_id);
+  const requestId = request.id;
 
   // الحالة المحفوظة سابقاً — من ai_posts[postIndex] (حملة) أو أعمدة الطلب (مفرد)
   const saved = isPost
@@ -160,11 +164,26 @@ export default function AIStudioPanel({
     saved.uploadedImages,
   );
   const [uploading, setUploading] = useState(false);
-  // قائمة صور المصدر المعروضة = الأصلية + المرفوعة (دون تكرار)
-  const contentImages: string[] = [
-    ...baseImages,
-    ...uploadedImages.filter((u) => !baseImages.includes(u)),
-  ];
+  const [partnerImages, setPartnerImages] = useState<string[]>([])
+  const [partnerImagesStatus, setPartnerImagesStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const contentImages = [...new Set([...baseImages, ...partnerImages, ...uploadedImages])]
+
+  useEffect(() => {
+    if (!isPartnerOrder) return
+    const controller = new AbortController()
+    fetch(`/api/admin/partner-orders/${requestId}?studio=1`, { signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error()
+        const { images } = await response.json()
+        if (controller.signal.aborted) return
+        setPartnerImages(images.filter(isPartnerStudioImageRef))
+        setPartnerImagesStatus('ready')
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setPartnerImagesStatus('error')
+      })
+    return () => controller.abort()
+  }, [isPartnerOrder, requestId])
 
   // حفظ حالة الاستوديو (تصاميم/صور مرفوعة) في قاعدة البيانات لتبقى بعد إعادة التحميل
   const persistStudioState = (patch: {
@@ -215,9 +234,8 @@ export default function AIStudioPanel({
         return next;
       });
       setSelectedImages((prev) => {
-        const next = prev.includes(data.publicUrl)
-          ? prev
-          : [...prev, data.publicUrl];
+        const current = prev ?? defaultPartnerSelection;
+        const next = current.includes(data.publicUrl) ? current : [...current, data.publicUrl];
         persistStudioState({ selectedImages: next });
         return next;
       });
@@ -231,8 +249,8 @@ export default function AIStudioPanel({
 
   // ── State (prefilled from saved studio state when re-opened) ──
   // يمكن اختيار أكثر من صورة مصدر تُضمَّن جميعها ويُبنى عليها التحليل والاتجاهات والتصميم.
-  const [selectedImages, setSelectedImages] = useState<string[]>(
-    saved.selectedImages.length
+  const [imageSelection, setSelectedImages] = useState<string[] | null>(
+    isPartnerOrder ? null : saved.selectedImages.length
       ? saved.selectedImages.filter((url: string) =>
           contentImages.includes(url),
         )
@@ -242,12 +260,15 @@ export default function AIStudioPanel({
           ? [contentImages[0]]
           : [],
   );
+  const defaultPartnerSelection = saved.sourceImage && contentImages.includes(saved.sourceImage)
+    ? [saved.sourceImage as string]
+    : contentImages.length === 1 ? [contentImages[0]] : [];
+  const selectedImages = imageSelection ?? defaultPartnerSelection;
   const [extraInfo, setExtraInfo] = useState("");
   const toggleImage = (url: string) =>
     setSelectedImages((prev) => {
-      const next = prev.includes(url)
-        ? prev.filter((u) => u !== url)
-        : [...prev, url];
+      const current = prev ?? defaultPartnerSelection;
+      const next = current.includes(url) ? current.filter((u) => u !== url) : [...current, url];
       persistStudioState({ selectedImages: next });
       return next;
     });
@@ -763,6 +784,8 @@ export default function AIStudioPanel({
       {/* ── اختيار صور المصدر (يمكن اختيار أكثر من صورة) ── */}
       <div className={cardCls}>
         <h4 className="font-bold text-dark">اختيار صور المصدر</h4>
+        {isPartnerOrder && partnerImagesStatus === 'loading' && <p role="status" className="text-sm text-muted">جارٍ تحميل صور الخبر…</p>}
+        {isPartnerOrder && partnerImagesStatus === 'error' && <p role="alert" className="text-sm text-red-700">تعذر تحميل صور الخبر. أعد فتح الاستديو للمحاولة مجددًا.</p>}
         {contentImages.length === 0 ? (
           <p className="text-sm text-muted">
             الصورة المرجعية اختيارية. بدونها سيُستخدم رسم رمزي للمجال بلا وجوه مولّدة.

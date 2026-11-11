@@ -62,7 +62,16 @@ async function sendCustomerEmail(reference:CustomerMailReference,render:()=>Mail
   try {
     const context=await customerEmailContext(reference)
     if(!context)return false
-    return sendTemplateEmail(reference.email??reference.clientEmail??'',context,render,undefined,orderNotificationKey(context,event,reference))
+    const key=orderNotificationKey(context,event,reference)
+    // The durable delivery claim and provider key make a retry safe after a lost
+    // response. Keep attempts inside the awaited request lifecycle.
+    for(let attempt=0;attempt<3;attempt++){
+      if(await sendTemplateEmail(reference.email??reference.clientEmail??'',context,render,undefined,key))return true
+      if(!key)break
+      if(attempt<2)await new Promise(resolve=>setTimeout(resolve,500*(attempt+1)))
+    }
+    console.error('[EMAIL] Customer notification failed', {requestId:context.requestId,event})
+    return false
   } catch { console.error('[EMAIL] Customer notification context unavailable; sending skipped');return false }
 }
 
@@ -185,7 +194,7 @@ export async function sendResetPasswordCode(args: {
 }
 
 export async function notifyStatusUpdateToClient(args: {
-  requestId?: string; email: string; requestNumber: string; clientName: string; status: string; statusLabel: string; adminNotes?: string
+  requestId?: string; email: string; requestNumber: string; clientName: string; status: string; statusLabel: string; adminNotes?: string | null; statusChangedAt?: string
 }) {
   return sendCustomerEmail(args,()=>templates.statusUpdateToClient(args),'statusUpdateToClient')
 }
@@ -220,9 +229,7 @@ export async function notifyCampaignReadyForReview(args: {
   return sendCustomerEmail(args,()=>templates.campaignReadyForReview(args),'campaignReadyForReview')
 }
 
-export async function notifyContentApprovedToAdmin(args: {
-  requestNumber: string; clientName: string
-}) {
+export async function notifyContentApprovedToAdmin(args: templates.AdminApprovalEmailData) {
   const t = templates.contentApprovedToAdmin(args)
   return sendEmail(ADMIN_EMAIL, t.subject, t.html)
 }
@@ -233,9 +240,7 @@ export async function notifyContentApprovedToClient(args: {
   return sendCustomerEmail(args,()=>templates.contentApprovedToClient(args),'contentApprovedToClient')
 }
 
-export async function notifyContentChangesRequested(args: {
-  requestNumber: string; clientName: string; feedback: string; proposedContent: string
-}) {
+export async function notifyContentChangesRequested(args: templates.AdminChangesEmailData) {
   const t = templates.contentChangesRequested(args)
   return sendEmail(ADMIN_EMAIL, t.subject, t.html)
 }
@@ -287,6 +292,12 @@ export async function notifyBankTransferReceivedToAdmin(args: {
 }) {
   const t = templates.bankTransferReceivedToAdmin(args)
   return sendEmail(ADMIN_EMAIL, t.subject, t.html)
+}
+
+export async function notifyBankTransferUnderReviewToClient(args: {
+  requestId: string; email: string; requestNumber: string; clientName: string; receiptReference: string
+}) {
+  return sendCustomerEmail(args,()=>templates.bankTransferUnderReviewToClient(args),'bankTransferUnderReviewToClient')
 }
 
 // ─── Quote Rejection and Negotiation Email Functions ───

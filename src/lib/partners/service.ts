@@ -27,6 +27,14 @@ function channelsOf(row: Record<string, unknown>) {
 function revision(order: Record<string, unknown>) {
   return sha256(JSON.stringify([order.proposed_content, order.proposed_images, order.content_sent_at]))
 }
+async function notifyCustomerAction(ctx: PartnerContext, order: {id: string; request_number: string | number; updated_at: string}, status: string, statusLabel: string) {
+  if(ctx.client.notifications===false||ctx.client.sandbox_only)return
+  const db=await partnerData(ctx.client)
+  const {data:contact}=await db.from('publish_requests').select('client_email,client_name').eq('id',order.id).single()
+  if(!contact?.client_email)return
+  const mail=await import('@/lib/email')
+  await mail.notifyStatusUpdateToClient({requestId:order.id,email:contact.client_email,clientName:contact.client_name??'العميل',requestNumber:String(order.request_number),status,statusLabel,statusChangedAt:String(order.updated_at)})
+}
 async function owned(ctx: PartnerContext, id: string) {
   const db = await partnerData(ctx.client)
   const { data, error } = await db.from('publish_requests').select(ORDER_FIELDS).eq('id', uuid(id)).eq('partner_id', ctx.client.id).eq('external_customer_id', ctx.customer).single()
@@ -182,7 +190,9 @@ export async function partnerOperation(request: Request, ctx: PartnerContext, pa
   if (method === 'GET' && path.length === 2) return { ...expose(order), files: await fileLinks(ctx, order.id) }
   if (method === 'POST' && path.length === 3 && path[2] === 'cancel') {
     const { data, error } = await db.rpc('partner_cancel_order', { p_partner: ctx.client.id, p_customer: ctx.customer, p_request: order.id })
-    dbError(error); return data
+    dbError(error)
+    await notifyCustomerAction(ctx,order,'cancelled','تم إلغاء طلبك بناءً على طلبك')
+    return data
   }
 
   if (method === 'POST' && path.length === 3 && path[2] === 'information') {
@@ -193,6 +203,11 @@ export async function partnerOperation(request: Request, ctx: PartnerContext, pa
       .eq('id', order.id).eq('partner_id', ctx.client.id).eq('external_customer_id', ctx.customer).eq('status', 'info_requested').eq('updated_at', order.updated_at).select('id')
     dbError(error)
     if (!data?.length) throw new PartnerError('ORDER_CHANGED', 409)
+    await notifyCustomerAction(ctx,order,'in_progress','استلمنا المعلومات الإضافية، واستؤنف تحضير طلبك')
+    if(ctx.client.notifications!==false&&!ctx.client.sandbox_only){
+      const mail=await import('@/lib/email')
+      await mail.notifyInfoResubmittedToAdmin({requestNumber:String(order.request_number),clientName:'عميل أول سعودي'})
+    }
     return { id: order.id, status: 'in_progress' }
   }
   if (method === 'POST' && path.length === 3 && path[2] === 'checkout') {
@@ -214,18 +229,32 @@ export async function partnerOperation(request: Request, ctx: PartnerContext, pa
     if (!['approve','changes'].includes(action)) throw new PartnerError('INVALID_ACTION')
     const feedback = action === 'changes' ? text(body.feedback, 4000) : null
     const images = Array.isArray(order.proposed_images) ? order.proposed_images : []
-    if (body.selected_image && !images.includes(body.selected_image)) throw new PartnerError('INVALID_IMAGE')
+    const selectedIndex = body.selected_image == null ? 0 : images.indexOf(body.selected_image)
+    if (selectedIndex < 0) throw new PartnerError('INVALID_IMAGE')
+    const selectedImage = images[selectedIndex] ?? null
     const now = new Date().toISOString()
     const update = action === 'approve' ? { status: 'in_progress', content_approved_at: now, user_feedback: null,
-      post_reviews: { ...order.post_reviews, 0: { ...order.post_reviews?.[0], status: 'approved', proposed_content: order.proposed_content, proposed_images: images, selected_image: body.selected_image ?? images[0] ?? null, content_approved_at: now } } } : { status: 'changes_requested', user_feedback: feedback, feedback_sent_at: now, post_reviews: { ...order.post_reviews, 0: { ...order.post_reviews?.[0], status: 'changes_requested', user_feedback: feedback, feedback_sent_at: now } } }
+      post_reviews: { ...order.post_reviews, 0: { ...order.post_reviews?.[0], status: 'approved', proposed_content: order.proposed_content, proposed_images: images, selected_image: selectedImage, content_approved_at: now } } } : { status: 'changes_requested', user_feedback: feedback, feedback_sent_at: now, post_reviews: { ...order.post_reviews, 0: { ...order.post_reviews?.[0], status: 'changes_requested', user_feedback: feedback, feedback_sent_at: now } } }
     const { data, error } = await db.from('publish_requests').update({ ...update, updated_at: now, last_status_change: now }).eq('id', order.id).eq('partner_id', ctx.client.id).eq('external_customer_id', ctx.customer).eq('status', 'content_review').eq('updated_at', order.updated_at).select('id')
     dbError(error)
     if (!data?.length) throw new PartnerError('CONTENT_CHANGED', 409)
     if (ctx.client.notifications !== false) {
       const mail = await import('@/lib/email')
-      if (action === 'approve') await mail.notifyContentApprovedToAdmin({ requestNumber: String(order.request_number), clientName: 'عميل أول سعودي' }).catch(() => undefined)
-      else await mail.notifyContentChangesRequested({ requestNumber: String(order.request_number), clientName: 'عميل أول سعودي', feedback: feedback ?? '', proposedContent: order.proposed_content ?? '' }).catch(() => undefined)
+      if (action === 'approve') await mail.notifyContentApprovedToAdmin({
+        requestNumber: `ATH-${String(order.request_number).padStart(4, '0')}`,
+        requestId: order.id,
+        clientName: 'عميل أول سعودي',
+        selectedDesign: selectedImage ? { url: selectedImage, position: selectedIndex + 1 } : undefined,
+      }).catch(() => undefined)
+      else await mail.notifyContentChangesRequested({
+        requestNumber: `ATH-${String(order.request_number).padStart(4, '0')}`,
+        requestId: order.id,
+        clientName: 'عميل أول سعودي',
+        feedback: feedback ?? '',
+        proposedContent: order.proposed_content ?? '',
+      }).catch(() => undefined)
     }
+    await notifyCustomerAction(ctx,order,update.status,action==='approve'?'تم استلام موافقتك على المحتوى، وجارٍ استكمال طلبك':'استلمنا طلب تعديلات المحتوى، وسيعمل الفريق على مراجعته')
     return { id: order.id, status: update.status }
   }
   if (method === 'POST' && path.length === 3 && path[2] === 'files') {

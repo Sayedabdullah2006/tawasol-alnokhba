@@ -1,4 +1,4 @@
-import { CUSTOMER_EMAIL_BRANDS, type CustomerEmailBrandId, partnerReminderEmail, customerEmailLogo, customerEmailPlainText } from './customer-email-brand.ts'
+import { CUSTOMER_EMAIL_BRANDS, type CustomerEmailBrandId, partnerReminderEmail, customerEmailLogo, customerEmailPlainText, customerEmailChrome } from './customer-email-brand.ts'
 import { FIRST1SAUDI_EMAIL_LOGO_BASE64 } from './first1saudi-email-logo.ts'
 
 export function customerMailAttachments(brand:CustomerEmailBrandId,attachments:Record<string,unknown>[]=[]){
@@ -39,6 +39,7 @@ export async function prepareCustomerMail(payload:Record<string,unknown>,env:(ke
   else if(/<header\b/.test(html))html=html.replace(/(<header\b[^>]*>)/,'$1'+logo)
   else html=html.replace(/(<body\b[^>]*>)/,'$1'+'<div style="background:#175b40;padding:20px;text-align:center">'+logo+'</div>')
  }
+ html=customerEmailChrome(html,brand)
  return {...payload,brand,html,...(html!==originalHtml&&payload.text?{text:customerEmailPlainText(html)}:{})}
 }
 export async function customerMailStatus(brand:CustomerEmailBrandId,env:(key:string)=>string|undefined){

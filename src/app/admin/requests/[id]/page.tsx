@@ -761,7 +761,20 @@ export default function AdminRequestDetailPage({ params }: { params: Promise<{ i
                   <ContentSender
                     key={senderNonce}
                     request={request}
-                    onSent={() => { setSendingContent(false); setAiContent(null); setAiImages(null); setAiPostIndex(null); window.location.reload() }}
+                    onSent={async () => {
+                      setSendingContent(false)
+                      setAiContent(null)
+                      setAiImages(null)
+                      setAiPostIndex(null)
+                      const { data } = await supabase.from('publish_requests')
+                        .select('*, influencer:influencers(name_ar, name_en)').eq('id', request.id).single()
+                      if (!data) {
+                        window.location.reload()
+                        return
+                      }
+                      setRequest(data)
+                      setNewStatus(data.status)
+                    }}
                     onCancel={() => { setSendingContent(false); setAiContent(null); setAiImages(null); setAiPostIndex(null) }}
                     initialContent={aiContent ?? (request.user_feedback ? (request.proposed_content ?? '') : undefined)}
                     initialImages={aiImages ?? (request.user_feedback ? (request.proposed_images ?? []) : undefined)}

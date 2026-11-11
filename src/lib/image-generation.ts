@@ -1,4 +1,4 @@
-import { STUDIO_BRAND_RULES, STUDIO_LOGO_RESERVATION } from './studio-design-guidelines'
+import { STUDIO_BRAND_RULES, STUDIO_LOGO_RESERVATION, FACE_LOCK, STUDIO_EXCLUDED_EMBLEM_RULE, PRINT_BOUNDARY as APPROVED_PRINT_BOUNDARY } from './studio-design-guidelines'
 import https from 'https'
 import sharp from 'sharp'
 import { designImageProvider, generateImageWithGemini } from './gemini-image-generation'
@@ -39,8 +39,10 @@ const PROFESSIONAL_EDITORIAL_BASELINE_MARKER = '=== PROFESSIONAL EDITORIAL AUTHE
 export const PROFESSIONAL_EDITORIAL_DESIGN_BASELINE = [
   PROFESSIONAL_EDITORIAL_BASELINE_MARKER,
   STUDIO_BRAND_RULES,
-  'Use the route-specific dimensions and content structure. Keep copy outside faces, hands and important clothing; never blend bodies or invent anatomy. Apply cinematic lighting and gold effects only around the untouched reference photograph.',
-  'For reports and newsletters, use the route-specific logo position and reserved pocket; do not relocate their digitally composited originals. Preserve all route-specific exact copy, image/name pairing, and video-space requirements.',
+  FACE_LOCK,
+  STUDIO_EXCLUDED_EMBLEM_RULE,
+  'Use the route-specific dimensions and content structure. Keep copy outside faces, hands and important clothing; never blend bodies or invent anatomy. Integrate the supplied photo within the complete generated composition, preserving the actual person.',
+  'For reports and newsletters preserve route-specific dimensions, exact copy, image/name pairing and video-space requirements. Keep the reserved footer empty for original digital logo and social branding.',
 ].join('\n')
 
 export function withProfessionalEditorialBaseline(promptText: string): string {
@@ -50,7 +52,7 @@ export function withProfessionalEditorialBaseline(promptText: string): string {
 }
 // Shared print boundary for studio, requests, newsletters, and campaign imagery.
 // Directional metadata belongs to the prompt, never to the artwork itself.
-const PRINT_BOUNDARY = '\n\nFINAL ARTWORK TEXT RULE: Render only text explicitly designated as visible copy. Never render field names, analysis labels, prompt instructions, source-image descriptions, layout notes, or explanatory metadata. Do not introduce headings to explain quoted copy.'
+const PRINT_BOUNDARY = '\n\n' + APPROVED_PRINT_BOUNDARY
 
 function imageSizeFor(opts: OpenAIImageOptions): string {
   if (opts.size) return opts.size
@@ -162,19 +164,21 @@ function isModerationBlocked(err: unknown): boolean {
 
 const SAFE_EDITORIAL_FALLBACK_PROMPT = [
   'Create a polished vertical 4:5 editorial social-media graphic about learning, scientific curiosity, global collaboration, and achievement.',
-  'Use only abstract geometric science motifs, elegant light trails, deep emerald #0A3A2A and luxurious gold #D4AF37, and a rich full-bleed composition.',
-  STUDIO_BRAND_RULES,
-  STUDIO_LOGO_RESERVATION,
-  'Use a concise Arabic headline and no more than four short verified factual callouts.',
-  'Do not include logos, additional brand names beyond the mandatory @First1Saudi footer handle, flags, weapons, dangerous materials, medical imagery, politics, military content, or violence.',
+  'Use honest abstract, non-documentary graphic motifs with the approved forest/citron/ivory identity; never invent a person or setting.',
+    STUDIO_BRAND_RULES,
+    STUDIO_LOGO_RESERVATION,
+    'No approved copy is provided in this generic retry: leave text empty rather than inventing a headline, name or facts.',
+    FACE_LOCK,
+  'Do not include logos, brand names, flags, weapons, dangerous materials, medical imagery, politics, military content, or violence.',
 ].join(' ')
 
 const SAFE_EDITORIAL_REFERENCE_FALLBACK_PROMPT = [
   'Create a polished vertical 4:5 editorial social-media graphic about learning, innovation, and achievement.',
-  'Keep the supplied image as one intact documentary photograph. Do not redraw or transform people; place the editorial typography and graphics only around the photo.',
-  STUDIO_BRAND_RULES,
-  STUDIO_LOGO_RESERVATION,
-  'Use a concise Arabic headline and no more than four short verified factual callouts.',
+  'Integrate the actual supplied source inside the complete composition, preserving face, clothing and pose. No portrait frame or person pasted afterward.',
+    STUDIO_BRAND_RULES,
+    STUDIO_LOGO_RESERVATION,
+    'No approved copy is provided in this generic retry: leave text empty rather than inventing a headline, name or facts.',
+    FACE_LOCK,
   'Keep the artwork full-bleed and neutral, with no logos, flags, weapons, danger symbols, politics, military content, or violence.',
 ].join(' ')
 

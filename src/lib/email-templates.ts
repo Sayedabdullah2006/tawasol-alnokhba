@@ -1,7 +1,7 @@
 // HTML email templates — all RTL Arabic, brand-aligned (navy + gold).
 // Each generator returns { subject, html } ready for Resend.
 
-import { emailBrand, emailContext, customerEmailLinks, customerEmailLogo } from './email-brand'
+import { emailBrand, emailContext, customerEmailLinks, customerEmailLogo, customerOrderUrl } from './email-brand'
 const SITE_URL = 'https://nukhba.media'
 
 const wrap = (innerHtml: string): string => customerEmailLinks(`<!DOCTYPE html>
@@ -57,8 +57,7 @@ a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !impo
           <tr>
             <td style="background-color:${emailBrand().primary}; padding:24px; text-align:center;">
               ${customerEmailLogo(emailContext().brand)}
-              <h1 style="margin:0; color:#FFFFFF; font-size:22px; font-weight:900; letter-spacing:0.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">${emailBrand().name}</h1>
-              <p style="margin:4px 0 0 0; color:${emailBrand().id==='first1saudi'?'#FFFFFF':emailBrand().accent}; font-size:11px; letter-spacing:2px; font-weight:bold; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">${emailBrand().english}</p>
+              ${emailBrand().id==='first1saudi'?'':`<h1 style="margin:0;color:#FFFFFF;font-size:22px;font-weight:900;">${emailBrand().name}</h1><p style="margin:4px 0 0;color:${emailBrand().accent};font-size:11px;letter-spacing:2px;font-weight:bold;">${emailBrand().english}</p>`}
             </td>
           </tr>
 
@@ -69,7 +68,7 @@ a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !impo
             </td>
           </tr>
 
-          <!-- Footer with contact info and unsubscribe -->
+          ${emailBrand().id==='first1saudi'?'<tr><td style="padding:18px;text-align:center;"><a href="https://wa.me/966543278747" style="color:#175b40;font-size:13px;">دعم العملاء</a></td></tr>':`<!-- Footer with contact info and unsubscribe -->
           <tr>
             <td style="background-color:${emailBrand().background}; padding:18px; text-align:center; border-top:1px solid #E3DCC9;">
               <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation">
@@ -80,13 +79,13 @@ a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !impo
                     <p style="margin:8px 0 0 0; font-size:11px;">
                       <a href="${SITE_URL}" style="color:${emailBrand().accent}; text-decoration:none;">${emailBrand().site.replace('https://','')}</a>
                       <span style="color:#6B7C99; margin:0 8px;">|</span>
-                      <a href="mailto:${emailBrand().supportEmail}" style="color:${emailBrand().accent}; text-decoration:none;">دعم العملاء</a>
+                      <a href="https://wa.me/966543278747" style="color:${emailBrand().accent}; text-decoration:none;">دعم العملاء</a>
                     </p>
                   </td>
                 </tr>
               </table>
             </td>
-          </tr>
+          </tr>`}
         </table>
       </td>
     </tr>
@@ -630,12 +629,24 @@ export function rejectedToClient(d: {
       <p style="margin:0 0 16px 0; font-size:14px; line-height:1.8;">
         ⚠️ <strong>بعد مراجعة طلبك، اعتذرنا عن قبوله.</strong>
       </p>
-      <p style="margin:0 0 8px 0; font-size:13px; color:#6B7C99;">سبب الرفض من الإدارة:</p>
-      ${note(d.reason)}
+      ${d.reason?.trim() ? `<p style="margin:0 0 8px 0;font-size:13px;color:#6B7C99;">سبب الرفض من الإدارة:</p>${note(d.reason)}` : ''}
       <p style="margin:18px 0; font-size:13px; line-height:1.8;">
         يسعدنا استقبال طلب جديد منك في أي وقت. لأي استفسار، تواصل معنا.
       </p>
       <p style="margin:0; text-align:center;">${button('تقديم طلب جديد', `${SITE_URL}/request`)}</p>
+    `),
+  }
+}
+
+export function bankTransferUnderReviewToClient(d: { requestNumber: string; clientName: string; requestId: string }) {
+  return {
+    subject: `استلمنا إيصال التحويل — طلبك تحت المراجعة · ${d.requestNumber}`,
+    html: wrap(`
+      ${greeting(d.clientName)}
+      <h2 style="color:${emailBrand().primary};font-size:20px;">تم استلام إيصال التحويل البنكي</h2>
+      <p>طلبك <strong>${escapeHtml(d.requestNumber)}</strong> الآن تحت مراجعة الدفع لدى الإدارة.</p>
+      <p style="line-height:1.8;">سنرسل لك تحديثًا عند التحقق من التحويل. استلام الإيصال لا يعني تأكيد الدفع بعد، ولا تحتاج إلى تكرار التحويل.</p>
+      <p style="text-align:center;">${button('متابعة طلبك', `${SITE_URL}/dashboard/${encodeURIComponent(d.requestId)}`)}</p>
     `),
   }
 }
@@ -646,7 +657,7 @@ export function statusUpdateToClient(d: {
   clientName: string
   status: string
   statusLabel: string
-  adminNotes?: string
+  adminNotes?: string | null
 }) {
   const statusEmojis: Record<string, string> = {
     'quoted': '💰',
@@ -668,16 +679,16 @@ export function statusUpdateToClient(d: {
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">${emoji}</div>
         <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">تم تحديث حالة طلبك</h2>
-        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${escapeHtml(d.requestNumber)}</p>
       </div>
       <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:20px; margin:20px 0; text-align:center;">
         <p style="margin:0 0 8px 0; color:#6B7C99; font-size:14px;">الحالة الجديدة:</p>
-        <p style="margin:0; color:${emailBrand().primary}; font-size:18px; font-weight:bold;">${d.statusLabel}</p>
+        <p style="margin:0; color:${emailBrand().primary}; font-size:18px; font-weight:bold;">${escapeHtml(d.statusLabel)}</p>
       </div>
       ${d.adminNotes ? `
         <div style="background:#F0F9FF; border:1px solid #BAE6FD; border-radius:12px; padding:16px; margin:20px 0;">
           <p style="margin:0 0 8px 0; color:#0369A1; font-size:14px; font-weight:bold;">ملاحظة من فريق العمل:</p>
-          <p style="margin:0; color:#0F172A; font-size:14px; line-height:1.6; white-space:pre-line;">${d.adminNotes}</p>
+          <p style="margin:0; color:#0F172A; font-size:14px; line-height:1.6; white-space:pre-line;">${escapeHtml(d.adminNotes)}</p>
         </div>
       ` : ''}
       <p style="margin:20px 0 0 0; font-size:13px; color:#6B7C99; line-height:1.8; text-align:center;">
@@ -786,7 +797,7 @@ export function contentReadyForReview(d: {
       <div style="margin:32px 0; text-align:center;">
         <div style="background:#E8F5E8; border-radius:12px; padding:16px; margin:16px 0;">
           <p style="margin:0 0 12px 0; font-size:14px; color:#059669; font-weight:bold;">راضٍ عن المحتوى؟</p>
-          <a href="${SITE_URL}/dashboard/${d.requestNumber.replace('ATH-', '')}" style="display:inline-block; background:#059669; color:#FFFFFF; padding:12px 24px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px; margin:0 8px;">
+          <a href="${emailContext().brand === 'first1saudi' ? customerOrderUrl(emailContext()) : SITE_URL + '/dashboard/' + d.requestNumber.replace('ATH-', '')}" style="display:inline-block; background:#059669; color:#FFFFFF; padding:12px 24px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px; margin:0 8px;">
             ✅ موافق على المحتوى
           </a>
         </div>
@@ -892,24 +903,37 @@ export function campaignReadyForReview(d: {
   }
 }
 
-export function contentApprovedToAdmin(d: {
-  requestNumber: string; clientName: string
-}) {
+export type AdminApprovalEmailData = {
+  requestNumber: string
+  clientName: string
+  requestId?: string
+  selectedDesign?: { url: string; position: number }
+}
+
+export function contentApprovedToAdmin(d: AdminApprovalEmailData) {
+  const orderUrl = d.requestId ? `${SITE_URL}/admin/requests/${encodeURIComponent(d.requestId)}` : `${SITE_URL}/admin/requests`
+  const design = d.selectedDesign
+  const designUrl = design && /^https:\/\//i.test(design.url) ? escapeHtml(design.url) : null
   return {
     subject: `تم اعتماد المحتوى - طلب ${d.requestNumber}`,
     html: wrap(`
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">✅</div>
         <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">تم اعتماد المحتوى</h2>
-        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${escapeHtml(d.requestNumber)}</p>
       </div>
 
       <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
-        قام العميل <strong style="color:${emailBrand().primary};">${d.clientName}</strong> بالموافقة على المحتوى المقترح. يمكنك الآن المتابعة مع عملية النشر.
+        قام العميل <strong style="color:${emailBrand().primary};">${escapeHtml(d.clientName)}</strong> بالموافقة على المحتوى المقترح. يمكنك الآن المتابعة مع عملية النشر.
       </p>
 
+      ${design ? `
+        <p style="font-size:14px; font-weight:bold;">التصميم الذي اختاره العميل: التصميم ${design.position}</p>
+        ${designUrl ? `<a href="${designUrl}"><img src="${designUrl}" alt="التصميم المعتمد" width="200" style="width:200px;max-width:100%;height:auto;border-radius:8px;"></a>` : ''}
+      ` : ''}
+
       <div style="margin:32px 0; text-align:center;">
-        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${emailBrand().primary}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+        <a href="${orderUrl}" style="display:inline-block; background:${emailBrand().primary}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
           عرض الطلب
         </a>
       </div>
@@ -952,36 +976,43 @@ export function contentApprovedToClient(d: {
   }
 }
 
-export function contentChangesRequested(d: {
-  requestNumber: string; clientName: string; feedback: string; proposedContent: string
-}) {
+export type AdminChangesEmailData = {
+  requestNumber: string
+  requestId?: string
+  clientName: string
+  feedback: string
+  proposedContent: string
+}
+
+export function contentChangesRequested(d: AdminChangesEmailData) {
+  const orderUrl = d.requestId ? `${SITE_URL}/admin/requests/${encodeURIComponent(d.requestId)}` : `${SITE_URL}/admin/requests`
   return {
     subject: `طلب تعديلات على المحتوى - طلب ${d.requestNumber}`,
     html: wrap(`
       <div style="text-align:center; margin:20px 0;">
         <div style="font-size:48px; margin-bottom:16px;">✏️</div>
         <h2 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:20px;">طلب تعديلات على المحتوى</h2>
-        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${d.requestNumber}</p>
+        <p style="margin:0; color:#6B7C99; font-size:14px;">طلب ${escapeHtml(d.requestNumber)}</p>
       </div>
 
       <p style="font-size:14px; color:#6B7C99; line-height:1.6; margin:16px 0;">
-        طلب العميل <strong style="color:${emailBrand().primary};">${d.clientName}</strong> تعديلات على المحتوى المقترح.
+        طلب العميل <strong style="color:${emailBrand().primary};">${escapeHtml(d.clientName)}</strong> تعديلات على المحتوى المقترح.
       </p>
 
       <div style="background:#FFF3CD; border-radius:12px; padding:20px; margin:24px 0; border-right:4px solid #856404;">
         <h3 style="margin:0 0 8px 0; color:#856404; font-size:16px;">ملاحظات العميل</h3>
-        <p style="margin:0; color:#856404; font-size:14px; line-height:1.6; white-space:pre-line;">${d.feedback}</p>
+        <p style="margin:0; color:#856404; font-size:14px; line-height:1.6; white-space:pre-line;">${escapeHtml(d.feedback)}</p>
       </div>
 
       <div style="background:#F8FAFC; border-radius:12px; padding:20px; margin:24px 0;">
         <h3 style="margin:0 0 8px 0; color:${emailBrand().primary}; font-size:16px;">المحتوى الأصلي المقترح</h3>
         <div style="background:#FFFFFF; border-radius:8px; padding:16px;">
-          <p style="margin:0; color:#6B7C99; font-size:14px; line-height:1.6; white-space:pre-line;">${d.proposedContent}</p>
+          <p style="margin:0; color:#6B7C99; font-size:14px; line-height:1.6; white-space:pre-line;">${escapeHtml(d.proposedContent)}</p>
         </div>
       </div>
 
       <div style="margin:32px 0; text-align:center;">
-        <a href="${SITE_URL}/admin/requests" style="display:inline-block; background:${emailBrand().primary}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
+        <a href="${orderUrl}" style="display:inline-block; background:${emailBrand().primary}; color:#FFFFFF; padding:14px 28px; text-decoration:none; border-radius:8px; font-weight:bold; font-size:14px;">
           عرض الطلب وإرسال المحتوى المعدل
         </a>
       </div>
@@ -1320,7 +1351,7 @@ export function negotiatedQuoteToClient(d: {
       </div>
 
       <p style="margin:20px 0 0 0; font-size:13px; color:#6B7C99; line-height:1.8; text-align:center;">
-        هذا العرض صالح لمدة 48 ساعة من تاريخ الإرسال
+        صلاحية هذا العرض موضحة في صفحة الطلب؛ راجعها قبل قبول العرض.
       </p>
     `)
   }

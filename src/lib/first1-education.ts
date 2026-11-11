@@ -1,4 +1,4 @@
-import { STUDIO_BRAND_RULES, STUDIO_LOGO_RESERVATION } from './studio-design-guidelines'
+import { STUDIO_BRAND_RULES, STUDIO_LOGO_RESERVATION, FACE_LOCK } from './studio-design-guidelines'
 import { OPENAI_MODEL } from '@/lib/ai-studio'
 import { generateImageWithOpenAI } from '@/lib/image-generation'
 import { compositeLogoBottomRight, resizeToPoster } from '@/lib/logo-overlay'
@@ -194,7 +194,7 @@ export async function generateEducationCopy(topic: EducationTopic): Promise<Gene
     messages: [
       {
         role: 'system',
-        content: `أنت كاتب محتوى لحساب أول سعودي. اكتب منشوراً عربياً واحداً فقط، عملياً ومشوقاً ومفيداً للمبتكرين والمخترعين ورواد الأعمال في السعودية. اكتب بأسلوب عفوي ذكي بلهجة سعودية خفيفة ومفهومة، كأنك تفتح سالفة مفيدة مع شخص طموح؛ تجنب الفصحى الرسمية والتقريرية والعبارات المعلبة. ابدأ بخطاف قصير يثير الفضول، واجعل القارئ يشعر أن المعلومة تستحق الحفظ وإعادة النشر. حافظ على الدقة ولا تضف حقائق خارج المعطيات. ممنوع ذكر المصدر أو الرابط أو اسم الجهة داخل المنشور. لا تستخدم Markdown أو النجوم أو التعداد الشكلي. أعد JSON فقط بالمفاتيح: title, caption, infographicTitle, infographicPoints, visualDirection, contentTags. caption بين 55 و100 كلمة ومن دون أي هاشتاق. contentTags مصفوفة من هاشتاقين عربيين فقط، مرتبطين مباشرة بموضوع المنشور. لا تستخدم #First1Saudi. infographicPoints مصفوفة من 3 نقاط عربية قصيرة جداً. ${howToDirective}`,
+        content: `أنت كاتب محتوى لحساب أول سعودي. اكتب منشوراً عربياً واحداً فقط، عملياً ومشوقاً ومفيداً للمبتكرين والمخترعين ورواد الأعمال في السعودية. اكتب بأسلوب عفوي ذكي بلهجة سعودية خفيفة ومفهومة، كأنك تفتح سالفة مفيدة مع شخص طموح؛ تجنب الفصحى الرسمية والتقريرية والعبارات المعلبة. ابدأ بخطاف قصير يثير الفضول، واجعل القارئ يشعر أن المعلومة تستحق الحفظ وإعادة النشر. حافظ على الدقة ولا تضف حقائق خارج المعطيات. لا تضع رابطًا في المنشور الرئيسي؛ جهّز الرابط في رد أول منفصل عند وجود حكاية منشورة، ولا تخترع رابطًا. ابدأ بأقوى حقيقة أو جهة موثقة، ثم الفكرة الأساسية و3 نقاط قصيرة بـ 🔹 إن توفرت، واختم بسؤال محدد قابل للنقاش. لا تحظر اسم الجهة الموثقة ولا تخترع شخصًا لهذا المحتوى التثقيفي. لا تستخدم Markdown أو النجوم. لا تكرر افتتاحية ثابتة؛ التفاصيل مكانها النص لا الصورة. أعد JSON فقط بالمفاتيح: title, caption, infographicTitle, infographicPoints, visualDirection, contentTags. caption بين 55 و100 كلمة ومن دون أي هاشتاق. contentTags مصفوفة من هاشتاقين عربيين فقط، مرتبطين مباشرة بموضوع المنشور. لا تستخدم #First1Saudi. infographicPoints مصفوفة من 3 نقاط عربية قصيرة جداً. ${howToDirective}`,
       },
       {
         role: 'user',
@@ -216,7 +216,7 @@ export async function generateEducationCopy(topic: EducationTopic): Promise<Gene
   const tags = contentTags.length === 2 ? contentTags : topic.contentTags
   return {
     title: cleanCaption(String(parsed.title ?? topic.title)) || topic.title,
-    caption: `${caption.replace(/#\S+/g, '').trim()}\n\n#إضاءات ${tags.join(' ')}`,
+    caption: `${caption.replace(/#\S+/g, '').trim()}\n\n${tags.slice(0, 2).join(' ')}`,
     infographicTitle: cleanCaption(String(parsed.infographicTitle ?? topic.title)) || topic.title,
     infographicPoints: points,
     visualDirection: cleanCaption(String(parsed.visualDirection ?? 'مخطط معلوماتي حديث وواضح')),
@@ -232,28 +232,30 @@ export async function generateEducationInfographic(content: GeneratedEducation, 
   const prompt = [
     'Create one premium 4:5 Arabic social infographic for First1Saudi, 1080x1350.',
     STUDIO_BRAND_RULES,
+    FACE_LOCK,
     STUDIO_LOGO_RESERVATION,
-    `Headline: ${content.infographicTitle}`,
-    `Use exactly these three compact Arabic callouts, each visually distinct with a simple icon or data mark: ${content.infographicPoints.map((point, index) => `${index + 1}. ${point}`).join(' | ')}`,
-    'STRICT RIGHT-TO-LEFT ARABIC LAYOUT: every Arabic text block must be right-aligned and read from right to left. For the three callouts, place number 1 on the FAR RIGHT, number 2 in the center, and number 3 on the LEFT. The visual journey must flow right-to-left; never put 1 on the left or arrange the numbered steps left-to-right. Use correctly connected Arabic letterforms and clear RTL hierarchy.',
+    `APPROVED EDUCATIONAL HEADLINE: "${content.infographicTitle}"`,
+    `Internal supporting facts ONLY, do not print these three callouts: ${content.infographicPoints.map((point, index) => `${index + 1}. ${point}`).join(' | ')}`,
+    'MINIMAL COVER: print only the approved headline and at most one useful verified number with its unit from the supplied facts, never an invented number. No detail cards or bullet duplication. Large connected RTL Arabic readable on mobile with high contrast. If a real achievement-holder photo is attached it dominates at least 60% without changing face, clothes, body or pose. Otherwise use abstract non-human graphics; do not invent a person. Vary composition and approved palette roles. Original logo and social icons with First1Saudi only in the small bottom strip.',
     `Visual direction: ${content.visualDirection}.`,
-    options.visualInstructions ?? 'Use symbolic innovation visuals such as a patent document, magnifier, prototype, blueprint, light path, or idea-to-market journey. Do not use people, flags, official seals, fake logos, sources, URLs, citations, or long paragraphs.',
+    options.visualInstructions ?? (options.referenceImageUrls?.length ? 'Integrate the actual attached reference naturally within the educational composition, preserving identity, clothing and pose. No invented people, setting, seal or logo.' : 'Use clearly illustrative innovation graphics such as a document, magnifier or prototype. Do not invent people, flags, official seals, logos, sources, URLs, citations or a documentary event.'),
     'If no portrait references are supplied, use symbolic illustrations of innovation and collaboration; never generate fake people or faces.',
 
   ].join('\n\n')
   const safetyFallbackPrompt = [
     'Create one premium 4:5 Arabic social infographic for First1Saudi.',
-    `Headline: ${content.infographicTitle}.`,
-    `Use exactly these three compact Arabic callouts: ${content.infographicPoints.map((point, index) => `${index + 1}. ${point}`).join(' | ')}`,
-    'Strict RTL: callout 1 on the far right, 2 in the centre, and 3 on the left. Use clearly connected Arabic letterforms.',
+    `APPROVED EDUCATIONAL HEADLINE: "${content.infographicTitle}".`,
+    `Internal supporting facts ONLY, not a printed detail list: ${content.infographicPoints.map((point, index) => `${index + 1}. ${point}`).join(' | ')}`,
+    'Minimal cover: one clear approved headline and at most one useful verified metric only; no detail callouts. Large mobile-readable connected RTL Arabic and high contrast. Preserve real attached people without alteration, photo dominant 60% when applicable. Original logo and social icons only in the footer.',
     `Visual direction: ${content.visualDirection}.`,
     options.referenceImageUrls?.length ? 'Preserve every supplied reference person faithfully and integrate them into the infographic, rather than making a plain portrait.' : '',
     STUDIO_BRAND_RULES,
+    FACE_LOCK,
     STUDIO_LOGO_RESERVATION,
   ].filter(Boolean).join('\n\n')
   const { b64 } = await generateImageWithOpenAI(prompt, options.referenceImageUrls ?? [], { aspectRatio: '4:5', safetyFallbackPrompt })
   const poster = await resizeToPoster(Buffer.from(b64, 'base64'))
-  const { buffer } = await compositeLogoBottomRight(poster, brand.first1saudi_logo_url, { widthRatio: 0.1 })
+  const { buffer } = await compositeLogoBottomRight(poster, brand.first1saudi_logo_url)
   const path = `${filePrefix}-${Date.now()}-${Math.random().toString(36).slice(2)}.png`
   const { error } = await service.storage.from('content-images').upload(path, buffer, { contentType: 'image/png' })
   if (error) throw new Error(`تعذّر حفظ التصميم: ${error.message}`)

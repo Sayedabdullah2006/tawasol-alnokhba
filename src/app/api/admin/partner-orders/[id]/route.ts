@@ -1,5 +1,6 @@
 import { partnerAdmin } from '@/lib/partners/admin'
 import { PartnerError, text, uuid } from '@/lib/partners/auth'
+import { isPartnerStudioImage, partnerStudioImageRef } from '@/lib/partners/studio-media'
 import { partnerMedia } from '@/lib/partners/media'
 
 async function handle(request: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -22,6 +23,10 @@ async function handle(request: Request, ctx: { params: Promise<{ id: string }> }
     }
     const { data: files, error: fileError } = await db.from('partner_files').select('id,path,name,mime_type,size').eq('request_id', id).eq('completed', true)
     if (fileError) throw new PartnerError('FILES_UNAVAILABLE', 503)
+    if (new URL(request.url).searchParams.get('studio') === '1') {
+      const images = (files ?? []).filter(isPartnerStudioImage).map(file => partnerStudioImageRef(file.id))
+      return Response.json({ images }, { headers: { 'Cache-Control': 'private, no-store' } })
+    }
     const visibleFiles = await Promise.all((files ?? []).map(async file => {
       const media = partnerMedia(file.name)
       let preview_url: string | null = null

@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
-import { STUDIO_DESIGN_DIRECTIONS } from '@/lib/studio-design-guidelines'
 import { readFile } from 'fs/promises'
 import path from 'path'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { getOpenAI, chatComplete, STUDIO_EDITORIAL_DESIGN_RULES } from '@/lib/openai'
-import { OPENAI_MODEL } from '@/lib/ai-studio'
+import { OPENAI_MODEL, analyzeNews, generateConcepts, conceptToString, buildNewsText, buildCompactImagePrompt } from '@/lib/ai-studio'
 import { generateImageWithOpenAI, imageGenerationErrorMessage } from '@/lib/image-generation'
 import { compositeCampaignLogos, resizeToPoster } from '@/lib/logo-overlay'
 import { completeGenerationJob, failGenerationJob, startGenerationJob, throwIfGenerationCancelled } from '@/lib/generation-jobs'
@@ -64,7 +63,7 @@ async function generateInsoCopy(item: InsoCoverageSeed, extra?: string) {
   return enforceInsoFooter(completion.choices[0]?.message?.content ?? '')
 }
 
-async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args: { note?: string; exactText?: string; direction: string; sourceImages?: string[]; hasVideo?: boolean; videoOrientation?: 'landscape' | 'portrait' }) {
+async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args: { note?: string; exactText?: string; direction: string; analysis?: unknown; sourceImages?: string[]; hasVideo?: boolean; videoOrientation?: 'landscape' | 'portrait' }) {
   const service = await createServiceRoleClient()
   const { data: brand } = await service.from('brand_settings').select('first1saudi_logo_url').eq('id', 1).single()
   if (!brand?.first1saudi_logo_url) {
@@ -74,50 +73,26 @@ async function generateInsoDesign(item: InsoCoverageSeed, postText: string, args
     sourceImageUrls: args.sourceImages ?? [],
     variantKey: `${item.coverage_date}:${item.slot}:${args.direction}:${args.note ?? ''}`,
   })
+  const studioPrompt = buildCompactImagePrompt({
+    analysis: args.analysis ?? { achievement_core: item.title, subtitle: item.brief, news_type: 'other' },
+    chosenConcept: args.direction, sourceText: postText, note: args.note,
+    templateDirective, hasVideo: args.hasVideo, videoOrientation: args.videoOrientation,
+  })
   const prompt = [
-    'Create an editorial 4:5 social media poster for the International Nuclear Science Olympiad 2026 in Jeddah.',
-    STUDIO_EDITORIAL_DESIGN_RULES,
-    'Arabic-first premium scientific event design. Deep emerald #0A3A2A and luxurious gold #D4AF37; the Minimal direction MUST allow a dominant light ivory, warm-white or pale-emerald background, Classic uses medium/light emerald, and only Dramatic requires a dark emerald background. Show science, global exchange, youth talent, and peaceful nuclear science through elegant visual metaphors; never show weapons, explosions, radiation danger signs, or fake logos.',
-    REAL_ARCHITECTURE_RULE,
-    `Event moment: ${item.title}. ${item.brief}`,
-    `Source post facts to interpret visually: ${postText}. Do not copy or paste this caption into the design.`,
-    `Creative direction: ${args.direction}.`,
-    templateDirective,
-    args.sourceImages?.length
-      ? `Use all ${args.sourceImages.length} supplied reference images as intact documentary photographs in one creative composition. Do not redraw, restyle, replace, or synthesize people; retain each photo's real pose, clothing, and scene while designing the surrounding layout creatively.`
-      : 'No reference image was supplied. Use symbolic science visuals without generated people or faces. Make Jeddah unmistakable and authentic through the Red Sea waterfront, event details, science, or a real verified landmark only. Never use a generic foreign city, invented tower, fictional venue, or imaginary cityscape.',
-    args.hasVideo
-      ? args.videoOrientation === 'portrait'
-        ? 'This is a cover for a vertical 9:16 event video. On the 1080×1350 canvas reserve one large, empty 9:16 video window aligned to the right, around 56% of the canvas width and 80% of its height, ending above the bottom 220-pixel logo pocket. It must be the dominant element, with a slim gold outline and a subtle play icon on the outer border only. Keep the window empty: no people, photos, words, numbers, or icons inside it. Build a clear Arabic RTL information column on the left, with all content and reference imagery arranged around the portrait video window. Never turn it into a horizontal frame.'
-        : 'This is a cover for a horizontal 16:9 event video. On the 1080×1350 canvas reserve one large, empty 16:9 video window spanning almost the full width across the upper half. It must be the dominant element, with a slim gold outline and a subtle play icon on the outer border only. Keep the window empty: no people, photos, words, numbers, or icons inside it. Arrange the Arabic RTL title, facts, and reference imagery below or around it. Never turn it into a vertical frame.'
-      : '',
-    'Turn the facts into an original visual infographic hierarchy: use a concise Arabic headline only when it can be rendered accurately, then 2 to 4 short factual callouts, numbers, icons, data marks, or a small timeline. Never use long paragraphs, never repeat the full post caption, and never make the design look like a screenshot of a social post.',
-    args.exactText?.trim() ? `Add this exact Arabic phrase in a small, readable line: "${args.exactText.trim()}". Copy every character exactly as supplied with correct connected RTL shaping. Do not invent, shorten, translate, spell-correct, or alter it.` : '',
-    'Reserve a 300×220-pixel lower-right pocket for original First1Saudi and Mawhiba digital overlays, including the full area below them. No text, people, numbers, icons or video in or beneath this pocket. Continue the surrounding background seamlessly; never draw a separate colored rectangle, rounded card, frame or panel for this pocket. Generate the full-width curved emerald footer with a gold-edged swoosh, all five equal white social icons (X, Instagram, LinkedIn, Facebook, TikTok) and the exact handle "@First1Saudi" in the left/center area; only the original logos are overlaid digitally. Generate the social icons and "@First1Saudi" in the footer left/center, away from the logo area.',
-    args.note?.trim() ? `Additional creative direction: ${args.note.trim()}` : '',
-  ].filter(Boolean).join('\n\n')
-  const safetyFallbackPrompt = [
-    'Create a premium 4:5 Arabic editorial social poster for the International Nuclear Science Olympiad 2026 in Jeddah.',
+    'Create ONE complete portrait 4:5 Arabic editorial poster for this verified INSO event story, integrating the actual source photographs, text and supporting topic icons together.',
     STUDIO_EDITORIAL_DESIGN_RULES,
     REAL_ARCHITECTURE_RULE,
-    `Event moment and verified brief: ${item.title}. ${item.brief}`,
-    `Interpret these source-post facts visually: ${postText.slice(0, 3500)}.`,
-    `Mandatory creative direction: ${args.direction}.`,
-    args.sourceImages?.length
-      ? 'Use every supplied reference image as an intact documentary photograph. Integrate the photos creatively without redrawing, replacing, or restyling people.'
-      : 'Use only authentic Jeddah context or abstract scientific elements. Omit any architecture whose authenticity is uncertain.',
-    'Use one concise Arabic headline and 2 to 4 short factual callouts in strict right-to-left hierarchy. Do not copy the whole caption.',
-    'Reserve the same 300×220-pixel lower-right digital-logo pocket, with no text in or underneath it; generate the curved footer, all five social icons and exact "@First1Saudi" at bottom left/center.',
-    args.exactText?.trim() ? `Add this exact Arabic phrase exactly as written: "${args.exactText.trim()}".` : '',
-    args.note?.trim() ? `Additional creative direction: ${args.note.trim()}` : '',
-    'Avoid flags, weapons, radiation-danger symbols, danger imagery, explosions, political messaging, military content, invented buildings, and invented claims.',
+    studioPrompt,
+    args.exactText?.trim() ? 'ADDITIONAL APPROVED VISIBLE COPY: "' + args.exactText.trim() + '". Place it after the complete news, without changing other approved copy.' : '',
+    'Original First1Saudi and Mawhiba logos and the social lockup are added after generation in the same blank ivory digital footer. Never redraw them or change the pictured people.',
   ].filter(Boolean).join('\n\n')
+  const safetyFallbackPrompt = prompt + '\n\nSimplify the surrounding graphics only; preserve the selected direction, approved visible copy, original people and empty digital footer. No invented architecture or new source facts.'
   const { b64 } = await generateImageWithOpenAI(prompt, args.sourceImages ?? [], { quality: 'high', safetyFallbackPrompt })
   const poster = await resizeToPoster(Buffer.from(b64, 'base64'))
   const response = await fetch(brand.first1saudi_logo_url)
   if (!response.ok) throw new Error('تعذّر تحميل شعار أول سعودي من إعدادات الهوية')
   const logos: Array<{ input: Buffer; widthRatio: number }> = [
-    { input: Buffer.from(await response.arrayBuffer()), widthRatio: 0.075 },
+    { input: Buffer.from(await response.arrayBuffer()), widthRatio: 235 / 1080 },
   ]
   // The room uses the approved Mawhiba Arabic/English lockup, with its white lettering preserved.
   const mawhibaLogo = await readFile(path.join(process.cwd(), 'public', 'brands', 'mawhiba-inso-calligraphy.png'))
@@ -268,7 +243,11 @@ export async function POST(request: Request) {
         await failGenerationJob(generationJobId, new Error('ولّد أو اكتب نص المنشور أولاً'))
         return NextResponse.json({ error: 'ولّد أو اكتب نص المنشور أولاً' }, { status: 400 })
       }
-      const directions = STUDIO_DESIGN_DIRECTIONS.map(direction => `${direction.title}: ${direction.brief}`)
+      const openai = getOpenAI()
+      const newsText = buildNewsText({ title: item.title, content: postText, extraInfo: item.brief })
+      const analysis = await analyzeNews(openai, { newsText, sourceImages })
+      const concepts = await generateConcepts(openai, { analysis, newsText, sourceImages, hasVideo: body.hasVideo, videoOrientation: body.videoOrientation })
+      const directions = concepts.map(conceptToString)
       const optionIndex = Number.isInteger(body.optionIndex) ? Number(body.optionIndex) : 0
       if (optionIndex < 0 || optionIndex >= directions.length) {
         await failGenerationJob(generationJobId, new Error('خيار التصميم غير صالح'))
@@ -280,9 +259,9 @@ export async function POST(request: Request) {
         const index = directions.indexOf(direction)
         createdOptions.push({
           id: `${Date.now()}-${index}`,
-          title: `الخيار ${index + 1}`,
+          title: concepts[index]?.title || `الخيار ${index + 1}`,
           direction,
-          imageUrl: await generateInsoDesign(item, postText, { direction, note: body.designNote, exactText: body.exactText, sourceImages, hasVideo: body.hasVideo, videoOrientation: body.videoOrientation }),
+          imageUrl: await generateInsoDesign(item, postText, { direction, analysis, note: body.designNote, exactText: body.exactText, sourceImages, hasVideo: body.hasVideo, videoOrientation: body.videoOrientation }),
           hasVideo: Boolean(body.hasVideo),
           videoOrientation: body.hasVideo ? (body.videoOrientation ?? 'landscape') : undefined,
           selected: false,
@@ -326,7 +305,7 @@ export async function POST(request: Request) {
       const editHistory = Array.isArray(options[optionIndex].editHistory)
         ? options[optionIndex].editHistory.filter((entry: unknown): entry is string => typeof entry === 'string' && entry.trim().length > 0).slice(-8)
         : []
-      const edited = await editDesign({ designImageUrl: options[optionIndex].imageUrl, note, exactText, referenceImageUrls: sourceImages, preserveEdits: editHistory })
+      const edited = await editDesign({ designImageUrl: options[optionIndex].imageUrl, note, exactText, referenceImageUrls: sourceImages, preserveEdits: editHistory, campaignBranding: true })
       await throwIfGenerationCancelled(generationJobId)
       const nextOptions = options.map((entry: { id?: string }, index: number) => index === optionIndex ? { ...entry, imageUrl: edited.imageUrl, createdAt: new Date().toISOString(), editHistory: [...editHistory, note].slice(-8) } : entry)
       const { data, error } = await service.from('event_coverage_items').update({

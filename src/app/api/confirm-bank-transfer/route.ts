@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
-import { notifyBankTransferReceivedToAdmin } from '@/lib/email'
+import { notifyBankTransferReceivedToAdmin, notifyBankTransferUnderReviewToClient } from '@/lib/email'
 
 export async function POST(request: Request) {
   try {
@@ -9,10 +9,11 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: 'يجب تسجيل الدخول' }, { status: 401 })
 
     const { requestId, receiptUrl } = await request.json()
+    if(typeof requestId!=='string'||typeof receiptUrl!=='string'||!receiptUrl.trim())return NextResponse.json({error:'إيصال التحويل مطلوب'},{status:400})
 
     const { data: req } = await supabase
       .from('publish_requests')
-      .select('user_id, status, request_number, client_name, final_total, admin_quoted_price')
+      .select('user_id, status, request_number, client_name, client_email, final_total, admin_quoted_price')
       .eq('id', requestId)
       .single()
 
@@ -32,6 +33,9 @@ export async function POST(request: Request) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', requestId)
+      .eq('status', 'approved')
+      .select('id')
+      .single()
 
     if (error) {
       console.error('Confirm transfer error:', error)
@@ -41,11 +45,11 @@ export async function POST(request: Request) {
     // Notify admin about the bank transfer receipt
     const requestNumber = `ATH-${String(req.request_number).padStart(4, '0')}`
     const totalAmount = req.final_total ?? req.admin_quoted_price ?? 0
-    notifyBankTransferReceivedToAdmin({
+    await Promise.allSettled([notifyBankTransferReceivedToAdmin({
       requestNumber,
       clientName: req.client_name ?? 'العميل',
       totalAmount: Number(totalAmount)
-    }).catch(e => console.error('Admin bank transfer notification failed:', e))
+    }), ...(req.client_email?[notifyBankTransferUnderReviewToClient({requestId,email:req.client_email,clientName:req.client_name??'العميل',requestNumber,receiptReference:receiptUrl})]:[])])
 
     return NextResponse.json({ success: true })
   } catch (err) {

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { generateNewsletterPoster, getWeeklyWindow } from '@/lib/newsletter'
+import { isStudioReviewBundle } from '@/lib/studio-review-bundle'
 import { uploadMediaFromUrl, publishNow } from '@/lib/postpulse'
 
 export const dynamic = 'force-dynamic'
@@ -52,8 +53,8 @@ async function handle(request: NextRequest) {
     const label = gen.window.label
     const newsletterId = gen.id
 
-    if (dryRun) {
-      return NextResponse.json({ success: true, dryRun: true, label, imageUrl, caption })
+    if (dryRun || isStudioReviewBundle(caption)) {
+      return NextResponse.json({ success: true, dryRun, awaitingApproval: !dryRun, label, imageUrl, caption })
     }
 
     // رفع البوستر إلى Post-Pulse ثم النشر على X فقط

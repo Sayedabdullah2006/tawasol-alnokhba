@@ -4,13 +4,15 @@
  * الاختيار: المثبّت يدوياً (in_newsletter) حصراً إن وُجد، وإلا اختيار تلقائي بتنويع
  * الأقسام والأحدث ضمن نافذة الأسبوع. النشر كل جمعة 1م بتوقيت السعودية.
  */
-import sharp from 'sharp'
+import { STUDIO_BRAND_RULES, FACE_LOCK, STUDIO_FACT_RULES, STUDIO_EDITORIAL_VOICE, studioFooterReservation } from './studio-design-guidelines'
+import { compositeLogoBottomRight, resizeToPoster } from './logo-overlay'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { generateImageWithOpenAI } from '@/lib/image-generation'
 import { getOpenAI, chatComplete } from '@/lib/openai'
+import { STUDIO_NEWS_LAYOUT_RULES, SYS_TWEETS } from './studio-reference-prompts'
 
 const NL_WIDTH = 1080
-const NL_HEIGHT = 1920
+const NL_HEIGHT = 1350
 
 export interface NewsletterItem {
   index: number
@@ -206,7 +208,7 @@ export const NEWSLETTER_DIRECTIONS: string[] = [
   'إنفوجرافيك تحريري بخطوط وأيقونات محدودة',
   'صفحة مجلة بصور منفصلة وعناوين موجزة',
   'تصميم مينمال فاخر بمساحات واسعة وتايبوغرافي قوي',
-  'تخطيط تقريري هادئ مع صورة رئيسية واضحة',
+  'تكوين تحريري متعدد الطبقات بمساحات سالبة واضحة',
 ]
 
 function weeklySeed(window: WeeklyWindow): number {
@@ -214,35 +216,15 @@ function weeklySeed(window: WeeklyWindow): number {
 }
 
 function buildNewsletterPrompt(window: WeeklyWindow, items: NewsletterItem[], direction: string): string {
-  const list = items
-    .map(it => `${it.index}. العنوان البارز: "${it.title}"${it.blurb ? ` — النبذة: "${it.blurb}"` : ''}`)
-    .join('\n')
+  const lead = items[0]
   return [
-    `DESIGN TASK — صمّم واجهة مجلّة/جريدة عربية عمودية **إبداعية وعصرية** (editorial magazine cover, not a plain classic newspaper). تكوين فنّي جريء وأنيق غير تقليدي.`,
-    `OUTPUT SIZE: vertical poster ${NL_WIDTH}×${NL_HEIGHT} (9:16), ultra-HD, print-quality.`,
-    `الاتجاه الإبداعي لهذا الأسبوع: ${direction}.`,
-    ``,
-    `الإبداع المطلوب: تكوين تحريري واضح — خبر رئيسي بمساحة كبيرة، وبقية الأخبار بأحجام وأعمدة متفاوتة، مع كتل لونية محدودة من الهوية، فواصل ذهبية رفيعة، وتايبوغرافي عربي قوي بأوزان متدرّجة. اجعل كل صورة لقطة وثائقية مستقلة ولا تدمج الأشخاص أو تعِد رسمهم.`,
-    ``,
-    `MASTHEAD (top): شريط علوي صلب بلون الهوية بارتفاع ≈ 300 بكسل، فيه عنوان عربي ضخم "النخبة في ٧" + سطر صغير "نشرة أسبوعية" + نطاق التاريخ "${window.label}" + خط ذهبي فاصل أسفله.`,
-    `‼️ الشعار: اترك في يسار الشريط العلوي مساحة مربّعة نظيفة ≈ ٢٦٠×٢٦٠ بكسل خالية تماماً (متمركزة رأسياً) — مخصّصة للشعار الذي يُضاف برمجياً. **بلا أي إطار أو حدود أو مربّع حول هذه المساحة — خلفية صلبة فقط**. لا ترسم أي شعار أو كلمة "FIRST1SAUDI".`,
-    ``,
-    `=== 🔒 صور الأشخاص — قاعدة حديدية (أهم قاعدة) ===`,
-    `‼️ **كل خبر يجب أن تظهر فيه صورته الحقيقية المرفقة**. عدد الصور المرفقة = عدد الأخبار (${items.length})، فلا تترك أي خبر بلا صورة، ولا تجعل أي بطاقة نصاً فقط.`,
-    `⛔ استخدم الصور الحقيقية المرفقة كما هي حصراً (نفس الوجه/الملامح). لا تُولّد ولا تختلق أي شخص/وجه، ولا تستبدل، ولا تُجمّل.`,
-    `ضع صورة كل خبر بارزة داخل بطاقته (في الأعلى أو الجانب). اربط كل صورة بخبرها المناسب ولا تكرّر صورة.`,
-    ``,
-    `=== ربط الصور ===`,
-    `‼️ الصور المرفقة مرتّبة بترتيب الأخبار تماماً: الصورة رقم N هي صورة الخبر رقم N. التزم بهذا الربط حرفياً ولا تخلط صورة خبر مع خبر آخر.`,
-    ``,
-    `=== العناوين ===`,
-    `‼️ العنوان البارز لكل خبر هو **نص "العنوان البارز" المقتبس أدناه فقط** (وهو يحمل اسم الشخص/الإنجاز). ⛔ لا تعرض اسم القسم أو التصنيف أو أي كلمة مثل (اختراعات/أوائل/بيئة/شهادات/تخرّج/العلوم...) كعنوان أو ترويسة إطلاقاً.`,
-    `اكتب نصوص العناوين والنبذ العربية حرفياً بين علامتي اقتباس كما هي:`,
-    list,
-    ``,
-    `🔒 BRAND IDENTITY (FIRST1SAUDI): Deep emerald #0A3A2A · luxurious gold #D4AF37 · light ivory, warm-white or pale-emerald dominant backgrounds are allowed when appropriate to the direction; keep emerald/gold accents.`,
-    `FOOTER: ولّد تذييلاً زمردياً بعرض التصميم بمنحنى أخضر وحافة ذهبية، وفي الوسط أيقونات X وInstagram وLinkedIn وFacebook وTikTok الخمس كاملة ومتساوية، ثم "@First1Saudi" باللون الأبيض؛ الشعار فقط يضاف برمجياً، وممنوع توليد الروابط. لا تضع نصاً داخل مساحة الشعار أعلى اليسار أو تحته ضمن الشريط العلوي، ولا تولّد شعاراً أو علامة مائية.`,
-    `قواعد: نصوص عربية حادّة متّصلة صحيحة الاتجاه (RTL) وحرفية. كل نبذة جملة مكتملة المعنى. لا تختلق نصاً. لا نِسب مئوية. لا إيموجي. لا نقاط «...». لا منشن (@) ولا أسماء أقسام في التصميم.`,
+    `Create ONE 1080×1350 portrait 4:5 cover for the weekly newsletter. Direction: ${direction}.`,
+    STUDIO_FACT_RULES, STUDIO_BRAND_RULES, STUDIO_NEWS_LAYOUT_RULES, FACE_LOCK,
+    studioFooterReservation(NL_WIDTH, NL_HEIGHT),
+    'The first actual reference belongs to the lead story; never mix identities between images. Use the actual lead photo as the dominant element (at least 60%) without changing the person. Other stories remain in the newsletter body, not additional text cards on this cover. Never invent a person if the lead has no suitable documentary reference.',
+    `Lead story source: ${lead?.fullContent || lead?.blurb || lead?.title || ''}`,
+    `Approved lead title: "${lead?.title || ''}". Reduce visible copy to the full verified name, one concise achievement line, and at most one useful number already documented in this source. Do not repeat the name. No multi-story grid, masthead, date range, subtitles or source row. Date range ${window.label} is editorial context only.`,
+    'Only original digital logo and social icons with First1Saudi belong in the small bottom strip. Inspect the actual final export for readable Arabic, likeness, integration, footer and exact dimensions.',
   ].join('\n')
 }
 
@@ -251,26 +233,13 @@ function buildNewsletterPrompt(window: WeeklyWindow, items: NewsletterItem[], di
  * وحجم ثابتين دائماً، ضمن الزاوية النظيفة المحجوزة له في التصميم.
  */
 async function compositeBrandLogo(poster: Buffer): Promise<Buffer> {
-  try {
-    const sc = await createServiceRoleClient()
-    const { data: brand } = await sc.from('brand_settings').select('first1saudi_logo_url').eq('id', 1).single()
-    const url = brand?.first1saudi_logo_url
-    if (!url) return poster
-    const r = await fetch(url)
-    if (!r.ok) return poster
-    const logo = await sharp(Buffer.from(await r.arrayBuffer())).resize({ width: 200 }).png().toBuffer()
-    const meta = await sharp(logo).metadata()
-    const h = meta.height ?? 200
-    const BAND = 300 // ارتفاع الشريط العلوي المتّفق عليه في البرومبت
-    const top = Math.max(28, Math.round(BAND / 2 - h / 2)) // توسيط رأسي داخل الشريط
-    return await sharp(poster).composite([{ input: logo, top, left: 60 }]).png().toBuffer()
-  } catch {
-    return poster
-  }
+  const sc = await createServiceRoleClient()
+  const { data: brand } = await sc.from('brand_settings').select('first1saudi_logo_url').eq('id', 1).single()
+  return (await compositeLogoBottomRight(poster, brand?.first1saudi_logo_url ?? '')).buffer
 }
 
 function defaultCaption(w: WeeklyWindow): string {
-  return `🗞️ النخبة في ٧ — ${w.label}\nأبرز إنجازات الأسبوع في لقطة واحدة.\n#أول_سعودي #First1Saudi`
+  return `نشرة إنجازات الأسبوع — ${w.label}\nمسودة تحتاج مراجعة النص قبل النشر؛ تعذر توليد الحزمة النصية.`
 }
 
 /** يعيد صياغة نبذة كل خبر كجملة عربية مكتملة مختصرة بلا منشن/هاشتاق/نقاط. */
@@ -305,14 +274,13 @@ async function refineBlurbs(items: NewsletterItem[]): Promise<string[]> {
 async function generateCaption(window: WeeklyWindow, items: NewsletterItem[]): Promise<string> {
   try {
     const openai = getOpenAI()
-    const titles = items.map((it, i) => `${i + 1}. ${it.title}`).join('\n')
+    const titles = items.map((it, i) => `${i + 1}. ${it.title}\n${it.fullContent || it.blurb}`).join('\n\n')
     const completion = await chatComplete(openai, {
       model: 'gpt-5.5',
       messages: [
         {
           role: 'system',
-          content:
-            'أنت كاتب محتوى مبدع لحساب First1Saudi. اكتب نصاً مرافقاً لنشرة «النخبة في ٧» الأسبوعية يلخّص أبرز إنجازات الأسبوع بأسلوب تشويقي راقٍ يشدّ القارئ ويحثّه على مشاهدة النشرة. سطران إلى ثلاثة بفصحى جذّابة، التقط الأبرز ولا تعدّد كل العناوين، بلا مبالغة ولا نِسب مئوية، وأنهِ بهاشتاقات #أول_سعودي #First1Saudi.',
+          content: SYS_TWEETS + '\nهذه نشرة أسبوعية؛ ابدأ بأقوى إنجاز موثق من الأخبار المرفقة، ولا تخلط أرقام أشخاص مختلفين. لا تستخدم عنوان خبر مقتضب لاختلاق تفاصيل أو حسابات. بقية الأخبار في المتن المرافق، والتصميم غلاف للخبر الرئيسي فقط. لا تخترع رابطًا للنشرة؛ إن لم يقدم رابط منشور استخدم موضع الرابط في الرد الأول. هذه حزمة مراجعة وليست نصًا صالحًا للجدولة بكامله.',
         },
         { role: 'user', content: `نطاق الأسبوع: ${window.label}\nعناوين أخبار النشرة:\n${titles}` },
       ],
@@ -365,9 +333,9 @@ export async function generateNewsletterPoster(opts?: {
   const prompt = buildNewsletterPrompt(window, items, direction)
   const refs = items.map(i => i.sourceImage || i.image).filter((u): u is string => !!u).slice(0, 8)
 
-  const { b64 } = await generateImageWithOpenAI(prompt, refs, { aspectRatio: '9:16', allowSafetyFallback: false })
+  const { b64 } = await generateImageWithOpenAI(prompt, refs, { aspectRatio: '4:5', allowSafetyFallback: false })
   const raw = Buffer.from(b64, 'base64')
-  const poster = await sharp(raw).resize(NL_WIDTH, NL_HEIGHT, { fit: 'cover', position: 'top' }).png().toBuffer()
+  const poster = await resizeToPoster(raw, NL_WIDTH, NL_HEIGHT)
   const withLogo = await compositeBrandLogo(poster)
 
   // النص المرافق التشويقي (يُولَّد قبل النشر)

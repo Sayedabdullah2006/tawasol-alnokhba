@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
-import { notifyInfoResubmittedToAdmin } from '@/lib/email'
+import { notifyInfoResubmittedToAdmin, notifyStatusUpdateToClient } from '@/lib/email'
 import { normalizeImageUrls, normalizeSupportingDocuments } from '@/lib/request-attachments'
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -89,10 +89,10 @@ export async function POST(request: Request) {
     }
 
     const requestNumber = `ATH-${String(existing.request_number).padStart(4, '0')}`
-    notifyInfoResubmittedToAdmin({
+    await Promise.allSettled([notifyInfoResubmittedToAdmin({
       requestNumber,
       clientName: existing.client_name ?? 'العميل',
-    }).catch(e => console.error('Admin notification failed:', e))
+    }), ...(existing.client_email?[notifyStatusUpdateToClient({requestId,email:existing.client_email,clientName:existing.client_name??'العميل',requestNumber,status:'in_progress',statusLabel:'استلمنا المعلومات الإضافية، واستؤنف تحضير طلبك',statusChangedAt:String(existing.updated_at)})]:[])])
 
     return NextResponse.json({ success: true })
   } catch (err) {

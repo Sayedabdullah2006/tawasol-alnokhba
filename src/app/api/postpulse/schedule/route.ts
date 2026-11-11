@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
 import { listScheduledPosts, uploadMediaFromUrl, publishNow } from '@/lib/postpulse'
 import { sendEmail } from '@/lib/email'
+import { isStudioReviewBundle, STUDIO_REVIEW_BUNDLE_ERROR } from '@/lib/studio-review-bundle'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 180
@@ -22,6 +23,7 @@ export async function POST(req: Request) {
   try { body = await req.json() } catch { return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 }) }
 
   const content = (body.content ?? '').trim()
+  if (isStudioReviewBundle(content)) return NextResponse.json({ error: STUDIO_REVIEW_BUNDLE_ERROR }, { status: 400 })
   const imageUrl = (body.imageUrl ?? '').trim()
   const local = (body.scheduledLocal ?? '').trim()
   if (!content && !imageUrl) return NextResponse.json({ error: 'النص أو التصميم مطلوب' }, { status: 400 })
