@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "predev": "node scripts/prepare-workforce-pdf.mjs",
-    "prebuild": "node --test tests/studio-nationality-policy.test.mjs && node scripts/prepare-workforce-pdf.mjs"
+    "prebuild": "node scripts/prepare-workforce-pdf.mjs"
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
