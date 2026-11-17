@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { FIRST1SAUDI_SERVICES_URL } from '@/lib/first1saudi-links'
 
 const stats = [
   { value: '+500K', label: 'وصول شهري' },
@@ -48,7 +49,7 @@ export default function HomePage() {
                 نحول خبرك إلى محتوى وتصميم وخطة نشر متكاملة، وتبقى أنت صاحب القرار قبل وصوله إلى الجمهور.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link href="/request" className="rounded-lg bg-green px-6 py-3 text-sm font-black text-white shadow-lg shadow-green/20 transition hover:bg-green/90 sm:text-base">ابدأ طلبك الآن</Link>
+                <Link href={FIRST1SAUDI_SERVICES_URL} className="rounded-lg bg-green px-6 py-3 text-sm font-black text-white shadow-lg shadow-green/20 transition hover:bg-green/90 sm:text-base">ابدأ طلبك الآن</Link>
                 <Link href="/services" className="rounded-lg border border-green/35 bg-white/55 px-6 py-3 text-sm font-bold text-green backdrop-blur-sm transition hover:bg-white/85 sm:text-base">استكشف الخدمات</Link>
               </div>
               <p className="mt-7 text-xs font-bold text-dark/75">من الإنجاز إلى الحضور: صياغة احترافية، تصميم متقن، ونشر يصل إلى جمهوره.</p>
@@ -132,7 +133,7 @@ export default function HomePage() {
         <div className="glass-panel-dark rounded-lg px-6 py-10 text-center sm:px-12">
           <h2 className="text-3xl font-black text-white sm:text-4xl">جاهز تترك أثراً دائماً؟</h2>
           <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-white/70">قدّم طلبك الآن، وتابع كل مرحلة من الصياغة إلى الاعتماد ثم النشر.</p>
-          <Link href="/request" className="mt-7 inline-flex rounded-lg bg-gold px-7 py-3 text-sm font-black text-dark shadow-lg shadow-black/20 transition hover:bg-gold/90">ابدأ طلبك الآن</Link>
+          <Link href={FIRST1SAUDI_SERVICES_URL} className="mt-7 inline-flex rounded-lg bg-gold px-7 py-3 text-sm font-black text-dark shadow-lg shadow-black/20 transition hover:bg-gold/90">ابدأ طلبك الآن</Link>
         </div>
       </section>
     </div>

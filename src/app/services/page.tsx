@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { FIRST1SAUDI_SERVICES_URL } from '@/lib/first1saudi-links'
 
 export const metadata = {
   title: 'الخدمات والمنتجات | تواصل النخبة',
@@ -72,7 +73,7 @@ export default function ServicesPage() {
             </div>
 
             <div className="mt-12 text-center">
-              <Link href="/request"
+              <Link href={FIRST1SAUDI_SERVICES_URL}
                 className="inline-block px-8 py-4 bg-green text-white rounded-xl text-lg font-bold hover:bg-green/90 transition-all">
                 ابدأ طلبك الآن
               </Link>

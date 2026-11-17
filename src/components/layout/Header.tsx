@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { FIRST1SAUDI_SERVICES_URL } from '@/lib/first1saudi-links'
 import { useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -10,7 +11,7 @@ import ClientNameFixed from '@/components/ui/ClientNameFixed'
 const navLinks = [
   { href: '/', label: 'الرئيسية' },
   { href: '/inventor-store', label: 'مسار المخترع', badge: 'جديد' },
-  { href: '/request/start', label: 'طلب نشر' },
+  { href: FIRST1SAUDI_SERVICES_URL, label: 'طلب نشر' },
 ]
 
 interface UserInfo {
