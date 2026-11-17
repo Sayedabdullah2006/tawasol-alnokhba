@@ -29,8 +29,15 @@ export async function partnerIdentity(ctx: PartnerContext, action: string) {
       if(link.error)throw new PartnerError('IDENTITY_UNAVAILABLE',503)
       if(link.data?.external_customer_id!==ctx.customer)throw new PartnerError('IDENTITY_LINK_CONFLICT',409)
     }
-    const result = await db.auth.admin.signOut(body.access_token,global?'global':'local')
+    const result = await db.rpc('partner_revoke_first1saudi_sessions', {
+      p_user: user.id,
+      p_session: session,
+      p_client: client,
+      p_customer: ctx.customer,
+      p_global: global,
+    })
     if (result.error) throw new PartnerError('IDENTITY_UNAVAILABLE',503)
+    if (result.data !== true) throw new PartnerError('IDENTITY_SESSION_INVALID',401)
     return global?{logged_out:true,scope:'global',logout_url:'https://nukhba.media/api/oauth/logout?ticket='+encodeURIComponent(globalLogoutTicket(user.id))}:{ logged_out:true, scope:'oauth_session' }
   }
   if (action === 'link') {
