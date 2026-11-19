@@ -4,11 +4,14 @@ import { test } from 'node:test'
 import ts from 'typescript'
 import { NextResponse } from 'next/server.js'
 
-function handler({ user = null, error = null, profile = null, profileError = null, throws = false } = {}) {
+function handler({ user = null, error = null, profile = null, profileError = null, throws = false } = {}, authorization = 'Bearer fixture-token') {
   const source = fs.readFileSync('src/app/api/auth/session/route.ts', 'utf8')
   const exports = {}
   const db = {
-    auth: { getUser: async () => ({ data: { user }, error }) },
+    auth: { getUser: async token => {
+      assert.equal(token, 'fixture-token')
+      return { data: { user }, error }
+    } },
     from(table) {
       assert.equal(table, 'profiles')
       return { select(columns) {
@@ -22,7 +25,11 @@ function handler({ user = null, error = null, profile = null, profileError = nul
   }
   const require = name => {
     if (name === 'next/server') return { NextResponse }
-    if (name === '@/lib/supabase-server') return { createServerSupabaseClient: async () => {
+    if (name === '@/lib/active-auth-session') return { requireActiveAuthSession: client => client }
+    if (name === '@supabase/supabase-js') return { createClient: (_url, _key, options) => {
+      assert.equal(options.auth.persistSession, false)
+      assert.equal(options.auth.autoRefreshToken, false)
+      assert.equal(options.global.headers.Authorization, 'Bearer fixture-token')
       if (throws) throw Error('private provider error')
       return db
     } }
@@ -31,10 +38,17 @@ function handler({ user = null, error = null, profile = null, profileError = nul
   new Function('require', 'exports', ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText)(require, exports)
-  return exports.GET
+  return () => exports.GET(new Request('https://nukhba.media/api/auth/session', {
+    headers: authorization ? { Authorization: authorization } : {},
+  }))
 }
 
 test('anonymous or globally revoked session returns no navigation identity', async () => {
+  for (const authorization of [null, 'Basic fixture', 'Bearer two tokens']) {
+    const response = await handler({}, authorization)()
+    assert.equal(response.status, 401)
+    assert.deepEqual(await response.json(), { user: null })
+  }
   for (const error of [null, { status: 401, code: 'session_not_found' }]) {
     const response = await handler({ error })()
     assert.equal(response.status, 401)

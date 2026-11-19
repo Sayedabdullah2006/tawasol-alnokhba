@@ -36,8 +36,13 @@ export default function Header() {
     const load = async () => {
       const request = ++sequence
       try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        if (!active || request !== sequence) return
+        if (error) throw error
+        if (!session) { setUser(null); return }
         const response = await fetch('/api/auth/session', {
-          cache: 'no-store', credentials: 'same-origin', signal: AbortSignal.timeout(10000),
+          cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(10000),
+          headers: { Authorization: `Bearer ${session.access_token}` },
         })
         if (!active || request !== sequence) return
         if (response.status === 401) { setUser(null); return }
