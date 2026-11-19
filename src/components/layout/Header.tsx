@@ -31,36 +31,54 @@ export default function Header() {
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    let active = true
+    let sequence = 0
     const load = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (authUser) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('full_name, role')
-          .eq('id', authUser.id)
-          .single()
-
-        setUser({
-          id: authUser.id,
-          fullName: profile?.full_name || authUser.email?.split('@')[0] || 'مستخدم',
-          role: profile?.role || 'client',
+      const request = ++sequence
+      try {
+        const response = await fetch('/api/auth/session', {
+          cache: 'no-store', credentials: 'same-origin', signal: AbortSignal.timeout(10000),
         })
+        if (!active || request !== sequence) return
+        if (response.status === 401) { setUser(null); return }
+        if (!response.ok) return // A temporary outage is not proof of logout.
+        const result = await response.json()
+        if (active && request === sequence) setUser(result.user)
+      } catch {
+        // Keep the last verified navigation state during a connection outage.
+      } finally {
+        if (active && request === sequence) setLoading(false)
       }
-      setLoading(false)
     }
-    load()
+    const refreshVisible = () => {
+      if (document.visibilityState === 'visible') void load()
+    }
+    void load()
+    window.addEventListener('focus', refreshVisible)
+    window.addEventListener('pageshow', refreshVisible)
+    document.addEventListener('visibilitychange', refreshVisible)
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
+        ++sequence
         setUser(null)
+        setLoading(false)
       } else {
-        load()
+        // Run outside the Auth callback's lock and ignore older responses.
+        queueMicrotask(() => { if (active) void load() })
       }
     })
 
-    return () => subscription.unsubscribe()
-  }, [supabase])
+    return () => {
+      active = false
+      ++sequence
+      subscription.unsubscribe()
+      window.removeEventListener('focus', refreshVisible)
+      window.removeEventListener('pageshow', refreshVisible)
+      document.removeEventListener('visibilitychange', refreshVisible)
+    }
+  }, [supabase, pathname])
 
   // Close dropdown on outside click
   useEffect(() => {
