@@ -17,6 +17,7 @@ import DateInput from "./DateInput";
 import CompensationPanel from "./CompensationPanel";
 import RequestStatusBadge from "./RequestStatusBadge";
 import RequestMetadata from "./RequestMetadata";
+import DecisionReason from "./DecisionReason";
 import {
   api,
   controlClass,
@@ -651,11 +652,7 @@ export default function EmployeeProfile({
                       <div className="mt-3"><RequestMetadata id={change.id} createdAt={change.created_at} /></div>
                       <p className="mt-2 break-all">{change.proposed_value}</p>
                       <p className="mt-2 text-muted">{change.reason}</p>
-                      {change.decision_reason && (
-                        <p className="mt-2">
-                          قرار الإدارة: {change.decision_reason}
-                        </p>
-                      )}
+                      {change.decision_reason && <div className="mt-3"><DecisionReason reason={change.decision_reason} /></div>}
                       {admin && change.status === "pending" && (
                         <Link
                           href="/admin/workforce/approvals"

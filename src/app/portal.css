@@ -101,8 +101,13 @@ body:has(.portal-screen)::before { display: none; }
 .portal-screen .portal-request-card:hover { border-color: #d5b57099; }
 .portal-screen [data-request-badge="approved"] { background: #164a39; border-color: #54bc91; color: #b5f6d9; }
 .portal-screen [data-request-badge="rejected"] { background: #582b37; border-color: #ed8194; color: #ffd0d7; }
-.portal-screen [data-request-card="approved"] { background: #0f302f; border-color: #54bc9166; }
-.portal-screen [data-request-card="rejected"] { background: #2d202e; border-color: #ed819466; }
+.portal-screen [data-request-card] { background: #10253e; border-color: var(--border); }
+.request-decision > summary::-webkit-details-marker { display: none; }
+.request-decision::details-content { interpolate-size: allow-keywords; overflow: clip; contain: layout; }
+.request-decision:not([open])::details-content { block-size: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .request-decision::details-content { transition: block-size .2s ease, content-visibility .2s, display .2s; transition-behavior: allow-discrete; }
+}
 .portal-screen .portal-toolbar { border: 1px solid #8da9cb33; background: #0a1c32da; border-radius: 18px; padding: 8px; }
 .portal-screen .portal-toolbar button { padding: 10px 18px; border-radius: 12px; font-size: 12px; font-weight: 800; color: #b8cce4; }
 .portal-screen .portal-toolbar button[aria-pressed="true"] { background: #daba78; color: #0e2037; }

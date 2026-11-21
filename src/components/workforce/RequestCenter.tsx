@@ -28,6 +28,7 @@ import {
 } from "./shared";
 import FinalSettlementCard from "./FinalSettlementCard";
 import DecisionSummary from "./DecisionSummary";
+import DecisionReason from "./DecisionReason";
 import RequestStatusBadge from "./RequestStatusBadge";
 import RequestMetadata, { RequestField, requestDate } from "./RequestMetadata";
 import ProfileApprovals from "./ProfileApprovals";
@@ -349,7 +350,7 @@ export default function RequestCenter({
               <article
                 key={row.id}
                 data-request-card={row.status}
-                className={`min-w-0 space-y-4 rounded-3xl border p-5 shadow-sm ${row.status === "pending" ? "border-amber-200 bg-amber-50/70" : row.status === "approved" ? "border-emerald-200 bg-emerald-50/70" : row.status === "rejected" ? "border-red-200 bg-red-50/70" : "border-slate-200 bg-slate-50"}`}
+                className="min-w-0 space-y-4 rounded-3xl border border-border bg-white/90 p-5 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-4">
                   <h2 className="min-w-0 break-words text-lg font-black leading-8">{row.title}</h2>
@@ -403,14 +404,7 @@ export default function RequestCenter({
                   </ul>
                 )}
                 {admin&&row.kind==='resignation'&&row.status==='approved'&&<FinalSettlementCard requestId={row.id} transport={transport}/>}
-                {row.decision_reason && (
-                  <div className="rounded-2xl border border-border bg-white/45 p-4 text-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold">سبب القرار</h3>{row.decided_at && <p className="text-xs text-muted">تاريخ القرار: <time dateTime={row.decided_at}>{requestDate(row.decided_at)}</time></p>}</div>
-                    <p className="mt-2 whitespace-pre-wrap break-words">
-                      {row.decision_reason}
-                    </p>
-                  </div>
-                )}
+                {row.decision_reason && <DecisionReason reason={row.decision_reason} decidedAt={row.decided_at} />}
                 {row.kind==='resignation'&&row.resignation_details&&<section className="space-y-3 rounded-xl border border-amber-300/30 p-4 text-sm">
                   <div className="grid gap-3 sm:grid-cols-2"><div><span className="opacity-70">{row.resignation_details.effective_at?'تاريخ انتهاء العقد':'آخر موعد للقرار'}</span><p className="mt-1 font-bold">{new Date(row.resignation_details.effective_at||row.resignation_details.response_due).toLocaleString('ar-SA',{calendar:'gregory',timeZone:'Asia/Riyadh'})}</p></div><div><span className="opacity-70">{row.resignation_details.settlement_due?'موعد تصفية الحقوق الأقصى':'العدول متاح حتى'}</span><p className="mt-1 font-bold">{new Date(row.resignation_details.settlement_due?row.resignation_details.settlement_due+'T12:00:00+03:00':row.resignation_details.withdraw_until).toLocaleDateString('ar-SA',{calendar:'gregory',timeZone:'Asia/Riyadh'})}</p></div></div>
                   {row.resignation_details.deferred_at&&<p>تأجيل القبول: {row.resignation_details.deferral_reason}</p>}
