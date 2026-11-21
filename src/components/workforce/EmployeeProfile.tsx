@@ -15,6 +15,8 @@ import EmployeeFields, {
 } from "./EmployeeFields";
 import DateInput from "./DateInput";
 import CompensationPanel from "./CompensationPanel";
+import RequestStatusBadge from "./RequestStatusBadge";
+import RequestMetadata from "./RequestMetadata";
 import {
   api,
   controlClass,
@@ -644,8 +646,9 @@ export default function EmployeeProfile({
                     >
                       <div className="flex justify-between gap-2">
                         <strong>{FIELD_LABELS[change.field]}</strong>
-                        <span>{changeStatus[change.status]}</span>
+                        <RequestStatusBadge status={change.status}>{changeStatus[change.status]}</RequestStatusBadge>
                       </div>
+                      <div className="mt-3"><RequestMetadata id={change.id} createdAt={change.created_at} /></div>
                       <p className="mt-2 break-all">{change.proposed_value}</p>
                       <p className="mt-2 text-muted">{change.reason}</p>
                       {change.decision_reason && (
@@ -653,9 +656,6 @@ export default function EmployeeProfile({
                           قرار الإدارة: {change.decision_reason}
                         </p>
                       )}
-                      <p className="mt-2 text-xs text-muted">
-                        {formatDate(change.created_at)}
-                      </p>
                       {admin && change.status === "pending" && (
                         <Link
                           href="/admin/workforce/approvals"

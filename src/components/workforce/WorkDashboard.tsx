@@ -1,4 +1,5 @@
 import Link from "next/link";
+import RequestStatusBadge from "./RequestStatusBadge";
 import type {AttendancePeriod} from "@/lib/workforce/attendance-summary";
 import type {PayrollCardData} from "@/lib/workforce/payroll-attendance";
 import type { ReactNode } from "react";
@@ -69,7 +70,7 @@ export function EmployeeDashboardView({ data, preview=false }: {preview?:boolean
         <PerformanceCard employeeId={data.employee.id} initial={data.performance} preview={preview}/>
       <section className={`${card} border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-100/60 text-violet-950`} aria-label="طلباتي">
         <CardTitle title="طلباتي" icon="request"><span className="rounded-full bg-white/70 px-3 py-1.5 text-xs font-bold">{data.requests.pending} معلقة</span></CardTitle>
-        <div className="flex-1">{data.requests.latest.length ? <div className="space-y-2">{data.requests.latest.map(request => <Link key={request.id} href={`/employee/requests/history?request=${request.id}`} className="flex items-center justify-between gap-3 rounded-xl border border-violet-200/60 bg-white/60 p-3 hover:bg-white"><p className="text-sm font-bold">{request.title}</p><span className="shrink-0 text-xs text-violet-700">{requestState[request.status]}</span></Link>)}</div> : <p className="flex min-h-24 items-center text-sm text-violet-800">لا توجد طلبات سابقة</p>}<Link href="/employee/requests/general" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-violet-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-800"><span aria-hidden>＋</span>طلب جديد</Link></div>
+        <div className="flex-1">{data.requests.latest.length ? <div className="space-y-2">{data.requests.latest.map(request => <Link key={request.id} href={`/employee/requests/history?request=${request.id}`} className="flex items-center justify-between gap-3 rounded-xl border border-violet-200/60 bg-white/60 p-3 hover:bg-white"><p className="text-sm font-bold">{request.title}</p><RequestStatusBadge status={request.status}>{requestState[request.status]}</RequestStatusBadge></Link>)}</div> : <p className="flex min-h-24 items-center text-sm text-violet-800">لا توجد طلبات سابقة</p>}<Link href="/employee/requests/general" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-violet-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-800"><span aria-hidden>＋</span>طلب جديد</Link></div>
         <Link href="/employee/requests/history" className={footer}><span>متابعة طلباتي</span><span aria-hidden>←</span></Link>
       </section>
       <section className={`${card} border-slate-200 bg-white text-[#102b57]`} aria-label="ملفي وأدواتي">

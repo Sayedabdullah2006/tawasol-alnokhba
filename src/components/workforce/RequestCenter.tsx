@@ -27,6 +27,9 @@ import {
   hasUnsavedWorkforceChanges,
 } from "./shared";
 import FinalSettlementCard from "./FinalSettlementCard";
+import DecisionSummary from "./DecisionSummary";
+import RequestStatusBadge from "./RequestStatusBadge";
+import RequestMetadata, { RequestField, requestDate } from "./RequestMetadata";
 import ProfileApprovals from "./ProfileApprovals";
 import PdfAttachmentPreview from "./PdfAttachmentPreview";
 import OvertimePeriod,{localRequestTime} from "./OvertimePeriod";
@@ -172,13 +175,30 @@ export default function RequestCenter({
   }, [page, status, revision, focusOnly, focused, requestKey,transport]);
   async function decide(row: EmployeeRequest, decision: string) {
     if (lock.current) return;
-    if(row.kind==='resignation'&&decision==='approved'&&!(await confirm("قبول الاستقالة الآن؟ يُوثّق انتهاء العقد من وقت القبول وتبدأ إجراءات تسليم العهد وتصفية الحقوق.")))return;
-    if (decision === "cancelled" && !(await confirm(row.kind==='resignation'?"تأكيد العدول عن الاستقالة؟":"إلغاء هذا الطلب؟")))
-      return;
     lock.current = true;
-    setBusy(true);
-    setError("");
     try {
+      if (admin && ["approved", "rejected", "deferred"].includes(decision)) {
+        const action = decision === "approved" ? "الموافقة" : decision === "rejected" ? "الرفض" : "التأجيل";
+        const period = row.kind === "overtime" && decision === "approved"
+          ? `${overtimePeriods[row.id]?.starts_at ?? localRequestTime(row.starts_at)} — ${overtimePeriods[row.id]?.ends_at ?? localRequestTime(row.ends_at)} (الرياض)`
+          : row.starts_at ? [row.starts_at, row.ends_at].filter(Boolean).map(value => new Date(value!).toLocaleString("ar-SA", { calendar: "gregory", timeZone: "Asia/Riyadh" })).join(" — ") : undefined;
+        if (!(await confirm(
+          <DecisionSummary
+            employeeName={row.employeeName || row.resignation_details?.employee_name || "غير محدد"}
+            requestTitle={row.title}
+            requestKind={`${REQUEST_KINDS[row.kind]}${row.kind === "leave" ? ` · ${leaveTypeLabel(row.leave_type)}` : ""}`}
+            reason={reasons[row.id] || ""}
+            period={period}
+            warning={row.kind === "resignation" && decision === "approved"
+              ? "قبول الاستقالة يوثّق انتهاء العقد من وقت القبول وتبدأ إجراءات تسليم العهد وتصفية الحقوق."
+              : decision === "deferred" ? `مدة تأجيل القبول: ${deferralDays[row.id] || 60} يومًا.` : undefined}
+          />,
+          { title: `تأكيد ${action} على الطلب`, confirmLabel: `تأكيد ${action}` },
+        ))) return;
+      }
+      if (decision === "cancelled" && !(await confirm(row.kind === "resignation" ? "تأكيد العدول عن الاستقالة؟" : "إلغاء هذا الطلب؟"))) return;
+      setBusy(true);
+      setError("");
       await transport("/api/workforce/requests", {
         method: "PATCH",
         body: JSON.stringify({
@@ -328,57 +348,28 @@ export default function RequestCenter({
             {rows.map((row) => (
               <article
                 key={row.id}
-                className={`min-w-0 space-y-4 rounded-3xl border p-5 shadow-sm ${row.status === "pending" ? "border-amber-200 bg-amber-50/70" : row.status === "approved" ? "border-emerald-200 bg-emerald-50/70" : "border-slate-200 bg-slate-50"}`}
+                data-request-card={row.status}
+                className={`min-w-0 space-y-4 rounded-3xl border p-5 shadow-sm ${row.status === "pending" ? "border-amber-200 bg-amber-50/70" : row.status === "approved" ? "border-emerald-200 bg-emerald-50/70" : row.status === "rejected" ? "border-red-200 bg-red-50/70" : "border-slate-200 bg-slate-50"}`}
               >
-                <div className="flex flex-wrap justify-between gap-2">
-                  <span className="text-xs text-muted">
-                    {REQUEST_KINDS[row.kind]}
-                    {row.kind === "leave"
-                      ? ` · ${leaveTypeLabel(row.leave_type)}`
-                      : ""}
-                    {admin ? ` · ${row.employeeName || ""}` : ""}
-                  </span>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-bold ${row.status === "pending" ? "bg-amber-50 text-amber-800" : row.status === "approved" ? "bg-green-50 text-green-800" : "bg-slate-100 text-slate-600"}`}
-                  >
+                <div className="flex items-start justify-between gap-4">
+                  <h2 className="min-w-0 break-words text-lg font-black leading-8">{row.title}</h2>
+                  <RequestStatusBadge status={row.status}>
                     {REQUEST_STATUS[row.status]}
-                  </span>
+                  </RequestStatusBadge>
                 </div>
-                <h2 className="font-black">{row.title}</h2>
+                <RequestMetadata id={row.id} createdAt={row.created_at}>
+                  <RequestField label="نوع الطلب">{REQUEST_KINDS[row.kind]}{row.kind === "leave" ? ` · ${leaveTypeLabel(row.leave_type)}` : ""}</RequestField>
+                  {admin && <RequestField label="الموظفة">{row.employeeName || "غير محدد"}</RequestField>}
+                  {row.starts_at && <RequestField label="بداية الفترة"><time dateTime={row.starts_at}>{requestDate(row.starts_at)}</time></RequestField>}
+                  {row.ends_at && <RequestField label="نهاية الفترة"><time dateTime={row.ends_at}>{requestDate(row.ends_at)}</time></RequestField>}
+                  {row.kind === "missing-hours" && <><RequestField label="يوم العمل"><bdi>{row.work_day}</bdi></RequestField><RequestField label="الساعات المطلوبة">{Number((row.missing_minutes ?? 0) / 60).toLocaleString("ar-SA")} ساعة</RequestField></>}
+                  {row.amount && !(admin && row.status === "pending" && row.kind === "overtime") && <RequestField label="المبلغ">{Number(row.amount).toLocaleString("ar-SA")} ر.س</RequestField>}
+                  {row.overtime_details && !(admin && row.status === "pending") && <RequestField label="تفاصيل خارج الدوام">{Number(row.overtime_details.hours).toLocaleString("ar-SA")} ساعة · {Number(row.overtime_details.hourly_rate).toLocaleString("ar-SA", { maximumFractionDigits: 4 })} ر.س/ساعة</RequestField>}
+                  {row.expense_details && <RequestField label="شهر المستحقات">{new Date(`${row.expense_details.payroll_month}T12:00:00+03:00`).toLocaleDateString("ar-SA", { calendar: "gregory", timeZone: "Asia/Riyadh", month: "long", year: "numeric" })}</RequestField>}
+                </RequestMetadata>
                 {row.remote_details&&<div className="space-y-3 rounded-xl border border-current/20 p-3 text-sm"><dl className="grid gap-3 sm:grid-cols-2"><div><dt>أجر الفترة المتفق عليه</dt><dd className="font-bold">{remoteMoney(row.remote_details.snapshot.agreed_amount)}</dd></div><div><dt>البدلات الموقوفة للفترة</dt><dd className="font-bold">{remoteMoney(row.remote_details.snapshot.adjustment_amount)}</dd></div><div><dt>ساعات العمل اليومية</dt><dd className="font-bold">{remoteMinutes(row.remote_details.snapshot.days[0].required_minutes)}</dd></div><div><dt>العودة للشروط السابقة</dt><dd><bdi>{row.remote_details.snapshot.returns_on}</bdi></dd></div></dl><a className="font-bold underline" target="_blank" rel="noreferrer" href={`/api/workforce/requests/${row.id}/remote-agreement`}>عرض الاتفاق الموقّع PDF</a><a className="mr-4 font-bold underline" href={`/api/workforce/requests/${row.id}/remote-agreement?download=1`}>تحميل PDF</a></div>}
                 {row.kind==='leave'&&row.leave_type==='unpaid'&&<UnpaidLeaveSummary estimate={row.unpaid_estimate} error={row.unpaid_estimate_error}/>}
-                {row.kind==='missing-hours'&&<p className="text-sm font-bold">{row.work_day} · {Number((row.missing_minutes??0)/60).toLocaleString('ar-SA')} ساعة</p>}
-                <p className="whitespace-pre-wrap break-words text-sm leading-7">
-                  {row.body}
-                </p>
-                <div className="flex flex-wrap gap-4 text-xs text-muted">
-                  <time>
-                    {new Date(row.created_at).toLocaleDateString("ar-SA", {
-                      calendar: "gregory",
-                    })}
-                  </time>
-                  {row.starts_at && (
-                    <span>
-                      {new Date(row.starts_at).toLocaleString("ar-SA", {
-                        calendar: "gregory",
-                        timeZone: "Asia/Riyadh",
-                      })}{" "}
-                      ←{" "}
-                      {row.ends_at &&
-                        new Date(row.ends_at).toLocaleString("ar-SA", {
-                          calendar: "gregory",
-                          timeZone: "Asia/Riyadh",
-                        })}
-                    </span>
-                  )}
-                  {row.amount && !(admin&&row.status==="pending"&&row.kind==="overtime") && (
-                    <strong className="text-dark">
-                      {Number(row.amount).toLocaleString("ar-SA")} ر.س
-                    </strong>
-                  )}
-                  {row.overtime_details&&!(admin&&row.status==="pending")&&<span>{Number(row.overtime_details.hours).toLocaleString('ar-SA')} ساعة · {Number(row.overtime_details.hourly_rate).toLocaleString('ar-SA',{maximumFractionDigits:4})} ر.س/ساعة</span>}
-                  {row.expense_details&&<span className="font-bold text-emerald-600">أُضيف إلى مستحقات {new Date(`${row.expense_details.payroll_month}T12:00:00+03:00`).toLocaleDateString('ar-SA',{calendar:'gregory',month:'long',year:'numeric'})}</span>}
-                </div>
+                {row.body.trim() && row.body.trim() !== row.title.trim() && <div className="space-y-2"><h3 className="text-xs font-bold text-muted">تفاصيل الطلب</h3><p className="whitespace-pre-wrap break-words text-sm leading-7">{row.body}</p></div>}
                 {!!row.attachments.length && (
                   <ul className="space-y-2">
                     {row.attachments.map((file) => (
@@ -413,8 +404,8 @@ export default function RequestCenter({
                 )}
                 {admin&&row.kind==='resignation'&&row.status==='approved'&&<FinalSettlementCard requestId={row.id} transport={transport}/>}
                 {row.decision_reason && (
-                  <div className="rounded-xl bg-slate-50 p-3 text-sm">
-                    <strong>قرار الإدارة</strong>
+                  <div className="rounded-2xl border border-border bg-white/45 p-4 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold">سبب القرار</h3>{row.decided_at && <p className="text-xs text-muted">تاريخ القرار: <time dateTime={row.decided_at}>{requestDate(row.decided_at)}</time></p>}</div>
                     <p className="mt-2 whitespace-pre-wrap break-words">
                       {row.decision_reason}
                     </p>

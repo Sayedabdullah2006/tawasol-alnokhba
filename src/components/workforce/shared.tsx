@@ -92,7 +92,7 @@ export function Dialog({
         event.preventDefault();
         onClose();
       }}
-      className={`fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] ${wide?'max-w-5xl':'max-w-2xl'} overflow-y-auto rounded-2xl border border-border bg-white p-5 text-dark shadow-2xl backdrop:bg-slate-950/50 md:p-7`}
+      className={`fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] ${wide?'max-w-5xl':'max-w-2xl'} overflow-y-auto overscroll-contain rounded-2xl border border-border bg-white p-5 text-dark shadow-2xl backdrop:overflow-hidden backdrop:overscroll-contain backdrop:bg-slate-950/50 md:p-7`}
     >
       <div className="mb-5 flex items-center justify-between gap-4">
         <h2 className="text-xl font-bold">{title}</h2>
@@ -154,32 +154,40 @@ export async function api<T>(url: string, options?: RequestInit): Promise<T> {
   return result as T;
 }
 export function useConfirm() {
-  const [question, setQuestion] = useState("");
+  const [question, setQuestion] = useState<{
+    message: ReactNode;
+    title?: string;
+    confirmLabel?: string;
+  } | null>(null);
   const resolve = useRef<((accepted: boolean) => void) | null>(null);
-  const confirm = (message: string) =>
+  useEffect(() => () => {
+    resolve.current?.(false);
+    resolve.current = null;
+  }, []);
+  const confirm = (message: ReactNode, options?: { title?: string; confirmLabel?: string }) =>
     new Promise<boolean>((done) => {
       resolve.current?.(false);
       resolve.current = done;
-      setQuestion(message);
+      setQuestion({ message, ...options });
     });
   const finish = (accepted: boolean) => {
-    setQuestion("");
+    setQuestion(null);
     resolve.current?.(accepted);
     resolve.current = null;
   };
   const confirmation = (
     <Dialog
-      title="تأكيد الإجراء"
+      title={question?.title || "تأكيد الإجراء"}
       open={!!question}
       onClose={() => finish(false)}
     >
-      <p className="text-sm leading-8">{question}</p>
-      <div className="mt-5 flex gap-3">
-        <Button type="button" onClick={() => finish(true)}>
-          تأكيد المتابعة
-        </Button>
-        <Button type="button" variant="outline" onClick={() => finish(false)}>
+      <div className="text-sm leading-8">{question?.message}</div>
+      <div className="mt-5 flex flex-wrap gap-3">
+        <Button type="button" variant="outline" autoFocus onClick={() => finish(false)}>
           العودة دون تغيير
+        </Button>
+        <Button type="button" onClick={() => finish(true)}>
+          {question?.confirmLabel || "تأكيد المتابعة"}
         </Button>
       </div>
     </Dialog>

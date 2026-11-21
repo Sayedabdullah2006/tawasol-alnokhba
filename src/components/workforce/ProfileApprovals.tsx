@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import { FIELD_LABELS, type ProfileChange } from "@/lib/workforce/types";
@@ -7,11 +7,13 @@ import {
   api,
   controlClass,
   Field,
-  formatDate,
   Notice,
   Panel,
+  useConfirm,
   useUnsavedChanges,
 } from "./shared";
+import DecisionSummary from "./DecisionSummary";
+import RequestMetadata from "./RequestMetadata";
 type RequestRow = ProfileChange & { wf_employees: { full_name: string } };
 export default function ProfileApprovals({ onChanged, embedded = false, requestId }: { onChanged?: () => void; embedded?: boolean; requestId?: string } = {}) {
   const [requests, setRequests] = useState<RequestRow[]>([]);
@@ -23,6 +25,8 @@ export default function ProfileApprovals({ onChanged, embedded = false, requestI
   const [count, setCount] = useState(0);
   const [busy, setBusy] = useState("");
   const [reasons, setReasons] = useState<Record<string, string>>({});
+  const lock = useRef(false);
+  const { confirm, confirmation } = useConfirm();
   const unsavedWarning = useUnsavedChanges(
     Object.values(reasons).some((value) => value.trim().length > 0),
   );
@@ -66,6 +70,7 @@ export default function ProfileApprovals({ onChanged, embedded = false, requestI
   return (
     <div className={embedded ? "min-w-0 space-y-6" : "mx-auto w-full min-w-0 max-w-5xl space-y-6 p-4 md:p-8"}>
       {unsavedWarning}
+      {confirmation}
       <Notice message={error} error />
       <Notice message={message} />
       <p className="text-sm text-muted">{count} طلب بانتظار القرار</p>
@@ -86,10 +91,8 @@ export default function ProfileApprovals({ onChanged, embedded = false, requestI
             key={request.id}
             title={`${request.wf_employees.full_name} · ${FIELD_LABELS[request.field]}`}
           >
-            <time className="text-xs text-muted">
-              {formatDate(request.created_at)}
-            </time>
-            <p className="break-all text-lg font-bold">
+            <RequestMetadata id={request.id} createdAt={request.created_at} />
+            <p className="mt-4 break-all text-lg font-bold">
               {request.proposed_value}
             </p>
             <p className="mt-3 text-sm leading-7 text-muted">
@@ -99,15 +102,26 @@ export default function ProfileApprovals({ onChanged, embedded = false, requestI
               className="mt-4 space-y-4"
               onSubmit={async (event) => {
                 event.preventDefault();
-                if (busy) return;
+                if (lock.current) return;
                 const submitter = (event.nativeEvent as SubmitEvent)
                   .submitter as HTMLButtonElement;
                 const decision = submitter?.value;
                 if (!["approved", "rejected"].includes(decision)) return;
                 const reason = new FormData(event.currentTarget).get("reason");
-                setBusy(request.id);
-                setError("");
+                lock.current = true;
                 try {
+                  const action = decision === "approved" ? "الموافقة" : "الرفض";
+                  if (!(await confirm(
+                    <DecisionSummary
+                      employeeName={request.wf_employees.full_name}
+                      requestKind="تغيير البيانات"
+                      requestTitle={`${FIELD_LABELS[request.field]}: ${request.proposed_value}`}
+                      reason={String(reason || "")}
+                    />,
+                    { title: `تأكيد ${action} على الطلب`, confirmLabel: `تأكيد ${action}` },
+                  ))) return;
+                  setBusy(request.id);
+                  setError("");
                   await api("/api/workforce/profile-changes", {
                     method: "PATCH",
                     body: JSON.stringify({ id: request.id, decision, reason }),
@@ -127,6 +141,7 @@ export default function ProfileApprovals({ onChanged, embedded = false, requestI
                 } catch (e) {
                   setError((e as Error).message);
                 } finally {
+                  lock.current = false;
                   setBusy("");
                 }
               }}
