@@ -29,6 +29,7 @@ import {
 import FinalSettlementCard from "./FinalSettlementCard";
 import DecisionSummary from "./DecisionSummary";
 import DecisionReason from "./DecisionReason";
+import RequestDisclosure from "./RequestDisclosure";
 import RequestStatusBadge from "./RequestStatusBadge";
 import RequestMetadata, { RequestField, requestDate } from "./RequestMetadata";
 import ProfileApprovals from "./ProfileApprovals";
@@ -368,7 +369,20 @@ export default function RequestCenter({
                   {row.overtime_details && !(admin && row.status === "pending") && <RequestField label="تفاصيل خارج الدوام">{Number(row.overtime_details.hours).toLocaleString("ar-SA")} ساعة · {Number(row.overtime_details.hourly_rate).toLocaleString("ar-SA", { maximumFractionDigits: 4 })} ر.س/ساعة</RequestField>}
                   {row.expense_details && <RequestField label="شهر المستحقات">{new Date(`${row.expense_details.payroll_month}T12:00:00+03:00`).toLocaleDateString("ar-SA", { calendar: "gregory", timeZone: "Asia/Riyadh", month: "long", year: "numeric" })}</RequestField>}
                 </RequestMetadata>
-                {row.remote_details&&<div className="space-y-3 rounded-xl border border-current/20 p-3 text-sm"><dl className="grid gap-3 sm:grid-cols-2"><div><dt>أجر الفترة المتفق عليه</dt><dd className="font-bold">{remoteMoney(row.remote_details.snapshot.agreed_amount)}</dd></div><div><dt>البدلات الموقوفة للفترة</dt><dd className="font-bold">{remoteMoney(row.remote_details.snapshot.adjustment_amount)}</dd></div><div><dt>ساعات العمل اليومية</dt><dd className="font-bold">{remoteMinutes(row.remote_details.snapshot.days[0].required_minutes)}</dd></div><div><dt>العودة للشروط السابقة</dt><dd><bdi>{row.remote_details.snapshot.returns_on}</bdi></dd></div></dl><a className="font-bold underline" target="_blank" rel="noreferrer" href={`/api/workforce/requests/${row.id}/remote-agreement`}>عرض الاتفاق الموقّع PDF</a><a className="mr-4 font-bold underline" href={`/api/workforce/requests/${row.id}/remote-agreement?download=1`}>تحميل PDF</a></div>}
+                {row.remote_details && (
+                  <RequestDisclosure title="تفاصيل اتفاق العمل عن بُعد">
+                    <dl className="grid gap-3 sm:grid-cols-2">
+                      <div><dt>أجر الفترة المتفق عليه</dt><dd className="font-bold">{remoteMoney(row.remote_details.snapshot.agreed_amount)}</dd></div>
+                      <div><dt>البدلات الموقوفة للفترة</dt><dd className="font-bold">{remoteMoney(row.remote_details.snapshot.adjustment_amount)}</dd></div>
+                      <div><dt>ساعات العمل اليومية</dt><dd className="font-bold">{remoteMinutes(row.remote_details.snapshot.days[0].required_minutes)}</dd></div>
+                      <div><dt>العودة للشروط السابقة</dt><dd><bdi>{row.remote_details.snapshot.returns_on}</bdi></dd></div>
+                    </dl>
+                    <div className="flex flex-wrap gap-4">
+                      <a className="font-bold underline" target="_blank" rel="noreferrer" href={`/api/workforce/requests/${row.id}/remote-agreement`}>عرض الاتفاق الموقّع PDF</a>
+                      <a className="font-bold underline" href={`/api/workforce/requests/${row.id}/remote-agreement?download=1`}>تحميل PDF</a>
+                    </div>
+                  </RequestDisclosure>
+                )}
                 {row.kind==='leave'&&row.leave_type==='unpaid'&&<UnpaidLeaveSummary estimate={row.unpaid_estimate} error={row.unpaid_estimate_error}/>}
                 {row.body.trim() && row.body.trim() !== row.title.trim() && <div className="space-y-2"><h3 className="text-xs font-bold text-muted">تفاصيل الطلب</h3><p className="whitespace-pre-wrap break-words text-sm leading-7">{row.body}</p></div>}
                 {!!row.attachments.length && (
