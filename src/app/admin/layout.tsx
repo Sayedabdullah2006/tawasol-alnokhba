@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic'
 const adminNav: NavEntry[] = [
   { href: '/admin', label: 'الإحصائيات', icon: '📊' },
   { href: '/admin/workforce', label: 'إدارة الموظفين', icon: '👥' },
+  { href: '/admin/virtual-office', label: 'المكتب الافتراضي', icon: '🏢' },
   {
     label: 'الطلبات والعملاء',
     icon: '📋',

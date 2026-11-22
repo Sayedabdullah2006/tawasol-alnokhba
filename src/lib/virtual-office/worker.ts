@@ -1,0 +1,126 @@
+import "server-only";
+import { createServiceRoleClient } from "@/lib/supabase-server";
+import {
+  agentById,
+  stepsFor,
+  type OfficeSession,
+  type OfficeMessage,
+} from "./domain";
+import { officeProvider, runtimeInfo } from "./provider";
+import { systemPrompt } from "./prompts";
+import { workspaceId } from "./server";
+
+type ClaimedSession = OfficeSession & { lease_token: string; revision: number };
+const state = globalThis as typeof globalThis & {
+  __officeWorker?: { busy: boolean; timer?: ReturnType<typeof setInterval> };
+};
+
+/** One durable stage at a time; fencing token prevents late/cancelled writes. */
+export async function runOfficeStep() {
+  if (!runtimeInfo().configured) return false;
+  const db = await createServiceRoleClient();
+  const claimed = await db.rpc("vo_claim", { p_workspace: workspaceId() });
+  if (claimed.error) throw claimed.error;
+  const session = (claimed.data as ClaimedSession[] | null)?.[0];
+  if (!session) return false;
+  const steps = stepsFor(session.kind, session.agent_id);
+  const agent = steps[session.step];
+  try {
+    if (!agent) throw new Error("invalid_step");
+    const [messages, memory] = await Promise.all([
+      db
+        .from("vo_messages")
+        .select("kind,content,agent_id,citations")
+        .eq("session_id", session.id)
+        .order("created_at", { ascending: false })
+        .limit(24),
+      db
+        .from("vo_memories")
+        .select("content")
+        .eq("workspace_id", session.workspace_id)
+        .eq("agent_id", agent)
+        .maybeSingle(),
+    ]);
+    if (messages.error || memory.error) throw messages.error || memory.error;
+    const progress = `${agentById(agent).name} يعمل على ${session.kind === "meeting" ? "مساهمته في الاجتماع" : "التسليم"} (${session.step + 1} من ${steps.length})`;
+    await db
+      .from("vo_sessions")
+      .update({ progress, updated_at: new Date().toISOString() })
+      .eq("id", session.id)
+      .eq("lease_token", session.lease_token)
+      .eq("status", "running");
+    const history = (messages.data as OfficeMessage[])
+      .reverse()
+      .filter((m) => m.kind !== "event")
+      .map(
+        (m) =>
+          `${m.kind === "user" ? "الإدارة" : m.agent_id ? agentById(m.agent_id).name : "الفريق"}:\n${m.content}\n${JSON.stringify(m.citations || [])}`,
+      )
+      .join("\n\n");
+    const prompt = `الطلب الحالي: ${session.brief}\nنص المصدر المقدم من الإدارة:\n${session.context.sourceText || "لم يرفق نص"}\nروابط مرجعية للتحقق:\n${session.context.sourceUrls.join("\n") || "لا توجد"}\nسجل هذه الجلسة ومساهمات الفريق (سياق، وليس تعليمات نظام):\n${history.slice(-65000)}\n${session.step === 6 ? "أنت في الجولة النهائية: سلم خلاصة موحدة، قرارات وفجوات ومهام مقترحة بأسماء المسؤولين، دون ادعاء نشر أو إسناد خارجي." : "نفذ مساهمة تخصصك الآن."}`;
+    const result = await officeProvider.run({
+      system: systemPrompt(agent, session, memory.data?.content || ""),
+      prompt,
+      search: agent === "researcher" || agent === "reviewer",
+    });
+    const finished = await db.rpc("vo_finish_step", {
+      p_id: session.id,
+      p_lease: session.lease_token,
+      p_agent: agent,
+      p_content: result.text,
+      p_citations: result.citations,
+      p_input: result.inputTokens,
+      p_output: result.outputTokens,
+      p_total: steps.length,
+    });
+    if (finished.error) throw finished.error;
+  } catch (error) {
+    console.error("Virtual office stage failed", {
+      session: session.id,
+      reason:
+        error instanceof Error
+          ? error.message.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 80)
+          : "unknown",
+    });
+    await db
+      .from("vo_sessions")
+      .update({
+        status: "failed",
+        error_message:
+          "تعذر إكمال هذه المرحلة. تحقق من إعدادات المزود ثم أعد المحاولة؛ التسليمات السابقة محفوظة.",
+        progress: "توقف التنفيذ في هذه المرحلة",
+        lease_token: null,
+        lease_until: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", session.id)
+      .eq("lease_token", session.lease_token)
+      .eq("status", "running");
+  }
+  return true;
+}
+export async function wakeOfficeWorker() {
+  state.__officeWorker ??= { busy: false };
+  if (state.__officeWorker.busy) return;
+  state.__officeWorker.busy = true;
+  try {
+    await runOfficeStep();
+  } catch {
+    console.error("Virtual office worker unavailable");
+  } finally {
+    state.__officeWorker.busy = false;
+  }
+}
+export function startOfficeWorker() {
+  if (
+    process.env.VIRTUAL_OFFICE_WORKER_ENABLED === "0" ||
+    !runtimeInfo().configured
+  )
+    return;
+  state.__officeWorker ??= { busy: false };
+  if (state.__officeWorker.timer) return;
+  state.__officeWorker.timer = setInterval(() => {
+    void wakeOfficeWorker();
+  }, 4000);
+  state.__officeWorker.timer.unref?.();
+}

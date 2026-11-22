@@ -1,0 +1,192 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import {
+  OFFICE_AGENTS,
+  parseBrief,
+  stepsFor,
+} from "../src/lib/virtual-office/domain.ts";
+
+test("office accepts bounded work briefs and keeps its six-role host-independent contract", () => {
+  assert.equal(new Set(OFFICE_AGENTS.map((a) => a.id)).size, 6);
+  const valid = {
+    agentId: "writer",
+    kind: "task",
+    brief: "جهز قصة موثقة",
+    project: "First1Saudi",
+    requestId: randomUUID(),
+    sourceUrls: ["https://example.com/source"],
+  };
+  assert.equal(parseBrief(valid).sourceUrls[0], "https://example.com/source");
+  for (const change of [
+    { agentId: "admin" },
+    { kind: "shell" },
+    { brief: "  " },
+    { brief: "ا".repeat(12001) },
+    { sourceUrls: ["javascript:alert(1)"] },
+    { sourceUrls: Array(9).fill("https://example.com") },
+    { requestId: "bad" },
+    { project: "ا".repeat(121) },
+  ])
+    assert.throws(() => parseBrief({ ...valid, ...change }));
+  assert.deepEqual(stepsFor("task", "art"), ["art"]);
+  assert.deepEqual(stepsFor("meeting", "editor"), [
+    "editor",
+    "researcher",
+    "writer",
+    "art",
+    "reviewer",
+    "publisher",
+    "editor",
+  ]);
+});
+
+test("durable queue, cancellation fencing, continuation, retry, idempotence and RLS", async () => {
+  const { PGlite } = await import("@electric-sql/pglite");
+  const db = new PGlite();
+  try {
+    await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
+      create schema auth; create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+      grant usage on schema public,auth to anon,authenticated,service_role; grant execute on function auth.uid() to anon,authenticated,service_role;
+      create table public.profiles(id uuid primary key,role text); grant select on public.profiles to authenticated,service_role;
+      insert into public.profiles values('00000000-0000-4000-8000-000000000001','admin'),('00000000-0000-4000-8000-000000000002','employee'),('00000000-0000-4000-8000-000000000003','client');`);
+    await db.exec(
+      await readFile(
+        new URL(
+          "../supabase/migrations/20261122143638_virtual_office.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    );
+    const submit = async (req = randomUUID(), brief = "اختبار خطة تحرير") =>
+      (
+        await db.query(
+          `select (public.vo_submit('qa','00000000-0000-4000-8000-000000000001',$1,'editor','team',$2,'{"project":"QA","sourceText":"","sourceUrls":[]}')).*`,
+          [req, brief],
+        )
+      ).rows[0];
+    const claim = async () =>
+      (await db.query(`select * from public.vo_claim('qa')`)).rows[0];
+    const act = async (id, action, request = randomUUID(), content = "") =>
+      (
+        await db.query(
+          `select (public.vo_session_action('qa',$1,$2,$3,$4)).*`,
+          [id, action, request, content],
+        )
+      ).rows[0];
+    const finish = async (row, agent = "editor") =>
+      (
+        await db.query(
+          `select public.vo_finish_step($1,$2,$3,'نتيجة موثقة','[]',10,20,7) as ok`,
+          [row.id, row.lease_token, agent],
+        )
+      ).rows[0].ok;
+    const req = randomUUID(),
+      first = await submit(req);
+    assert.equal((await submit(req)).id, first.id);
+    await assert.rejects(() => submit(req, "طلب مختلف"));
+    const claimed = await claim();
+    assert.equal(claimed.id, first.id);
+    assert.equal(await claim(), undefined);
+    assert.equal(await finish(claimed), true);
+    assert.equal(
+      await finish(claimed),
+      false,
+      "a completed stage cannot write twice",
+    );
+    let next = await claim();
+    assert.equal(next.step, 1);
+    await act(first.id, "cancel");
+    assert.equal(
+      await finish(next, "researcher"),
+      false,
+      "cancel fences late provider output",
+    );
+    await act(first.id, "retry");
+    next = await claim();
+    assert.equal(next.step, 1, "retry resumes after durable output");
+    await db.query(
+      `update public.vo_sessions set lease_until=now()-interval '1 second' where id=$1`,
+      [first.id],
+    );
+    const recovered = await claim();
+    assert.notEqual(recovered.lease_token, next.lease_token);
+    assert.equal(
+      await finish(next, "researcher"),
+      false,
+      "old lease cannot write after restart",
+    );
+    assert.equal(await finish(recovered, "researcher"), true);
+    for (const role of ["writer", "art", "reviewer", "publisher", "editor"])
+      assert.equal(await finish(await claim(), role), true);
+    assert.equal(
+      (
+        await db.query("select status from public.vo_sessions where id=$1", [
+          first.id,
+        ])
+      ).rows[0].status,
+      "review",
+    );
+    assert.equal((await act(first.id, "approve")).status, "completed");
+    const followReq = randomUUID();
+    assert.equal(
+      (await act(first.id, "reply", followReq, "عدّل النسخة وفق المصادر"))
+        .revision,
+      1,
+    );
+    assert.equal(
+      (await act(first.id, "reply", followReq, "عدّل النسخة وفق المصادر"))
+        .revision,
+      1,
+      "retried follow-up is not duplicated",
+    );
+    assert.equal(
+      (
+        await db.query(
+          `select count(*)::int as n from public.vo_messages where session_id=$1 and kind='assistant'`,
+          [first.id],
+        )
+      ).rows[0].n,
+      7,
+    );
+    await db.exec(
+      `set role authenticated; select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000002',false);`,
+    );
+    assert.equal(
+      (await db.query("select count(*)::int as n from public.vo_sessions"))
+        .rows[0].n,
+      0,
+    );
+    assert.equal(
+      (await db.query("select count(*)::int as n from public.vo_messages"))
+        .rows[0].n,
+      0,
+    );
+    await assert.rejects(() => db.query(`select * from public.vo_claim('qa')`));
+    await assert.rejects(() =>
+      db.query(`update public.vo_sessions set status='completed'`),
+    );
+    await db.exec(
+      `select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000003',false);`,
+    );
+    assert.equal(
+      (await db.query("select count(*)::int as n from public.vo_sessions"))
+        .rows[0].n,
+      0,
+    );
+    await db.exec(
+      `select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000001',false);`,
+    );
+    assert.equal(
+      (await db.query("select count(*)::int as n from public.vo_sessions"))
+        .rows[0].n,
+      1,
+    );
+    await db.exec("reset role;set role anon;");
+    await assert.rejects(() => db.query("select * from public.vo_sessions"));
+  } finally {
+    await db.close();
+  }
+});
