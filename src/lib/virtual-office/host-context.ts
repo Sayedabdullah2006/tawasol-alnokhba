@@ -60,6 +60,7 @@ export async function readOfficeHostContext(
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(data.checkedAt));
+  data.checkedAtRiyadh = `${at} بتوقيت الرياض`;
   const evidence = sections
     .map(
       (s) =>
