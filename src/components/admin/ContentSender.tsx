@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useToast } from '@/components/ui/Toast'
 import Button from '@/components/ui/Button'
@@ -26,6 +26,7 @@ export default function ContentSender({ request, onSent, onCancel, initialConten
   const [proposedContent, setProposedContent] = useState(initialContent ?? '')
   const [proposedImages, setProposedImages] = useState<string[]>(initialImages ?? [])
   const [lightbox, setLightbox] = useState<string | null>(null)
+  const contentId = useId()
 
   const handleSend = async () => {
     if (!proposedContent.trim()) {
@@ -107,20 +108,21 @@ export default function ContentSender({ request, onSent, onCancel, initialConten
       )}
 
       <div>
-        <label className="block text-sm font-medium text-dark mb-2">
+        <label htmlFor={contentId} className="block text-sm font-medium text-dark mb-2">
           النص المقترح <span className="text-red-500">*</span>
         </label>
         <textarea
+          id={contentId}
+          aria-describedby={`${contentId}-help`}
+          required
           value={proposedContent}
           onChange={e => setProposedContent(e.target.value)}
           placeholder="اكتب النص المقترح هنا..."
           className="w-full px-4 py-3 rounded-xl border border-border bg-white text-sm min-h-[120px] resize-y"
-          maxLength={1000}
         />
-        <div className="flex justify-between items-center mt-1">
-          <span className="text-xs text-muted">الحد الأقصى 1000 حرف</span>
-          <span className="text-xs text-muted">{proposedContent.length}/1000</span>
-        </div>
+        <p id={`${contentId}-help`} className="text-xs text-muted mt-1">
+          النصوص الطويلة والإيموجي والروابط مدعومة، دون حد لعدد الأحرف.
+        </p>
       </div>
 
       <div>

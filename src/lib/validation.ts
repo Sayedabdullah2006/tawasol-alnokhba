@@ -246,11 +246,17 @@ export function validateUserFeedback(feedback: unknown): string {
 }
 
 export function validateContent(content: unknown): string {
-  return validateText(content, 'المحتوى المقترح', {
-    required: true,
-    minLength: 10,
-    maxLength: 5000
-  })!
+  // Admin-authored review copy is plain text, not a spam-filtered public field.
+  // Accept any non-empty text, including long copy, emoji, links and repetition.
+  // Escape it when rendering HTML rather than rejecting characters here.
+  if (typeof content !== 'string' || !content.trim()) {
+    throw new ValidationException([{
+      field: 'المحتوى المقترح',
+      message: 'يرجى كتابة النص المقترح'
+    }])
+  }
+
+  return content.trim()
 }
 
 // Check for suspicious content patterns

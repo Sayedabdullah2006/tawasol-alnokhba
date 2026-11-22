@@ -742,7 +742,7 @@ export function contentReadyForReview(d: {
       <div style="background:#F8FAFC; border-radius:12px; padding:20px; margin:24px 0;">
         <h3 style="margin:0 0 12px 0; color:${emailBrand().primary}; font-size:16px;">النص المقترح</h3>
         <div style="background:#FFFFFF; border-radius:8px; padding:16px; border-right:4px solid ${emailBrand().accent};">
-          <p style="margin:0; color:${emailBrand().primary}; font-size:14px; line-height:1.8; white-space:pre-line;">${d.proposedContent}</p>
+          <p style="margin:0; color:${emailBrand().primary}; font-size:14px; line-height:1.8; white-space:pre-line;">${escapeHtml(d.proposedContent)}</p>
         </div>
       </div>
 
