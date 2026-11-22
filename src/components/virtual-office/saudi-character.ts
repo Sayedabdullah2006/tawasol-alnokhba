@@ -1,67 +1,115 @@
 import * as THREE from "three";
 import type { OfficeAppearance } from "@/lib/virtual-office/domain";
+import { contour, organicMesh, oval, tailoredSurface } from "./human-geometry";
 
-/** Actual cloth geometry and a woven red/ivory texture, not a hat painted on a head. */
+/** Adult face and soft cloth, local to the neck joint. */
 export function createSaudiHead(look: OfficeAppearance) {
-  const group = new THREE.Group();
-  group.position.set(0, 1.64, -0.02);
-  const material = (color: string) =>
-    new THREE.MeshStandardMaterial({ color, roughness: 0.9 });
-  function ellipsoid(
-    radius: number,
-    at: number[],
-    scale: number[],
-    color: string,
-  ) {
-    const mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(radius, 24, 16),
-      material(color),
+  const head = new THREE.Group();
+  head.name = "adult-head";
+  head.scale.setScalar(0.85);
+  const mat = (color: string) =>
+    new THREE.MeshStandardMaterial({ color, roughness: 0.85 });
+  const skin = mat(look.skin),
+    hair = mat(look.hair),
+    scarf = mat(look.scarf);
+  organicMesh(
+    head,
+    tailoredSurface([
+      [-0.235, 0.035, 0.052],
+      [-0.215, 0.085, 0.088],
+      [-0.155, 0.128, 0.113],
+      [-0.06, 0.155, 0.128],
+      [0.045, 0.163, 0.133],
+      [0.15, 0.148, 0.122],
+      [0.215, 0.105, 0.092],
+      [0.245, 0.002, 0.003],
+    ]),
+    skin,
+  ).name = "face-and-jaw";
+  for (const side of [-1, 1]) {
+    oval(head, [0.027, 0.058, 0.031], [side * 0.157, -0.025, 0], skin);
+    oval(
+      head,
+      [0.012, 0.03, 0.009],
+      [side * 0.177, -0.025, -0.015],
+      mat(new THREE.Color(look.skin).multiplyScalar(0.82).getStyle()),
     );
-    mesh.position.set(at[0], at[1], at[2]);
-    mesh.scale.set(scale[0], scale[1], scale[2]);
-    mesh.castShadow = true;
-    group.add(mesh);
-    return mesh;
-  }
-  function panel(size: number[], at: number[], mat: THREE.Material) {
-    const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(size[0], size[1], size[2]),
-      mat,
+    const x = side * 0.067;
+    oval(head, [0.036, 0.016, 0.01], [x, 0.035, -0.123], mat("#f1e9df"));
+    oval(head, [0.012, 0.013, 0.005], [x, 0.034, -0.134], mat("#473c30"));
+    oval(head, [0.006, 0.009, 0.003], [x, 0.034, -0.139], mat("#17232b"));
+    oval(
+      head,
+      [0.003, 0.003, 0.002],
+      [x - 0.004, 0.039, -0.142],
+      mat("#ffffff"),
     );
-    mesh.position.set(at[0], at[1], at[2]);
-    mesh.castShadow = true;
-    group.add(mesh);
-    return mesh;
-  }
-  ellipsoid(0.29, [0, 0, 0], [0.88, 1.12, 0.91], look.skin);
-  for (const x of [-0.26, 0.26])
-    ellipsoid(0.064, [x, -0.015, 0], [0.6, 1, 0.8], look.skin);
-  ellipsoid(0.043, [0, -0.005, -0.258], [0.65, 0.9, 0.7], look.skin);
-  for (const x of [-0.1, 0.1]) {
-    ellipsoid(0.023, [x, 0.045, -0.257], [1, 1, 0.45], "#26313a");
-    const brow = panel(
-      [0.075, 0.018, 0.018],
-      [x, 0.105, -0.253],
-      material(look.hair),
+    contour(
+      head,
+      [
+        [x - 0.033, 0.047, -0.125],
+        [x, 0.054, -0.132],
+        [x + 0.033, 0.046, -0.125],
+      ],
+      0.0035,
+      hair,
     );
-    brow.rotation.z = x < 0 ? -0.06 : 0.06;
+    contour(
+      head,
+      [
+        [x - 0.038, 0.079, -0.12],
+        [x, 0.091, -0.13],
+        [x + 0.034, 0.078, -0.12],
+      ],
+      0.007,
+      hair,
+    );
   }
-  const smile = new THREE.Mesh(
-    new THREE.TorusGeometry(0.059, 0.008, 6, 18, Math.PI * 0.65),
-    material("#85533e"),
+  oval(head, [0.018, 0.058, 0.026], [0, -0.006, -0.134], skin);
+  oval(head, [0.027, 0.023, 0.034], [0, -0.047, -0.157], skin);
+  for (const x of [-0.022, 0.022])
+    oval(head, [0.016, 0.013, 0.019], [x, -0.053, -0.145], skin);
+  const lip = mat(look.gender === "female" ? "#a46b64" : "#926354");
+  contour(
+    head,
+    [
+      [-0.047, -0.119, -0.109],
+      [-0.02, -0.12, -0.122],
+      [0, -0.124, -0.126],
+      [0.025, -0.119, -0.12],
+      [0.047, -0.113, -0.108],
+    ],
+    0.0055,
+    lip,
   );
-  smile.position.set(0.027, -0.12, -0.26);
-  smile.rotation.z = Math.PI * 1.17;
-  group.add(smile);
+  oval(head, [0.029, 0.009, 0.007], [0, -0.134, -0.117], lip);
+  if (look.gender === "male") {
+    const beard = mat(
+      new THREE.Color(look.skin)
+        .lerp(new THREE.Color(look.hair), 0.32)
+        .getStyle(),
+    );
+    contour(
+      head,
+      [
+        [-0.111, -0.125, -0.073],
+        [-0.078, -0.184, -0.084],
+        [0, -0.216, -0.064],
+        [0.078, -0.184, -0.084],
+        [0.111, -0.125, -0.073],
+      ],
+      0.009,
+      beard,
+    );
+  }
   if (look.headwear === "shemagh") {
     const canvas = document.createElement("canvas");
-    canvas.width = 128;
-    canvas.height = 128;
+    canvas.width = canvas.height = 128;
     const ctx = canvas.getContext("2d")!;
     ctx.fillStyle = "#fff9ef";
     ctx.fillRect(0, 0, 128, 128);
     ctx.strokeStyle = look.scarf;
-    ctx.lineWidth = 2.2;
+    ctx.lineWidth = 2;
     for (let y = -16; y < 145; y += 16)
       for (let x = -16; x < 145; x += 16) {
         ctx.beginPath();
@@ -81,82 +129,113 @@ export function createSaudiHead(look: OfficeAppearance) {
       roughness: 1,
       side: THREE.DoubleSide,
     });
-    const crown = new THREE.Mesh(
-      new THREE.SphereGeometry(0.335, 24, 16),
-      cloth,
-    );
-    crown.position.set(0, 0.21, 0.025);
-    crown.scale.set(1, 0.48, 1);
-    crown.castShadow = true;
-    group.add(crown);
-    const folds = new THREE.BufferGeometry();
-    folds.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(
-        [
-          -0.29, 0.18, 0.13, 0, 0.2, 0.27, 0.29, 0.18, 0.13, -0.39, -0.53, 0.22,
-          0, -0.57, 0.35, 0.39, -0.53, 0.22,
-        ],
-        3,
-      ),
-    );
-    folds.setAttribute(
-      "uv",
-      new THREE.Float32BufferAttribute(
-        [0, 1, 0.5, 1, 1, 1, 0, 0, 0.5, 0, 1, 0],
-        2,
-      ),
-    );
-    folds.setIndex([0, 1, 3, 1, 4, 3, 1, 2, 4, 2, 5, 4]);
-    folds.computeVertexNormals();
-    const cape = new THREE.Mesh(folds, cloth);
-    cape.castShadow = true;
-    group.add(cape);
-    for (const x of [-0.295, 0.295]) {
-      const drape = panel([0.105, 0.56, 0.28], [x, -0.1, 0.035], cloth);
-      drape.rotation.z = x < 0 ? -0.12 : 0.12;
-    }
-    for (const y of [0.265, 0.305]) {
-      const agal = new THREE.Mesh(
-        new THREE.TorusGeometry(0.293, 0.027, 10, 40),
-        material("#22272b"),
+    oval(head, [0.195, 0.08, 0.183], [0, 0.21, 0.025], cloth);
+    clothDrape(head, cloth, 0.19, 0.37, 0.62);
+    for (const y of [0.235, 0.267]) {
+      const agal = organicMesh(
+        head,
+        new THREE.TorusGeometry(0.178, 0.014, 8, 40),
+        mat("#25292b"),
+        [0, y, 0.02],
       );
       agal.rotation.x = Math.PI / 2;
-      agal.scale.y = 0.92;
-      agal.position.set(0, y, 0.025);
-      agal.castShadow = true;
-      group.add(agal);
+      agal.scale.y = 0.94;
     }
   } else if (look.headwear === "hijab") {
-    ellipsoid(0.32, [0, 0.01, 0.125], [1.06, 1.31, 0.82], look.scarf);
-    ellipsoid(0.324, [0, 0.2, 0.015], [1, 0.55, 1], look.scarf);
-    for (const x of [-0.265, 0.265]) {
-      const side = panel(
-        [0.13, 0.52, 0.28],
-        [x, -0.09, 0.015],
-        material(look.scarf),
-      );
-      side.rotation.z = x < 0 ? -0.14 : 0.14;
-    }
-    const drape = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.155, 0.43, 0.52, 24, 1, true),
-      material(look.scarf),
+    oval(head, [0.18, 0.105, 0.163], [0, 0.18, 0.035], scarf);
+    clothDrape(head, scarf, 0.176, 0.33, 0.6);
+    contour(
+      head,
+      [
+        [-0.15, 0.16, -0.067],
+        [-0.166, 0, -0.05],
+        [-0.137, -0.18, -0.046],
+        [0, -0.29, -0.045],
+        [0.137, -0.18, -0.046],
+        [0.166, 0, -0.05],
+        [0.15, 0.16, -0.067],
+      ],
+      0.022,
+      scarf,
     );
-    drape.position.set(0, -0.4, 0.065);
-    drape.scale.z = 0.7;
-    drape.castShadow = true;
-    group.add(drape);
+    organicMesh(
+      head,
+      tailoredSurface(
+        [
+          [-0.48, 0.31, 0.16],
+          [-0.35, 0.25, 0.14],
+          [-0.27, 0.12, 0.1],
+          [-0.25, 0.09, 0.075],
+        ],
+        0.025,
+      ),
+      scarf,
+      [0, 0, 0.04],
+    );
   } else {
-    ellipsoid(0.31, [0, -0.015, 0.12], [1.06, 1.25, 0.82], look.hair);
-    ellipsoid(0.31, [0, 0.2, 0.015], [1, 0.56, 1], look.hair);
-    const fringe = ellipsoid(
-      0.21,
-      [-0.1, 0.2, -0.17],
-      [1, 0.45, 0.66],
-      look.hair,
-    );
-    fringe.rotation.z = -0.3;
-    ellipsoid(0.15, [0.02, -0.1, 0.35], [0.75, 1.25, 0.85], look.hair);
+    oval(head, [0.166, 0.205, 0.123], [0, 0.06, 0.067], hair);
+    oval(head, [0.165, 0.095, 0.142], [0, 0.18, 0.01], hair);
+    if (look.gender === "female") {
+      clothDrape(head, hair, 0.155, 0.18, 0.5);
+      const fringe = oval(
+        head,
+        [0.125, 0.052, 0.04],
+        [-0.045, 0.165, -0.1],
+        hair,
+      );
+      fringe.rotation.z = -0.24;
+      for (const x of [-0.145, 0.145])
+        contour(
+          head,
+          [
+            [x, 0.12, 0.07],
+            [x * 1.08, -0.09, 0.1],
+            [x * 0.87, -0.28, 0.11],
+          ],
+          0.012,
+          mat(new THREE.Color(look.hair).multiplyScalar(1.16).getStyle()),
+        );
+    }
   }
-  return group;
+  return head;
+}
+function clothDrape(
+  parent: THREE.Object3D,
+  material: THREE.Material,
+  top: number,
+  bottom: number,
+  length: number,
+) {
+  const points: number[] = [],
+    uv: number[] = [],
+    indices: number[] = [];
+  const rows = 18,
+    cols = 36;
+  for (let r = 0; r <= rows; r++)
+    for (let c = 0; c <= cols; c++) {
+      const t = r / rows,
+        a = -Math.PI / 2 + 0.72 + (c / cols) * (Math.PI * 2 - 1.44),
+        radius = THREE.MathUtils.lerp(top, bottom, t),
+        fold = Math.sin(a * 9 + t * 2) * 0.01 * t;
+      points.push(
+        Math.cos(a) * (radius + fold),
+        0.19 - length * t,
+        Math.sin(a) * (radius * 0.63 + fold) + 0.025 + 0.05 * t,
+      );
+      uv.push(c / cols, t);
+      if (r < rows && c < cols) {
+        const i = r * (cols + 1) + c;
+        indices.push(i, i + 1, i + cols + 1, i + 1, i + cols + 2, i + cols + 1);
+      }
+    }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(points, 3),
+  );
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  material.side = THREE.DoubleSide;
+  organicMesh(parent, geometry, material);
 }

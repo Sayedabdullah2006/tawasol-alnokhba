@@ -18,7 +18,7 @@ import {
   type OfficeStaff,
   type OfficeActivity,
 } from "@/lib/virtual-office/domain";
-import { createSaudiHead } from "./saudi-character";
+import { createOfficeCharacter } from "./human-character";
 import { firstName, officeExcerpt } from "@/lib/virtual-office/presentation";
 import { officeFloor, officePath, type FloorPoint } from "./office-navigation";
 import { createOfficePool } from "./office-pool";
@@ -536,8 +536,8 @@ export default function OfficeScene({
       box(station, [0.75, 0.04, 0.28], [0, 1.19, 0.36], "#e1e7ec");
       cylinder(station, 0.1, 0.18, [0.88, 1.24, 0.35], "#edf2f5");
       box(station, [0.4, 0.05, 0.5], [-0.85, 1.2, 0.25], agent.color);
-      // A sculpted desk character: face, hair, clothing, arms, chair and shoes.
-      const person = new THREE.Group();
+      const character = createOfficeCharacter(appearance, agent.color);
+      const person = character.root;
       person.position.set(x, 0, z + 0.55);
       scene.add(person);
       const chair = new THREE.Group();
@@ -550,37 +550,7 @@ export default function OfficeScene({
         const leg = box(chair, [0.08, 0.06, 0.65], [0, 0.1, 0.1], "#263b54");
         leg.rotation.y = (i * Math.PI) / 2.5;
       }
-      box(person, [0.62, 0.65, 0.4], [0, 1.02, 0], appearance.clothing);
-      const skin = appearance.skin;
-      const head = createSaudiHead(appearance);
-      person.add(head);
-      if (appearance.gender === "male") {
-        // Thobe collar, placket, pocket and role-colored pen.
-        cylinder(person, 0.12, 0.12, [0, 1.38, -0.025], appearance.clothing);
-        box(person, [0.055, 0.35, 0.018], [0, 1.14, -0.21], "#d4dadd");
-        box(person, [0.15, 0.13, 0.018], [-0.17, 1.12, -0.21], "#e1e6e9");
-        box(person, [0.018, 0.13, 0.025], [-0.17, 1.16, -0.23], agent.color);
-      } else if (appearance.headwear === "none") {
-        box(person, [0.17, 0.38, 0.018], [0, 1.18, -0.21], "#f3ece2");
-      }
-      const arms: THREE.Mesh[] = [];
-      const legs: THREE.Group[] = [];
-      for (const dx of [-0.4, 0.4]) {
-        const arm = box(
-          person,
-          [0.18, 0.18, 0.55],
-          [dx, 1.17, -0.24],
-          appearance.clothing,
-        );
-        arms.push(arm);
-        sphere(arm, 0.095, [0, -0.01, -0.29], skin);
-        const leg = new THREE.Group();
-        leg.position.set(dx * 0.52, 0.7, -0.15);
-        person.add(leg);
-        legs.push(leg);
-        box(leg, [0.22, 0.45, 0.24], [0, -0.25, -0.1], appearance.clothing);
-        box(leg, [0.24, 0.12, 0.37], [0, -0.51, -0.17], "#23344b");
-      }
+      character.update({ time: index, dt: 1, walking: false, seated: true });
       person.traverse((o) => {
         if (o instanceof THREE.Mesh) {
           o.userData.agent = agent.id;
@@ -597,9 +567,7 @@ export default function OfficeScene({
       return {
         id: agent.id,
         person,
-        head,
-        arms,
-        legs,
+        character,
         screen,
         marker,
         human: agent.human,
@@ -636,29 +604,14 @@ export default function OfficeScene({
       [-1.4, 2.7],
       [1.4, 2.7],
     ];
-    const visitor = new THREE.Group();
+    const visitorCharacter = createOfficeCharacter(
+      OFFICE_APPEARANCE.editor,
+      "#ac8646",
+    );
+    const visitor = visitorCharacter.root;
     visitor.position.set(0, 0, 6.5);
     visitor.visible = walkEnabled.current;
     scene.add(visitor);
-    const look = OFFICE_APPEARANCE.editor;
-    box(visitor, [0.6, 0.7, 0.38], [0, 1.14, 0], look.clothing);
-    cylinder(visitor, 0.29, 0.55, [0, 0.68, 0], look.clothing, 0.34);
-    visitor.add(createSaudiHead(look));
-    const walkingLimbs: THREE.Group[] = [];
-    for (const side of [-1, 1]) {
-      const leg = new THREE.Group();
-      leg.position.set(side * 0.17, 0.7, 0);
-      visitor.add(leg);
-      box(leg, [0.2, 0.5, 0.2], [0, -0.25, 0], look.clothing);
-      box(leg, [0.22, 0.12, 0.35], [0, -0.58, -0.07], "#263b54");
-      walkingLimbs.push(leg);
-      const arm = new THREE.Group();
-      arm.position.set(side * 0.39, 1.4, 0);
-      visitor.add(arm);
-      box(arm, [0.17, 0.52, 0.18], [0, -0.26, 0], look.clothing);
-      sphere(arm, 0.09, [0, -0.57, 0], look.skin);
-      walkingLimbs.push(arm);
-    }
     const destination = new THREE.Mesh(
       new THREE.TorusGeometry(0.25, 0.025, 8, 32),
       mat("#ac8646"),
@@ -666,8 +619,7 @@ export default function OfficeScene({
     destination.rotation.x = Math.PI / 2;
     destination.visible = false;
     scene.add(destination);
-    let walkPath: FloorPoint[] = [],
-      travel = 0;
+    let walkPath: FloorPoint[] = [];
     type IdleTour = {
       id: OfficePersonId;
       path: FloorPoint[];
@@ -1005,13 +957,13 @@ export default function OfficeScene({
         if (moved) {
           const delta = visitor.position.clone().sub(start);
           visitor.rotation.y = Math.atan2(-delta.x, -delta.z);
-          travel += distance * 5;
         }
-        walkingLimbs.forEach((limb, i) => {
-          limb.rotation.x =
-            moved && !reduced.matches
-              ? Math.sin(travel + (i < 2 ? 0 : Math.PI)) * 0.48
-              : 0;
+        visitorCharacter.update({
+          time: now / 1000,
+          dt,
+          walking: moved,
+          seated: false,
+          reducedMotion: reduced.matches,
         });
         destination.visible = walkPath.length > 0;
         const lookAt = visitor.position
@@ -1162,26 +1114,19 @@ export default function OfficeScene({
         p.marker.visible = live.current.selected === p.id;
         p.marker.position.x = p.person.position.x;
         p.marker.position.z = p.person.position.z;
-        const animated = !reduced.matches && live.current.ambient;
-        p.head.rotation.z = animated
-          ? Math.sin(t * (running ? 2 : 0.85) + p.index) * 0.035
-          : 0;
-        p.head.rotation.y =
-          animated && !running ? Math.sin(t * 0.55 + p.index * 2) * 0.12 : 0;
-        p.arms.forEach((arm, i) => {
-          arm.rotation.x = strolling
-            ? -1 + Math.sin(t * 8 + p.index + i * Math.PI) * 0.35
-            : poolMode && !p.human && pool.game.turn === p.index
-              ? -0.6 + Math.sin(t * 3) * 0.2
-              : animated
-                ? Math.sin(t * (running ? 8 : 1.2) + i * 2 + p.index) *
-                  (running ? 0.08 : 0.035)
-                : 0;
-        });
-        p.legs.forEach((leg, i) => {
-          leg.rotation.x = strolling
-            ? Math.sin(t * 8 + p.index + i * Math.PI) * 0.4
-            : 0;
+        p.character.update({
+          time: t + p.index * 0.37,
+          dt,
+          walking: strolling,
+          seated:
+            !strolling &&
+            (p.human || (!poolMode && !idleTour && !playPath)) &&
+            p.person.position.distanceTo(gathering ? p.seat : p.home) < 0.18,
+          working: running,
+          playing: poolMode && !p.human,
+          shooter:
+            poolMode && !p.human && !strolling && pool.game.turn === p.index,
+          reducedMotion: reduced.matches,
         });
         p.screen.material = mat(running ? "#4d9d9e" : agentColor(p.id));
         const label = labels.current.get(p.id);
@@ -1263,6 +1208,7 @@ export default function OfficeScene({
       const textures = new Set<THREE.Texture>();
       const mats = new Set<THREE.Material>();
       scene.traverse((o) => {
+        if (o instanceof THREE.SkinnedMesh) o.skeleton.dispose();
         if (o instanceof THREE.Mesh) {
           o.geometry.dispose();
           const list = Array.isArray(o.material) ? o.material : [o.material];
