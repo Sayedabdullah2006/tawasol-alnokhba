@@ -7,7 +7,11 @@ import { routeStaffDepartment } from "./department-routing";
 /** Read-only host adapter. Replace with Hamza's staff directory when integrating. */
 export async function readHostTeam(db: SupabaseClient, workspace: string) {
   const service = await createServiceRoleClient();
-  const [summary, looks, placements] = await Promise.all([
+  const {
+    data: { user },
+  } = await db.auth.getUser();
+  if (!user) throw new OfficeError("سجل الدخول للمتابعة", 401);
+  const [summary, looks, placements, directory] = await Promise.all([
     db.rpc("wf_admin_dashboard", {
       p_from: null,
       p_to: null,
@@ -22,9 +26,13 @@ export async function readHostTeam(db: SupabaseClient, workspace: string) {
       .from("wf_employees")
       .select("id,department:wf_departments(name)")
       .eq("status", "active"),
+    service.rpc("vo_staff_directory", {
+      p_actor: user.id,
+      p_workspace: workspace,
+    }),
   ]);
-  if (summary.error || looks.error || placements.error)
-    throw summary.error || looks.error || placements.error;
+  if (summary.error || looks.error || placements.error || directory.error)
+    throw summary.error || looks.error || placements.error || directory.error;
   const rows = summary.data?.employees as {
     id: string;
     full_name: string;
@@ -50,6 +58,9 @@ export async function readHostTeam(db: SupabaseClient, workspace: string) {
       );
       return {
         id: row.id,
+        presence: (directory.data.staff as OfficeStaff[]).find(
+          (p) => p.id === row.id,
+        )?.presence,
         name: row.full_name,
         jobTitle: row.job_title,
         registeredDepartment,

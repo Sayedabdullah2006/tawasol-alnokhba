@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import type { OfficeStaff, StaffAppearance } from "@/lib/virtual-office/domain";
 import s from "./office.module.css";
+import PresenceBadge from "./OfficePresence";
 type Task = { id: string; title: string; dueAt: string | null; stage: string };
 const stageNames: Record<string, string> = {
   backlog: "لم تبدأ",
@@ -86,12 +87,13 @@ export default function HumanStaffPanel({
           <span className={s.humanBadge}>الفريق الحقيقي</span>
           <h2>{person.name}</h2>
           <p>{person.jobTitle || "عضو في فريق تواصل النخبة"}</p>
+          <PresenceBadge presence={person.presence} />
         </div>
       </div>
       <div className={s.humanBody}>
         <p className={s.humanExplanation}>
-          هذه الشخصية تمثل زميلك الحقيقي. الأرقام والمهام من نظام الفريق، وليست
-          محادثة ذكاء اصطناعي أو مؤشرًا على وجوده الآن.
+          الحالة من جلسة الحضور المسجلة في النظام، وتوضح الاجتماع أو الاستراحة
+          أو العمل الجاري. حركة الشخصية تمثيلية ولا تغير الحضور.
         </p>
         <dl className={s.humanMetrics}>
           <div>

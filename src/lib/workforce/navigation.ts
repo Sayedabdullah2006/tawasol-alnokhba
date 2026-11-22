@@ -68,6 +68,7 @@ const screen = (
 });
 
 export const employeeModules: EmployeeModule[] = [
+  {key:'office',title:'المكتب الافتراضي',purpose:'فريق الشركة وحالة الحضور ومساحة عملك.',adminArea:'المكتب الافتراضي',screens:[screen('virtual-office','مكتبي الافتراضي','الحالة من الحضور والمهام ضمن صلاحياتك.',[],undefined,true)]},
   {key:'sales',title:'المبيعات',purpose:'تسجيل العملاء والفرص ومتابعة النتائج.',adminArea:'المبيعات والأهداف',screens:[screen('crm','العملاء والفرص — CRM','جهات وفرص وأنشطة وعروض موثقة.',[],undefined,true)]},
   {
     key: "knowledge",

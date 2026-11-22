@@ -12,23 +12,23 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import {
   OFFICE_APPEARANCE,
-  appearanceForStaff,
   type OfficePersonId,
   type OfficeStaff,
   type OfficeActivity,
 } from "@/lib/virtual-office/domain";
 import { createOfficeCharacter } from "./human-character";
 import {
-  agentsForDepartment,
   departmentById,
-  departmentAppearance,
   type DepartmentId,
 } from "@/lib/virtual-office/departments";
-import { firstName, officeExcerpt } from "@/lib/virtual-office/presentation";
+import { officeExcerpt } from "@/lib/virtual-office/presentation";
+import { officeActors as sceneActors } from "@/lib/virtual-office/scene-layout";
 import { officeFloor, officePath, type FloorPoint } from "./office-navigation";
 import { createOfficePool } from "./office-pool";
 import { POOL, lowestPoolBall } from "./pool-physics";
 import s from "./office.module.css";
+import { presenceView } from "@/lib/virtual-office/presence";
+import { usePresenceNow } from "./OfficePresence";
 
 type Props = {
   department: DepartmentId;
@@ -42,6 +42,7 @@ type Props = {
   activities: OfficeActivity[];
   taskSummaries: Partial<Record<OfficePersonId, string>>;
   onOpenActivity: (activity: OfficeActivity) => void;
+  employeeView?: boolean;
 };
 type SceneApi = {
   focus: (id?: OfficePersonId) => void;
@@ -52,43 +53,6 @@ type SceneApi = {
   recreation: (enabled: boolean) => void;
   newPoolRound: () => void;
 };
-function sceneActors(staff: OfficeStaff[], department: DepartmentId) {
-  const virtual = agentsForDepartment(department);
-  return [
-    ...(staff.length
-      ? []
-      : virtual.map((agent) => ({
-          ...agent,
-          name: agent.firstName,
-          role: agent.name,
-          fullName: agent.firstName,
-          id: agent.id as OfficePersonId,
-          human: false,
-          appearance: departmentAppearance(department, agent.id),
-        }))),
-    ...staff.map((person, index) => {
-      const extra = index - 6,
-        row = Math.floor(Math.max(0, extra) / 4),
-        count = Math.min(4, Math.max(0, staff.length - 6) - row * 4);
-      return {
-        id: `staff:${person.id}` as OfficePersonId,
-        name: firstName(person.name),
-        fullName: person.name,
-        role: person.jobTitle || "فريق تواصل النخبة",
-        color: "#567895",
-        position:
-          index < 6
-            ? virtual[index].position
-            : ([
-                ((extra % 4) - (count - 1) / 2) * 4.5,
-                9 + row * 4,
-              ] as readonly [number, number]),
-        human: true,
-        appearance: appearanceForStaff(person.appearance),
-      };
-    }),
-  ];
-}
 
 export default function OfficeScene({
   department,
@@ -102,7 +66,9 @@ export default function OfficeScene({
   activities,
   taskSummaries,
   onOpenActivity,
+  employeeView = false,
 }: Props) {
+  const presenceNow = usePresenceNow();
   const sceneId = useId().replace(/:/g, "");
   const wrap = useRef<HTMLDivElement>(null);
   const host = useRef<HTMLDivElement>(null);
@@ -191,7 +157,7 @@ export default function OfficeScene({
     };
   }, []);
   useEffect(() => {
-    if (!hovered?.startsWith("staff:")) return;
+    if (!hovered?.startsWith("staff:") || employeeView) return;
     const controller = new AbortController();
     async function loadTask() {
       try {
@@ -223,7 +189,7 @@ export default function OfficeScene({
       controller.abort();
       clearInterval(timer);
     };
-  }, [hovered]);
+  }, [hovered, employeeView]);
   const visit = (id: OfficePersonId) => {
     onSelect(id);
     api.current?.focus(id);
@@ -263,8 +229,7 @@ export default function OfficeScene({
     if (!host.current) return;
     const container: HTMLDivElement = host.current;
     const actors = sceneActors(live.current.staff, department);
-    const staffDepth =
-      Math.ceil(Math.max(0, live.current.staff.length - 6) / 4) * 4;
+    const staffDepth = Math.ceil(live.current.staff.length / 4) * 4;
     const extraDepth = staffDepth + 7;
     const poolZ = 10 + staffDepth;
     let renderer: THREE.WebGLRenderer;
@@ -1325,6 +1290,12 @@ export default function OfficeScene({
               const activity = activities.find((a) => a.agentId === agent.id);
               const task = taskSummaries[agent.id] || staffTasks[agent.id];
               const hintId = `${sceneId}-${agent.id.replace(":", "-")}`;
+              const presence = agent.human
+                ? presenceView(
+                    staff.find((p) => `staff:${p.id}` === agent.id)?.presence,
+                    presenceNow,
+                  )
+                : null;
               const caption =
                 activity?.kind === "plan"
                   ? "الخطة جاهزة"
@@ -1354,13 +1325,20 @@ export default function OfficeScene({
                     onFocus={() => showHint(agent.id)}
                     onBlur={leaveHint}
                     {...{ interestfor: hintId }}
-                    aria-label={`${agent.name}، ${agent.role}`}
+                    aria-label={`${agent.name}، ${agent.role}${presence ? `، ${presence.label}` : "، مساعد افتراضي"}`}
                     aria-describedby={hintId}
                     aria-pressed={selected === agent.id}
                   >
                     <span
-                      className={active.includes(agent.id) ? s.workingDot : ""}
-                      style={{ background: agent.color }}
+                      className={
+                        presence
+                          ? s.presenceDot
+                          : active.includes(agent.id)
+                            ? s.workingDot
+                            : ""
+                      }
+                      data-state={presence?.state}
+                      style={presence ? undefined : { background: agent.color }}
                     />
                     {agent.name}
                   </button>
@@ -1381,9 +1359,7 @@ export default function OfficeScene({
                     <strong>{agent.fullName}</strong>
                     <span>{agent.role}</span>
                     <small>
-                      {agent.human
-                        ? "شخصية تمثيلية للموظف"
-                        : "عضو الفريق الافتراضي"}
+                      {agent.human ? presence?.label : "عضو الفريق الافتراضي"}
                     </small>
                     {task ? (
                       <p>

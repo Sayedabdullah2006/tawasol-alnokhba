@@ -29,6 +29,16 @@ const departmentSource=await readFile(new URL('../src/lib/virtual-office/departm
 const departmentCode=ts.transpileModule(departmentSource,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText.replace('from "./domain"',`from "${new URL('../src/lib/virtual-office/domain.ts',import.meta.url).href}"`);
 const departmentUrl=`data:text/javascript;base64,${Buffer.from(departmentCode).toString('base64')}`;
 const {OFFICE_DEPARTMENTS,agentsForDepartment,departmentWorkspace,parseDepartment,departmentAppearance,requiresOfficeResearch}=await import(departmentUrl);
+const layoutCode=ts.transpileModule(await readFile(new URL('../src/lib/virtual-office/scene-layout.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText.replace('from "./domain"',`from "${new URL('../src/lib/virtual-office/domain.ts',import.meta.url).href}"`).replace('from "./departments"',`from "${departmentUrl}"`);
+const {officeActors,companyRooms}=await import(`data:text/javascript;base64,${Buffer.from(layoutCode).toString('base64')}`);
+test('the complete company always contains all virtual staff and adds real colleagues without replacing them',()=>{
+ const staff=Array.from({length:9},(_,i)=>({id:'real-'+i,name:'موظف '+i,jobTitle:'كاتب',appearance:'unset',officeDepartment:'content'}));
+ const actors=officeActors(staff,'content');assert.equal(actors.length,15);assert.equal(actors.filter(p=>!p.human).length,6);assert.equal(actors.filter(p=>p.human).length,9);
+ assert.equal(new Set(actors.map(p=>p.position.join(':'))).size,15,'no real employee shares a virtual desk');
+ const rooms=companyRooms(staff);assert.equal(rooms.length,8);assert.equal(rooms.flatMap(r=>r.members).length,57);
+ assert.equal(new Set(rooms.flatMap(r=>r.members.map(p=>p.key))).size,57,'seat IDs are namespaced by department');
+ for(const r of rooms){assert.equal(r.members.filter(p=>!p.human).length,6);for(const p of r.members){assert(Math.abs(p.position[0])<9);assert(Math.abs(p.position[1])<r.depth/2-1);}}
+});
 const planSource=await readFile(new URL('../src/lib/virtual-office/planning.ts',import.meta.url),'utf8');
 const planCode=ts.transpileModule(planSource,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText.replace('from "./domain"',`from "${new URL('../src/lib/virtual-office/domain.ts',import.meta.url).href}"`).replace('from "./departments"',`from "${departmentUrl}"`);
 const {parseOfficePlan}=await import(`data:text/javascript;base64,${Buffer.from(planCode).toString('base64')}`);

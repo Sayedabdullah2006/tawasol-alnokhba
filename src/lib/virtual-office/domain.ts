@@ -147,6 +147,7 @@ export const OFFICE_APPEARANCE: Record<AgentId, OfficeAppearance> = {
 };
 export type StaffAppearance = "unset" | "shemagh" | "hijab" | "hair";
 export type OfficeStaff = {
+  presence?: import("./presence").OfficePresence;
   id: string;
   name: string;
   jobTitle: string;
@@ -223,11 +224,13 @@ export type OfficeSession = {
   output_tokens: number;
 };
 export type OfficeSnapshot = {
+  now?: string;
   contractVersion: number;
   sessions: OfficeSession[];
   memories: { agent_id: AgentId; content: string }[];
   runtime: { configured: boolean; model: string; provider: string };
   staff: OfficeStaff[];
+  companyStaff?: OfficeStaff[];
   staffAvailable: boolean;
   activities: OfficeActivity[];
 };

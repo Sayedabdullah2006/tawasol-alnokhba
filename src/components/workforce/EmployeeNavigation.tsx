@@ -33,7 +33,7 @@ export default function EmployeeNavigation({ activePath }: { activePath?: string
         }
       }}
     >
-      <ul className="grid w-full grid-cols-3 gap-2 lg:grid-cols-7">
+      <ul className="grid w-full grid-cols-3 gap-2 lg:grid-cols-8">
         {modules.map((module) => {
           const screens = module.screens.filter((s) => s.available);
           if (!screens.length) return null;

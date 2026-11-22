@@ -8,11 +8,16 @@ export const metadata: Metadata = { title: "المكتب الافتراضي | ت
 export default async function VirtualOfficePage({
   searchParams,
 }: {
-  searchParams: Promise<{ department?: string | string[] }>;
+  searchParams: Promise<{ department?: string | string[]; view?: string }>;
 }) {
   const query = await searchParams;
   const department = OFFICE_DEPARTMENTS.some((d) => d.id === query.department)
     ? (query.department as DepartmentId)
     : "leadership";
-  return <VirtualOffice initialDepartment={department} />;
+  return (
+    <VirtualOffice
+      initialDepartment={department}
+      initialOverview={query.view !== "department"}
+    />
+  );
 }

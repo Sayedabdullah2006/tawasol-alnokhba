@@ -2079,3 +2079,225 @@
     height: 340px;
   }
 }
+.employeeOffice {
+  min-width: 0;
+  background: #f3f6fa;
+  color: #193752;
+}
+.presenceBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.7;
+  color: #426078;
+}
+.presenceBadge i,
+.presenceDot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #8995a2;
+}
+.presenceBadge[data-state="available"] i,
+.presenceDot[data-state="available"] {
+  background: #16816b;
+}
+.presenceBadge[data-state="busy"] i,
+.presenceDot[data-state="busy"] {
+  background: #b64b53;
+}
+.presenceBadge[data-state="break"] i,
+.presenceDot[data-state="break"] {
+  background: #b48024;
+}
+.presenceBadge[data-state="unknown"] i,
+.presenceDot[data-state="unknown"] {
+  background: transparent;
+  border: 1.5px solid #8995a2;
+}
+.availabilityPanel {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  margin-block: 22px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #ccd9e4;
+  border-inline-start: 3px solid #ac8646;
+  border-radius: 8px;
+}
+.availabilityPanel > div {
+  flex: 1;
+  min-width: min(100%, 240px);
+}
+.availabilityPanel strong {
+  display: block;
+  margin-block-end: 5px;
+}
+.availabilityPanel p {
+  font-size: 0.8rem;
+  color: #60758b;
+  line-height: 1.9;
+  margin: 6px 0 0;
+}
+.availabilityPanel > p[role="status"] {
+  flex-basis: 100%;
+  margin: 0;
+}
+.availabilityPanel form {
+  display: flex;
+  align-items: end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.availabilityPanel fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.availabilityPanel legend {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0;
+}
+.availabilityOptions {
+  display: flex;
+  gap: 12px;
+}
+.availabilityOptions > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.availabilityOptions label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  cursor: pointer;
+  padding-inline: 6px;
+}
+.availabilityOptions input {
+  width: 18px;
+  height: 18px;
+  accent-color: #203f68;
+}
+.availabilityOptions input:focus-visible {
+  outline: 2px solid #203f68;
+  outline-offset: 3px;
+}
+.availabilityPanel a {
+  font-size: 0.8rem;
+  color: #203f68;
+  text-underline-offset: 4px;
+}
+.availabilityPanel fieldset:disabled {
+  opacity: 0.6;
+}
+.employeeWork {
+  margin-block-start: 26px;
+  padding: 22px;
+  background: #fff;
+  border: 1px solid #dce5ed;
+  border-radius: 8px;
+}
+.employeeWork h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0 0 10px;
+}
+.employeeWork > p,
+.employeeWork > div > p {
+  color: #60758b;
+  font-size: 0.85rem;
+  line-height: 1.9;
+}
+.employeeWork .humanTasks {
+  margin-block: 18px;
+}
+.employeeInitial {
+  display: inline-grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: #eaf0f5;
+  color: #203f68;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+.companyScene {
+  height: clamp(560px, 55vw, 780px);
+}
+.departmentDoor {
+  position: absolute;
+  inset: 0 auto auto 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 140px;
+  min-height: 48px;
+  padding: 7px 10px;
+  border: 1px solid #b8cbd9;
+  border-bottom: 2px solid #ac8646;
+  border-radius: 5px;
+  background: #fffffff0;
+  color: #203f68;
+  box-shadow: 0 3px 12px #203f6812;
+  font: inherit;
+  cursor: pointer;
+}
+.departmentDoor strong {
+  font-size: 0.84rem;
+}
+.departmentDoor small {
+  font-size: 0.68rem;
+  color: #60758b;
+}
+.departmentDoor:hover,
+.departmentDoor:focus-visible {
+  outline: 2px solid #ac8646;
+  outline-offset: 2px;
+  background: #fffdf5;
+}
+.companyPersonHint {
+  position: absolute;
+  top: 22px;
+  inset-inline-start: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 18px;
+  border: 1px solid #ccd9e4;
+  border-radius: 8px;
+  background: #fffffff0;
+  color: #203f68;
+  pointer-events: none;
+  z-index: 5;
+}
+.companyPersonHint span,
+.companyPersonHint small {
+  font-size: 0.8rem;
+}
+@media (max-width: 600px) {
+  .companyScene {
+    height: 600px;
+  }
+  .departmentDoor {
+    width: 94px;
+    padding: 5px;
+  }
+  .departmentDoor strong {
+    font-size: 0.7rem;
+  }
+  .departmentDoor small {
+    font-size: 0.58rem;
+  }
+}

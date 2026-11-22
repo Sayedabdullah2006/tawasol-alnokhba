@@ -91,18 +91,24 @@ export async function snapshot(
     : { data: [], error: null };
   if (previews.error) throw previews.error;
   let staff: Awaited<ReturnType<typeof readHostTeam>> = [],
+    companyStaff: Awaited<ReturnType<typeof readHostTeam>> = [],
     staffAvailable = true;
   try {
-    staff = (await readHostTeam(hostDb, workspaceId())).filter(person=>person.officeDepartment===department);
+    companyStaff = await readHostTeam(hostDb, workspaceId());
+    staff = companyStaff.filter(
+      (person) => person.officeDepartment === department,
+    );
   } catch {
     staffAvailable = false;
   }
   return {
     contractVersion: OFFICE_CONTRACT_VERSION,
+    now: new Date().toISOString(),
     sessions: sessions.data as OfficeSession[],
     memories: memories.data,
     runtime: runtimeInfo(),
     staff,
+    companyStaff,
     staffAvailable,
     activities: officeActivities(recent, previews.data || []),
   };

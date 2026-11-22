@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   OFFICE_CONTRACT_VERSION,
   appearanceForStaff,
@@ -19,6 +20,7 @@ import {
   type OfficeSession,
 } from "@/lib/virtual-office/domain";
 import s from "./office.module.css";
+import PresenceBadge, { PresenceClock } from "./OfficePresence";
 import HumanStaffPanel from "./HumanStaffPanel";
 import OfficePlanCard from "./OfficePlanCard";
 import {
@@ -40,6 +42,10 @@ const OfficeScene = dynamic(() => import("./OfficeScene"), {
   loading: () => (
     <div className={s.sceneLoading}>جارٍ تجهيز المكتب الثلاثي الأبعاد…</div>
   ),
+});
+const CompanyScene = dynamic(() => import("./CompanyScene"), {
+  ssr: false,
+  loading: () => <div className={s.sceneLoading}>جارٍ تجهيز إدارات الشركة…</div>,
 });
 const endpoint = "/api/admin/virtual-office";
 async function requestOffice(
@@ -245,21 +251,23 @@ function Status({ session }: { session: OfficeSession }) {
 
 export default function VirtualOffice({
   initialDepartment = "leadership",
+  initialOverview = true,
 }: {
   initialDepartment?: DepartmentId;
+  initialOverview?: boolean;
 }) {
   const department = initialDepartment;
   return (
     <div dir="rtl">
       <div className={s.companyNavigation}>
         <div className={s.companyNavigationTitle}>
-          <strong>إدارات الشركة الافتراضية</strong>
-          <span>٨ إدارات · فرق فعلية أو افتراضية</span>
+          <strong>تواصل النخبة</strong>
+          <span>٨ إدارات</span>
         </div>
         <nav aria-label="إدارات الشركة">
           {OFFICE_DEPARTMENTS.map((d) => (
             <Link
-              href={`?department=${d.id}`}
+              href={`?department=${d.id}&view=department`}
               scroll={false}
               key={d.id}
               aria-current={department === d.id ? "page" : undefined}
@@ -269,11 +277,23 @@ export default function VirtualOffice({
           ))}
         </nav>
       </div>
-      <DepartmentOffice key={department} department={department} />
+      <DepartmentOffice
+        key={`${department}:${initialOverview}`}
+        department={department}
+        initialOverview={initialOverview}
+      />
     </div>
   );
 }
-function DepartmentOffice({ department }: { department: DepartmentId }) {
+function DepartmentOffice({
+  department,
+  initialOverview,
+}: {
+  department: DepartmentId;
+  initialOverview: boolean;
+}) {
+  const router = useRouter();
+  const [companyView, setCompanyView] = useState(initialOverview);
   const unit = departmentById(department),
     agents = agentsForDepartment(department),
     manager = departmentAgent(department, "editor");
@@ -591,7 +611,7 @@ function DepartmentOffice({ department }: { department: DepartmentId }) {
       (view !== "meetings" || v.kind === "meeting") &&
       (filter === "all" || v.status === filter),
   );
-  return (
+  const office = (
     <div className={s.office} dir="rtl">
       <header className={s.header}>
         <div className={s.heading}>
@@ -599,8 +619,14 @@ function DepartmentOffice({ department }: { department: DepartmentId }) {
             <Icon type="office" />
           </span>
           <div>
-            <h1>{unit.name}</h1>
-            <p>{unit.description}</p>
+            <h1>
+              {companyView && view === "office" ? "تواصل النخبة" : unit.name}
+            </h1>
+            <p>
+              {companyView && view === "office"
+                ? "المكتب الافتراضي"
+                : unit.description}
+            </p>
           </div>
         </div>
         <div className={s.headerActions}>
@@ -636,8 +662,21 @@ function DepartmentOffice({ department }: { department: DepartmentId }) {
       <div className={s.topline}>
         <nav className={s.viewNav} aria-label="أقسام المكتب">
           <button
-            aria-pressed={view === "office"}
-            onClick={() => setView("office")}
+            type="button"
+            aria-pressed={view === "office" && companyView}
+            onClick={() => {
+              setView("office");
+              setCompanyView(true);
+            }}
+          >
+            الشركة كاملة
+          </button>
+          <button
+            aria-pressed={view === "office" && !companyView}
+            onClick={() => {
+              setView("office");
+              setCompanyView(false);
+            }}
           >
             <Icon type="office" />
             المكتب
@@ -664,13 +703,11 @@ function DepartmentOffice({ department }: { department: DepartmentId }) {
             ? `${running.length} مهمة للمساعدين قيد التنفيذ`
             : handoffs.length
               ? `تسليم جاهز لموافقة ${manager.name}`
-              : data?.staff.length
-                ? "المساعدون جاهزون عند الحاجة؛ أعمال الموظفين في بطاقاتهم"
-                : "الفريق بانتظار تكليفك"}
+              : ""}
           <b>
-            {data?.staff.length
-              ? `${data.staff.length} موظف فعلي`
-              : "٦ تخصصات افتراضية"}
+            {companyView
+              ? `${48 + (data?.companyStaff?.length || 0)} موظفًا`
+              : `${6 + (data?.staff.length || 0)} موظفين`}
           </b>
         </p>
       </div>
@@ -689,58 +726,65 @@ function DepartmentOffice({ department }: { department: DepartmentId }) {
       <div className={s.layout}>
         <section className={s.mainColumn}>
           {view === "office" ? (
-            <OfficeScene
-              department={department}
-              selected={
-                staffId
-                  ? `staff:${staffId}`
-                  : data?.staff.length
-                    ? `staff:${data.staff[0].id}`
-                    : selected
-              }
-              active={active}
-              staff={data?.staff || []}
-              activities={data?.activities || []}
-              taskSummaries={taskSummaries}
-              onOpenActivity={(activity) => {
-                const target = sessions.find(
-                  (v) => v.id === activity.sessionId,
-                );
-                if (!target) return;
-                openSession(
-                  target,
-                  activity.agentId,
-                  activity.messageId ?? null,
-                );
-                requestAnimationFrame(() =>
-                  workPanelRef.current?.scrollIntoView({
-                    block: "nearest",
-                    behavior: window.matchMedia(
-                      "(prefers-reduced-motion: reduce)",
-                    ).matches
-                      ? "auto"
-                      : "smooth",
-                  }),
-                );
-              }}
-              meeting={meeting}
-              meetingAgents={meetingAgents}
-              onSelect={(id) => {
-                if (id.startsWith("staff:")) {
-                  setStaffId(id.slice(6));
-                  setNotice("");
-                  setError("");
-                } else choose(id as AgentId);
-              }}
-              onTalk={(id) => {
-                if (id.startsWith("staff:")) setStaffId(id.slice(6));
-                else {
-                  choose(id as AgentId);
-                  setKind("chat");
-                }
-                openChat();
-              }}
-            />
+            companyView ? (
+              <CompanyScene
+                staff={data?.companyStaff || data?.staff || []}
+                department={department}
+                onEnter={(id) => {
+                  setCompanyView(false);
+                  router.push(`?department=${id}&view=department`, {
+                    scroll: false,
+                  });
+                }}
+              />
+            ) : (
+              <OfficeScene
+                department={department}
+                selected={staffId ? `staff:${staffId}` : selected}
+                active={active}
+                staff={data?.staff || []}
+                activities={data?.activities || []}
+                taskSummaries={taskSummaries}
+                onOpenActivity={(activity) => {
+                  const target = sessions.find(
+                    (v) => v.id === activity.sessionId,
+                  );
+                  if (!target) return;
+                  openSession(
+                    target,
+                    activity.agentId,
+                    activity.messageId ?? null,
+                  );
+                  requestAnimationFrame(() =>
+                    workPanelRef.current?.scrollIntoView({
+                      block: "nearest",
+                      behavior: window.matchMedia(
+                        "(prefers-reduced-motion: reduce)",
+                      ).matches
+                        ? "auto"
+                        : "smooth",
+                    }),
+                  );
+                }}
+                meeting={meeting}
+                meetingAgents={meetingAgents}
+                onSelect={(id) => {
+                  if (id.startsWith("staff:")) {
+                    setStaffId(id.slice(6));
+                    setNotice("");
+                    setError("");
+                  } else choose(id as AgentId);
+                }}
+                onTalk={(id) => {
+                  if (id.startsWith("staff:")) setStaffId(id.slice(6));
+                  else {
+                    choose(id as AgentId);
+                    setKind("chat");
+                  }
+                  openChat();
+                }}
+              />
+            )
           ) : (
             <section className={s.board}>
               <div className={s.boardHeading}>
@@ -864,12 +908,8 @@ function DepartmentOffice({ department }: { department: DepartmentId }) {
               فتح مساحة الموظف
             </button>
           </details>
-          <details className={s.assistantRoster} open={!data?.staff.length}>
-            <summary>
-              {data?.staff.length
-                ? "مساعدو الإدارة الافتراضيون عند الحاجة"
-                : "فريق الإدارة الافتراضي"}
-            </summary>
+          <details className={s.assistantRoster} open>
+            <summary>فريق الإدارة</summary>
             <div className={s.teamHeading}>
               <h2>فريق المكتب</h2>
               <span>اختر الموظف لفتح مساحة عمله</span>
@@ -951,6 +991,7 @@ function DepartmentOffice({ department }: { department: DepartmentId }) {
                       <small>
                         {person.jobTitle} · {person.metrics.open} مهام مفتوحة
                       </small>
+                      <PresenceBadge presence={person.presence} />
                     </span>
                     <span className={s.humanBadge}>فريقك</span>
                   </button>
@@ -1441,4 +1482,5 @@ function DepartmentOffice({ department }: { department: DepartmentId }) {
       </div>
     </div>
   );
+  return <PresenceClock now={data?.now}>{office}</PresenceClock>;
 }
