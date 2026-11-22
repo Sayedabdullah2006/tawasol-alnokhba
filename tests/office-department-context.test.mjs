@@ -181,7 +181,7 @@ test("real SQL scopes department data, separates financial meanings, deduplicate
     await db.exec(base.slice(start, end + 7));
     const prior = await readFile(
       root(
-        "supabase/migrations/20261122201850_virtual_office_coordination.sql",
+        "supabase/migrations/20261122203410_virtual_office_coordination.sql",
       ),
       "utf8",
     );
@@ -193,7 +193,7 @@ test("real SQL scopes department data, separates financial meanings, deduplicate
     await db.exec(
       await readFile(
         root(
-          "supabase/migrations/20261122210021_office_department_data_context.sql",
+          "supabase/migrations/20261122210546_office_department_data_context.sql",
         ),
         "utf8",
       ),

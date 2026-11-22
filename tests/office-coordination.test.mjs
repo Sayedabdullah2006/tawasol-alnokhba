@@ -253,7 +253,7 @@ test("SQL gates new stages on manager approval, scopes help, fences stale writes
     await db.exec(
       await readFile(
         file(
-          "supabase/migrations/20261122201850_virtual_office_coordination.sql",
+          "supabase/migrations/20261122203410_virtual_office_coordination.sql",
         ),
         "utf8",
       ),
