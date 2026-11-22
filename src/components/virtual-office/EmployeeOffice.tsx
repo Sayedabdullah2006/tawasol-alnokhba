@@ -18,6 +18,8 @@ import {
 import { firstName } from "@/lib/virtual-office/presentation";
 import PresenceBadge, { PresenceClock } from "./OfficePresence";
 import s from "./office.module.css";
+import { useOfficeCoordination } from "./useOfficeCoordination";
+import OfficeCoordinationPanel from "./OfficeCoordinationPanel";
 const OfficeScene = dynamic(() => import("./OfficeScene"), {
   ssr: false,
   loading: () => <p className={s.sceneLoading}>جارٍ تجهيز مكتبك…</p>,
@@ -38,6 +40,7 @@ export default function EmployeeOffice({
 }) {
   const router = useRouter();
   const [companyView, setCompanyView] = useState(initialOverview);
+  const coordination = useOfficeCoordination(department);
   const [data, setData] = useState(initial),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
@@ -271,33 +274,49 @@ export default function EmployeeOffice({
               </button>
             </nav>
           </div>
-          {companyView ? (
-            <CompanyScene
+          <div className={s.workplaceLayout}>
+            <div>
+              {companyView ? (
+                <CompanyScene
+                  motion={coordination.motion}
+                  onMotionEnd={coordination.finish}
+                  onOpenInteraction={coordination.open}
+                  staff={allStaff}
+                  department={department}
+                  onEnter={(id) => {
+                    setCompanyView(false);
+                    router.push(`?department=${id}&view=department`, {
+                      scroll: false,
+                    });
+                  }}
+                />
+              ) : (
+                <OfficeScene
+                  motion={coordination.motion}
+                  onMotionEnd={coordination.finish}
+                  onOpenInteraction={coordination.open}
+                  employeeView
+                  department={department}
+                  selected={selected}
+                  active={[]}
+                  staff={staff}
+                  activities={[]}
+                  taskSummaries={summaries}
+                  meeting={false}
+                  meetingAgents={[]}
+                  onSelect={setSelected}
+                  onTalk={openPerson}
+                  onOpenActivity={() => {}}
+                />
+              )}
+            </div>
+            <OfficeCoordinationPanel
+              control={coordination}
               staff={allStaff}
-              department={department}
-              onEnter={(id) => {
-                setCompanyView(false);
-                router.push(`?department=${id}&view=department`, {
-                  scroll: false,
-                });
-              }}
+              admin={false}
+              onSession={() => {}}
             />
-          ) : (
-            <OfficeScene
-              employeeView
-              department={department}
-              selected={selected}
-              active={[]}
-              staff={staff}
-              activities={[]}
-              taskSummaries={summaries}
-              meeting={false}
-              meetingAgents={[]}
-              onSelect={setSelected}
-              onTalk={openPerson}
-              onOpenActivity={() => {}}
-            />
-          )}
+          </div>
           <section
             className={s.employeeWork}
             aria-labelledby={`${titleId}-tasks`}

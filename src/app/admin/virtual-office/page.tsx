@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import VirtualOffice from "@/components/virtual-office/VirtualOffice";
+import { isOfficeUuid } from "@/lib/virtual-office/domain";
 import {
   OFFICE_DEPARTMENTS,
   type DepartmentId,
@@ -8,7 +9,11 @@ export const metadata: Metadata = { title: "المكتب الافتراضي | ت
 export default async function VirtualOfficePage({
   searchParams,
 }: {
-  searchParams: Promise<{ department?: string | string[]; view?: string }>;
+  searchParams: Promise<{
+    department?: string | string[];
+    view?: string;
+    session?: string;
+  }>;
 }) {
   const query = await searchParams;
   const department = OFFICE_DEPARTMENTS.some((d) => d.id === query.department)
@@ -18,6 +23,7 @@ export default async function VirtualOfficePage({
     <VirtualOffice
       initialDepartment={department}
       initialOverview={query.view !== "department"}
+      initialSession={isOfficeUuid(query.session) ? query.session : undefined}
     />
   );
 }

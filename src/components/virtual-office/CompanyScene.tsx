@@ -8,11 +8,24 @@ import type { DepartmentId } from "@/lib/virtual-office/departments";
 import { createOfficeCharacter } from "./human-character";
 import PresenceBadge from "./OfficePresence";
 import s from "./office.module.css";
+import type {
+  OfficeMotion,
+  OfficeInteraction,
+} from "@/lib/virtual-office/coordination";
+import {
+  createInteractionWalk,
+  companyWalkFloor,
+  type InteractionWalk,
+} from "./coordination-motion";
+import { officeExcerpt } from "@/lib/virtual-office/presentation";
 
 type Props = {
   staff: OfficeStaff[];
   department: DepartmentId;
   onEnter: (department: DepartmentId) => void;
+  motion?: OfficeMotion | null;
+  onMotionEnd?: (runId: string) => void;
+  onOpenInteraction?: (event: OfficeInteraction) => void;
 };
 const compactSnapshot = () => window.matchMedia("(max-width: 600px)").matches;
 const subscribeCompact = (changed: () => void) => {
@@ -21,7 +34,14 @@ const subscribeCompact = (changed: () => void) => {
   return () => media.removeEventListener("change", changed);
 };
 /** One physical company floor. Department doors lead into the detailed office. */
-export default function CompanyScene({ staff, department, onEnter }: Props) {
+export default function CompanyScene({
+  staff,
+  department,
+  onEnter,
+  motion = null,
+  onMotionEnd,
+  onOpenInteraction,
+}: Props) {
   const compact = useSyncExternalStore(
     subscribeCompact,
     compactSnapshot,
@@ -30,12 +50,13 @@ export default function CompanyScene({ staff, department, onEnter }: Props) {
   const host = useRef<HTMLDivElement>(null),
     wrap = useRef<HTMLDivElement>(null);
   const doors = useRef(new Map<string, HTMLButtonElement>());
+  const interactionBubble = useRef<HTMLButtonElement>(null);
   const api = useRef<{
     zoom: (factor: number) => void;
     reset: () => void;
     focus: (id: DepartmentId) => void;
   } | null>(null);
-  const live = useRef({ staff, onEnter });
+  const live = useRef({ staff, onEnter, motion, onMotionEnd });
   const [failed, setFailed] = useState(false),
     [expanded, setExpanded] = useState(false),
     [full, setFull] = useState(false),
@@ -45,8 +66,8 @@ export default function CompanyScene({ staff, department, onEnter }: Props) {
     .join("|");
   const rooms = companyRooms(staff, compact ? 2 : 4);
   useEffect(() => {
-    live.current = { staff, onEnter };
-  }, [staff, onEnter]);
+    live.current = { staff, onEnter, motion, onMotionEnd };
+  }, [staff, onEnter, motion, onMotionEnd]);
   useEffect(() => {
     const changed = () => setFull(document.fullscreenElement === wrap.current),
       escape = (e: KeyboardEvent) => {
@@ -382,6 +403,13 @@ export default function CompanyScene({ staff, department, onEnter }: Props) {
     intersection.observe(container);
     const project = new THREE.Vector3(),
       reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const walkingFloor = companyWalkFloor(layout);
+    let interaction: {
+        runId: string;
+        actor: string;
+        walk: InteractionWalk;
+      } | null = null,
+      lastInteraction = "";
     function draw(now: number) {
       frame = requestAnimationFrame(draw);
       if (!visible || document.hidden) {
@@ -394,7 +422,79 @@ export default function CompanyScene({ staff, department, onEnter }: Props) {
       if (!start) start = now;
       const time = (now - start) / 1000;
       count++;
+      const requested = live.current.motion;
+      if (requested && requested.runId !== lastInteraction) {
+        lastInteraction = requested.runId;
+        const actor = characters.find(
+            (p) =>
+              p.key === `${requested.from.department}:${requested.from.id}`,
+          ),
+          target = characters.find(
+            (p) => p.key === `${requested.to.department}:${requested.to.id}`,
+          );
+        if (actor) {
+          const from = actor.root.getWorldPosition(new THREE.Vector3()),
+            home = actor.group.localToWorld(actor.home.clone()),
+            to =
+              target && target !== actor
+                ? target.group
+                    .localToWorld(target.home.clone())
+                    .add(new THREE.Vector3(1.3, 0, 0.7))
+                : actor.group.localToWorld(
+                    new THREE.Vector3(3, 0.16, depth / 2 - 1.3),
+                  );
+          interaction = {
+            runId: requested.runId,
+            actor: actor.key,
+            walk: createInteractionWalk(walkingFloor, from, to, home),
+          };
+        } else
+          queueMicrotask(() => live.current.onMotionEnd?.(requested.runId));
+      }
       for (const p of characters) {
+        if (interaction?.actor === p.key) {
+          const world = p.root.getWorldPosition(new THREE.Vector3()),
+            next = interaction.walk.tick(now, dt, world),
+            dx = next.position.x - world.x,
+            dz = next.position.z - world.z;
+          p.root.position.copy(
+            p.group.worldToLocal(
+              new THREE.Vector3(next.position.x, 0.16, next.position.z),
+            ),
+          );
+          if (next.walking)
+            p.root.rotation.y = Math.atan2(-dx, -dz) - p.group.rotation.y;
+          p.character.update({
+            time,
+            dt,
+            walking: next.walking,
+            seated: false,
+            reducedMotion: reduced.matches,
+          });
+          if (interactionBubble.current) {
+            const point = p.root
+                .getWorldPosition(new THREE.Vector3())
+                .add(new THREE.Vector3(0, 2.7, 0))
+                .project(camera),
+              px = (point.x * 0.5 + 0.5) * container.clientWidth,
+              py = (-point.y * 0.5 + 0.5) * container.clientHeight;
+            interactionBubble.current.style.transform = `translate(-50%,-100%) translate(${THREE.MathUtils.clamp(px, 130, container.clientWidth - 130)}px,${Math.max(90, py)}px)`;
+            interactionBubble.current.style.visibility =
+              Math.abs(point.x) > 1 ||
+              Math.abs(point.y) > 1 ||
+              Math.abs(point.z) > 1
+                ? "hidden"
+                : "visible";
+          }
+          if (next.done) {
+            const runId = interaction.runId;
+            p.root.position.copy(p.home);
+            p.root.rotation.y = 0;
+            interaction = null;
+            queueMicrotask(() => live.current.onMotionEnd?.(runId));
+          }
+          continue;
+        }
         const phase = (time + p.roomIndex * 3 + p.index * 20) % (p.count * 20),
           away = phase < 20,
           progress = away
@@ -436,6 +536,8 @@ export default function CompanyScene({ staff, department, onEnter }: Props) {
           });
       }
       controls.update();
+      if (interactionBubble.current && !interaction)
+        interactionBubble.current.style.visibility = "hidden";
       for (const room of layout) {
         const el = doors.current.get(room.department.id);
         if (!el) continue;
@@ -522,6 +624,27 @@ export default function CompanyScene({ staff, department, onEnter }: Props) {
     >
       {!failed && (
         <div ref={host} className={s.canvasHost}>
+          {motion && (
+            <button
+              type="button"
+              ref={interactionBubble}
+              className={s.coordinationBubble}
+              onClick={() => onOpenInteraction?.(motion)}
+              aria-label={`قراءة التفاعل: ${motion.title}`}
+            >
+              <small>
+                {motion.kind === "morning"
+                  ? "ملخص الصباح"
+                  : motion.kind === "help"
+                    ? "طلب مساعدة"
+                    : "تسليم بين الإدارات"}
+              </small>
+              <strong>
+                {motion.from.name} ← {motion.to.name}
+              </strong>
+              <span>{officeExcerpt(motion.text, 120)}</span>
+            </button>
+          )}
           {rooms.map((room) => (
             <button
               type="button"

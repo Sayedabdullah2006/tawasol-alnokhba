@@ -29,6 +29,14 @@ import { POOL, lowestPoolBall } from "./pool-physics";
 import s from "./office.module.css";
 import { presenceView } from "@/lib/virtual-office/presence";
 import { usePresenceNow } from "./OfficePresence";
+import type {
+  OfficeMotion,
+  OfficeInteraction,
+} from "@/lib/virtual-office/coordination";
+import {
+  createInteractionWalk,
+  type InteractionWalk,
+} from "./coordination-motion";
 
 type Props = {
   department: DepartmentId;
@@ -43,6 +51,9 @@ type Props = {
   taskSummaries: Partial<Record<OfficePersonId, string>>;
   onOpenActivity: (activity: OfficeActivity) => void;
   employeeView?: boolean;
+  motion?: OfficeMotion | null;
+  onMotionEnd?: (runId: string) => void;
+  onOpenInteraction?: (event: OfficeInteraction) => void;
 };
 type SceneApi = {
   focus: (id?: OfficePersonId) => void;
@@ -67,6 +78,9 @@ export default function OfficeScene({
   taskSummaries,
   onOpenActivity,
   employeeView = false,
+  motion = null,
+  onMotionEnd,
+  onOpenInteraction,
 }: Props) {
   const presenceNow = usePresenceNow();
   const sceneId = useId().replace(/:/g, "");
@@ -86,6 +100,7 @@ export default function OfficeScene({
   const [recreation, setRecreation] = useState(false);
   const poolReadout = useRef<HTMLParagraphElement>(null);
   const lifeStatus = useRef<HTMLSpanElement>(null);
+  const interactionBubble = useRef<HTMLButtonElement>(null);
   const [expanded, setExpanded] = useState(false);
   const [nativeFull, setNativeFull] = useState(false);
   useEffect(() => {
@@ -112,6 +127,8 @@ export default function OfficeScene({
     onTalk,
     staff,
     ambient,
+    motion,
+    onMotionEnd,
   });
   const staffSignature = staff
     .map((p) => `${p.id}:${p.name}:${p.appearance}`)
@@ -214,6 +231,8 @@ export default function OfficeScene({
       onTalk,
       staff,
       ambient,
+      motion,
+      onMotionEnd,
     };
   }, [
     selected,
@@ -224,6 +243,8 @@ export default function OfficeScene({
     onTalk,
     staff,
     ambient,
+    motion,
+    onMotionEnd,
   ]);
   useEffect(() => {
     if (!host.current) return;
@@ -627,6 +648,12 @@ export default function OfficeScene({
     const idleTours = new Map<OfficePersonId, IdleTour>();
     let nextTour = 0,
       tourIndex = 0;
+    let interaction: {
+        runId: string;
+        person: OfficePersonId;
+        walk: InteractionWalk;
+      } | null = null,
+      lastInteraction = "";
     const keys = new Set<string>();
     function goTo(at: FloorPoint) {
       walkPath = officePath(floor, visitor.position, at);
@@ -982,11 +1009,61 @@ export default function OfficeScene({
           targetCamera = targetLook = null;
       }
       const t = now * 0.001;
+      const requested = live.current.motion;
+      if (requested && requested.runId !== lastInteraction && !poolMode) {
+        lastInteraction = requested.runId;
+        const from =
+          requested.from.department === department
+            ? people.find((p) => p.id === requested.from.id)
+            : null;
+        const to =
+          requested.to.department === department
+            ? people.find((p) => p.id === requested.to.id)
+            : null;
+        const actor = from || to;
+        if (actor) {
+          if (interaction && interaction.person !== actor.id) {
+            const previous = people.find((p) => p.id === interaction!.person);
+            if (previous)
+              idleTours.set(previous.id, {
+                id: previous.id,
+                path: officePath(
+                  floor,
+                  previous.person.position,
+                  previous.home,
+                ),
+                phase: "home",
+                until: 0,
+                stride: 0,
+                destination: "library",
+              });
+          }
+          idleTours.delete(actor.id);
+          const destination =
+            to && to.id !== actor.id
+              ? { x: to.home.x + 1.3, z: to.home.z + 0.7 }
+              : { x: 0, z: 5.1 };
+          interaction = {
+            runId: requested.runId,
+            person: actor.id,
+            walk: createInteractionWalk(
+              floor,
+              actor.person.position,
+              destination,
+              actor.home,
+            ),
+          };
+        } else {
+          interaction = null;
+          queueMicrotask(() => live.current.onMotionEnd?.(requested.runId));
+        }
+      }
       if (!nextTour) nextTour = now;
       if (!poolMode && idleTours.size < 2 && now >= nextTour) {
         const available = people.filter(
           (p) =>
             !idleTours.has(p.id) &&
+            interaction?.person !== p.id &&
             !playPaths.has(p.id) &&
             !live.current.active.includes(p.id) &&
             (p.id !== live.current.selected || people.length === 1),
@@ -1059,7 +1136,20 @@ export default function OfficeScene({
             p.person.position.add(delta.normalize().multiplyScalar(dt * speed));
           return distance > 0.001;
         }
-        if (poolMode || playPath) {
+        if (interaction?.person === p.id && !poolMode) {
+          const next = interaction.walk.tick(now, dt, p.person.position),
+            dx = next.position.x - p.person.position.x,
+            dz = next.position.z - p.person.position.z;
+          p.person.position.set(next.position.x, 0, next.position.z);
+          strolling = next.walking;
+          if (strolling) p.person.rotation.y = Math.atan2(-dx, -dz);
+          if (next.done) {
+            const runId = interaction.runId;
+            p.person.position.copy(p.home);
+            interaction = null;
+            queueMicrotask(() => live.current.onMotionEnd?.(runId));
+          }
+        } else if (poolMode || playPath) {
           strolling = advance(playPath || [], 2.8);
           if (!strolling) {
             if (poolMode)
@@ -1108,7 +1198,7 @@ export default function OfficeScene({
             gathering ? p.seat : p.home,
             reduced.matches ? 1 : 0.07,
           );
-        if (!idleTour && !playPath && !poolMode)
+        if (!idleTour && !playPath && !poolMode && interaction?.person !== p.id)
           p.person.rotation.y = gathering
             ? p.index < 3
               ? -Math.PI / 2
@@ -1126,6 +1216,7 @@ export default function OfficeScene({
             !poolMode &&
             !idleTour &&
             !playPath &&
+            interaction?.person !== p.id &&
             p.person.position.distanceTo(gathering ? p.seat : p.home) < 0.18,
           working: running,
           coffee:
@@ -1155,6 +1246,15 @@ export default function OfficeScene({
           .project(camera);
         const px = (project.x * 0.5 + 0.5) * container.clientWidth,
           py = (-project.y * 0.5 + 0.5) * container.clientHeight;
+        if (interactionBubble.current && interaction?.person === p.id) {
+          interactionBubble.current.style.transform = `translate(-50%,-100%) translate(${THREE.MathUtils.clamp(px, 130, container.clientWidth - 130)}px,${Math.max(85, py - 18)}px)`;
+          interactionBubble.current.style.visibility =
+            Math.abs(project.z) > 1 ||
+            Math.abs(project.x) > 1 ||
+            Math.abs(project.y) > 1
+              ? "hidden"
+              : "visible";
+        }
         const bubble = bubbles.current.get(p.id);
         if (bubble) {
           const x = THREE.MathUtils.clamp(
@@ -1188,6 +1288,8 @@ export default function OfficeScene({
           ? "visible"
           : "hidden";
       }
+      if (interactionBubble.current && !interaction)
+        interactionBubble.current.style.visibility = "hidden";
       if (lifeStatus.current) {
         const coffee = [...idleTours.values()].find(
           (tour) => tour.destination === "coffee" && tour.phase === "pause",
@@ -1286,6 +1388,27 @@ export default function OfficeScene({
       ) : (
         <>
           <div ref={host} className={s.canvasHost}>
+            {motion && (
+              <button
+                type="button"
+                ref={interactionBubble}
+                className={s.coordinationBubble}
+                onClick={() => onOpenInteraction?.(motion)}
+                aria-label={`قراءة التفاعل: ${motion.title}`}
+              >
+                <small>
+                  {motion.kind === "morning"
+                    ? "ملخص الصباح"
+                    : motion.kind === "help"
+                      ? "طلب مساعدة"
+                      : "تسليم بين الزملاء"}
+                </small>
+                <strong>
+                  {motion.from.name} ← {motion.to.name}
+                </strong>
+                <span>{officeExcerpt(motion.text, 120)}</span>
+              </button>
+            )}
             {sceneActors(staff, department).map((agent) => {
               const activity = activities.find((a) => a.agentId === agent.id);
               const task = taskSummaries[agent.id] || staffTasks[agent.id];

@@ -21,6 +21,8 @@ import {
 } from "@/lib/virtual-office/domain";
 import s from "./office.module.css";
 import PresenceBadge, { PresenceClock } from "./OfficePresence";
+import { useOfficeCoordination } from "./useOfficeCoordination";
+import OfficeCoordinationPanel from "./OfficeCoordinationPanel";
 import HumanStaffPanel from "./HumanStaffPanel";
 import OfficePlanCard from "./OfficePlanCard";
 import {
@@ -252,9 +254,11 @@ function Status({ session }: { session: OfficeSession }) {
 export default function VirtualOffice({
   initialDepartment = "leadership",
   initialOverview = true,
+  initialSession,
 }: {
   initialDepartment?: DepartmentId;
   initialOverview?: boolean;
+  initialSession?: string;
 }) {
   const department = initialDepartment;
   return (
@@ -278,9 +282,10 @@ export default function VirtualOffice({
         </nav>
       </div>
       <DepartmentOffice
-        key={`${department}:${initialOverview}`}
+        key={`${department}:${initialOverview}:${initialSession || ""}`}
         department={department}
         initialOverview={initialOverview}
+        initialSession={initialSession}
       />
     </div>
   );
@@ -288,12 +293,15 @@ export default function VirtualOffice({
 function DepartmentOffice({
   department,
   initialOverview,
+  initialSession,
 }: {
   department: DepartmentId;
   initialOverview: boolean;
+  initialSession?: string;
 }) {
   const router = useRouter();
   const [companyView, setCompanyView] = useState(initialOverview);
+  const coordination = useOfficeCoordination(department);
   const unit = departmentById(department),
     agents = agentsForDepartment(department),
     manager = departmentAgent(department, "editor");
@@ -312,14 +320,14 @@ function DepartmentOffice({
   const [focusedMessage, setFocusedMessage] = useState<string | null>(null);
   const workPanelRef = useRef<HTMLElement>(null);
   const chatDialog = useRef<HTMLDialogElement>(null);
-  function openChat() {
+  const openChat = useCallback(() => {
     const dialog = chatDialog.current;
     if (dialog && !dialog.open) {
       dialog.scrollTop = 0;
       dialog.showModal();
       dialog.scrollTop = 0;
     }
-  }
+  }, []);
   const [panel, setPanel] = useState<"work" | "memory">("work"),
     [kind, setKind] = useState<SessionKind>("chat");
   const [sessionId, setSessionId] = useState<string | null>(null),
@@ -341,6 +349,7 @@ function DepartmentOffice({
     pollError = useRef(false);
   const refreshing = useRef(false);
   const hostMembership = useRef("");
+  const initialSessionOpened = useRef(false);
   const submission = useRef<{ signature: string; id: string } | null>(null);
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
@@ -357,6 +366,26 @@ function DepartmentOffice({
         ]);
         if (id !== revision.current) return;
         setData(snapshot);
+        if (initialSession && !initialSessionOpened.current) {
+          const value = snapshot.sessions.find(
+            (s: OfficeSession) => s.id === initialSession,
+          );
+          if (value) {
+            initialSessionOpened.current = true;
+            sessionRef.current = value.id;
+            setSessionId(value.id);
+            setSelected(value.agent_id);
+            setStaffId(null);
+            setCompanyView(false);
+            openChat();
+            void api(undefined, value.id, signal)
+              .then((detail) => {
+                if (!signal?.aborted && sessionRef.current === value.id)
+                  setMessages(detail.messages);
+              })
+              .catch(() => {});
+          }
+        }
         const membership = snapshot.staff
           .map((person: OfficeStaff) => person.id)
           .join("|");
@@ -382,7 +411,7 @@ function DepartmentOffice({
         refreshing.current = false;
       }
     },
-    [api],
+    [api, initialSession, openChat],
   );
   useEffect(() => {
     const controller = new AbortController();
@@ -723,11 +752,14 @@ function DepartmentOffice({
           استعراض المكتب وتجهيز ذاكرة الفريق.
         </div>
       )}
-      <div className={s.layout}>
+      <div className={view === "office" ? s.workplaceLayout : s.layout}>
         <section className={s.mainColumn}>
           {view === "office" ? (
             companyView ? (
               <CompanyScene
+                motion={coordination.motion}
+                onMotionEnd={coordination.finish}
+                onOpenInteraction={coordination.open}
                 staff={data?.companyStaff || data?.staff || []}
                 department={department}
                 onEnter={(id) => {
@@ -739,6 +771,9 @@ function DepartmentOffice({
               />
             ) : (
               <OfficeScene
+                motion={coordination.motion}
+                onMotionEnd={coordination.finish}
+                onOpenInteraction={coordination.open}
                 department={department}
                 selected={staffId ? `staff:${staffId}` : selected}
                 active={active}
@@ -1008,6 +1043,24 @@ function DepartmentOffice({
             ))}
           </div>
         </section>
+        {view === "office" && (
+          <OfficeCoordinationPanel
+            control={coordination}
+            staff={data?.companyStaff || data?.staff || []}
+            admin
+            onSession={(event) => {
+              if (event.resource.department !== department) {
+                router.push(
+                  `?department=${event.resource.department}&view=department&session=${event.resource.id}`,
+                  { scroll: false },
+                );
+                return;
+              }
+              const value = sessions.find((v) => v.id === event.resource.id);
+              if (value) openSession(value);
+            }}
+          />
+        )}
         <dialog
           ref={chatDialog}
           className={s.chatDialog}

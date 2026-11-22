@@ -29,7 +29,7 @@ export default async function Page({
       key={`${department}:${query.view}`}
       initial={initial}
       department={department}
-      initialOverview={query.view !== "department"}
+      initialOverview={query.view === "company"}
     />
   );
 }

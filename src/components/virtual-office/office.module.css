@@ -2301,3 +2301,324 @@
     font-size: 0.58rem;
   }
 }
+.workplaceLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  align-items: start;
+}
+.workplaceLayout > * {
+  min-width: 0;
+}
+.coordinationPanel {
+  position: sticky;
+  top: 100px;
+  border: 1px solid #ccd9e4;
+  border-radius: 10px;
+  padding: 18px;
+  background: #fff;
+  color: #193752;
+}
+.coordinationPanel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: 16px;
+}
+.coordinationPanel > header span {
+  font-size: 0.7rem;
+  color: #7b6745;
+}
+.coordinationPanel h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 3px 0 0;
+}
+.coordinationPanel > header button {
+  border: 1px solid #d7e0e8;
+  background: #f6f8fa;
+  color: #203f68;
+  border-radius: 6px;
+  min-width: 36px;
+  min-height: 36px;
+  font-size: 1.2rem;
+}
+.coordinationPanel > p {
+  font-size: 0.8rem;
+  line-height: 1.9;
+}
+.morningCard {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: 100%;
+  text-align: start;
+  background: #edf3f6;
+  border: 0;
+  border-inline-start: 3px solid #ac8646;
+  border-radius: 5px;
+  padding: 15px;
+  color: #203f68;
+}
+.morningCard span {
+  font-size: 0.78rem;
+}
+.morningCard strong {
+  font-size: 1rem;
+  font-weight: 700;
+}
+.morningCard i {
+  font-style: normal;
+  color: #ac8646;
+  margin-inline: 7px;
+}
+.morningCard small {
+  font-size: 0.71rem;
+  color: #62778b;
+  line-height: 1.8;
+}
+.coordinationActions {
+  display: flex;
+  gap: 8px;
+  margin-block: 15px;
+}
+.coordinationActions button,
+.helpSuggestions button,
+.replayInteraction {
+  font: inherit;
+  font-size: 0.76rem;
+  border: 1px solid #ccd9e4;
+  background: #fff;
+  color: #203f68;
+  border-radius: 5px;
+  min-height: 40px;
+  padding: 8px 11px;
+}
+.coordinationActions button {
+  flex: 1;
+}
+.helpSuggestions {
+  padding-block: 10px 15px;
+  border-block: 1px solid #e2e9ef;
+  font-size: 0.79rem;
+}
+.helpSuggestions summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.helpSuggestions ul {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+}
+.helpSuggestions li {
+  padding-block: 9px;
+}
+.helpSuggestions strong {
+  font-size: 0.78rem;
+}
+.helpSuggestions p {
+  font-size: 0.72rem;
+  line-height: 1.8;
+  color: #64798e;
+  margin-block: 5px;
+}
+.coordinationFeed {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0 0;
+  max-height: 540px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.coordinationFeed > li {
+  padding-block: 12px;
+  border-bottom: 1px solid #e2e9ef;
+}
+.coordinationFeed > li > button:first-child {
+  display: flex;
+  flex-direction: column;
+  text-align: start;
+  gap: 6px;
+  background: transparent;
+  border: 0;
+  color: #203f68;
+  padding: 0;
+  width: 100%;
+  font: inherit;
+}
+.coordinationFeed small {
+  font-size: 0.68rem;
+  color: #8f6d34;
+}
+.coordinationFeed strong {
+  font-size: 0.83rem;
+  font-weight: 700;
+  line-height: 1.8;
+}
+.coordinationFeed span {
+  font-size: 0.73rem;
+  color: #61788c;
+}
+.coordinationFeed p {
+  font-size: 0.75rem;
+  line-height: 1.85;
+  color: #506980;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+}
+.replayInteraction {
+  border: 0;
+  padding-inline: 0;
+  min-height: 30px;
+  font-size: 0.7rem;
+  color: #8b6b35;
+}
+.coordinationForm {
+  margin-block: 16px;
+  padding: 14px;
+  background: #f5f8fa;
+  border: 1px solid #d9e3eb;
+  border-radius: 6px;
+}
+.coordinationForm h3 {
+  font-weight: 700;
+  font-size: 0.92rem;
+  margin-block: 0 14px;
+}
+.coordinationForm label,
+.coordinationDetails label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-block: 12px 5px;
+}
+.coordinationForm input,
+.coordinationForm select,
+.coordinationForm textarea,
+.coordinationDetails textarea {
+  display: block;
+  width: 100%;
+  background: #fff;
+  border: 1px solid #8c9daa;
+  border-radius: 5px;
+  padding: 10px;
+  color: #193752;
+  font: inherit;
+  font-size: max(1rem, 1em);
+  min-height: 46px;
+  box-sizing: border-box;
+}
+.coordinationForm textarea,
+.coordinationDetails textarea {
+  resize: vertical;
+}
+.coordinationForm p {
+  font-size: 0.72rem;
+  line-height: 1.8;
+  color: #65798c;
+}
+.coordinationForm > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block-start: 12px;
+}
+.coordinationDetails {
+  padding: 26px;
+  color: #193752;
+}
+.coordinationDetails h2 {
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1.7;
+}
+.coordinationDetails h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-block: 24px 10px;
+}
+.coordinationDetails p {
+  font-size: 0.94rem;
+  line-height: 2;
+  white-space: pre-wrap;
+}
+.coordinationDetails a {
+  display: inline-block;
+  color: #203f68;
+  text-underline-offset: 4px;
+  margin-block: 8px;
+  line-height: 1.9;
+}
+.coordinationDetails .primary {
+  color: #fff;
+}
+.coordinationDetails > button {
+  margin: 8px;
+}
+.coordinationDetails > form {
+  padding-block: 16px;
+  border-block: 1px solid #dbe4eb;
+}
+.coordinationDetails > form button {
+  margin-block-start: 12px;
+}
+.coordinationBubble {
+  position: absolute;
+  inset: 0 auto auto 0;
+  z-index: 12;
+  visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: min(260px, calc(100% - 24px));
+  padding: 12px 14px;
+  text-align: start;
+  direction: rtl;
+  background: #fffffff5;
+  border: 1px solid #b5cbd8;
+  border-inline-start: 3px solid #ac8646;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px #203f6818;
+  color: #193752;
+  font: inherit;
+  will-change: transform;
+}
+.coordinationBubble small {
+  font-size: 0.65rem;
+  color: #8c6b35;
+}
+.coordinationBubble strong {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.coordinationBubble span {
+  font-size: 0.76rem;
+  line-height: 1.8;
+}
+.coordinationPanel button:focus-visible,
+.coordinationPanel a:focus-visible,
+.coordinationBubble:focus-visible {
+  outline: 2px solid #ac8646;
+  outline-offset: 3px;
+}
+@media (max-width: 1100px) {
+  .workplaceLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .coordinationPanel {
+    position: static;
+  }
+  .coordinationFeed {
+    max-height: 440px;
+  }
+}
+@media (pointer: coarse) {
+  .coordinationActions button,
+  .helpSuggestions button {
+    min-height: 48px;
+  }
+}
