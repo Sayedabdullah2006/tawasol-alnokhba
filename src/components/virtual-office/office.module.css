@@ -12,6 +12,206 @@
   width: 100%;
   font-size: 1rem;
 }
+.sceneWrap.sceneExpanded,
+.sceneWrap:fullscreen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100dvh;
+  z-index: 200;
+  border-radius: 0;
+  border: 0;
+}
+.planCard {
+  margin: 12px 16px;
+  padding: 16px;
+  border: 1px solid #d0bd96;
+  border-radius: 10px;
+  background: #fffcf3;
+  color: #193752;
+}
+.planHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.planHeader h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+.planHeader > span {
+  font-size: 0.7rem;
+  color: #86642a;
+  white-space: nowrap;
+}
+.planNotice {
+  font-size: 0.75rem;
+  line-height: 1.8;
+  color: #80612f;
+}
+.planSummary {
+  font-size: 0.85rem;
+  line-height: 1.9;
+  white-space: pre-wrap;
+}
+.planSteps {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0;
+}
+.planSteps > li {
+  padding: 12px 0;
+  border-top: 1px solid #e4dac5;
+}
+.planSteps li > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.planSteps strong {
+  font-size: 0.85rem;
+  color: #193752;
+}
+.planSteps small {
+  font-size: 0.7rem;
+  color: #63778a;
+}
+.planSteps p {
+  font-size: 0.8rem;
+  line-height: 1.9;
+  margin: 7px 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.planNumber {
+  display: inline-grid;
+  place-items: center;
+  width: 23px;
+  height: 23px;
+  border-radius: 50%;
+  background: #203f68;
+  color: #fff;
+  font-size: 0.7rem;
+}
+.planSteps .planFinal {
+  border-top-style: dashed;
+}
+.planCard > button {
+  width: 100%;
+  justify-content: center;
+  min-height: 48px;
+  margin-top: 15px;
+}
+.planRevision,
+.excludedRoles {
+  margin-top: 12px;
+  font-size: 0.75rem;
+}
+.planRevision summary,
+.excludedRoles summary,
+.approvedPlan summary {
+  cursor: pointer;
+  color: #294965;
+  padding-block: 8px;
+}
+.planRevision label {
+  display: block;
+  margin: 10px 0 7px;
+}
+.office .planRevision textarea {
+  width: 100%;
+  min-height: 90px;
+  resize: vertical;
+  font: inherit;
+  font-size: max(1rem, 1em);
+  color: #193752;
+  background: #fff;
+  border: 1px solid #767676;
+  border-radius: 7px;
+  padding: 9px;
+}
+.planRevision p {
+  color: #66798b;
+  font-size: 0.7rem;
+  line-height: 1.8;
+}
+.planRevision button {
+  min-height: 48px;
+}
+.excludedRoles ul {
+  padding-inline-start: 16px;
+}
+.excludedRoles li {
+  margin-block: 8px;
+}
+.excludedRoles li span {
+  display: block;
+  line-height: 1.8;
+  color: #66798b;
+}
+.approvedPlan {
+  margin: 10px 16px;
+  padding: 8px 12px;
+  background: #f4f8fb;
+  border: 1px solid #d3dfe9;
+  border-radius: 7px;
+  color: #193752;
+  font-size: 0.8rem;
+}
+.status.plan_review {
+  background: #fff1d0;
+  color: #795716;
+}
+.poolPanel {
+  position: absolute;
+  top: 70px;
+  right: 16px;
+  width: min(270px, calc(100% - 32px));
+  padding: 12px 14px;
+  border: 1px solid #b9cccf;
+  border-radius: 10px;
+  background: #fffffff0;
+  color: #193752;
+  box-shadow: 0 3px 12px #19375214;
+}
+.poolPanel strong {
+  font-size: 0.9rem;
+}
+.poolPanel p {
+  font-size: 0.75rem;
+  line-height: 1.9;
+  margin: 6px 0;
+}
+.poolPanel small {
+  display: block;
+  font-size: 0.65rem;
+  line-height: 1.7;
+  color: #5c7485;
+}
+.poolPanel button {
+  margin-top: 8px;
+  font-size: 0.7rem !important;
+  background: #203f68;
+  color: #fff;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 5px;
+  min-height: 30px;
+}
+@media (max-width: 600px) {
+  .poolPanel {
+    top: 112px;
+    right: 10px;
+    width: 220px;
+    padding: 8px 10px;
+  }
+  .poolPanel small {
+    display: none;
+  }
+}
 .office button,
 .office input,
 .office textarea,

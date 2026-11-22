@@ -83,6 +83,15 @@ test("durable queue, cancellation fencing, continuation, retry, idempotence and 
     await db.exec(
       "insert into public.vo_staff_avatars(workspace_id,employee_id,preset,updated_by) values('qa','00000000-0000-4000-8000-000000000004','hijab','00000000-0000-4000-8000-000000000001')",
     );
+    await db.exec(
+      await readFile(
+        new URL(
+          "../supabase/migrations/20261122175659_virtual_office_adaptive_plans.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    );
     const submit = async (req = randomUUID(), brief = "اختبار خطة تحرير") =>
       (
         await db.query(
@@ -205,6 +214,194 @@ test("durable queue, cancellation fencing, continuation, retry, idempotence and 
       ).rows[0].n,
       7,
     );
+    // Adaptive sessions use the editor only until an exact version of the plan is approved.
+    const specialistIds = [
+      "researcher",
+      "writer",
+      "art",
+      "reviewer",
+      "publisher",
+    ];
+    const planFor = (roles) => ({
+      summary: "هذه خطة محددة حسب طبيعة الطلب",
+      steps: roles.map((agentId) => ({
+        agentId,
+        reason: "هذا التخصص مطلوب لهذا الطلب",
+        instruction: "أنجز المساهمة المحددة في هذا الطلب",
+        deliverable: "تسليم واضح قابل للمراجعة",
+      })),
+      excluded: specialistIds
+        .filter((id) => !roles.includes(id))
+        .map((agentId) => ({
+          agentId,
+          reason: "هذا التخصص غير مطلوب في نطاق الطلب",
+        })),
+    });
+    const adaptiveSubmit = async () =>
+      (
+        await db.query(
+          `select (public.vo_submit('qa-adaptive','00000000-0000-4000-8000-000000000001',$1,'editor','team','جهز توجيه تصميم لنص معتمد','{"workflow":"adaptive-v1","project":"QA","sourceText":"","sourceUrls":[]}')).*`,
+          [randomUUID()],
+        )
+      ).rows[0];
+    const adaptiveClaim = async () =>
+      (await db.query("select * from public.vo_claim_v3('qa-adaptive')"))
+        .rows[0];
+    const adaptiveAct = async (id, action, body = {}, request = randomUUID()) =>
+      (
+        await db.query(
+          `select (public.vo_session_action('qa-adaptive',$1,$2,$3,$4)).*`,
+          [id, action, request, JSON.stringify(body)],
+        )
+      ).rows[0];
+    const savePlan = async (row, plan) =>
+      (
+        await db.query(
+          `select public.vo_save_plan($1,$2,$3,'خطة تنتظر موافقتك',10,20) as ok`,
+          [row.id, row.lease_token, JSON.stringify(plan)],
+        )
+      ).rows[0].ok;
+    const adaptive = await adaptiveSubmit();
+    assert.equal(adaptive.workflow, "adaptive");
+    assert.equal(
+      (await db.query("select * from public.vo_claim('qa-adaptive')")).rows
+        .length,
+      0,
+      "old workers never claim adaptive sessions",
+    );
+    const planning = await adaptiveClaim();
+    await assert.rejects(() =>
+      savePlan(planning, {
+        ...planFor(["writer"]),
+        steps: [...planFor(["writer"]).steps, ...planFor(["writer"]).steps],
+      }),
+    );
+    assert.equal(await savePlan(planning, planFor(["writer"])), true);
+    assert.equal(
+      await adaptiveClaim(),
+      undefined,
+      "no execution before plan approval",
+    );
+    await assert.rejects(() =>
+      adaptiveAct(adaptive.id, "approve_handoff", { step: 1, planVersion: 1 }),
+    );
+    await adaptiveAct(adaptive.id, "cancel");
+    assert.equal(
+      (await adaptiveAct(adaptive.id, "retry")).status,
+      "plan_review",
+      "cancel/retry preserves the plan approval gate",
+    );
+    const revised = await adaptiveAct(adaptive.id, "revise_plan", {
+      planVersion: 1,
+      notes: "استبعد الكتابة؛ نحتاج التوجيه الفني فقط",
+    });
+    assert.equal(revised.plan, null);
+    assert.equal(revised.step, 0);
+    assert.equal(
+      await savePlan(planning, planFor(["writer"])),
+      false,
+      "late planning output cannot replace a revised plan",
+    );
+    const replan = await adaptiveClaim();
+    assert.equal(await savePlan(replan, planFor(["art"])), true);
+    await assert.rejects(
+      () => adaptiveAct(adaptive.id, "approve_plan", { planVersion: 1 }),
+      "old approval must not approve revised roles",
+    );
+    const approveId = randomUUID();
+    const approved = await adaptiveAct(
+      adaptive.id,
+      "approve_plan",
+      { planVersion: 2 },
+      approveId,
+    );
+    assert.equal(approved.approved_plan_version, 2);
+    assert.equal(
+      (await db.query("select * from public.vo_claim('qa-adaptive')")).rows
+        .length,
+      0,
+    );
+    const artist = await adaptiveClaim();
+    assert.equal(artist.step, 1);
+    await adaptiveAct(
+      adaptive.id,
+      "approve_plan",
+      { planVersion: 2 },
+      approveId,
+    );
+    await assert.rejects(() =>
+      db.query(
+        `select public.vo_finish_step($1,$2,'writer','غير مسموح','[]',1,1,3)`,
+        [artist.id, artist.lease_token],
+      ),
+    );
+    await assert.rejects(() =>
+      db.query(
+        `select public.vo_finish_step($1,$2,'art','عدد خاطئ','[]',1,1,7)`,
+        [artist.id, artist.lease_token],
+      ),
+    );
+    assert.equal(
+      (
+        await db.query(
+          `select public.vo_finish_step($1,$2,'art','التوجيه الفني جاهز','[]',1,1,3) as ok`,
+          [artist.id, artist.lease_token],
+        )
+      ).rows[0].ok,
+      true,
+    );
+    assert.equal(
+      await adaptiveClaim(),
+      undefined,
+      "chosen stages still require handoff approval",
+    );
+    await assert.rejects(() =>
+      adaptiveAct(adaptive.id, "approve_handoff", { planVersion: 1, step: 2 }),
+    );
+    await adaptiveAct(adaptive.id, "approve_handoff", {
+      planVersion: 2,
+      step: 2,
+    });
+    const finalEditor = await adaptiveClaim();
+    assert.equal(finalEditor.step, 2);
+    await db.query(
+      `select public.vo_finish_step($1,$2,'editor','الخلاصة النهائية','[]',1,1,3)`,
+      [finalEditor.id, finalEditor.lease_token],
+    );
+    assert.deepEqual(
+      (
+        await db.query(
+          `select agent_id from public.vo_messages where session_id=$1 and kind='assistant' order by created_at`,
+          [adaptive.id],
+        )
+      ).rows.map((m) => m.agent_id),
+      ["editor", "editor", "art", "editor"],
+    );
+    assert.equal(
+      (await adaptiveAct(adaptive.id, "approve")).status,
+      "completed",
+    );
+    // A request that needs only the editor can omit all five specialist roles.
+    const editorialOnly = await adaptiveSubmit(),
+      editorPlan = await adaptiveClaim();
+    await savePlan(editorPlan, planFor([]));
+    await adaptiveAct(editorialOnly.id, "approve_plan", { planVersion: 1 });
+    const editorialWork = await adaptiveClaim();
+    await db.query(
+      `select public.vo_finish_step($1,$2,'editor','استشارة تحريرية جاهزة','[]',1,1,2)`,
+      [editorialWork.id, editorialWork.lease_token],
+    );
+    assert.equal(
+      (
+        await db.query("select status from public.vo_sessions where id=$1", [
+          editorialOnly.id,
+        ])
+      ).rows[0].status,
+      "review",
+    );
+    await db.query(
+      "delete from public.vo_sessions where workspace_id='qa-adaptive'",
+    );
     await db.exec(
       `set role authenticated; select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000002',false);`,
     );
@@ -227,6 +424,9 @@ test("durable queue, cancellation fencing, continuation, retry, idempotence and 
       db.query("update public.vo_staff_avatars set preset='shemagh'"),
     );
     await assert.rejects(() => db.query(`select * from public.vo_claim('qa')`));
+    await assert.rejects(() =>
+      db.query(`select * from public.vo_claim_v3('qa')`),
+    );
     await assert.rejects(() =>
       db.query(`update public.vo_sessions set status='completed'`),
     );

@@ -133,6 +133,9 @@ export async function POST(request: Request) {
           project: input.project,
           sourceText: input.sourceText,
           sourceUrls: input.sourceUrls,
+          ...(["team", "meeting"].includes(input.kind)
+            ? { workflow: "adaptive-v1" }
+            : {}),
         },
       });
       if (result.error) throw result.error;
@@ -140,15 +143,27 @@ export async function POST(request: Request) {
       return officeResponse({ session: result.data }, 201);
     }
     if (
-      !["reply", "approve", "approve_handoff", "cancel", "retry"].includes(
-        String(body.action),
-      ) ||
+      ![
+        "reply",
+        "approve",
+        "approve_plan",
+        "revise_plan",
+        "approve_handoff",
+        "cancel",
+        "retry",
+      ].includes(String(body.action)) ||
       !uuid(body.sessionId) ||
       !uuid(body.requestId)
     )
       throw new OfficeError("إجراء أو معرف جلسة غير صالح");
     if (
-      ["reply", "retry", "approve_handoff"].includes(String(body.action)) &&
+      [
+        "reply",
+        "retry",
+        "approve_plan",
+        "revise_plan",
+        "approve_handoff",
+      ].includes(String(body.action)) &&
       !runtimeInfo().configured
     )
       throw new OfficeError("مزود الذكاء الاصطناعي غير مهيأ على الخادم", 503);
@@ -159,20 +174,47 @@ export async function POST(request: Request) {
         Number(body.step) > 6)
     )
       throw new OfficeError("حدّث التسليم قبل إسناد المرحلة التالية");
+    if (
+      ["approve_plan", "revise_plan"].includes(String(body.action)) &&
+      (!Number.isInteger(body.planVersion) || Number(body.planVersion) < 1)
+    )
+      throw new OfficeError("حدّث الخطة قبل الموافقة أو طلب التعديل");
+    if (
+      body.action === "revise_plan" &&
+      (typeof body.notes !== "string" ||
+        body.notes.trim().length < 3 ||
+        body.notes.length > 4000)
+    )
+      throw new OfficeError("وضح تعديل الخطة من ٣ إلى ٤٠٠٠ حرف");
     const result = await db.rpc("vo_session_action", {
       p_workspace: actor.workspaceId,
       p_id: body.sessionId,
       p_action: body.action,
       p_request: body.requestId,
       p_content:
-        body.action === "approve_handoff"
-          ? String(body.step)
-          : typeof body.brief === "string"
-            ? body.brief
-            : "",
+        ["approve_plan", "revise_plan"].includes(String(body.action)) ||
+        (body.action === "approve_handoff" && Number(body.planVersion) > 0)
+          ? JSON.stringify({
+              step: body.step,
+              planVersion: body.planVersion,
+              notes: body.notes,
+            })
+          : body.action === "approve_handoff"
+            ? String(body.step)
+            : typeof body.brief === "string"
+              ? body.brief
+              : "",
     });
     if (result.error) throw result.error;
-    if (["reply", "retry", "approve_handoff"].includes(String(body.action)))
+    if (
+      [
+        "reply",
+        "retry",
+        "approve_plan",
+        "revise_plan",
+        "approve_handoff",
+      ].includes(String(body.action))
+    )
       after(wakeOfficeWorker);
     return officeResponse({ session: result.data });
   } catch (e) {

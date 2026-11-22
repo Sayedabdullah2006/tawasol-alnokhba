@@ -57,7 +57,7 @@ export async function snapshot(hostDb: SupabaseClient) {
     db
       .from("vo_sessions")
       .select(
-        "id,workspace_id,agent_id,kind,title,brief,status,step,approved_step,progress,error_message,created_at,updated_at,context,input_tokens,output_tokens",
+        "id,workspace_id,agent_id,kind,title,brief,status,step,approved_step,workflow,plan,plan_version,approved_plan_version,progress,error_message,created_at,updated_at,context,input_tokens,output_tokens",
       )
       .eq("workspace_id", workspaceId())
       .order("updated_at", { ascending: false })

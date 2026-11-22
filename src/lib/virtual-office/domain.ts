@@ -1,5 +1,5 @@
 /** Portable office contract. No Next.js, database, auth or provider dependencies. */
-export const OFFICE_CONTRACT_VERSION = 2;
+export const OFFICE_CONTRACT_VERSION = 3;
 export const OFFICE_AGENTS = [
   {
     id: "editor",
@@ -75,6 +75,17 @@ export const OFFICE_AGENTS = [
   },
 ] as const;
 export type AgentId = (typeof OFFICE_AGENTS)[number]["id"];
+export type SpecialistId = Exclude<AgentId, "editor">;
+export type OfficePlan = {
+  summary: string;
+  steps: {
+    agentId: SpecialistId;
+    reason: string;
+    instruction: string;
+    deliverable: string;
+  }[];
+  excluded: { agentId: SpecialistId; reason: string }[];
+};
 export type OfficeAppearance = {
   gender: "male" | "female" | "unspecified";
   headwear: "shemagh" | "hijab" | "none";
@@ -166,6 +177,7 @@ export type SessionStatus =
   | "queued"
   | "running"
   | "handoff"
+  | "plan_review"
   | "review"
   | "completed"
   | "failed"
@@ -190,6 +202,10 @@ export type OfficeSession = {
   status: SessionStatus;
   step: number;
   approved_step: number;
+  workflow: "legacy" | "adaptive";
+  plan: OfficePlan | null;
+  plan_version: number;
+  approved_plan_version: number;
   progress: string;
   error_message: string | null;
   created_at: string;
@@ -211,13 +227,14 @@ export type OfficeActivity = {
   agentId: AgentId;
   sessionId: string;
   messageId?: string;
-  kind: "question" | "reply" | "result" | "handoff";
+  kind: "question" | "reply" | "result" | "handoff" | "plan";
   preview: string;
 };
 export const STATUS_LABELS: Record<SessionStatus, string> = {
   queued: "في الانتظار",
   running: "قيد العمل",
   handoff: "بانتظار موافقة مدير التحرير",
+  plan_review: "الخطة بانتظار موافقتك",
   review: "بانتظار اعتمادك",
   completed: "معتمد",
   failed: "تعذر التنفيذ",
@@ -257,9 +274,18 @@ export function stepsFor(kind: SessionKind, agent: AgentId): AgentId[] {
     : [agent];
 }
 export function currentAgent(session: OfficeSession): AgentId {
-  return (
-    stepsFor(session.kind, session.agent_id)[session.step] ?? session.agent_id
-  );
+  if (session.status === "plan_review") return "editor";
+  return sessionSteps(session)[session.step] ?? session.agent_id;
+}
+export function sessionSteps(
+  session: Pick<OfficeSession, "kind" | "agent_id"> &
+    Partial<Pick<OfficeSession, "workflow" | "plan">>,
+): AgentId[] {
+  if (session.workflow !== "adaptive")
+    return stepsFor(session.kind, session.agent_id);
+  return session.plan
+    ? ["editor", ...session.plan.steps.map((s) => s.agentId), "editor"]
+    : ["editor"];
 }
 export class OfficeError extends Error {
   status: number;

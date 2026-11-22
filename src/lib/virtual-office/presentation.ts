@@ -1,6 +1,6 @@
 import {
   currentAgent,
-  stepsFor,
+  sessionSteps,
   type AgentId,
   type OfficeActivity,
   type OfficeMessage,
@@ -80,9 +80,11 @@ export function officeActivities(
         preview: officeExcerpt(m.content),
       });
   }
-  const waiting = sessions.find((s) => s.status === "handoff");
+  const waiting = sessions.find(
+    (s) => s.status === "handoff" || s.status === "plan_review",
+  );
   if (waiting) {
-    const previous = stepsFor(waiting.kind, waiting.agent_id)[waiting.step - 1];
+    const previous = sessionSteps(waiting)[waiting.step - 1];
     const output = ordered.find(
       (m) =>
         m.session_id === waiting.id &&
@@ -93,7 +95,7 @@ export function officeActivities(
       agentId: "editor",
       sessionId: waiting.id,
       messageId: output?.id,
-      kind: "handoff",
+      kind: waiting.status === "plan_review" ? "plan" : "handoff",
       preview: officeExcerpt(output?.content || waiting.title),
     });
   }

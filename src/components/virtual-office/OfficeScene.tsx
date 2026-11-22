@@ -21,6 +21,8 @@ import {
 import { createSaudiHead } from "./saudi-character";
 import { firstName, officeExcerpt } from "@/lib/virtual-office/presentation";
 import { officeFloor, officePath, type FloorPoint } from "./office-navigation";
+import { createOfficePool } from "./office-pool";
+import { POOL, lowestPoolBall } from "./pool-physics";
 import s from "./office.module.css";
 
 type Props = {
@@ -28,6 +30,7 @@ type Props = {
   active: OfficePersonId[];
   staff: OfficeStaff[];
   meeting: boolean;
+  meetingAgents: OfficePersonId[];
   onSelect: (id: OfficePersonId) => void;
   onTalk: (id: OfficePersonId) => void;
   activities: OfficeActivity[];
@@ -40,6 +43,8 @@ type SceneApi = {
   rotate: () => void;
   walk: (enabled: boolean) => void;
   step: (direction: "forward" | "back" | "left" | "right") => void;
+  recreation: (enabled: boolean) => void;
+  newPoolRound: () => void;
 };
 function sceneActors(staff: OfficeStaff[]) {
   return [
@@ -76,6 +81,7 @@ export default function OfficeScene({
   selected,
   active,
   meeting,
+  meetingAgents,
   onSelect,
   onTalk,
   staff,
@@ -96,13 +102,31 @@ export default function OfficeScene({
   const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hovered, setHovered] = useState<OfficePersonId | null>(null);
   const [walking, setWalking] = useState(false);
-  const [ambient, setAmbient] = useState(true);
+  const ambient = true;
+  const [recreation, setRecreation] = useState(false);
+  const poolReadout = useRef<HTMLParagraphElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [nativeFull, setNativeFull] = useState(false);
+  useEffect(() => {
+    const change = () =>
+      setNativeFull(document.fullscreenElement === wrap.current);
+    const escape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setExpanded(false);
+    };
+    document.addEventListener("fullscreenchange", change);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("fullscreenchange", change);
+      document.removeEventListener("keydown", escape);
+    };
+  }, []);
   const walkEnabled = useRef(false);
   const [staffTasks, setStaffTasks] = useState<Record<string, string>>({});
   const live = useRef({
     selected,
     active,
     meeting,
+    meetingAgents,
     onSelect,
     onTalk,
     staff,
@@ -204,17 +228,29 @@ export default function OfficeScene({
       selected,
       active,
       meeting,
+      meetingAgents,
       onSelect,
       onTalk,
       staff,
       ambient,
     };
-  }, [selected, active, meeting, onSelect, onTalk, staff, ambient]);
+  }, [
+    selected,
+    active,
+    meeting,
+    meetingAgents,
+    onSelect,
+    onTalk,
+    staff,
+    ambient,
+  ]);
   useEffect(() => {
     if (!host.current) return;
     const container: HTMLDivElement = host.current;
     const actors = sceneActors(live.current.staff);
-    const extraDepth = Math.ceil(live.current.staff.length / 4) * 4;
+    const staffDepth = Math.ceil(live.current.staff.length / 4) * 4;
+    const extraDepth = staffDepth + 7;
+    const poolZ = 10 + staffDepth;
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({
@@ -246,8 +282,8 @@ export default function OfficeScene({
     controls.enableDamping = true;
     controls.dampingFactor = 0.09;
     controls.enablePan = false;
-    controls.minZoom = 0.65;
-    controls.maxZoom = 2.6;
+    controls.minZoom = 0.01;
+    controls.maxZoom = Infinity;
     controls.minPolarAngle = 0.3;
     controls.maxPolarAngle = Math.PI / 2.55;
     controls.touches.ONE = null;
@@ -577,7 +613,29 @@ export default function OfficeScene({
     const floor = officeFloor(
       actors.map((a) => a.position),
       extraDepth,
+      poolZ,
     );
+    const pool = createOfficePool(scene, poolZ);
+    const poolSign = textPlane(
+      "ركن البلياردو · ٩ كرات",
+      3.3,
+      0.75,
+      "#203f68",
+      "#ead8ae",
+    );
+    poolSign.position.set(6, 1.5, poolZ + 2.9);
+    scene.add(poolSign);
+    let poolMode = false,
+      nextShot = 0;
+    const playPaths = new Map<OfficePersonId, FloorPoint[]>();
+    const playSpots = [
+      [-3.8, -1.3],
+      [3.8, -1.3],
+      [-3.8, 1.3],
+      [3.8, 1.3],
+      [-1.4, 2.7],
+      [1.4, 2.7],
+    ];
     const visitor = new THREE.Group();
     visitor.position.set(0, 0, 6.5);
     visitor.visible = walkEnabled.current;
@@ -610,13 +668,14 @@ export default function OfficeScene({
     scene.add(destination);
     let walkPath: FloorPoint[] = [],
       travel = 0;
-    let idleTour: {
+    type IdleTour = {
       id: OfficePersonId;
       path: FloorPoint[];
       phase: "away" | "pause" | "home";
       until: number;
       stride: number;
-    } | null = null;
+    };
+    const idleTours = new Map<OfficePersonId, IdleTour>();
     let nextTour = 0,
       tourIndex = 0;
     const keys = new Set<string>();
@@ -629,6 +688,48 @@ export default function OfficeScene({
     let targetCamera: THREE.Vector3 | null = null,
       targetLook: THREE.Vector3 | null = null;
     api.current = {
+      recreation(enabled) {
+        poolMode = enabled;
+        setRecreation(enabled);
+        idleTours.clear();
+        nextShot = performance.now() + 1200;
+        people
+          .filter((p) => !p.human)
+          .forEach((p, i) => {
+            playPaths.set(
+              p.id,
+              officePath(
+                floor,
+                p.person.position,
+                enabled
+                  ? { x: playSpots[i][0], z: poolZ + playSpots[i][1] }
+                  : p.home,
+              ),
+            );
+          });
+        walkEnabled.current = false;
+        setWalking(false);
+        visitor.visible = false;
+        walkPath = [];
+        keys.clear();
+        destination.visible = false;
+        const at = enabled
+          ? new THREE.Vector3(0, 0.5, poolZ)
+          : new THREE.Vector3(0, 0.5, staffDepth / 2);
+        targetLook = at;
+        targetCamera = at.clone().add(new THREE.Vector3(19, 23, 26));
+        framing = "person";
+        camera.zoom = enabled
+          ? container.clientWidth / container.clientHeight > 1.4
+            ? 3.2
+            : 2.8
+          : 1.6;
+        camera.updateProjectionMatrix();
+      },
+      newPoolRound() {
+        pool.reset();
+        nextShot = performance.now() + 1200;
+      },
       focus(id) {
         framing = id ? "person" : "overview";
         const person = people.find((p) => p.id === id);
@@ -654,7 +755,8 @@ export default function OfficeScene({
       },
       zoom(amount) {
         framing = "person";
-        camera.zoom = THREE.MathUtils.clamp(camera.zoom * amount, 0.65, 2.6);
+        const zoom = camera.zoom * amount;
+        if (Number.isFinite(zoom)) camera.zoom = Math.max(0.01, zoom);
         camera.updateProjectionMatrix();
       },
       rotate() {
@@ -727,6 +829,21 @@ export default function OfficeScene({
         api.current?.focus(id);
         hideHints();
         live.current.onTalk(id);
+      } else if (poolMode) {
+        const at = ray.ray.intersectPlane(
+          new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.25),
+          new THREE.Vector3(),
+        );
+        if (
+          at &&
+          Math.abs(at.x) < POOL.halfX &&
+          Math.abs(at.z - poolZ) < POOL.halfZ &&
+          [...playPaths.values()].every((p) => !p.length)
+        ) {
+          const white = pool.game.balls[0];
+          pool.shoot(Math.atan2(at.z - poolZ - white.z, at.x - white.x));
+          nextShot = performance.now() + 1800;
+        }
       } else if (walkEnabled.current) {
         const at = ray.ray.intersectPlane(
           new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
@@ -916,17 +1033,13 @@ export default function OfficeScene({
           targetCamera = targetLook = null;
       }
       const t = now * 0.001;
-      if (!nextTour) nextTour = now + 4500;
-      if (
-        live.current.ambient &&
-        !reduced.matches &&
-        !live.current.meeting &&
-        !idleTour &&
-        now > nextTour
-      ) {
+      if (!nextTour) nextTour = now;
+      if (!poolMode && idleTours.size < 2 && now >= nextTour) {
         const available = people.filter(
           (p) =>
             !p.human &&
+            !idleTours.has(p.id) &&
+            !playPaths.has(p.id) &&
             !live.current.active.includes(p.id) &&
             p.id !== live.current.selected,
         );
@@ -934,61 +1047,105 @@ export default function OfficeScene({
         if (colleague) {
           const end =
             tourIndex % 2 ? { x: -7.9, z: -5.8 } : { x: 0.65, z: -5.1 };
-          idleTour = {
+          idleTours.set(colleague.id, {
             id: colleague.id,
             path: officePath(floor, colleague.person.position, end),
             phase: "away",
             until: 0,
             stride: 0,
-          };
+          });
           tourIndex++;
         }
-        nextTour = now + 12000;
+        nextTour = now + 350;
+      }
+      pool.update(dt, poolMode);
+      if (poolMode) {
+        const ready = [...playPaths.values()].every(
+            (path) => path.length === 0,
+          ),
+          game = pool.game;
+        if (!ready || game.moving) nextShot = now + 1500;
+        if (ready && !game.moving && now > nextShot) {
+          if (game.winner !== null) {
+            pool.reset();
+            nextShot = now + 1500;
+          } else {
+            pool.shoot();
+            nextShot = now + 4500;
+          }
+        }
+        if (poolReadout.current) {
+          const text = !ready
+            ? "يتجه الفريق إلى طاولة البلياردو…"
+            : game.winner !== null
+              ? `${OFFICE_AGENTS[game.winner].firstName} فاز بالكرة ٩!`
+              : `دور ${OFFICE_AGENTS[game.turn].firstName} · الهدف الكرة ${lowestPoolBall(game)} · ${game.balls.filter((b) => b.id > 0 && b.alive).length} كرات على الطاولة. ${game.message}`;
+          if (poolReadout.current.textContent !== text)
+            poolReadout.current.textContent = text;
+        }
       }
       controls.update();
       const rect = container.getBoundingClientRect();
       for (const p of people) {
         const running = live.current.active.includes(p.id),
-          gathering = live.current.meeting && !p.human;
+          gathering =
+            live.current.meeting &&
+            !p.human &&
+            live.current.meetingAgents.includes(p.id);
         let strolling = false;
-        if (idleTour?.id === p.id) {
-          if (!live.current.ambient || reduced.matches || gathering) {
-            p.person.position.copy(p.home);
-            idleTour = null;
-          } else {
-            if (running && idleTour.phase !== "home") {
-              idleTour.phase = "home";
-              idleTour.path = officePath(floor, p.person.position, p.home);
-            }
-            const next = idleTour.path[0];
-            if (next) {
-              const delta = new THREE.Vector3(next.x, 0, next.z).sub(
-                  p.person.position,
-                ),
-                distance = delta.length();
-              p.person.rotation.y = Math.atan2(-delta.x, -delta.z);
-              if (distance < dt * 1.8) {
-                p.person.position.set(next.x, 0, next.z);
-                idleTour.path.shift();
-              } else
-                p.person.position.add(
-                  delta.normalize().multiplyScalar(dt * 1.8),
-                );
-              idleTour.stride += dt * 8;
-              strolling = true;
-            } else if (idleTour.phase === "away") {
-              idleTour.phase = "pause";
-              idleTour.until = now + 2400;
-            } else if (idleTour.phase === "pause" && now > idleTour.until) {
-              idleTour.phase = "home";
-              idleTour.path = officePath(floor, p.person.position, p.home);
-            } else if (idleTour.phase === "home") {
+        const idleTour = idleTours.get(p.id),
+          playPath = playPaths.get(p.id);
+        function advance(path: FloorPoint[], speed: number) {
+          const next = path[0];
+          if (!next) return false;
+          const delta = new THREE.Vector3(next.x, 0, next.z).sub(
+              p.person.position,
+            ),
+            distance = delta.length();
+          p.person.rotation.y = Math.atan2(-delta.x, -delta.z);
+          if (distance < dt * speed) {
+            p.person.position.set(next.x, 0, next.z);
+            path.shift();
+          } else
+            p.person.position.add(delta.normalize().multiplyScalar(dt * speed));
+          return distance > 0.001;
+        }
+        if (!p.human && (poolMode || playPath)) {
+          strolling = advance(playPath || [], 2.8);
+          if (!strolling) {
+            if (poolMode)
+              p.person.rotation.y = Math.atan2(
+                p.person.position.x,
+                p.person.position.z - poolZ,
+              );
+            else {
               p.person.position.lerp(p.home, 0.15);
               if (p.person.position.distanceTo(p.home) < 0.04) {
                 p.person.position.copy(p.home);
-                idleTour = null;
-                nextTour = now + 2200;
+                playPaths.delete(p.id);
               }
+            }
+          }
+        } else if (idleTour) {
+          if (running && idleTour.phase !== "home") {
+            idleTour.phase = "home";
+            idleTour.path = officePath(floor, p.person.position, p.home);
+          }
+          if (idleTour.path.length) {
+            strolling = advance(idleTour.path, 2.4);
+            idleTour.stride += dt * 8;
+          } else if (idleTour.phase === "away") {
+            idleTour.phase = "pause";
+            idleTour.until = now + 600;
+          } else if (idleTour.phase === "pause" && now > idleTour.until) {
+            idleTour.phase = "home";
+            idleTour.path = officePath(floor, p.person.position, p.home);
+          } else if (idleTour.phase === "home") {
+            p.person.position.lerp(p.home, 0.15);
+            if (p.person.position.distanceTo(p.home) < 0.04) {
+              p.person.position.copy(p.home);
+              idleTours.delete(p.id);
+              nextTour = now;
             }
           }
         } else
@@ -996,7 +1153,7 @@ export default function OfficeScene({
             gathering ? p.seat : p.home,
             reduced.matches ? 1 : 0.07,
           );
-        if (idleTour?.id !== p.id)
+        if (!idleTour && !playPath && !poolMode)
           p.person.rotation.y = gathering
             ? p.index < 3
               ? -Math.PI / 2
@@ -1012,19 +1169,19 @@ export default function OfficeScene({
         p.head.rotation.y =
           animated && !running ? Math.sin(t * 0.55 + p.index * 2) * 0.12 : 0;
         p.arms.forEach((arm, i) => {
-          arm.rotation.x =
-            strolling && idleTour
-              ? -1 + Math.sin(idleTour.stride + i * Math.PI) * 0.35
+          arm.rotation.x = strolling
+            ? -1 + Math.sin(t * 8 + p.index + i * Math.PI) * 0.35
+            : poolMode && !p.human && pool.game.turn === p.index
+              ? -0.6 + Math.sin(t * 3) * 0.2
               : animated
                 ? Math.sin(t * (running ? 8 : 1.2) + i * 2 + p.index) *
                   (running ? 0.08 : 0.035)
                 : 0;
         });
         p.legs.forEach((leg, i) => {
-          leg.rotation.x =
-            strolling && idleTour
-              ? Math.sin(idleTour.stride + i * Math.PI) * 0.4
-              : 0;
+          leg.rotation.x = strolling
+            ? Math.sin(t * 8 + p.index + i * Math.PI) * 0.4
+            : 0;
         });
         p.screen.material = mat(running ? "#4d9d9e" : agentColor(p.id));
         const label = labels.current.get(p.id);
@@ -1122,10 +1279,30 @@ export default function OfficeScene({
       renderer.domElement.remove();
     };
   }, [staffSignature, showHint, leaveHint, hideHints]);
+  async function toggleFullscreen() {
+    hideHints();
+    if (document.fullscreenElement === wrap.current) {
+      await document.exitFullscreen();
+      return;
+    }
+    if (expanded) {
+      setExpanded(false);
+      return;
+    }
+    if (document.fullscreenEnabled && wrap.current?.requestFullscreen) {
+      try {
+        await wrap.current.requestFullscreen();
+        return;
+      } catch {
+        /* Embedded browsers can deny native fullscreen. */
+      }
+    }
+    setExpanded(true);
+  }
   return (
     <div
       ref={wrap}
-      className={s.sceneWrap}
+      className={`${s.sceneWrap} ${expanded ? s.sceneExpanded : ""}`}
       tabIndex={0}
       role="group"
       aria-label="المكتب التفاعلي"
@@ -1147,13 +1324,15 @@ export default function OfficeScene({
               const task = taskSummaries[agent.id] || staffTasks[agent.id];
               const hintId = `${sceneId}-${agent.id.replace(":", "-")}`;
               const caption =
-                activity?.kind === "handoff"
-                  ? "جاهز للإسناد"
-                  : activity?.kind === "question"
-                    ? "سؤال"
-                    : activity?.kind === "result"
-                      ? "النتيجة"
-                      : "رد جديد";
+                activity?.kind === "plan"
+                  ? "الخطة جاهزة"
+                  : activity?.kind === "handoff"
+                    ? "جاهز للإسناد"
+                    : activity?.kind === "question"
+                      ? "سؤال"
+                      : activity?.kind === "result"
+                        ? "النتيجة"
+                        : "رد جديد";
               return (
                 <Fragment key={agent.id}>
                   <button
@@ -1224,7 +1403,7 @@ export default function OfficeScene({
                         if (el) bubbles.current.set(agent.id, el);
                         else bubbles.current.delete(agent.id);
                       }}
-                      className={`${s.speechBubble} ${activity.kind === "handoff" ? s.handoffBubble : ""}`}
+                      className={`${s.speechBubble} ${["handoff", "plan"].includes(activity.kind) ? s.handoffBubble : ""}`}
                       onClick={() => {
                         hideHints();
                         onOpenActivity(activity);
@@ -1270,14 +1449,19 @@ export default function OfficeScene({
               ←
             </button>
           </div>
-          <button
-            type="button"
-            className={s.ambientToggle}
-            aria-pressed={ambient}
-            onClick={() => setAmbient(!ambient)}
-          >
-            {ambient ? "إيقاف حركة المكتب" : "تشغيل حركة المكتب"}
-          </button>
+          {recreation && (
+            <div className={s.poolPanel}>
+              <strong>بلياردو ٩ كرات</strong>
+              <p ref={poolReadout}>يتجه الفريق إلى الطاولة…</p>
+              <small>
+                يلعبون تلقائيًا. انقر على الطاولة لتوجيه تسديدة الدور الحالي. أقل
+                رقم أولًا، ودخول البيضاء خطأ.
+              </small>
+              <button type="button" onClick={() => api.current?.newPoolRound()}>
+                جولة جديدة
+              </button>
+            </div>
+          )}
           {walking && (
             <div className={s.walkControls}>
               <span ref={walkStatus}>اختر وجهتك أو تحرك بالأسهم</span>
@@ -1314,6 +1498,20 @@ export default function OfficeScene({
             </div>
           )}
           <div className={s.cameraTools} aria-label="التحكم في عرض المكتب">
+            <button
+              type="button"
+              aria-pressed={expanded || nativeFull}
+              onClick={() => void toggleFullscreen()}
+            >
+              {expanded || nativeFull ? "تصغير المكتب" : "ملء الشاشة"}
+            </button>
+            <button
+              type="button"
+              aria-pressed={recreation}
+              onClick={() => api.current?.recreation(!recreation)}
+            >
+              {recreation ? "العودة للمكاتب" : "ترفيه الموظفين"}
+            </button>
             <button
               onClick={() => api.current?.zoom(1.15)}
               aria-label="تقريب المكتب"

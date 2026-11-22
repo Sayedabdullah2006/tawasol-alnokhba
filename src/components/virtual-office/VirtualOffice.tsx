@@ -14,7 +14,7 @@ import {
   KIND_LABELS,
   agentById,
   currentAgent,
-  stepsFor,
+  sessionSteps,
   type AgentId,
   type OfficeMessage,
   type OfficeSnapshot,
@@ -23,6 +23,7 @@ import {
 } from "@/lib/virtual-office/domain";
 import s from "./office.module.css";
 import HumanStaffPanel from "./HumanStaffPanel";
+import OfficePlanCard from "./OfficePlanCard";
 import {
   firstName,
   officeExcerpt,
@@ -336,12 +337,29 @@ export default function VirtualOffice() {
       (v) =>
         v.kind === "meeting" &&
         (["running", "handoff"].includes(v.status) ||
-          (v.status === "queued" && v.step > 0)),
+          (v.status === "queued" && v.step > 0)) &&
+        (v.workflow !== "adaptive" ||
+          (v.step > 0 && v.approved_plan_version === v.plan_version)),
     );
-  const waiting = sessions.filter(
-    (v) => v.status === "review" || v.status === "handoff",
+  const waiting = sessions.filter((v) =>
+    ["review", "handoff", "plan_review"].includes(v.status),
   ).length;
-  const handoffs = sessions.filter((v) => v.status === "handoff");
+  const handoffs = sessions.filter(
+    (v) => v.status === "handoff" || v.status === "plan_review",
+  );
+  const meetingAgents = [
+    ...new Set(
+      sessions
+        .filter(
+          (v) =>
+            v.kind === "meeting" &&
+            ["running", "queued", "handoff"].includes(v.status) &&
+            (v.workflow !== "adaptive" ||
+              (v.approved_plan_version === v.plan_version && !!v.plan)),
+        )
+        .flatMap(sessionSteps),
+    ),
+  ];
   const taskSummaries: Partial<Record<OfficePersonId, string>> = {};
   running.forEach((v) => {
     taskSummaries[currentAgent(v)] = v.title;
@@ -435,8 +453,8 @@ export default function VirtualOffice() {
       setPending(false);
     }
   }
-  async function action(value: string) {
-    if (!session || pending) return;
+  async function action(value: string, notes?: string): Promise<boolean> {
+    if (!session || pending) return false;
     setPending(true);
     setError("");
     try {
@@ -445,19 +463,27 @@ export default function VirtualOffice() {
         sessionId: session.id,
         requestId: crypto.randomUUID(),
         step: session.step,
+        planVersion: session.plan_version,
+        notes,
       });
       await refresh();
       setNotice(
-        value === "approve_handoff"
-          ? `وافق مدير التحرير وأُسندت المهمة إلى ${agentById(currentAgent(session)).firstName}.`
-          : value === "approve"
-            ? "تم اعتماد التسليم. لم يتم نشره تلقائيًا."
-            : value === "cancel"
-              ? "تم إلغاء التكليف؛ لن تحفظ نتيجة المرحلة الجارية."
-              : "أعيدت المهمة إلى قائمة الانتظار.",
+        value === "approve_plan"
+          ? "اعتمدت الخطة؛ يبدأ الفريق بالمراحل المختارة فقط."
+          : value === "revise_plan"
+            ? "وصلت ملاحظاتك؛ يعيد عبدالله إعداد الخطة قبل أي تنفيذ."
+            : value === "approve_handoff"
+              ? `وافق مدير التحرير وأُسندت المهمة إلى ${agentById(currentAgent(session)).firstName}.`
+              : value === "approve"
+                ? "تم اعتماد التسليم. لم يتم نشره تلقائيًا."
+                : value === "cancel"
+                  ? "تم إلغاء التكليف؛ لن تحفظ نتيجة المرحلة الجارية."
+                  : "أعيدت المهمة إلى قائمة الانتظار.",
       );
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "تعذر تنفيذ الإجراء");
+      return false;
     } finally {
       setPending(false);
     }
@@ -603,6 +629,7 @@ export default function VirtualOffice() {
                 );
               }}
               meeting={meeting}
+              meetingAgents={meetingAgents}
               onSelect={(id) => {
                 if (id.startsWith("staff:")) {
                   setStaffId(id.slice(6));
@@ -630,7 +657,7 @@ export default function VirtualOffice() {
                   </h2>
                   <p>
                     {view === "meetings"
-                      ? "كل تخصص يقدم رأيه، ومدير التحرير يسلم محضرًا وقرارات."
+                      ? "مدير التحرير يختار المشاركين بحسب الموضوع، ثم يعرض الخطة لموافقتك."
                       : "تكليفات حقيقية، ومراحل محفوظة حتى اعتمادك."}
                   </p>
                 </div>
@@ -668,8 +695,8 @@ export default function VirtualOffice() {
                   </h3>
                   <p>
                     {view === "meetings"
-                      ? "حدد موضوعًا وقرارًا تحتاجه، وسيشارك الموظفون الستة من تخصصاتهم."
-                      : "أرسل الفكرة والمراجع، وتابع تسليم كل تخصص من هذه المساحة."}
+                      ? "حدد موضوعًا وقرارًا تحتاجه، ويقترح عبدالله التخصصات اللازمة فقط."
+                      : "أرسل الفكرة والمراجع، وراجع خطة الفريق قبل بدء التنفيذ."}
                   </p>
                   <button
                     className={s.primary}
@@ -708,14 +735,16 @@ export default function VirtualOffice() {
               <span>عند عبدالله · مدير التحرير</span>
               <strong>
                 {handoffs.length === 1
-                  ? "تسليم جاهز لموافقتك"
-                  : `${handoffs.length} تسليمات تنتظر موافقتك`}
+                  ? handoffs[0].status === "plan_review"
+                    ? "خطة جاهزة لموافقتك قبل التنفيذ"
+                    : "تسليم جاهز لموافقتك"
+                  : `${handoffs.length} خطط وتسليمات تنتظر موافقتك`}
               </strong>
               <button
                 type="button"
                 onClick={() => openSession(handoffs[0], "editor")}
               >
-                راجع وأسند المهمة التالية
+                راجع ووافق
               </button>
             </div>
           )}
@@ -961,11 +990,20 @@ export default function VirtualOffice() {
                       <p>{session.progress}</p>
                       {busy && (
                         <progress
-                          max={stepsFor(session.kind, session.agent_id).length}
+                          max={sessionSteps(session).length}
                           value={session.step}
                         />
                       )}
                     </div>
+                  )}
+                  {session?.plan && (
+                    <OfficePlanCard
+                      key={`${session.id}:${session.plan_version}`}
+                      session={session}
+                      pending={pending}
+                      configured={!!data?.runtime.configured}
+                      onAction={action}
+                    />
                   )}
                   {session?.status === "handoff" && (
                     <div className={s.handoffCard}>
@@ -975,19 +1013,12 @@ export default function VirtualOffice() {
                       <div className={s.handoffPeople}>
                         <span>
                           <Portrait
-                            id={
-                              stepsFor(session.kind, session.agent_id)[
-                                session.step - 1
-                              ]
-                            }
+                            id={sessionSteps(session)[session.step - 1]}
                           />
                           <b>
                             {
-                              agentById(
-                                stepsFor(session.kind, session.agent_id)[
-                                  session.step - 1
-                                ],
-                              ).firstName
+                              agentById(sessionSteps(session)[session.step - 1])
+                                .firstName
                             }
                           </b>
                           <small>سلّم المرحلة</small>
@@ -1037,9 +1068,9 @@ export default function VirtualOffice() {
                         </h3>
                         <p>
                           {kind === "team"
-                            ? "ينتقل الطلب عبر الأدوار الستة، ثم يعود إليك بتسليم موحد للمراجعة."
+                            ? "عبدالله يختار التخصصات المناسبة ويعرض الخطة لموافقتك قبل أن يبدأ الفريق."
                             : kind === "meeting"
-                              ? "شارك الفكرة والقرار المطلوب. تحفظ مساهمات الفريق والمحضر هنا."
+                              ? "شارك موضوع الاجتماع والقرار المطلوب. يعرض عبدالله خطة بالمشاركين المناسبين لموافقتك أولًا."
                               : agent.greeting}
                         </p>
                       </div>
@@ -1107,7 +1138,10 @@ export default function VirtualOffice() {
                           اعتماد التسليم
                         </button>
                       )}
-                      {(busy || session.status === "handoff") && (
+                      {(busy ||
+                        ["handoff", "plan_review"].includes(
+                          session.status,
+                        )) && (
                         <button
                           className={s.secondary}
                           disabled={pending}
@@ -1204,7 +1238,9 @@ export default function VirtualOffice() {
                       onChange={(e) => setBrief(e.target.value)}
                       disabled={
                         busy ||
-                        session?.status === "handoff" ||
+                        ["handoff", "plan_review"].includes(
+                          session?.status || "",
+                        ) ||
                         session?.status === "cancelled"
                       }
                       required
@@ -1225,7 +1261,9 @@ export default function VirtualOffice() {
                         disabled={
                           pending ||
                           busy ||
-                          session?.status === "handoff" ||
+                          ["handoff", "plan_review"].includes(
+                            session?.status || "",
+                          ) ||
                           !data?.runtime.configured ||
                           brief.trim().length < 3 ||
                           session?.status === "cancelled"
@@ -1237,10 +1275,12 @@ export default function VirtualOffice() {
                           : session
                             ? "إرسال المتابعة"
                             : kind === "meeting"
-                              ? "بدء الاجتماع"
+                              ? "تجهيز خطة الاجتماع"
                               : kind === "chat"
                                 ? "إرسال"
-                                : "إسناد التكليف"}
+                                : kind === "team"
+                                  ? "تجهيز خطة الفريق"
+                                  : "إسناد التكليف"}
                       </button>
                     </div>
                   </form>

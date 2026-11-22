@@ -8,6 +8,7 @@ export interface OfficeProvider {
     system: string;
     prompt: string;
     search: boolean;
+    jsonSchema?: { name: string; schema: Record<string, unknown> };
   }): Promise<{
     text: string;
     citations: Citation[];
@@ -80,7 +81,7 @@ function requestResponse(body: unknown): Promise<ResponseBody> {
   });
 }
 export const officeProvider: OfficeProvider = {
-  async run({ system, prompt, search }) {
+  async run({ system, prompt, search, jsonSchema }) {
     if (!runtimeInfo().configured) throw new Error("provider_not_configured");
     const result = await requestResponse({
       model: runtimeInfo().model,
@@ -91,6 +92,13 @@ export const officeProvider: OfficeProvider = {
         ? { reasoning: { effort: "low" } }
         : {}),
       max_output_tokens: 5000,
+      ...(jsonSchema
+        ? {
+            text: {
+              format: { type: "json_schema", strict: true, ...jsonSchema },
+            },
+          }
+        : {}),
       ...(search
         ? {
             tools: [{ type: "web_search" }],

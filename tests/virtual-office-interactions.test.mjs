@@ -6,7 +6,7 @@ import {
   officeFloor,
   officePath,
 } from "../src/components/virtual-office/office-navigation.ts";
-import { OFFICE_AGENTS } from "../src/lib/virtual-office/domain.ts";
+import { OFFICE_AGENTS, sessionSteps, currentAgent } from "../src/lib/virtual-office/domain.ts";
 const source = await readFile(
   new URL("../src/lib/virtual-office/presentation.ts", import.meta.url),
   "utf8",
@@ -25,6 +25,18 @@ const code = ts
 const { plainOfficeText, firstName, officeActivities } = await import(
   `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`
 );
+const planSource=await readFile(new URL('../src/lib/virtual-office/planning.ts',import.meta.url),'utf8');
+const planCode=ts.transpileModule(planSource,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText.replace('from "./domain"',`from "${new URL('../src/lib/virtual-office/domain.ts',import.meta.url).href}"`);
+const {parseOfficePlan}=await import(`data:text/javascript;base64,${Buffer.from(planCode).toString('base64')}`);
+test('the approved route contains exactly the chosen specialists and rejects invalid plans',()=>{
+ const plan={summary:'توجيه فني للنص المعتمد',steps:[{agentId:'art',reason:'المطلوب تصميم فقط',instruction:'جهزي اتجاه التصميم للنص المعتمد',deliverable:'توجيه فني وبرومبت'}],excluded:['researcher','writer','reviewer','publisher'].map(agentId=>({agentId,reason:'غير مطلوب في هذا التكليف'}))};
+ assert.equal(parseOfficePlan(plan).steps.length,1);
+ const s={kind:'team',agent_id:'editor',workflow:'adaptive',plan,status:'plan_review',step:1};
+ assert.deepEqual(sessionSteps(s),['editor','art','editor']);assert.equal(currentAgent(s),'editor');assert.equal(currentAgent({...s,status:'running'}),'art');
+ assert.deepEqual(sessionSteps({...s,plan:{...plan,steps:[]}}),['editor','editor']);
+ for(const invalid of [{...plan,steps:[{...plan.steps[0],agentId:'shell'}]},{...plan,excluded:[]},{...plan,steps:[...plan.steps,...plan.steps]},{...plan,steps:[{...plan.steps[0],instruction:'ا'.repeat(1601)}]}])assert.throws(()=>parseOfficePlan(invalid));
+ assert.equal(officeActivities([{...s,id:'plan',title:'توجيه فني'}],[]).find(a=>a.agentId==='editor').kind,'plan');
+});
 test("old responses become readable plain text while sources, hashtags and claims survive", () => {
   assert.equal(
     plainOfficeText(

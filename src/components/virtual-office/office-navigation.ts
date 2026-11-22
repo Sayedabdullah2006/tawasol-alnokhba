@@ -3,8 +3,12 @@ type Obstacle = { left: number; right: number; back: number; front: number };
 export function officeFloor(
   positions: readonly (readonly [number, number])[],
   extraDepth: number,
+  poolZ?: number,
 ) {
   const obstacles: Obstacle[] = [
+    ...(poolZ === undefined
+      ? []
+      : [{ left: -3.4, right: 3.4, back: poolZ - 1.95, front: poolZ + 1.95 }]),
     { left: -2.85, right: 2.85, back: -1.35, front: 4.4 },
     { left: -4.7, right: -1.3, back: -7, front: -5.65 },
     { left: -1.1, right: 1.1, back: -7, front: -5.7 },
