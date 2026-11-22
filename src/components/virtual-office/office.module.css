@@ -1190,6 +1190,161 @@
   background: #fff;
   color: #193752;
 }
+.staffRoster {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(235px, 1fr));
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.staffRoster button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 86px;
+  width: 100%;
+  text-align: start;
+  background: #fff;
+  border: 1px solid #ccd9e4;
+  border-radius: 8px;
+  padding: 14px;
+  color: var(--ink);
+}
+.staffRoster button > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+.staffRoster strong {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.staffRoster small {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--soft);
+  margin-top: 6px;
+  line-height: 1.8;
+}
+.staffRoster .humanSelected {
+  border-color: #527491;
+  box-shadow: inset 0 -3px #527491;
+}
+.humanBadge {
+  font-size: 0.75rem;
+  background: #e9f0f6;
+  color: #385b78;
+  border-radius: 4px;
+  padding: 4px 7px;
+  white-space: nowrap;
+  display: inline-block;
+  margin-bottom: 5px;
+}
+.initialPortrait {
+  background: #e4edf4;
+  color: #375d7c;
+  font-weight: 800;
+  font-size: 1.1rem;
+  align-items: center;
+}
+.portraitLarge.initialPortrait {
+  font-size: 1.5rem;
+}
+.humanBody {
+  padding: 0 20px 22px;
+}
+.humanExplanation {
+  font-size: 0.875rem;
+  line-height: 2;
+  color: var(--soft);
+  margin: 10px 0 18px;
+}
+.humanMetrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  border-block: 1px solid var(--line);
+  padding: 16px 0;
+  margin: 18px 0 24px;
+}
+.humanMetrics dt {
+  font-size: 0.75rem;
+  color: var(--soft);
+  margin-bottom: 5px;
+}
+.humanMetrics dd {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+.humanBody h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 12px;
+}
+.humanTasks {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 18px;
+}
+.humanTasks li + li {
+  border-top: 1px solid var(--line);
+}
+.humanTasks a {
+  display: block;
+  padding: 12px 0;
+  color: var(--ink);
+}
+.humanTasks strong {
+  display: block;
+  font-size: 0.875rem;
+  line-height: 1.8;
+  font-weight: 600;
+}
+.humanTasks span {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--soft);
+  margin-top: 5px;
+}
+.humanProfileLink {
+  font-size: 0.875rem;
+  text-decoration: underline;
+  color: var(--navy);
+  text-underline-offset: 4px;
+}
+.appearanceForm {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 20px;
+}
+.appearanceForm p {
+  font-size: 0.875rem;
+  color: var(--soft);
+  line-height: 1.9;
+}
+.appearanceForm label {
+  display: block;
+  font-size: 0.875rem;
+  margin: 14px 0 7px;
+}
+.appearanceForm select {
+  border: 1px solid #bdcbd8;
+  border-radius: 6px;
+  min-height: 44px;
+  padding: 8px;
+  width: 100%;
+  font-size: 1rem;
+}
+.appearanceForm button {
+  margin-top: 12px;
+}
+.humanError {
+  font-size: 0.875rem;
+  color: #9b433b;
+  line-height: 1.8;
+}
 .office input::placeholder,
 .office textarea::placeholder {
   color: #718394;

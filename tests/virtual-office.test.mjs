@@ -50,6 +50,8 @@ test("durable queue, cancellation fencing, continuation, retry, idempotence and 
       create schema auth; create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
       grant usage on schema public,auth to anon,authenticated,service_role; grant execute on function auth.uid() to anon,authenticated,service_role;
       create table public.profiles(id uuid primary key,role text); grant select on public.profiles to authenticated,service_role;
+      create table public.wf_employees(id uuid primary key);
+      insert into public.wf_employees values('00000000-0000-4000-8000-000000000004');
       insert into public.profiles values('00000000-0000-4000-8000-000000000001','admin'),('00000000-0000-4000-8000-000000000002','employee'),('00000000-0000-4000-8000-000000000003','client');`);
     await db.exec(
       await readFile(
@@ -59,6 +61,18 @@ test("durable queue, cancellation fencing, continuation, retry, idempotence and 
         ),
         "utf8",
       ),
+    );
+    await db.exec(
+      await readFile(
+        new URL(
+          "../supabase/migrations/20261122150909_virtual_office_staff_avatars.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    );
+    await db.exec(
+      "insert into public.vo_staff_avatars(workspace_id,employee_id,preset,updated_by) values('qa','00000000-0000-4000-8000-000000000004','hijab','00000000-0000-4000-8000-000000000001')",
     );
     const submit = async (req = randomUUID(), brief = "اختبار خطة تحرير") =>
       (
@@ -163,6 +177,14 @@ test("durable queue, cancellation fencing, continuation, retry, idempotence and 
       (await db.query("select count(*)::int as n from public.vo_messages"))
         .rows[0].n,
       0,
+    );
+    assert.equal(
+      (await db.query("select count(*)::int as n from public.vo_staff_avatars"))
+        .rows[0].n,
+      0,
+    );
+    await assert.rejects(() =>
+      db.query("update public.vo_staff_avatars set preset='shemagh'"),
     );
     await assert.rejects(() => db.query(`select * from public.vo_claim('qa')`));
     await assert.rejects(() =>

@@ -15,6 +15,7 @@ import {
 } from "@/lib/virtual-office/server";
 import { runtimeInfo } from "@/lib/virtual-office/provider";
 import { wakeOfficeWorker } from "@/lib/virtual-office/worker";
+import { hostEmployeeTasks } from "@/lib/virtual-office/host-team";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 150;
@@ -43,11 +44,19 @@ async function readBody(request: Request) {
 }
 export async function GET(request: Request) {
   try {
-    await officeActor();
-    const id = new URL(request.url).searchParams.get("session");
+    const actor = await officeActor();
+    const params = new URL(request.url).searchParams;
+    const employee = params.get("employee");
+    if (employee) {
+      if (!uuid(employee)) throw new OfficeError("معرف الموظف غير صالح");
+      return officeResponse({
+        tasks: await hostEmployeeTasks(actor.db, employee),
+      });
+    }
+    const id = params.get("session");
     if (id && !uuid(id)) throw new OfficeError("معرف الجلسة غير صالح");
     return officeResponse(
-      id ? { messages: await sessionMessages(id) } : await snapshot(),
+      id ? { messages: await sessionMessages(id) } : await snapshot(actor.db),
     );
   } catch (e) {
     return officeFailure(e);
@@ -65,6 +74,32 @@ export async function POST(request: Request) {
     if (!body || typeof body !== "object" || Array.isArray(body))
       throw new OfficeError("طلب غير صالح");
     const db = await createServiceRoleClient();
+    if (body.action === "staffAppearance") {
+      if (
+        !uuid(body.employeeId) ||
+        !["unset", "shemagh", "hijab", "hair"].includes(String(body.preset))
+      )
+        throw new OfficeError("اختر الموظف ومظهر الشخصية");
+      const employee = await actor.db
+        .from("wf_employees")
+        .select("id")
+        .eq("id", body.employeeId)
+        .eq("status", "active")
+        .maybeSingle();
+      if (employee.error) throw employee.error;
+      if (!employee.data) throw new OfficeError("الموظف غير متاح", 404);
+      const result = await db
+        .from("vo_staff_avatars")
+        .upsert({
+          workspace_id: actor.workspaceId,
+          employee_id: body.employeeId,
+          preset: body.preset,
+          updated_by: actor.id,
+          updated_at: new Date().toISOString(),
+        });
+      if (result.error) throw result.error;
+      return officeResponse({ saved: true });
+    }
     if (body.action === "memory") {
       if (
         !isAgentId(body.agentId) ||
@@ -72,15 +107,13 @@ export async function POST(request: Request) {
         body.content.length > 8000
       )
         throw new OfficeError("ذاكرة الموظف غير صالحة أو تتجاوز ٨٠٠٠ حرف");
-      const result = await db
-        .from("vo_memories")
-        .upsert({
-          workspace_id: actor.workspaceId,
-          agent_id: body.agentId,
-          content: body.content.trim(),
-          updated_by: actor.id,
-          updated_at: new Date().toISOString(),
-        });
+      const result = await db.from("vo_memories").upsert({
+        workspace_id: actor.workspaceId,
+        agent_id: body.agentId,
+        content: body.content.trim(),
+        updated_by: actor.id,
+        updated_at: new Date().toISOString(),
+      });
       if (result.error) throw result.error;
       return officeResponse({ saved: true });
     }

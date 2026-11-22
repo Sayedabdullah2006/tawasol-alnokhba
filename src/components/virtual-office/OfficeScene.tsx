@@ -3,38 +3,77 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { OFFICE_AGENTS, type AgentId } from "@/lib/virtual-office/domain";
+import {
+  OFFICE_AGENTS,
+  OFFICE_APPEARANCE,
+  appearanceForStaff,
+  type OfficePersonId,
+  type OfficeStaff,
+} from "@/lib/virtual-office/domain";
+import { createSaudiHead } from "./saudi-character";
 import s from "./office.module.css";
 
 type Props = {
-  selected: AgentId;
-  active: AgentId[];
+  selected: OfficePersonId;
+  active: OfficePersonId[];
+  staff: OfficeStaff[];
   meeting: boolean;
-  onSelect: (id: AgentId) => void;
+  onSelect: (id: OfficePersonId) => void;
 };
 type SceneApi = {
-  focus: (id?: AgentId) => void;
+  focus: (id?: OfficePersonId) => void;
   zoom: (amount: number) => void;
   rotate: () => void;
 };
+function sceneActors(staff: OfficeStaff[]) {
+  return [
+    ...OFFICE_AGENTS.map((agent) => ({
+      ...agent,
+      id: agent.id as OfficePersonId,
+      human: false,
+      appearance: OFFICE_APPEARANCE[agent.id],
+    })),
+    ...staff.map((person, index) => {
+      const row = Math.floor(index / 4),
+        count = Math.min(4, staff.length - row * 4);
+      return {
+        id: `staff:${person.id}` as OfficePersonId,
+        name: person.name,
+        color: "#567895",
+        position: [
+          ((index % 4) - (count - 1) / 2) * 4.5,
+          9 + row * 4,
+        ] as readonly [number, number],
+        human: true,
+        appearance: appearanceForStaff(person.appearance),
+      };
+    }),
+  ];
+}
 
 export default function OfficeScene({
   selected,
   active,
   meeting,
   onSelect,
+  staff,
 }: Props) {
   const host = useRef<HTMLDivElement>(null);
-  const labels = useRef(new Map<AgentId, HTMLButtonElement>());
-  const live = useRef({ selected, active, meeting, onSelect });
+  const labels = useRef(new Map<OfficePersonId, HTMLButtonElement>());
+  const live = useRef({ selected, active, meeting, onSelect, staff });
+  const staffSignature = staff
+    .map((p) => `${p.id}:${p.name}:${p.appearance}`)
+    .join("|");
   const api = useRef<SceneApi | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
-    live.current = { selected, active, meeting, onSelect };
-  }, [selected, active, meeting, onSelect]);
+    live.current = { selected, active, meeting, onSelect, staff };
+  }, [selected, active, meeting, onSelect, staff]);
   useEffect(() => {
     if (!host.current) return;
     const container: HTMLDivElement = host.current;
+    const actors = sceneActors(live.current.staff);
+    const extraDepth = Math.ceil(live.current.staff.length / 4) * 4;
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({
@@ -48,7 +87,7 @@ export default function OfficeScene({
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.6));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.25;
@@ -56,9 +95,9 @@ export default function OfficeScene({
     container.prepend(renderer.domElement);
     const scene = new THREE.Scene();
     const camera = new THREE.OrthographicCamera(-14, 14, 11, -11, 0.1, 100);
-    camera.position.set(19, 23, 26);
+    camera.position.set(19, 23, 26 + extraDepth / 2);
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 0.3, 0);
+    controls.target.set(0, 0.3, extraDepth / 2);
     controls.enableDamping = true;
     controls.dampingFactor = 0.09;
     controls.enablePan = false;
@@ -190,10 +229,20 @@ export default function OfficeScene({
       return plane;
     }
     // A cutaway editorial floor, with the brand's navy and brass rather than a generic game room.
-    box(scene, [20.5, 0.5, 15.5], [0, -0.4, 0], "#263d61");
-    box(scene, [20, 0.15, 15], [0, -0.08, 0], "#e2e8ee");
+    box(
+      scene,
+      [20.5, 0.5, 15.5 + extraDepth],
+      [0, -0.4, extraDepth / 2],
+      "#263d61",
+    );
+    box(
+      scene,
+      [20, 0.15, 15 + extraDepth],
+      [0, -0.08, extraDepth / 2],
+      "#e2e8ee",
+    );
     for (let x = -9; x < 10; x += 2)
-      for (let z = -6.5; z < 7; z += 2)
+      for (let z = -6.5; z < 7 + extraDepth; z += 2)
         box(
           scene,
           [1.97, 0.015, 1.97],
@@ -201,7 +250,12 @@ export default function OfficeScene({
           (x + z) % 4 ? "#e4e9ee" : "#dbe3eb",
         );
     box(scene, [20, 3.8, 0.2], [0, 1.9, -7.5], "#e9edf3");
-    box(scene, [0.2, 3.8, 15], [-10, 1.9, 0], "#d9e1ed");
+    box(
+      scene,
+      [0.2, 3.8, 15 + extraDepth],
+      [-10, 1.9, extraDepth / 2],
+      "#d9e1ed",
+    );
     box(scene, [20, 0.12, 0.23], [0, 3.85, -7.5], "#bda26d");
     for (const x of [-6, 6]) {
       box(scene, [4.8, 2.2, 0.12], [x, 2.25, -7.34], "#2f4b70");
@@ -257,7 +311,8 @@ export default function OfficeScene({
     box(scene, [2.6, 0.75, 0.85], [-3, 0.4, -6.4], "#748fa5");
     box(scene, [2.6, 0.85, 0.3], [-3, 1, -6.65], "#748fa5");
     const clickable: THREE.Object3D[] = [];
-    const people = OFFICE_AGENTS.map((agent, index) => {
+    const people = actors.map((agent, index) => {
+      const appearance = agent.appearance;
       const [x, z] = agent.position;
       const station = new THREE.Group();
       station.position.set(x, 0, z - 0.6);
@@ -305,35 +360,35 @@ export default function OfficeScene({
         const leg = box(person, [0.08, 0.06, 0.65], [0, 0.1, 0.1], "#263b54");
         leg.rotation.y = (i * Math.PI) / 2.5;
       }
-      box(person, [0.62, 0.65, 0.4], [0, 1.02, 0], agent.color);
-      const skin =
-        index % 3 === 0 ? "#c9946e" : index % 3 === 1 ? "#d8aa83" : "#b97f59";
-      const head = sphere(person, 0.29, [0, 1.63, -0.02], skin);
-      head.scale.set(0.85, 1.12, 0.9);
-      const hair = sphere(
-        person,
-        0.3,
-        [0, 1.75, 0.025],
-        index === 3 || index === 4 ? agent.color : "#28303b",
-      );
-      hair.scale.set(0.89, 0.66, 1);
-      if (index === 0 || index === 5) {
-        const hat = sphere(person, 0.305, [0, 1.8, 0.02], "#eff3f5");
-        hat.scale.set(1, 0.44, 1);
+      box(person, [0.62, 0.65, 0.4], [0, 1.02, 0], appearance.clothing);
+      const skin = appearance.skin;
+      const head = createSaudiHead(appearance);
+      person.add(head);
+      if (appearance.gender === "male") {
+        // Thobe collar, placket, pocket and role-colored pen.
+        cylinder(person, 0.12, 0.12, [0, 1.38, -0.025], appearance.clothing);
+        box(person, [0.055, 0.35, 0.018], [0, 1.14, -0.21], "#d4dadd");
+        box(person, [0.15, 0.13, 0.018], [-0.17, 1.12, -0.21], "#e1e6e9");
+        box(person, [0.018, 0.13, 0.025], [-0.17, 1.16, -0.23], agent.color);
+      } else if (appearance.headwear === "none") {
+        box(person, [0.17, 0.38, 0.018], [0, 1.18, -0.21], "#f3ece2");
       }
-      for (const dx of [-0.1, 0.1])
-        sphere(person, 0.025, [dx, 1.66, -0.27], "#263546");
       const arms: THREE.Mesh[] = [];
       for (const dx of [-0.4, 0.4]) {
         const arm = box(
           person,
           [0.18, 0.18, 0.55],
           [dx, 1.17, -0.24],
-          agent.color,
+          appearance.clothing,
         );
         arms.push(arm);
         sphere(person, 0.095, [dx, 1.16, -0.53], skin);
-        box(person, [0.22, 0.45, 0.24], [dx * 0.52, 0.45, -0.25], "#314256");
+        box(
+          person,
+          [0.22, 0.45, 0.24],
+          [dx * 0.52, 0.45, -0.25],
+          appearance.clothing,
+        );
         box(person, [0.24, 0.12, 0.37], [dx * 0.52, 0.19, -0.32], "#23344b");
       }
       person.traverse((o) => {
@@ -356,8 +411,11 @@ export default function OfficeScene({
         arms,
         screen,
         marker,
+        human: agent.human,
         home: new THREE.Vector3(x, 0, z + 0.55),
-        seat: new THREE.Vector3(seats[index][0], 0, seats[index][1]),
+        seat: agent.human
+          ? new THREE.Vector3(x, 0, z + 0.55)
+          : new THREE.Vector3(seats[index][0], 0, seats[index][1]),
         index,
       };
     });
@@ -368,7 +426,7 @@ export default function OfficeScene({
         const person = people.find((p) => p.id === id);
         const at = person
           ? person.person.position.clone()
-          : new THREE.Vector3(0, 0, 0);
+          : new THREE.Vector3(0, 0, extraDepth / 2);
         targetLook = at.clone().add(new THREE.Vector3(0, 0.5, 0));
         targetCamera = at.clone().add(new THREE.Vector3(19, 23, 26));
         camera.zoom = person ? 1.6 : 1;
@@ -403,7 +461,7 @@ export default function OfficeScene({
       ray.setFromCamera(pointer, camera);
       const hit = ray.intersectObjects(clickable)[0];
       if (hit?.object.userData.agent)
-        live.current.onSelect(hit.object.userData.agent as AgentId);
+        live.current.onSelect(hit.object.userData.agent as OfficePersonId);
     };
     const contextLost = (e: Event) => {
       e.preventDefault();
@@ -418,7 +476,10 @@ export default function OfficeScene({
       if (!w || !h) return;
       renderer.setSize(w, h);
       const aspect = w / h;
-      const halfHeight = Math.max(12.5, 13.5 / aspect);
+      const halfHeight = Math.max(
+        12.5 + extraDepth * 0.4,
+        (13.5 + extraDepth * 0.5) / aspect,
+      );
       camera.left = -halfHeight * aspect;
       camera.right = halfHeight * aspect;
       camera.top = halfHeight;
@@ -448,7 +509,7 @@ export default function OfficeScene({
       const t = now * 0.001;
       for (const p of people) {
         const running = live.current.active.includes(p.id),
-          gathering = live.current.meeting;
+          gathering = live.current.meeting && !p.human;
         p.person.position.lerp(
           gathering ? p.seat : p.home,
           reduced.matches ? 1 : 0.07,
@@ -481,8 +542,8 @@ export default function OfficeScene({
       controls.update();
       renderer.render(scene, camera);
     }
-    function agentColor(id: AgentId) {
-      return OFFICE_AGENTS.find((a) => a.id === id)!.color;
+    function agentColor(id: OfficePersonId) {
+      return actors.find((a) => a.id === id)!.color;
     }
     frame = requestAnimationFrame(draw);
     return () => {
@@ -512,7 +573,7 @@ export default function OfficeScene({
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, []);
+  }, [staffSignature]);
   return (
     <div className={s.sceneWrap}>
       {failed ? (
@@ -526,7 +587,7 @@ export default function OfficeScene({
       ) : (
         <>
           <div ref={host} className={s.canvasHost}>
-            {OFFICE_AGENTS.map((agent) => (
+            {sceneActors(staff).map((agent) => (
               <button
                 key={agent.id}
                 ref={(el) => {
@@ -539,6 +600,7 @@ export default function OfficeScene({
               >
                 <span style={{ background: agent.color }} />
                 {agent.name}
+                {agent.human && <small>الفريق</small>}
                 {active.includes(agent.id) && <small>يعمل</small>}
               </button>
             ))}

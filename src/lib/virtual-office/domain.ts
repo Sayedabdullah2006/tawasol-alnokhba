@@ -14,11 +14,11 @@ export const OFFICE_AGENTS = [
   },
   {
     id: "researcher",
-    name: "الباحث",
+    name: "الباحثة",
     short: "البحث",
     initials: "بح",
     color: "#227a78",
-    responsibility: "يجمع المصادر ويتحقق من الإنجازات والتواريخ",
+    responsibility: "تجمع المصادر وتتحقق من الإنجازات والتواريخ",
     tools: ["بحث الويب بالمصادر", "تدقيق التواريخ", "تحديد فجوات الأدلة"],
     greeting: "ما الشخصية أو الإنجاز الذي نبحث عنه؟ أرفق ما لديك من مصادر.",
     position: [-6, 1],
@@ -36,22 +36,22 @@ export const OFFICE_AGENTS = [
   },
   {
     id: "art",
-    name: "المدير الفني",
+    name: "المديرة الفنية",
     short: "التصميم",
     initials: "فن",
     color: "#b77a36",
-    responsibility: "يجهز فكرة التصميم ويوجه أدوات الصور",
+    responsibility: "تجهز فكرة التصميم وتوجه أدوات الصور",
     tools: ["توجيه فني", "تجهيز برومبت الصور", "الاستوديو الحالي"],
     greeting: "لنحدد الرسالة البصرية والمادة الأصلية والهوية والمقاس.",
     position: [6, -3],
   },
   {
     id: "reviewer",
-    name: "المراجع",
+    name: "المراجعة",
     short: "المراجعة",
     initials: "مر",
     color: "#9d5968",
-    responsibility: "يراجع الادعاءات والنص والتصميم",
+    responsibility: "تراجع الادعاءات والنص والتصميم",
     tools: ["بحث للتحقق", "مراجعة الادعاءات", "قائمة التعديلات"],
     greeting: "أرسل المادة ومصادرها، وسأميز المثبت وما يحتاج تعديلًا أو دليلًا.",
     position: [6, 1],
@@ -69,6 +69,92 @@ export const OFFICE_AGENTS = [
   },
 ] as const;
 export type AgentId = (typeof OFFICE_AGENTS)[number]["id"];
+export type OfficeAppearance = {
+  gender: "male" | "female" | "unspecified";
+  headwear: "shemagh" | "hijab" | "none";
+  skin: string;
+  clothing: string;
+  hair: string;
+  scarf: string;
+};
+/** Fictional Saudi teammates; one appearance shared by the 3D model and its portrait. */
+export const OFFICE_APPEARANCE: Record<AgentId, OfficeAppearance> = {
+  editor: {
+    gender: "male",
+    headwear: "shemagh",
+    skin: "#c58f68",
+    clothing: "#f7f5ee",
+    hair: "#292c32",
+    scarf: "#b8464a",
+  },
+  researcher: {
+    gender: "female",
+    headwear: "hijab",
+    skin: "#dab18d",
+    clothing: "#233e47",
+    hair: "#2d2526",
+    scarf: "#37766f",
+  },
+  writer: {
+    gender: "male",
+    headwear: "shemagh",
+    skin: "#af7653",
+    clothing: "#e8edf1",
+    hair: "#292b30",
+    scarf: "#a73640",
+  },
+  art: {
+    gender: "female",
+    headwear: "none",
+    skin: "#c99270",
+    clothing: "#ac794c",
+    hair: "#50362c",
+    scarf: "#ac794c",
+  },
+  reviewer: {
+    gender: "female",
+    headwear: "hijab",
+    skin: "#b77f60",
+    clothing: "#30394e",
+    hair: "#302526",
+    scarf: "#a17c8b",
+  },
+  publisher: {
+    gender: "male",
+    headwear: "shemagh",
+    skin: "#deb48d",
+    clothing: "#fbf8f0",
+    hair: "#313030",
+    scarf: "#b93b46",
+  },
+};
+export type StaffAppearance = "unset" | "shemagh" | "hijab" | "hair";
+export type OfficeStaff = {
+  id: string;
+  name: string;
+  jobTitle: string;
+  appearance: StaffAppearance;
+  metrics: {
+    assigned: number;
+    open: number;
+    inProgress: number;
+    overdue: number;
+  };
+};
+export type OfficePersonId = AgentId | `staff:${string}`;
+export function appearanceForStaff(preset: StaffAppearance): OfficeAppearance {
+  if (preset === "shemagh") return { ...OFFICE_APPEARANCE.editor };
+  if (preset === "hijab") return { ...OFFICE_APPEARANCE.researcher };
+  if (preset === "hair") return { ...OFFICE_APPEARANCE.art };
+  return {
+    gender: "unspecified",
+    headwear: "none",
+    skin: "#cfa17f",
+    clothing: "#68849a",
+    hair: "#354657",
+    scarf: "#68849a",
+  };
+}
 export type SessionKind = "chat" | "task" | "team" | "meeting";
 export type SessionStatus =
   "queued" | "running" | "review" | "completed" | "failed" | "cancelled";
@@ -104,6 +190,8 @@ export type OfficeSnapshot = {
   sessions: OfficeSession[];
   memories: { agent_id: AgentId; content: string }[];
   runtime: { configured: boolean; model: string; provider: string };
+  staff: OfficeStaff[];
+  staffAvailable: boolean;
 };
 export const STATUS_LABELS: Record<SessionStatus, string> = {
   queued: "في الانتظار",

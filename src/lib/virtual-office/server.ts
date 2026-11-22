@@ -9,6 +9,8 @@ import {
   type OfficeSession,
 } from "./domain";
 import { runtimeInfo } from "./provider";
+import { readHostTeam } from "./host-team";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** The only host-specific seam. Hamza supplies its verified actor/workspace here. */
 export const workspaceId = () =>
@@ -46,9 +48,9 @@ export async function officeActor(request?: Request) {
         throw new OfficeError("مصدر الطلب غير مسموح", 403);
     }
   }
-  return { id: user.id, workspaceId: workspaceId() };
+  return { id: user.id, workspaceId: workspaceId(), db };
 }
-export async function snapshot() {
+export async function snapshot(hostDb: SupabaseClient) {
   const db = await createServiceRoleClient();
   const [sessions, memories] = await Promise.all([
     db
@@ -65,11 +67,20 @@ export async function snapshot() {
       .eq("workspace_id", workspaceId()),
   ]);
   if (sessions.error || memories.error) throw sessions.error || memories.error;
+  let staff: Awaited<ReturnType<typeof readHostTeam>> = [],
+    staffAvailable = true;
+  try {
+    staff = await readHostTeam(hostDb, workspaceId());
+  } catch {
+    staffAvailable = false;
+  }
   return {
     contractVersion: OFFICE_CONTRACT_VERSION,
     sessions: sessions.data as OfficeSession[],
     memories: memories.data,
     runtime: runtimeInfo(),
+    staff,
+    staffAvailable,
   };
 }
 export async function sessionMessages(id: string) {
