@@ -92,6 +92,7 @@ test("durable queue, cancellation fencing, continuation, retry, idempotence and 
         "utf8",
       ),
     );
+    await db.exec(await readFile(new URL('../supabase/migrations/20261122195000_virtual_office_departments.sql',import.meta.url),'utf8'));
     const submit = async (req = randomUUID(), brief = "اختبار خطة تحرير") =>
       (
         await db.query(
@@ -402,6 +403,16 @@ test("durable queue, cancellation fencing, continuation, retry, idempotence and 
     await db.query(
       "delete from public.vo_sessions where workspace_id='qa-adaptive'",
     );
+    const departmental=async(scope,department)=>(await db.query(`select (public.vo_submit($1,'00000000-0000-4000-8000-000000000001',$2,'editor','chat','جهز ملخصًا من البيانات المرفقة',$3)).*`,[scope,randomUUID(),JSON.stringify({project:'QA',sourceText:'',sourceUrls:[],department})])).rows[0];
+    const financial=await departmental('qa-company:department:finance','finance'),hr=await departmental('qa-company:department:people','people');
+    const claimDepartments=async(scopes)=>(await db.query('select * from public.vo_claim_departments($1::text[])',[scopes])).rows[0];
+    const fc=await claimDepartments(['qa-empty','qa-company:department:finance','qa-company:department:people']);assert.equal(fc.id,financial.id);assert.equal(fc.context.department,'finance');
+    const hc=await claimDepartments(['qa-company:department:finance','qa-company:department:people']);assert.equal(hc.id,hr.id);assert.equal(hc.context.department,'people');
+    assert.equal(await claimDepartments(['qa-company:department:finance','qa-company:department:people']),undefined);
+    for(const c of [fc,hc])await db.query(`select public.vo_finish_step($1,$2,'editor','ملخص الإدارة جاهز','[]',1,1,1)`,[c.id,c.lease_token]);
+    assert.notEqual((await db.query('select workspace_id from public.vo_sessions where id=$1',[fc.id])).rows[0].workspace_id,(await db.query('select workspace_id from public.vo_sessions where id=$1',[hc.id])).rows[0].workspace_id);
+    await assert.rejects(()=>claimDepartments([]));await assert.rejects(()=>claimDepartments(Array(9).fill('qa-company')));
+    await db.query('delete from public.vo_sessions where id=any($1::uuid[])',[[fc.id,hc.id]]);
     await db.exec(
       `set role authenticated; select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000002',false);`,
     );
@@ -427,6 +438,7 @@ test("durable queue, cancellation fencing, continuation, retry, idempotence and 
     await assert.rejects(() =>
       db.query(`select * from public.vo_claim_v3('qa')`),
     );
+    await assert.rejects(()=>db.query("select * from public.vo_claim_departments(array['qa'])"));
     await assert.rejects(() =>
       db.query(`update public.vo_sessions set status='completed'`),
     );

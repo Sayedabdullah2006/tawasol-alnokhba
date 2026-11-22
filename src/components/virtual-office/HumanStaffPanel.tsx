@@ -107,6 +107,11 @@ export default function HumanStaffPanel({
             <dd>{person.metrics.overdue}</dd>
           </div>
         </dl>
+        <p className={s.humanExplanation}>
+          {person.registeredDepartment &&
+            `القسم المسجل: ${person.registeredDepartment}. `}
+          {person.departmentReason}
+        </p>
         <h3>أقرب مهام العمل</h3>
         {error && (
           <p role="alert" className={s.humanError}>

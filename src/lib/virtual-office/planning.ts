@@ -4,6 +4,7 @@ import {
   type OfficePlan,
   type SpecialistId,
 } from "./domain";
+import { departmentAgent, type DepartmentId } from "./departments";
 
 const specialists = OFFICE_AGENTS.filter((a) => a.id !== "editor").map(
   (a) => a.id,
@@ -84,12 +85,15 @@ export function parseOfficePlan(value: unknown): OfficePlan {
   if (all.length !== 5 || new Set(all).size !== 5) return fail();
   return result;
 }
-export function planAsText(plan: OfficePlan) {
+export function planAsText(
+  plan: OfficePlan,
+  department: DepartmentId = "content",
+) {
   return `${plan.summary}\n\n${
     plan.steps.length
       ? plan.steps
           .map((s) => {
-            const a = OFFICE_AGENTS.find((a) => a.id === s.agentId)!;
+            const a = departmentAgent(department, s.agentId);
             return `${a.firstName}، ${a.name}: ${s.instruction}\nالتسليم: ${s.deliverable}`;
           })
           .join("\n\n")

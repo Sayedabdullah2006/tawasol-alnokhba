@@ -12,10 +12,14 @@ import { runtimeInfo } from "./provider";
 import { readHostTeam } from "./host-team";
 import { officeActivities } from "./presentation";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { departmentWorkspace, type DepartmentId } from "./departments";
 
 /** The only host-specific seam. Hamza supplies its verified actor/workspace here. */
-export const workspaceId = () =>
-  process.env.VIRTUAL_OFFICE_WORKSPACE_ID || "nukhba";
+export const workspaceId = (department: DepartmentId = "content") =>
+  departmentWorkspace(
+    process.env.VIRTUAL_OFFICE_WORKSPACE_ID || "nukhba",
+    department,
+  );
 export async function officeActor(request?: Request) {
   const db = await createServerSupabaseClient();
   const {
@@ -51,7 +55,10 @@ export async function officeActor(request?: Request) {
   }
   return { id: user.id, workspaceId: workspaceId(), db };
 }
-export async function snapshot(hostDb: SupabaseClient) {
+export async function snapshot(
+  hostDb: SupabaseClient,
+  department: DepartmentId = "content",
+) {
   const db = await createServiceRoleClient();
   const [sessions, memories] = await Promise.all([
     db
@@ -59,13 +66,13 @@ export async function snapshot(hostDb: SupabaseClient) {
       .select(
         "id,workspace_id,agent_id,kind,title,brief,status,step,approved_step,workflow,plan,plan_version,approved_plan_version,progress,error_message,created_at,updated_at,context,input_tokens,output_tokens",
       )
-      .eq("workspace_id", workspaceId())
+      .eq("workspace_id", workspaceId(department))
       .order("updated_at", { ascending: false })
       .limit(100),
     db
       .from("vo_memories")
       .select("agent_id,content")
-      .eq("workspace_id", workspaceId()),
+      .eq("workspace_id", workspaceId(department)),
   ]);
   if (sessions.error || memories.error) throw sessions.error || memories.error;
   const recent = sessions.data as OfficeSession[];
@@ -86,7 +93,7 @@ export async function snapshot(hostDb: SupabaseClient) {
   let staff: Awaited<ReturnType<typeof readHostTeam>> = [],
     staffAvailable = true;
   try {
-    staff = await readHostTeam(hostDb, workspaceId());
+    staff = (await readHostTeam(hostDb, workspaceId())).filter(person=>person.officeDepartment===department);
   } catch {
     staffAvailable = false;
   }
@@ -100,13 +107,16 @@ export async function snapshot(hostDb: SupabaseClient) {
     activities: officeActivities(recent, previews.data || []),
   };
 }
-export async function sessionMessages(id: string) {
+export async function sessionMessages(
+  id: string,
+  department: DepartmentId = "content",
+) {
   const db = await createServiceRoleClient();
   const { data: session, error } = await db
     .from("vo_sessions")
     .select("id")
     .eq("id", id)
-    .eq("workspace_id", workspaceId())
+    .eq("workspace_id", workspaceId(department))
     .maybeSingle();
   if (error) throw error;
   if (!session) throw new OfficeError("الجلسة غير متاحة", 404);

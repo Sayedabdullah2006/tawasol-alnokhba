@@ -1,5 +1,5 @@
 /** Portable office contract. No Next.js, database, auth or provider dependencies. */
-export const OFFICE_CONTRACT_VERSION = 3;
+export const OFFICE_CONTRACT_VERSION = 4;
 export const OFFICE_AGENTS = [
   {
     id: "editor",
@@ -150,6 +150,9 @@ export type OfficeStaff = {
   id: string;
   name: string;
   jobTitle: string;
+  registeredDepartment?: string;
+  officeDepartment?: string;
+  departmentReason?: string;
   appearance: StaffAppearance;
   metrics: {
     assigned: number;
@@ -210,7 +213,12 @@ export type OfficeSession = {
   error_message: string | null;
   created_at: string;
   updated_at: string;
-  context: { project: string; sourceText: string; sourceUrls: string[] };
+  context: {
+    project: string;
+    sourceText: string;
+    sourceUrls: string[];
+    department?: string;
+  };
   input_tokens: number;
   output_tokens: number;
 };
@@ -233,7 +241,7 @@ export type OfficeActivity = {
 export const STATUS_LABELS: Record<SessionStatus, string> = {
   queued: "في الانتظار",
   running: "قيد العمل",
-  handoff: "بانتظار موافقة مدير التحرير",
+  handoff: "بانتظار موافقة المدير",
   plan_review: "الخطة بانتظار موافقتك",
   review: "بانتظار اعتمادك",
   completed: "معتمد",

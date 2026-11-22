@@ -12,10 +12,12 @@ import {
   officeResponse,
   sessionMessages,
   snapshot,
+  workspaceId,
 } from "@/lib/virtual-office/server";
 import { runtimeInfo } from "@/lib/virtual-office/provider";
 import { wakeOfficeWorker } from "@/lib/virtual-office/worker";
 import { hostEmployeeTasks } from "@/lib/virtual-office/host-team";
+import { parseDepartment } from "@/lib/virtual-office/departments";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 150;
@@ -46,6 +48,7 @@ export async function GET(request: Request) {
   try {
     const actor = await officeActor();
     const params = new URL(request.url).searchParams;
+    const department = parseDepartment(params.get("department"));
     const employee = params.get("employee");
     if (employee) {
       if (!uuid(employee)) throw new OfficeError("معرف الموظف غير صالح");
@@ -56,7 +59,9 @@ export async function GET(request: Request) {
     const id = params.get("session");
     if (id && !uuid(id)) throw new OfficeError("معرف الجلسة غير صالح");
     return officeResponse(
-      id ? { messages: await sessionMessages(id) } : await snapshot(actor.db),
+      id
+        ? { messages: await sessionMessages(id, department) }
+        : await snapshot(actor.db, department),
     );
   } catch (e) {
     return officeFailure(e);
@@ -73,6 +78,8 @@ export async function POST(request: Request) {
     const body = JSON.parse(raw) as Record<string, unknown>;
     if (!body || typeof body !== "object" || Array.isArray(body))
       throw new OfficeError("طلب غير صالح");
+    const department = parseDepartment(body.department);
+    const officeWorkspace = workspaceId(department);
     const db = await createServiceRoleClient();
     if (body.action === "staffAppearance") {
       if (
@@ -106,7 +113,7 @@ export async function POST(request: Request) {
       )
         throw new OfficeError("ذاكرة الموظف غير صالحة أو تتجاوز ٨٠٠٠ حرف");
       const result = await db.from("vo_memories").upsert({
-        workspace_id: actor.workspaceId,
+        workspace_id: officeWorkspace,
         agent_id: body.agentId,
         content: body.content.trim(),
         updated_by: actor.id,
@@ -123,13 +130,14 @@ export async function POST(request: Request) {
           503,
         );
       const result = await db.rpc("vo_submit", {
-        p_workspace: actor.workspaceId,
+        p_workspace: officeWorkspace,
         p_actor: actor.id,
         p_request: input.requestId,
         p_agent: input.agentId,
         p_kind: input.kind,
         p_brief: input.brief,
         p_context: {
+          department,
           project: input.project,
           sourceText: input.sourceText,
           sourceUrls: input.sourceUrls,
@@ -187,7 +195,7 @@ export async function POST(request: Request) {
     )
       throw new OfficeError("وضح تعديل الخطة من ٣ إلى ٤٠٠٠ حرف");
     const result = await db.rpc("vo_session_action", {
-      p_workspace: actor.workspaceId,
+      p_workspace: officeWorkspace,
       p_id: body.sessionId,
       p_action: body.action,
       p_request: body.requestId,

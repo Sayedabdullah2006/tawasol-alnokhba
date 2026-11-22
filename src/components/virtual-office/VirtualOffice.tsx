@@ -4,15 +4,12 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
-  OFFICE_AGENTS,
   OFFICE_CONTRACT_VERSION,
-  OFFICE_APPEARANCE,
   appearanceForStaff,
   type OfficeStaff,
   type OfficePersonId,
   STATUS_LABELS,
   KIND_LABELS,
-  agentById,
   currentAgent,
   sessionSteps,
   type AgentId,
@@ -24,6 +21,14 @@ import {
 import s from "./office.module.css";
 import HumanStaffPanel from "./HumanStaffPanel";
 import OfficePlanCard from "./OfficePlanCard";
+import {
+  OFFICE_DEPARTMENTS,
+  departmentById,
+  departmentAgent,
+  agentsForDepartment,
+  departmentAppearance,
+  type DepartmentId,
+} from "@/lib/virtual-office/departments";
 import {
   firstName,
   officeExcerpt,
@@ -37,21 +42,21 @@ const OfficeScene = dynamic(() => import("./OfficeScene"), {
   ),
 });
 const endpoint = "/api/admin/virtual-office";
-async function api(
+async function requestOffice(
   body?: Record<string, unknown>,
   session?: string,
   signal?: AbortSignal,
+  department: DepartmentId = "content",
 ) {
-  const response = await fetch(
-    session ? `${endpoint}?session=${encodeURIComponent(session)}` : endpoint,
-    {
-      method: body ? "POST" : "GET",
-      headers: body ? { "Content-Type": "application/json" } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
-      cache: "no-store",
-      signal,
-    },
-  );
+  const params = new URLSearchParams({ department });
+  if (session) params.set("session", session);
+  const response = await fetch(`${endpoint}?${params}`, {
+    method: body ? "POST" : "GET",
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify({ ...body, department }) : undefined,
+    cache: "no-store",
+    signal,
+  });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "تعذر الاتصال بالمكتب");
   return data;
@@ -92,13 +97,17 @@ function Portrait({
   id = "editor",
   large = false,
   staff,
+  department = "content",
 }: {
   id?: AgentId;
   large?: boolean;
   staff?: OfficeStaff;
+  department?: DepartmentId;
 }) {
-  const agent = agentById(id),
-    look = staff ? appearanceForStaff(staff.appearance) : OFFICE_APPEARANCE[id];
+  const agent = departmentAgent(department, id),
+    look = staff
+      ? appearanceForStaff(staff.appearance)
+      : departmentAppearance(department, id);
   const patternId = `shemagh-${useId().replace(/:/g, "")}`;
   if (staff?.appearance === "unset")
     return (
@@ -234,7 +243,46 @@ function Status({ session }: { session: OfficeSession }) {
   );
 }
 
-export default function VirtualOffice() {
+export default function VirtualOffice({
+  initialDepartment = "leadership",
+}: {
+  initialDepartment?: DepartmentId;
+}) {
+  const department = initialDepartment;
+  return (
+    <div dir="rtl">
+      <div className={s.companyNavigation}>
+        <div className={s.companyNavigationTitle}>
+          <strong>إدارات الشركة الافتراضية</strong>
+          <span>٨ إدارات · فرق فعلية أو افتراضية</span>
+        </div>
+        <nav aria-label="إدارات الشركة">
+          {OFFICE_DEPARTMENTS.map((d) => (
+            <Link
+              href={`?department=${d.id}`}
+              scroll={false}
+              key={d.id}
+              aria-current={department === d.id ? "page" : undefined}
+            >
+              {d.short}
+            </Link>
+          ))}
+        </nav>
+      </div>
+      <DepartmentOffice key={department} department={department} />
+    </div>
+  );
+}
+function DepartmentOffice({ department }: { department: DepartmentId }) {
+  const unit = departmentById(department),
+    agents = agentsForDepartment(department),
+    manager = departmentAgent(department, "editor");
+  const agentById = (id: AgentId) => departmentAgent(department, id);
+  const api = useCallback(
+    (body?: Record<string, unknown>, session?: string, signal?: AbortSignal) =>
+      requestOffice(body, session, signal, department),
+    [department],
+  );
   const [data, setData] = useState<OfficeSnapshot | null>(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
@@ -257,7 +305,9 @@ export default function VirtualOffice() {
   const [sessionId, setSessionId] = useState<string | null>(null),
     [messages, setMessages] = useState<OfficeMessage[]>([]);
   const [brief, setBrief] = useState(""),
-    [project, setProject] = useState("First1Saudi"),
+    [project, setProject] = useState(
+      department === "content" ? "First1Saudi" : "تواصل النخبة",
+    ),
     [sourceText, setSourceText] = useState(""),
     [sourceUrls, setSourceUrls] = useState("");
   const [memories, setMemories] = useState<Partial<Record<AgentId, string>>>(
@@ -270,34 +320,50 @@ export default function VirtualOffice() {
     revision = useRef(0),
     pollError = useRef(false);
   const refreshing = useRef(false);
+  const hostMembership = useRef("");
   const submission = useRef<{ signature: string; id: string } | null>(null);
-  const refresh = useCallback(async (signal?: AbortSignal) => {
-    if (refreshing.current) return;
-    refreshing.current = true;
-    const id = ++revision.current,
-      current = sessionRef.current;
-    try {
-      const [snapshot, detail] = await Promise.all([
-        api(undefined, undefined, signal),
-        current
-          ? api(undefined, current, signal)
-          : Promise.resolve({ messages: [] }),
-      ]);
-      if (id !== revision.current) return;
-      setData(snapshot);
-      if (current === sessionRef.current) setMessages(detail.messages);
-      if (pollError.current) {
-        setError("");
-        pollError.current = false;
+  const refresh = useCallback(
+    async (signal?: AbortSignal) => {
+      if (refreshing.current) return;
+      refreshing.current = true;
+      const id = ++revision.current,
+        current = sessionRef.current;
+      try {
+        const [snapshot, detail] = await Promise.all([
+          api(undefined, undefined, signal),
+          current
+            ? api(undefined, current, signal)
+            : Promise.resolve({ messages: [] }),
+        ]);
+        if (id !== revision.current) return;
+        setData(snapshot);
+        const membership = snapshot.staff
+          .map((person: OfficeStaff) => person.id)
+          .join("|");
+        const preferActual =
+          membership !== hostMembership.current && !chatDialog.current?.open;
+        hostMembership.current = membership;
+        setStaffId((current) =>
+          current &&
+          !snapshot.staff.some((person: OfficeStaff) => person.id === current)
+            ? snapshot.staff[0]?.id || null
+            : current || (preferActual ? snapshot.staff[0]?.id || null : null),
+        );
+        if (current === sessionRef.current) setMessages(detail.messages);
+        if (pollError.current) {
+          setError("");
+          pollError.current = false;
+        }
+      } catch (e) {
+        if (signal?.aborted) return;
+        pollError.current = true;
+        setError(e instanceof Error ? e.message : "تعذر تحديث المكتب");
+      } finally {
+        refreshing.current = false;
       }
-    } catch (e) {
-      if (signal?.aborted) return;
-      pollError.current = true;
-      setError(e instanceof Error ? e.message : "تعذر تحديث المكتب");
-    } finally {
-      refreshing.current = false;
-    }
-  }, []);
+    },
+    [api],
+  );
   useEffect(() => {
     const controller = new AbortController();
     void refresh(controller.signal);
@@ -471,9 +537,9 @@ export default function VirtualOffice() {
         value === "approve_plan"
           ? "اعتمدت الخطة؛ يبدأ الفريق بالمراحل المختارة فقط."
           : value === "revise_plan"
-            ? "وصلت ملاحظاتك؛ يعيد عبدالله إعداد الخطة قبل أي تنفيذ."
+            ? `وصلت ملاحظاتك؛ يعيد ${manager.firstName} إعداد الخطة قبل أي تنفيذ.`
             : value === "approve_handoff"
-              ? `وافق مدير التحرير وأُسندت المهمة إلى ${agentById(currentAgent(session)).firstName}.`
+              ? `وافق المدير وأُسندت المهمة إلى ${agentById(currentAgent(session)).firstName}.`
               : value === "approve"
                 ? "تم اعتماد التسليم. لم يتم نشره تلقائيًا."
                 : value === "cancel"
@@ -533,12 +599,27 @@ export default function VirtualOffice() {
             <Icon type="office" />
           </span>
           <div>
-            <h1>المكتب الافتراضي</h1>
-            <p>فريق التحرير، في مساحة واحدة.</p>
+            <h1>{unit.name}</h1>
+            <p>{unit.description}</p>
           </div>
         </div>
         <div className={s.headerActions}>
           <span className={s.workspaceBadge}>تواصل النخبة</span>
+          {!!data?.staff.length && (
+            <Link className={s.secondary} href="/admin/workforce/tasks">
+              تكليف الموظفين الفعليين
+            </Link>
+          )}
+          <button
+            type="button"
+            className={s.secondary}
+            onClick={() => {
+              setBrief(unit.brief);
+              newWork("team");
+            }}
+          >
+            {data?.staff.length ? "مثال لطلب المساعدين" : "مثال لتكليف الإدارة"}
+          </button>
           <button
             className={s.primary}
             onClick={() => {
@@ -548,7 +629,7 @@ export default function VirtualOffice() {
             }}
           >
             <Icon type="plus" />
-            تكليف الفريق
+            {data?.staff.length ? "استعن بمساعدي الإدارة" : "تكليف الفريق"}
           </button>
         </div>
       </header>
@@ -566,24 +647,31 @@ export default function VirtualOffice() {
             onClick={() => setView("tasks")}
           >
             <Icon type="tasks" />
-            المهام والتسليمات{waiting > 0 && <span>{waiting}</span>}
+            {data?.staff.length ? "تكليفات المساعدين" : "المهام والتسليمات"}
+            {waiting > 0 && <span>{waiting}</span>}
           </button>
           <button
             aria-pressed={view === "meetings"}
             onClick={() => setView("meetings")}
           >
             <Icon type="meeting" />
-            الاجتماعات
+            {data?.staff.length ? "اجتماع المساعدين" : "الاجتماعات"}
           </button>
         </nav>
         <p className={s.officePulse}>
           <span className={running.length ? s.pulseActive : s.pulseIdle} />
           {running.length
-            ? `${running.length} مهمة قيد التنفيذ`
+            ? `${running.length} مهمة للمساعدين قيد التنفيذ`
             : handoffs.length
-              ? "تسليم جاهز لموافقة مدير التحرير"
-              : "الفريق بانتظار تكليفك"}
-          <b>٦ تخصصات</b>
+              ? `تسليم جاهز لموافقة ${manager.name}`
+              : data?.staff.length
+                ? "المساعدون جاهزون عند الحاجة؛ أعمال الموظفين في بطاقاتهم"
+                : "الفريق بانتظار تكليفك"}
+          <b>
+            {data?.staff.length
+              ? `${data.staff.length} موظف فعلي`
+              : "٦ تخصصات افتراضية"}
+          </b>
         </p>
       </div>
       {error && (
@@ -602,7 +690,14 @@ export default function VirtualOffice() {
         <section className={s.mainColumn}>
           {view === "office" ? (
             <OfficeScene
-              selected={staffId ? `staff:${staffId}` : selected}
+              department={department}
+              selected={
+                staffId
+                  ? `staff:${staffId}`
+                  : data?.staff.length
+                    ? `staff:${data.staff[0].id}`
+                    : selected
+              }
               active={active}
               staff={data?.staff || []}
               activities={data?.activities || []}
@@ -657,7 +752,7 @@ export default function VirtualOffice() {
                   </h2>
                   <p>
                     {view === "meetings"
-                      ? "مدير التحرير يختار المشاركين بحسب الموضوع، ثم يعرض الخطة لموافقتك."
+                      ? `${manager.name} يختار المشاركين بحسب الموضوع، ثم يعرض الخطة لموافقتك.`
                       : "تكليفات حقيقية، ومراحل محفوظة حتى اعتمادك."}
                   </p>
                 </div>
@@ -695,7 +790,7 @@ export default function VirtualOffice() {
                   </h3>
                   <p>
                     {view === "meetings"
-                      ? "حدد موضوعًا وقرارًا تحتاجه، ويقترح عبدالله التخصصات اللازمة فقط."
+                      ? `حدد موضوعًا وقرارًا تحتاجه، ويقترح ${manager.firstName} التخصصات اللازمة فقط.`
                       : "أرسل الفكرة والمراجع، وراجع خطة الفريق قبل بدء التنفيذ."}
                   </p>
                   <button
@@ -715,7 +810,7 @@ export default function VirtualOffice() {
                         className={sessionId === v.id ? s.rowSelected : ""}
                         onClick={() => openSession(v)}
                       >
-                        <Portrait id={v.agent_id} />
+                        <Portrait department={department} id={v.agent_id} />
                         <span>
                           <strong>{v.title}</strong>
                           <small>
@@ -732,7 +827,9 @@ export default function VirtualOffice() {
           )}
           {handoffs.length > 0 && (
             <div className={s.approvalInbox}>
-              <span>عند عبدالله · مدير التحرير</span>
+              <span>
+                عند {manager.firstName} · {manager.name}
+              </span>
               <strong>
                 {handoffs.length === 1
                   ? handoffs[0].status === "plan_review"
@@ -756,63 +853,74 @@ export default function VirtualOffice() {
                     data?.staff.find((p) => p.id === staffId)?.name || "الموظف",
                   )
                 : agent.firstName}{" "}
-              · المحادثة والذاكرة
+              {staffId ? "· أعمال الموظف" : "· المحادثة والذاكرة"}
             </summary>
-            <p>اضغط على أي شخصية للتحدث معها، أو افتح مساحة الموظف المحدد.</p>
+            <p>
+              {staffId
+                ? "افتح شخصية الموظف لعرض مهامه وملفه الفعلي."
+                : "اضغط شخصية المساعد للتحدث معه، أو افتح مساحته المحددة."}
+            </p>
             <button type="button" className={s.secondary} onClick={openChat}>
               فتح مساحة الموظف
             </button>
           </details>
-          <div className={s.teamHeading}>
-            <h2>فريق المكتب</h2>
-            <span>اختر الموظف لفتح مساحة عمله</span>
-          </div>
-          <ul className={s.roster}>
-            {OFFICE_AGENTS.map((a) => {
-              const isActive = active.includes(a.id),
-                review = sessions.some(
-                  (v) => v.status === "review" && v.agent_id === a.id,
+          <details className={s.assistantRoster} open={!data?.staff.length}>
+            <summary>
+              {data?.staff.length
+                ? "مساعدو الإدارة الافتراضيون عند الحاجة"
+                : "فريق الإدارة الافتراضي"}
+            </summary>
+            <div className={s.teamHeading}>
+              <h2>فريق المكتب</h2>
+              <span>اختر الموظف لفتح مساحة عمله</span>
+            </div>
+            <ul className={s.roster}>
+              {agents.map((a) => {
+                const isActive = active.includes(a.id),
+                  review = sessions.some(
+                    (v) => v.status === "review" && v.agent_id === a.id,
+                  );
+                return (
+                  <li key={a.id}>
+                    <button
+                      className={
+                        !staffId && selected === a.id ? s.agentSelected : ""
+                      }
+                      aria-pressed={!staffId && selected === a.id}
+                      onClick={() => {
+                        choose(a.id);
+                        setKind("chat");
+                        openChat();
+                      }}
+                    >
+                      <Portrait department={department} id={a.id} />
+                      <strong>{a.firstName}</strong>
+                      <span className={s.rosterRole}>{a.name}</span>
+                      <small>
+                        <i
+                          className={
+                            isActive
+                              ? s.workingDot
+                              : review
+                                ? s.reviewDot
+                                : s.idleDot
+                          }
+                        />
+                        {isActive
+                          ? "قيد العمل"
+                          : review
+                            ? "بانتظار اعتماد"
+                            : "متاح للتكليف"}
+                      </small>
+                    </button>
+                  </li>
                 );
-              return (
-                <li key={a.id}>
-                  <button
-                    className={
-                      !staffId && selected === a.id ? s.agentSelected : ""
-                    }
-                    aria-pressed={!staffId && selected === a.id}
-                    onClick={() => {
-                      choose(a.id);
-                      setKind("chat");
-                      openChat();
-                    }}
-                  >
-                    <Portrait id={a.id} />
-                    <strong>{a.firstName}</strong>
-                    <span className={s.rosterRole}>{a.name}</span>
-                    <small>
-                      <i
-                        className={
-                          isActive
-                            ? s.workingDot
-                            : review
-                              ? s.reviewDot
-                              : s.idleDot
-                        }
-                      />
-                      {isActive
-                        ? "قيد العمل"
-                        : review
-                          ? "بانتظار اعتماد"
-                          : "متاح للتكليف"}
-                    </small>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+              })}
+            </ul>
+          </details>
           <div className={s.teamHeading}>
-            <h2>فريق تواصل النخبة</h2>
-            <span>الموظفون الحقيقيون من نظام الفريق</span>
+            <h2>فريق الإدارة الفعلي</h2>
+            <span>يظهر تلقائيًا حسب القسم والمسمى وطبيعة العمل</span>
           </div>
           {data?.staffAvailable === false ? (
             <p className={s.humanExplanation}>
@@ -820,7 +928,8 @@ export default function VirtualOffice() {
             </p>
           ) : !data?.staff?.length ? (
             <p className={s.humanExplanation}>
-              يظهر الموظفون النشطون هنا تلقائيًا عند إضافتهم إلى نظام الفريق.
+              لا يوجد موظفون فعليون مرتبطون بهذه الإدارة حاليًا؛ الفريق الافتراضي
+              جاهز. يظهر الموظف تلقائيًا عند إضافته أو تحديث قسمه وطبيعة عمله.
             </p>
           ) : (
             <ul className={s.staffRoster}>
@@ -836,7 +945,7 @@ export default function VirtualOffice() {
                       openChat();
                     }}
                   >
-                    <Portrait staff={person} />
+                    <Portrait department={department} staff={person} />
                     <span>
                       <strong>{firstName(person.name)}</strong>
                       <small>
@@ -850,9 +959,12 @@ export default function VirtualOffice() {
             </ul>
           )}
           <div className={s.bottomNote}>
-            <span>ذاكرة محفوظة · تنفيذ في الخلفية · اعتماد قبل النشر</span>
-            <Link href="/admin/studio">استوديو التصميم</Link>
-            <Link href="/admin/integrations">مركز النشر</Link>
+            <span>ذاكرة مستقلة للإدارة · اعتماد قبل التنفيذ</span>
+            {unit.links.map((link) => (
+              <Link key={link.href} href={link.href}>
+                {link.label}
+              </Link>
+            ))}
           </div>
         </section>
         <dialog
@@ -887,6 +999,7 @@ export default function VirtualOffice() {
               person={data.staff.find((p) => p.id === staffId)!}
               portrait={
                 <Portrait
+                  department={department}
                   staff={data.staff.find((p) => p.id === staffId)!}
                   large
                 />
@@ -902,7 +1015,7 @@ export default function VirtualOffice() {
               aria-label={`مساحة عمل ${agent.firstName}`}
             >
               <div className={s.agentHeader}>
-                <Portrait id={selected} large />
+                <Portrait department={department} id={selected} large />
                 <div>
                   <h2>{agent.firstName}</h2>
                   <p>
@@ -1008,11 +1121,12 @@ export default function VirtualOffice() {
                   {session?.status === "handoff" && (
                     <div className={s.handoffCard}>
                       <span className={s.handoffEyebrow}>
-                        على مكتب مدير التحرير
+                        على مكتب {manager.name}
                       </span>
                       <div className={s.handoffPeople}>
                         <span>
                           <Portrait
+                            department={department}
                             id={sessionSteps(session)[session.step - 1]}
                           />
                           <b>
@@ -1025,7 +1139,10 @@ export default function VirtualOffice() {
                         </span>
                         <i aria-hidden="true">←</i>
                         <span>
-                          <Portrait id={currentAgent(session)} />
+                          <Portrait
+                            department={department}
+                            id={currentAgent(session)}
+                          />
                           <b>{agentById(currentAgent(session)).firstName}</b>
                           <small>{agentById(currentAgent(session)).name}</small>
                         </span>
@@ -1068,9 +1185,9 @@ export default function VirtualOffice() {
                         </h3>
                         <p>
                           {kind === "team"
-                            ? "عبدالله يختار التخصصات المناسبة ويعرض الخطة لموافقتك قبل أن يبدأ الفريق."
+                            ? `${manager.firstName} يختار التخصصات المناسبة ويعرض الخطة لموافقتك قبل أن يبدأ الفريق.`
                             : kind === "meeting"
-                              ? "شارك موضوع الاجتماع والقرار المطلوب. يعرض عبدالله خطة بالمشاركين المناسبين لموافقتك أولًا."
+                              ? `شارك موضوع الاجتماع والقرار المطلوب. يعرض ${manager.firstName} خطة بالمشاركين المناسبين لموافقتك أولًا.`
                               : agent.greeting}
                         </p>
                       </div>

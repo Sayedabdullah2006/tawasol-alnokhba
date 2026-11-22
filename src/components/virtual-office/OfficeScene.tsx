@@ -11,7 +11,6 @@ import {
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import {
-  OFFICE_AGENTS,
   OFFICE_APPEARANCE,
   appearanceForStaff,
   type OfficePersonId,
@@ -19,6 +18,12 @@ import {
   type OfficeActivity,
 } from "@/lib/virtual-office/domain";
 import { createOfficeCharacter } from "./human-character";
+import {
+  agentsForDepartment,
+  departmentById,
+  departmentAppearance,
+  type DepartmentId,
+} from "@/lib/virtual-office/departments";
 import { firstName, officeExcerpt } from "@/lib/virtual-office/presentation";
 import { officeFloor, officePath, type FloorPoint } from "./office-navigation";
 import { createOfficePool } from "./office-pool";
@@ -26,6 +31,7 @@ import { POOL, lowestPoolBall } from "./pool-physics";
 import s from "./office.module.css";
 
 type Props = {
+  department: DepartmentId;
   selected: OfficePersonId;
   active: OfficePersonId[];
   staff: OfficeStaff[];
@@ -46,30 +52,37 @@ type SceneApi = {
   recreation: (enabled: boolean) => void;
   newPoolRound: () => void;
 };
-function sceneActors(staff: OfficeStaff[]) {
+function sceneActors(staff: OfficeStaff[], department: DepartmentId) {
+  const virtual = agentsForDepartment(department);
   return [
-    ...OFFICE_AGENTS.map((agent) => ({
-      ...agent,
-      name: agent.firstName,
-      role: agent.name,
-      fullName: agent.firstName,
-      id: agent.id as OfficePersonId,
-      human: false,
-      appearance: OFFICE_APPEARANCE[agent.id],
-    })),
+    ...(staff.length
+      ? []
+      : virtual.map((agent) => ({
+          ...agent,
+          name: agent.firstName,
+          role: agent.name,
+          fullName: agent.firstName,
+          id: agent.id as OfficePersonId,
+          human: false,
+          appearance: departmentAppearance(department, agent.id),
+        }))),
     ...staff.map((person, index) => {
-      const row = Math.floor(index / 4),
-        count = Math.min(4, staff.length - row * 4);
+      const extra = index - 6,
+        row = Math.floor(Math.max(0, extra) / 4),
+        count = Math.min(4, Math.max(0, staff.length - 6) - row * 4);
       return {
         id: `staff:${person.id}` as OfficePersonId,
         name: firstName(person.name),
         fullName: person.name,
         role: person.jobTitle || "فريق تواصل النخبة",
         color: "#567895",
-        position: [
-          ((index % 4) - (count - 1) / 2) * 4.5,
-          9 + row * 4,
-        ] as readonly [number, number],
+        position:
+          index < 6
+            ? virtual[index].position
+            : ([
+                ((extra % 4) - (count - 1) / 2) * 4.5,
+                9 + row * 4,
+              ] as readonly [number, number]),
         human: true,
         appearance: appearanceForStaff(person.appearance),
       };
@@ -78,6 +91,7 @@ function sceneActors(staff: OfficeStaff[]) {
 }
 
 export default function OfficeScene({
+  department,
   selected,
   active,
   meeting,
@@ -105,6 +119,7 @@ export default function OfficeScene({
   const ambient = true;
   const [recreation, setRecreation] = useState(false);
   const poolReadout = useRef<HTMLParagraphElement>(null);
+  const lifeStatus = useRef<HTMLSpanElement>(null);
   const [expanded, setExpanded] = useState(false);
   const [nativeFull, setNativeFull] = useState(false);
   useEffect(() => {
@@ -214,7 +229,7 @@ export default function OfficeScene({
     api.current?.focus(id);
   };
   const neighbour = (direction: number) => {
-    const actors = sceneActors(staff),
+    const actors = sceneActors(staff, department),
       index = actors.findIndex((a) => a.id === selected);
     visit(actors[(index + direction + actors.length) % actors.length].id);
   };
@@ -247,8 +262,9 @@ export default function OfficeScene({
   useEffect(() => {
     if (!host.current) return;
     const container: HTMLDivElement = host.current;
-    const actors = sceneActors(live.current.staff);
-    const staffDepth = Math.ceil(live.current.staff.length / 4) * 4;
+    const actors = sceneActors(live.current.staff, department);
+    const staffDepth =
+      Math.ceil(Math.max(0, live.current.staff.length - 6) / 4) * 4;
     const extraDepth = staffDepth + 7;
     const poolZ = 10 + staffDepth;
     let renderer: THREE.WebGLRenderer;
@@ -444,7 +460,13 @@ export default function OfficeScene({
       box(scene, [0.08, 2, 0.15], [x, 2.25, -7.15], "#f0f5f9");
       box(scene, [4.5, 0.08, 0.15], [x, 2.25, -7.15], "#f0f5f9");
     }
-    const sign = textPlane("تواصل النخبة", 4.7, 1.2, "#203f68", "#ead8ae");
+    const sign = textPlane(
+      departmentById(department).name,
+      4.7,
+      1.2,
+      "#203f68",
+      "#ead8ae",
+    );
     sign.position.set(0, 2.55, -7.32);
     scene.add(sign);
     box(scene, [4.7, 0.08, 0.1], [0, 1.75, -7.3], "#bda26d");
@@ -495,6 +517,15 @@ export default function OfficeScene({
     box(scene, [1.8, 0.9, 0.65], [0, 0.45, -6.6], "#294366");
     box(scene, [1.9, 0.08, 0.75], [0, 0.94, -6.6], "#cbb18b");
     box(scene, [0.45, 0.45, 0.4], [-0.45, 1.2, -6.6], "#354b69");
+    box(scene, [0.35, 0.16, 0.03], [-0.45, 1.28, -6.37], "#203f68");
+    for (const x of [-0.57, -0.34])
+      sphere(scene, 0.035, [x, 1.29, -6.34], "#cbb18b");
+    box(scene, [0.3, 0.035, 0.24], [-0.45, 1.02, -6.3], "#b6c4ce");
+    cylinder(scene, 0.12, 0.24, [0.77, 1.1, -6.57], "#644b3c");
+    cylinder(scene, 0.13, 0.04, [0.77, 1.24, -6.57], "#cbb18b");
+    const coffeeSign = textPlane("ركن القهوة", 1.9, 0.5, "#203f68", "#ead8ae");
+    coffeeSign.position.set(0, 2.03, -6.62);
+    scene.add(coffeeSign);
     for (const x of [0.2, 0.55])
       cylinder(scene, 0.09, 0.16, [x, 1.06, -6.5], "#f7f8fa");
     const clickable: THREE.Object3D[] = [];
@@ -583,7 +614,7 @@ export default function OfficeScene({
       extraDepth,
       poolZ,
     );
-    const pool = createOfficePool(scene, poolZ);
+    const pool = createOfficePool(scene, poolZ, actors.length);
     const poolSign = textPlane(
       "ركن البلياردو · ٩ كرات",
       3.3,
@@ -626,6 +657,7 @@ export default function OfficeScene({
       phase: "away" | "pause" | "home";
       until: number;
       stride: number;
+      destination: "coffee" | "library";
     };
     const idleTours = new Map<OfficePersonId, IdleTour>();
     let nextTour = 0,
@@ -645,20 +677,20 @@ export default function OfficeScene({
         setRecreation(enabled);
         idleTours.clear();
         nextShot = performance.now() + 1200;
-        people
-          .filter((p) => !p.human)
-          .forEach((p, i) => {
-            playPaths.set(
-              p.id,
-              officePath(
-                floor,
-                p.person.position,
-                enabled
-                  ? { x: playSpots[i][0], z: poolZ + playSpots[i][1] }
-                  : p.home,
-              ),
-            );
-          });
+        people.forEach((p, i) => {
+          const spot = playSpots[i] || [
+            i % 2 ? -3.9 : 3.9,
+            -2.3 + (Math.floor((i - 6) / 2) % 7) * 0.75,
+          ];
+          playPaths.set(
+            p.id,
+            officePath(
+              floor,
+              p.person.position,
+              enabled ? { x: spot[0], z: poolZ + spot[1] } : p.home,
+            ),
+          );
+        });
         walkEnabled.current = false;
         setWalking(false);
         visitor.visible = false;
@@ -989,11 +1021,10 @@ export default function OfficeScene({
       if (!poolMode && idleTours.size < 2 && now >= nextTour) {
         const available = people.filter(
           (p) =>
-            !p.human &&
             !idleTours.has(p.id) &&
             !playPaths.has(p.id) &&
             !live.current.active.includes(p.id) &&
-            p.id !== live.current.selected,
+            (p.id !== live.current.selected || people.length === 1),
         );
         const colleague = available[tourIndex % available.length];
         if (colleague) {
@@ -1005,6 +1036,7 @@ export default function OfficeScene({
             phase: "away",
             until: 0,
             stride: 0,
+            destination: tourIndex % 2 ? "library" : "coffee",
           });
           tourIndex++;
         }
@@ -1030,8 +1062,8 @@ export default function OfficeScene({
           const text = !ready
             ? "يتجه الفريق إلى طاولة البلياردو…"
             : game.winner !== null
-              ? `${OFFICE_AGENTS[game.winner].firstName} فاز بالكرة ٩!`
-              : `دور ${OFFICE_AGENTS[game.turn].firstName} · الهدف الكرة ${lowestPoolBall(game)} · ${game.balls.filter((b) => b.id > 0 && b.alive).length} كرات على الطاولة. ${game.message}`;
+              ? `${actors[game.winner].name} فاز بالكرة ٩!`
+              : `دور ${actors[game.turn].name} · الهدف الكرة ${lowestPoolBall(game)} · ${game.balls.filter((b) => b.id > 0 && b.alive).length} كرات على الطاولة. ${game.message}`;
           if (poolReadout.current.textContent !== text)
             poolReadout.current.textContent = text;
         }
@@ -1062,7 +1094,7 @@ export default function OfficeScene({
             p.person.position.add(delta.normalize().multiplyScalar(dt * speed));
           return distance > 0.001;
         }
-        if (!p.human && (poolMode || playPath)) {
+        if (poolMode || playPath) {
           strolling = advance(playPath || [], 2.8);
           if (!strolling) {
             if (poolMode)
@@ -1088,7 +1120,8 @@ export default function OfficeScene({
             idleTour.stride += dt * 8;
           } else if (idleTour.phase === "away") {
             idleTour.phase = "pause";
-            idleTour.until = now + 600;
+            idleTour.until =
+              now + (idleTour.destination === "coffee" ? 6500 : 1400);
           } else if (idleTour.phase === "pause" && now > idleTour.until) {
             idleTour.phase = "home";
             idleTour.path = officePath(floor, p.person.position, p.home);
@@ -1100,6 +1133,11 @@ export default function OfficeScene({
               nextTour = now;
             }
           }
+          if (idleTour.phase === "pause" && idleTour.destination === "coffee")
+            p.person.rotation.y = Math.atan2(
+              p.person.position.x,
+              p.person.position.z + 6.6,
+            );
         } else
           p.person.position.lerp(
             gathering ? p.seat : p.home,
@@ -1120,12 +1158,15 @@ export default function OfficeScene({
           walking: strolling,
           seated:
             !strolling &&
-            (p.human || (!poolMode && !idleTour && !playPath)) &&
+            !poolMode &&
+            !idleTour &&
+            !playPath &&
             p.person.position.distanceTo(gathering ? p.seat : p.home) < 0.18,
           working: running,
-          playing: poolMode && !p.human,
-          shooter:
-            poolMode && !p.human && !strolling && pool.game.turn === p.index,
+          coffee:
+            idleTour?.destination === "coffee" && idleTour.phase === "pause",
+          playing: poolMode,
+          shooter: poolMode && !strolling && pool.game.turn === p.index,
           reducedMotion: reduced.matches,
         });
         p.screen.material = mat(running ? "#4d9d9e" : agentColor(p.id));
@@ -1182,6 +1223,21 @@ export default function OfficeScene({
           ? "visible"
           : "hidden";
       }
+      if (lifeStatus.current) {
+        const coffee = [...idleTours.values()].find(
+          (tour) => tour.destination === "coffee" && tour.phase === "pause",
+        );
+        const name = coffee
+          ? actors.find((a) => a.id === coffee.id)?.name
+          : null;
+        const text = poolMode
+          ? "استراحة بلياردو تمثيلية للفريق"
+          : name
+            ? `${name} في ركن القهوة ☕`
+            : "زيارات قهوة تلقائية بالتناوب";
+        if (lifeStatus.current.textContent !== text)
+          lifeStatus.current.textContent = text;
+      }
       renderer.render(scene, camera);
     }
     function agentColor(id: OfficePersonId) {
@@ -1224,7 +1280,7 @@ export default function OfficeScene({
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [staffSignature, showHint, leaveHint, hideHints]);
+  }, [staffSignature, department, showHint, leaveHint, hideHints]);
   async function toggleFullscreen() {
     hideHints();
     if (document.fullscreenElement === wrap.current) {
@@ -1265,7 +1321,7 @@ export default function OfficeScene({
       ) : (
         <>
           <div ref={host} className={s.canvasHost}>
-            {sceneActors(staff).map((agent) => {
+            {sceneActors(staff, department).map((agent) => {
               const activity = activities.find((a) => a.agentId === agent.id);
               const task = taskSummaries[agent.id] || staffTasks[agent.id];
               const hintId = `${sceneId}-${agent.id.replace(":", "-")}`;
@@ -1326,7 +1382,7 @@ export default function OfficeScene({
                     <span>{agent.role}</span>
                     <small>
                       {agent.human
-                        ? "فريق تواصل النخبة"
+                        ? "شخصية تمثيلية للموظف"
                         : "عضو الفريق الافتراضي"}
                     </small>
                     {task ? (
@@ -1369,11 +1425,16 @@ export default function OfficeScene({
             </span>
           </div>
           <div className={s.sceneCaption}>
-            <span>مكتب التحرير</span>
+            <span>{departmentById(department).name}</span>
+            <span ref={lifeStatus} className={s.officeLife}>
+              زيارات قهوة تلقائية بالتناوب
+            </span>
             <small id={`${sceneId}-help`}>
               {walking
                 ? "انقر الأرض للمشي · الأسهم أو WASD للتحرك · Escape للتوقف"
-                : "مرّر على الموظف للتعريف · اضغط الفقاعة لقراءة المحادثة"}
+                : staff.length
+                  ? "حركة تمثيلية · اضغط الموظف لعرض أعماله الفعلية"
+                  : "مرّر على الموظف للتعريف · اضغط الفقاعة لقراءة المحادثة"}
             </small>
           </div>
           <div className={s.staffNavigation} aria-label="التنقل بين الموظفين">
@@ -1385,7 +1446,10 @@ export default function OfficeScene({
               →
             </button>
             <span>
-              {sceneActors(staff).find((a) => a.id === selected)?.name}
+              {
+                sceneActors(staff, department).find((a) => a.id === selected)
+                  ?.name
+              }
             </span>
             <button
               type="button"

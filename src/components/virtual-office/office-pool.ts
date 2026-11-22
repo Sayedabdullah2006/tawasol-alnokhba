@@ -7,8 +7,8 @@ import {
   shootPool,
   aimPool,
 } from "./pool-physics";
-export function createOfficePool(scene: THREE.Scene, z: number) {
-  let game = newPoolGame();
+export function createOfficePool(scene: THREE.Scene, z: number, players = 6) {
+  let game = newPoolGame(players);
   const root = new THREE.Group();
   root.position.z = z;
   scene.add(root);
@@ -101,7 +101,7 @@ export function createOfficePool(scene: THREE.Scene, z: number) {
       return game;
     },
     reset() {
-      game = newPoolGame();
+      game = newPoolGame(players);
       lastShot = 0;
     },
     shoot(angle = aimPool(game)) {

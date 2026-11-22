@@ -25,9 +25,38 @@ const code = ts
 const { plainOfficeText, firstName, officeActivities } = await import(
   `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`
 );
+const departmentSource=await readFile(new URL('../src/lib/virtual-office/departments.ts',import.meta.url),'utf8');
+const departmentCode=ts.transpileModule(departmentSource,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText.replace('from "./domain"',`from "${new URL('../src/lib/virtual-office/domain.ts',import.meta.url).href}"`);
+const departmentUrl=`data:text/javascript;base64,${Buffer.from(departmentCode).toString('base64')}`;
+const {OFFICE_DEPARTMENTS,agentsForDepartment,departmentWorkspace,parseDepartment,departmentAppearance,requiresOfficeResearch}=await import(departmentUrl);
 const planSource=await readFile(new URL('../src/lib/virtual-office/planning.ts',import.meta.url),'utf8');
-const planCode=ts.transpileModule(planSource,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText.replace('from "./domain"',`from "${new URL('../src/lib/virtual-office/domain.ts',import.meta.url).href}"`);
+const planCode=ts.transpileModule(planSource,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText.replace('from "./domain"',`from "${new URL('../src/lib/virtual-office/domain.ts',import.meta.url).href}"`).replace('from "./departments"',`from "${departmentUrl}"`);
 const {parseOfficePlan}=await import(`data:text/javascript;base64,${Buffer.from(planCode).toString('base64')}`);
+test('company departments have independent identities and workspace scopes while editorial history stays compatible',()=>{
+ const workspaces=new Set();
+ for(const d of OFFICE_DEPARTMENTS){const people=agentsForDepartment(d.id);assert.equal(people.length,6);assert.equal(new Set(people.map(p=>p.firstName)).size,6);assert.deepEqual(people.map(p=>p.id),OFFICE_AGENTS.map(p=>p.id));workspaces.add(departmentWorkspace('company',d.id));for(const link of d.links)assert(link.href.startsWith('/admin/'));}
+ assert.equal(workspaces.size,8);assert.equal(departmentWorkspace('company','content'),'company');assert.equal(parseDepartment(undefined),'content');assert.throws(()=>parseDepartment('../finance'));assert.throws(()=>parseDepartment(['finance']));
+ assert.equal(agentsForDepartment('finance')[0].name,'المدير المالي');assert.equal(agentsForDepartment('people')[0].name,'مديرة الموارد البشرية');assert.equal(departmentAppearance('people','editor').headwear,'hijab');assert.equal(agentsForDepartment('content')[0].firstName,'عبدالله');
+});
+const routingCode=ts.transpileModule(await readFile(new URL('../src/lib/virtual-office/department-routing.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const {routeStaffDepartment}=await import(`data:text/javascript;base64,${Buffer.from(routingCode).toString('base64')}`);
+test('real staff follow the nature of their work, then their registered department, without changing HR data',()=>{
+ for(const [title,registered,expected]of [
+  ['مساعدة تنفيذية','الإدارة وتطوير الأعمال','leadership'],['محاسبة','الإدارة وتطوير الأعمال','finance'],
+  ['مسؤولة التوظيف','','people'],['Marketing Manager','','marketing'],['مدير حسابات العملاء','','sales'],
+  ['مصممة تجربة المستخدم','','technology'],['مصممة جرافيك','','content'],['مدير مشاريع','','operations'],
+  ['متخصصة','الإدارة المالية','finance'],['مصممة','إدارة التسويق','marketing'],['مسؤولة الجودة','','operations'],['غير محدد','','leadership'],
+ ])assert.equal(routeStaffDepartment(title,registered).department,expected,title);
+ assert.equal(routeStaffDepartment('محاسبة','').department,'finance');assert.equal(routeStaffDepartment('مسؤولة مبيعات','').department,'sales');
+});
+test('department tools follow the real specialty rather than the historical seat name',()=>{
+ const brief=(department,text)=>({brief:text,context:{department,project:'QA',sourceText:'',sourceUrls:[]}});
+ assert.equal(requiresOfficeResearch(brief('content','تحقق من الخبر'),'researcher'),true);
+ assert.equal(requiresOfficeResearch(brief('people','جهز وصفًا وظيفيًا من المتطلبات'),'researcher'),false);
+ assert.equal(requiresOfficeResearch(brief('marketing','حلل السوق والجمهور'),'researcher'),true);
+ assert.equal(requiresOfficeResearch(brief('finance','تحقق من اللوائح الضريبية بمصادر'),'researcher'),true);
+ assert.equal(requiresOfficeResearch(brief('finance','جهز الموازنة من الأرقام'),'art'),false);
+});
 test('the approved route contains exactly the chosen specialists and rejects invalid plans',()=>{
  const plan={summary:'توجيه فني للنص المعتمد',steps:[{agentId:'art',reason:'المطلوب تصميم فقط',instruction:'جهزي اتجاه التصميم للنص المعتمد',deliverable:'توجيه فني وبرومبت'}],excluded:['researcher','writer','reviewer','publisher'].map(agentId=>({agentId,reason:'غير مطلوب في هذا التكليف'}))};
  assert.equal(parseOfficePlan(plan).steps.length,1);

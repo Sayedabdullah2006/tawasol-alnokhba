@@ -1,29 +1,43 @@
 import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase-server";
-import {
-  agentById,
-  sessionSteps,
-  type OfficeSession,
-  type OfficeMessage,
-} from "./domain";
+import { sessionSteps, type OfficeSession, type OfficeMessage } from "./domain";
 import { officeProvider, runtimeInfo } from "./provider";
 import { systemPrompt, planningPrompt } from "./prompts";
 import { OFFICE_PLAN_SCHEMA, parseOfficePlan, planAsText } from "./planning";
 import { workspaceId } from "./server";
+import {
+  OFFICE_DEPARTMENTS,
+  departmentAgent,
+  departmentForSession,
+  requiresOfficeResearch,
+} from "./departments";
 
 type ClaimedSession = OfficeSession & { lease_token: string; revision: number };
 const state = globalThis as typeof globalThis & {
   __officeWorker?: { busy: boolean; timer?: ReturnType<typeof setInterval> };
+  __officeDepartmentCursor?: number;
 };
 
 /** One durable stage at a time; fencing token prevents late/cancelled writes. */
 export async function runOfficeStep() {
   if (!runtimeInfo().configured) return false;
   const db = await createServiceRoleClient();
-  const claimed = await db.rpc("vo_claim_v3", { p_workspace: workspaceId() });
+  const offset = state.__officeDepartmentCursor ?? 0;
+  state.__officeDepartmentCursor = (offset + 1) % OFFICE_DEPARTMENTS.length;
+  const scopes = OFFICE_DEPARTMENTS.map((_, i) =>
+    workspaceId(
+      OFFICE_DEPARTMENTS[(i + offset) % OFFICE_DEPARTMENTS.length].id,
+    ),
+  );
+  const claimed = await db.rpc("vo_claim_departments", {
+    p_workspaces: scopes,
+  });
   if (claimed.error) throw claimed.error;
   const session = (claimed.data as ClaimedSession[] | null)?.[0];
   if (!session) return false;
+  const department = departmentForSession(session);
+  const agentById = (id: OfficeSession["agent_id"]) =>
+    departmentAgent(department, id);
   const steps = sessionSteps(session);
   const planning = session.workflow === "adaptive" && session.step === 0;
   const agent = steps[session.step];
@@ -45,7 +59,7 @@ export async function runOfficeStep() {
     ]);
     if (messages.error || memory.error) throw messages.error || memory.error;
     const progress = planning
-      ? "مدير التحرير يختار التخصصات ويجهز خطة لموافقتك"
+      ? `${agentById("editor").name} يختار التخصصات ويجهز خطة لموافقتك`
       : `${agentById(agent).name} يعمل على ${session.kind === "meeting" ? "مساهمته في الاجتماع" : "التسليم"} (${session.step + 1} من ${steps.length})`;
     await db
       .from("vo_sessions")
@@ -73,7 +87,7 @@ export async function runOfficeStep() {
         ? planningPrompt(session, memory.data?.content || "")
         : systemPrompt(agent, session, memory.data?.content || ""),
       prompt,
-      search: agent === "researcher" || agent === "reviewer",
+      search: !planning && requiresOfficeResearch(session, agent),
       ...(planning
         ? {
             jsonSchema: {
@@ -89,7 +103,7 @@ export async function runOfficeStep() {
         p_id: session.id,
         p_lease: session.lease_token,
         p_plan: plan,
-        p_text: planAsText(plan),
+        p_text: planAsText(plan, department),
         p_input: result.inputTokens,
         p_output: result.outputTokens,
       });

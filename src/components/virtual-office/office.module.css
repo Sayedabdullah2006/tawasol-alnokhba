@@ -1,3 +1,84 @@
+.companyNavigation {
+  background: #f3f6fa;
+  max-width: 1800px;
+  margin: 0 auto;
+  padding: 24px clamp(16px, 2.2vw, 34px) 0;
+  color: #193752;
+}
+.companyNavigationTitle {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: baseline;
+  margin-bottom: 16px;
+}
+.companyNavigationTitle strong {
+  font-size: 1.2rem;
+}
+.companyNavigationTitle span {
+  color: #66798b;
+  font-size: 0.85rem;
+}
+.companyNavigation nav {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  border-bottom: 1px solid #d7e0e8;
+}
+.companyNavigation nav a {
+  flex-shrink: 0;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  padding: 14px 18px;
+  color: #66798b;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  scroll-snap-align: start;
+}
+.companyNavigation nav a[aria-current="page"] {
+  border-bottom-color: #ac8646;
+  color: #203f68;
+}
+.companyNavigation nav a:focus-visible {
+  outline: 2px solid #ac8646;
+  outline-offset: -3px;
+}
+.companyNavigation nav small {
+  color: #66798b;
+  font-size: 0.7rem;
+}
+.assistantRoster {
+  margin-top: 20px;
+  border-top: 1px solid #dde5ed;
+  padding-top: 14px;
+}
+.assistantRoster > summary {
+  cursor: pointer;
+  color: #203f68;
+  font-weight: 600;
+}
+.officeLife {
+  display: block;
+  color: #486963;
+  font-size: 0.72rem;
+  font-weight: 500;
+  margin-top: 4px;
+}
+@media (max-width: 600px) {
+  .companyNavigationTitle {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .companyNavigation nav a {
+    padding: 12px;
+  }
+}
 .office {
   --ink: #193752;
   --soft: #66798b;

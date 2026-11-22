@@ -12,6 +12,7 @@ export type HumanPose = {
   playing?: boolean;
   shooter?: boolean;
   reducedMotion?: boolean;
+  coffee?: boolean;
 };
 
 /** A joint hierarchy shared by every fictional teammate, real staff avatar and visitor. */
@@ -160,6 +161,37 @@ export function createOfficeCharacter(look: OfficeAppearance, accent: string) {
     thumb.rotation.z = side * 0.55;
     return { shoulder, elbow, wrist };
   });
+  const mug = new THREE.Group();
+  mug.name = "coffee-cup";
+  mug.visible = false;
+  mug.position.set(0.015, -0.07, -0.04);
+  arms[1].wrist.add(mug);
+  organicMesh(
+    mug,
+    new THREE.CylinderGeometry(0.044, 0.034, 0.105, 20),
+    mat("#f8f3e9"),
+    [0, 0.053, 0],
+  );
+  organicMesh(
+    mug,
+    new THREE.CylinderGeometry(0.037, 0.037, 0.005, 20),
+    mat("#4c2e20"),
+    [0, 0.108, 0],
+  );
+  const lip = organicMesh(
+    mug,
+    new THREE.TorusGeometry(0.043, 0.004, 6, 24),
+    mat("#b99c63"),
+    [0, 0.109, 0],
+  );
+  lip.rotation.x = Math.PI / 2;
+  const handle = organicMesh(
+    mug,
+    new THREE.TorusGeometry(0.034, 0.009, 6, 20),
+    mat("#f8f3e9"),
+    [0.06, 0.057, 0],
+  );
+  handle.scale.x = 0.7;
   const legs = [-1, 1].map((side) => {
     const hip = new THREE.Group();
     hip.position.set(side * 0.133, -0.035, 0);
@@ -245,15 +277,29 @@ export function createOfficeCharacter(look: OfficeAppearance, accent: string) {
       const { shoulder, elbow, wrist } = arms[i];
       const desk = sitting > 0.5;
       const aim = p.shooter ? (i === 0 ? 0.95 : 0.55) : 0;
+      const sipping = p.coffee && i === 1;
       shoulder.rotation.x = damp(
         shoulder.rotation.x,
-        desk ? 0.35 : aim || -swing * 0.32,
+        sipping
+          ? 1.18 + Math.sin(p.time * 1.8) * 0.04
+          : desk
+            ? 0.35
+            : aim || -swing * 0.32,
         dt,
       );
-      shoulder.rotation.z = (i === 0 ? -1 : 1) * (desk ? 0.11 : 0.06);
+      shoulder.rotation.z = sipping
+        ? 0.6
+        : (i === 0 ? -1 : 1) * (desk ? 0.11 : 0.06);
+      shoulder.rotation.y = damp(shoulder.rotation.y, sipping ? 0.8 : 0, dt);
       elbow.rotation.x = damp(
         elbow.rotation.x,
-        desk ? 1.05 : p.shooter ? 0.85 : 0.1 + Math.max(0, swing) * 0.15,
+        sipping
+          ? 2.47 + Math.sin(p.time * 1.8) * 0.05
+          : desk
+            ? 1.05
+            : p.shooter
+              ? 0.85
+              : 0.1 + Math.max(0, swing) * 0.15,
         dt,
       );
       wrist.rotation.x = desk ? -0.08 : 0;
@@ -261,6 +307,13 @@ export function createOfficeCharacter(look: OfficeAppearance, accent: string) {
       if (p.working && desk)
         wrist.rotation.x += Math.sin(p.time * 8 + i * 2) * 0.035 * idle;
     }
+    mug.visible = !!p.coffee;
+    mug.quaternion
+      .copy(spine.quaternion)
+      .multiply(arms[1].shoulder.quaternion)
+      .multiply(arms[1].elbow.quaternion)
+      .multiply(arms[1].wrist.quaternion)
+      .invert();
     if (
       skirt &&
       rest &&

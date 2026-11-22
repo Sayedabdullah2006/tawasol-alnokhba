@@ -2,11 +2,12 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceRoleClient } from "@/lib/supabase-server";
 import { OfficeError, type OfficeStaff, type StaffAppearance } from "./domain";
+import { routeStaffDepartment } from "./department-routing";
 
 /** Read-only host adapter. Replace with Hamza's staff directory when integrating. */
 export async function readHostTeam(db: SupabaseClient, workspace: string) {
   const service = await createServiceRoleClient();
-  const [summary, looks] = await Promise.all([
+  const [summary, looks, placements] = await Promise.all([
     db.rpc("wf_admin_dashboard", {
       p_from: null,
       p_to: null,
@@ -17,8 +18,13 @@ export async function readHostTeam(db: SupabaseClient, workspace: string) {
       .from("vo_staff_avatars")
       .select("employee_id,preset")
       .eq("workspace_id", workspace),
+    db
+      .from("wf_employees")
+      .select("id,department:wf_departments(name)")
+      .eq("status", "active"),
   ]);
-  if (summary.error || looks.error) throw summary.error || looks.error;
+  if (summary.error || looks.error || placements.error)
+    throw summary.error || looks.error || placements.error;
   const rows = summary.data?.employees as {
     id: string;
     full_name: string;
@@ -34,19 +40,31 @@ export async function readHostTeam(db: SupabaseClient, workspace: string) {
   if (!Array.isArray(rows)) throw new Error("host_directory_unavailable");
   return rows
     .filter((row) => row.status === "active")
-    .map((row): OfficeStaff => ({
-      id: row.id,
-      name: row.full_name,
-      jobTitle: row.job_title,
-      appearance: (looks.data.find((v) => v.employee_id === row.id)?.preset ??
-        "unset") as StaffAppearance,
-      metrics: {
-        assigned: row.metrics.assigned,
-        open: row.metrics.open,
-        inProgress: row.metrics.in_progress,
-        overdue: row.metrics.overdue,
-      },
-    }));
+    .map((row): OfficeStaff => {
+      const relation = placements.data.find((p) => p.id === row.id)?.department;
+      const registeredDepartment =
+        (Array.isArray(relation) ? relation[0] : relation)?.name || "";
+      const routing = routeStaffDepartment(
+        row.job_title || "",
+        registeredDepartment,
+      );
+      return {
+        id: row.id,
+        name: row.full_name,
+        jobTitle: row.job_title,
+        registeredDepartment,
+        officeDepartment: routing.department,
+        departmentReason: routing.reason,
+        appearance: (looks.data.find((v) => v.employee_id === row.id)?.preset ??
+          "unset") as StaffAppearance,
+        metrics: {
+          assigned: row.metrics.assigned,
+          open: row.metrics.open,
+          inProgress: row.metrics.in_progress,
+          overdue: row.metrics.overdue,
+        },
+      };
+    });
 }
 export async function hostEmployeeTasks(db: SupabaseClient, id: string) {
   const employee = await db

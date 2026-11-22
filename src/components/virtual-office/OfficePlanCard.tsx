@@ -1,6 +1,10 @@
 "use client";
 import { useId, useState } from "react";
-import { agentById, type OfficeSession } from "@/lib/virtual-office/domain";
+import { type AgentId, type OfficeSession } from "@/lib/virtual-office/domain";
+import {
+  departmentAgent,
+  departmentForSession,
+} from "@/lib/virtual-office/departments";
 import s from "./office.module.css";
 export default function OfficePlanCard({
   session,
@@ -16,6 +20,9 @@ export default function OfficePlanCard({
   const id = useId(),
     [notes, setNotes] = useState("");
   const plan = session.plan;
+  const department = departmentForSession(session);
+  const agentById = (id: AgentId) => departmentAgent(department, id);
+  const manager = agentById("editor");
   if (!plan) return null;
   const reviewing = session.status === "plan_review";
   const content = (
@@ -42,7 +49,9 @@ export default function OfficePlanCard({
           );
         })}
         <li className={s.planFinal}>
-          <strong>عبدالله · مدير التحرير</strong>
+          <strong>
+            {manager.firstName} · {manager.name}
+          </strong>
           <p>
             {plan.steps.length
               ? "يجمع تسليمات التخصصات المختارة ويرفع النتيجة النهائية لاعتمادك."
@@ -87,7 +96,7 @@ export default function OfficePlanCard({
   return (
     <section className={s.planCard}>
       <div className={s.planHeader}>
-        <h3>خطة عبدالله للطلب</h3>
+        <h3>خطة {manager.firstName} للطلب</h3>
         <span>نسخة {session.plan_version}</span>
       </div>
       <p className={s.planNotice}>
