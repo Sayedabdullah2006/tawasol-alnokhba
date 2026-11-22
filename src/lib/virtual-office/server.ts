@@ -10,6 +10,7 @@ import {
 } from "./domain";
 import { runtimeInfo } from "./provider";
 import { readHostTeam } from "./host-team";
+import { officeActivities } from "./presentation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** The only host-specific seam. Hamza supplies its verified actor/workspace here. */
@@ -56,7 +57,7 @@ export async function snapshot(hostDb: SupabaseClient) {
     db
       .from("vo_sessions")
       .select(
-        "id,workspace_id,agent_id,kind,title,brief,status,step,progress,error_message,created_at,updated_at,context,input_tokens,output_tokens",
+        "id,workspace_id,agent_id,kind,title,brief,status,step,approved_step,progress,error_message,created_at,updated_at,context,input_tokens,output_tokens",
       )
       .eq("workspace_id", workspaceId())
       .order("updated_at", { ascending: false })
@@ -67,6 +68,21 @@ export async function snapshot(hostDb: SupabaseClient) {
       .eq("workspace_id", workspaceId()),
   ]);
   if (sessions.error || memories.error) throw sessions.error || memories.error;
+  const recent = sessions.data as OfficeSession[];
+  // Bound the preview read to records from this verified workspace. Full content stays in the conversation.
+  const previews = recent.length
+    ? await db
+        .from("vo_messages")
+        .select("id,session_id,agent_id,kind,content,created_at")
+        .in(
+          "session_id",
+          recent.slice(0, 24).map((s) => s.id),
+        )
+        .neq("kind", "event")
+        .order("created_at", { ascending: false })
+        .limit(96)
+    : { data: [], error: null };
+  if (previews.error) throw previews.error;
   let staff: Awaited<ReturnType<typeof readHostTeam>> = [],
     staffAvailable = true;
   try {
@@ -81,6 +97,7 @@ export async function snapshot(hostDb: SupabaseClient) {
     runtime: runtimeInfo(),
     staff,
     staffAvailable,
+    activities: officeActivities(recent, previews.data || []),
   };
 }
 export async function sessionMessages(id: string) {

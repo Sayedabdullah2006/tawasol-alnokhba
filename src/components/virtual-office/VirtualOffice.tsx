@@ -5,9 +5,11 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   OFFICE_AGENTS,
+  OFFICE_CONTRACT_VERSION,
   OFFICE_APPEARANCE,
   appearanceForStaff,
   type OfficeStaff,
+  type OfficePersonId,
   STATUS_LABELS,
   KIND_LABELS,
   agentById,
@@ -21,6 +23,11 @@ import {
 } from "@/lib/virtual-office/domain";
 import s from "./office.module.css";
 import HumanStaffPanel from "./HumanStaffPanel";
+import {
+  firstName,
+  officeExcerpt,
+  plainOfficeText,
+} from "@/lib/virtual-office/presentation";
 
 const OfficeScene = dynamic(() => import("./OfficeScene"), {
   ssr: false,
@@ -233,6 +240,17 @@ export default function VirtualOffice() {
   const [selected, setSelected] = useState<AgentId>("editor"),
     [view, setView] = useState<"office" | "tasks" | "meetings">("office");
   const [staffId, setStaffId] = useState<string | null>(null);
+  const [focusedMessage, setFocusedMessage] = useState<string | null>(null);
+  const workPanelRef = useRef<HTMLElement>(null);
+  const chatDialog = useRef<HTMLDialogElement>(null);
+  function openChat() {
+    const dialog = chatDialog.current;
+    if (dialog && !dialog.open) {
+      dialog.scrollTop = 0;
+      dialog.showModal();
+      dialog.scrollTop = 0;
+    }
+  }
   const [panel, setPanel] = useState<"work" | "memory">("work"),
     [kind, setKind] = useState<SessionKind>("chat");
   const [sessionId, setSessionId] = useState<string | null>(null),
@@ -297,8 +315,18 @@ export default function VirtualOffice() {
   }, [refresh]);
   useEffect(() => {
     const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages.length, sessionId]);
+    const target =
+      focusedMessage &&
+      el?.querySelector<HTMLElement>(`[data-message-id="${focusedMessage}"]`);
+    if (target)
+      target.scrollIntoView({
+        block: "nearest",
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+      });
+    else if (el) el.scrollTop = el.scrollHeight;
+  }, [messages.length, sessionId, focusedMessage]);
   const sessions = data?.sessions || [],
     session = sessions.find((v) => v.id === sessionId),
     agent = agentById(selected);
@@ -307,9 +335,17 @@ export default function VirtualOffice() {
     meeting = sessions.some(
       (v) =>
         v.kind === "meeting" &&
-        (v.status === "running" || (v.status === "queued" && v.step > 0)),
+        (["running", "handoff"].includes(v.status) ||
+          (v.status === "queued" && v.step > 0)),
     );
-  const waiting = sessions.filter((v) => v.status === "review").length;
+  const waiting = sessions.filter(
+    (v) => v.status === "review" || v.status === "handoff",
+  ).length;
+  const handoffs = sessions.filter((v) => v.status === "handoff");
+  const taskSummaries: Partial<Record<OfficePersonId, string>> = {};
+  running.forEach((v) => {
+    taskSummaries[currentAgent(v)] = v.title;
+  });
   const busy = session?.status === "running" || session?.status === "queued";
   const canReply =
     session && ["review", "completed", "failed"].includes(session.status);
@@ -319,6 +355,7 @@ export default function VirtualOffice() {
     "";
   const choose = useCallback((id: AgentId) => {
     setStaffId(null);
+    setFocusedMessage(null);
     setSelected(id);
     setPanel("work");
     setSessionId(null);
@@ -327,17 +364,25 @@ export default function VirtualOffice() {
     setNotice("");
     setError("");
   }, []);
-  function openSession(value: OfficeSession) {
+  function openSession(
+    value: OfficeSession,
+    person = value.agent_id,
+    messageId: string | null = null,
+  ) {
     setStaffId(null);
     setSessionId(value.id);
     sessionRef.current = value.id;
-    setSelected(value.agent_id);
+    setSelected(person);
+    setFocusedMessage(messageId);
     setPanel("work");
     setMessages([]);
     void refresh();
+    openChat();
   }
   function newWork(mode: SessionKind = "chat") {
+    if (mode === "team" || mode === "meeting") setSelected("editor");
     setStaffId(null);
+    setFocusedMessage(null);
     setSessionId(null);
     sessionRef.current = null;
     setMessages([]);
@@ -345,10 +390,11 @@ export default function VirtualOffice() {
     setPanel("work");
     setNotice("");
     setError("");
+    openChat();
   }
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (pending) return;
+    if (pending || (session && !canReply)) return;
     setPending(true);
     setError("");
     setNotice("");
@@ -358,7 +404,8 @@ export default function VirtualOffice() {
           ? { action: "reply", sessionId: session.id, brief }
           : {
               action: "create",
-              agentId: selected,
+              agentId:
+                kind === "team" || kind === "meeting" ? "editor" : selected,
               kind,
               brief,
               project,
@@ -377,6 +424,7 @@ export default function VirtualOffice() {
       });
       submission.current = null;
       setSessionId(result.session.id);
+      setSelected(result.session.agent_id);
       sessionRef.current = result.session.id;
       setBrief("");
       await refresh();
@@ -396,14 +444,17 @@ export default function VirtualOffice() {
         action: value,
         sessionId: session.id,
         requestId: crypto.randomUUID(),
+        step: session.step,
       });
       await refresh();
       setNotice(
-        value === "approve"
-          ? "تم اعتماد التسليم. لم يتم نشره تلقائيًا."
-          : value === "cancel"
-            ? "تم إلغاء التكليف؛ لن تحفظ نتيجة المرحلة الجارية."
-            : "أعيدت المهمة إلى قائمة الانتظار.",
+        value === "approve_handoff"
+          ? `وافق مدير التحرير وأُسندت المهمة إلى ${agentById(currentAgent(session)).firstName}.`
+          : value === "approve"
+            ? "تم اعتماد التسليم. لم يتم نشره تلقائيًا."
+            : value === "cancel"
+              ? "تم إلغاء التكليف؛ لن تحفظ نتيجة المرحلة الجارية."
+              : "أعيدت المهمة إلى قائمة الانتظار.",
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "تعذر تنفيذ الإجراء");
@@ -427,7 +478,13 @@ export default function VirtualOffice() {
   function download() {
     if (!session) return;
     const file = new Blob(
-      [JSON.stringify({ contractVersion: 1, session, messages }, null, 2)],
+      [
+        JSON.stringify(
+          { contractVersion: OFFICE_CONTRACT_VERSION, session, messages },
+          null,
+          2,
+        ),
+      ],
       { type: "application/json;charset=utf-8" },
     );
     const url = URL.createObjectURL(file),
@@ -497,7 +554,9 @@ export default function VirtualOffice() {
           <span className={running.length ? s.pulseActive : s.pulseIdle} />
           {running.length
             ? `${running.length} مهمة قيد التنفيذ`
-            : "الفريق بانتظار تكليفك"}
+            : handoffs.length
+              ? "تسليم جاهز لموافقة مدير التحرير"
+              : "الفريق بانتظار تكليفك"}
           <b>٦ تخصصات</b>
         </p>
       </div>
@@ -520,6 +579,29 @@ export default function VirtualOffice() {
               selected={staffId ? `staff:${staffId}` : selected}
               active={active}
               staff={data?.staff || []}
+              activities={data?.activities || []}
+              taskSummaries={taskSummaries}
+              onOpenActivity={(activity) => {
+                const target = sessions.find(
+                  (v) => v.id === activity.sessionId,
+                );
+                if (!target) return;
+                openSession(
+                  target,
+                  activity.agentId,
+                  activity.messageId ?? null,
+                );
+                requestAnimationFrame(() =>
+                  workPanelRef.current?.scrollIntoView({
+                    block: "nearest",
+                    behavior: window.matchMedia(
+                      "(prefers-reduced-motion: reduce)",
+                    ).matches
+                      ? "auto"
+                      : "smooth",
+                  }),
+                );
+              }}
               meeting={meeting}
               onSelect={(id) => {
                 if (id.startsWith("staff:")) {
@@ -527,6 +609,14 @@ export default function VirtualOffice() {
                   setNotice("");
                   setError("");
                 } else choose(id as AgentId);
+              }}
+              onTalk={(id) => {
+                if (id.startsWith("staff:")) setStaffId(id.slice(6));
+                else {
+                  choose(id as AgentId);
+                  setKind("chat");
+                }
+                openChat();
               }}
             />
           ) : (
@@ -613,6 +703,37 @@ export default function VirtualOffice() {
               )}
             </section>
           )}
+          {handoffs.length > 0 && (
+            <div className={s.approvalInbox}>
+              <span>عند عبدالله · مدير التحرير</span>
+              <strong>
+                {handoffs.length === 1
+                  ? "تسليم جاهز لموافقتك"
+                  : `${handoffs.length} تسليمات تنتظر موافقتك`}
+              </strong>
+              <button
+                type="button"
+                onClick={() => openSession(handoffs[0], "editor")}
+              >
+                راجع وأسند المهمة التالية
+              </button>
+            </div>
+          )}
+          <details className={s.employeeDock}>
+            <summary>
+              مساحة{" "}
+              {staffId
+                ? firstName(
+                    data?.staff.find((p) => p.id === staffId)?.name || "الموظف",
+                  )
+                : agent.firstName}{" "}
+              · المحادثة والذاكرة
+            </summary>
+            <p>اضغط على أي شخصية للتحدث معها، أو افتح مساحة الموظف المحدد.</p>
+            <button type="button" className={s.secondary} onClick={openChat}>
+              فتح مساحة الموظف
+            </button>
+          </details>
           <div className={s.teamHeading}>
             <h2>فريق المكتب</h2>
             <span>اختر الموظف لفتح مساحة عمله</span>
@@ -630,10 +751,15 @@ export default function VirtualOffice() {
                       !staffId && selected === a.id ? s.agentSelected : ""
                     }
                     aria-pressed={!staffId && selected === a.id}
-                    onClick={() => choose(a.id)}
+                    onClick={() => {
+                      choose(a.id);
+                      setKind("chat");
+                      openChat();
+                    }}
                   >
                     <Portrait id={a.id} />
-                    <strong>{a.name}</strong>
+                    <strong>{a.firstName}</strong>
+                    <span className={s.rosterRole}>{a.name}</span>
                     <small>
                       <i
                         className={
@@ -678,11 +804,12 @@ export default function VirtualOffice() {
                       setStaffId(person.id);
                       setNotice("");
                       setError("");
+                      openChat();
                     }}
                   >
                     <Portrait staff={person} />
                     <span>
-                      <strong>{person.name}</strong>
+                      <strong>{firstName(person.name)}</strong>
                       <small>
                         {person.jobTitle} · {person.metrics.open} مهام مفتوحة
                       </small>
@@ -699,358 +826,461 @@ export default function VirtualOffice() {
             <Link href="/admin/integrations">مركز النشر</Link>
           </div>
         </section>
-        {staffId && data?.staff?.some((p) => p.id === staffId) ? (
-          <HumanStaffPanel
-            key={staffId}
-            person={data.staff.find((p) => p.id === staffId)!}
-            portrait={
-              <Portrait
-                staff={data.staff.find((p) => p.id === staffId)!}
-                large
-              />
-            }
-            onSaved={async () => {
-              await refresh();
-            }}
-          />
-        ) : (
-          <aside className={s.workPanel} aria-label={`مساحة عمل ${agent.name}`}>
-            <div className={s.agentHeader}>
-              <Portrait id={selected} large />
-              <div>
-                <h2>{agent.name}</h2>
-                <p>{agent.responsibility}</p>
-              </div>
-            </div>
-            <div className={s.agentTools}>
-              {agent.tools.map((tool) => (
-                <span key={tool}>{tool}</span>
-              ))}
-            </div>
-            <nav className={s.panelNav} aria-label="مساحة الموظف">
-              <button
-                aria-pressed={panel === "work"}
-                onClick={() => setPanel("work")}
-              >
-                <Icon type="send" />
-                المحادثة والعمل
+        <dialog
+          ref={chatDialog}
+          className={s.chatDialog}
+          onClose={() => setPanel("work")}
+          aria-label={
+            staffId ? "مساحة الموظف الحقيقي" : `محادثة ${agent.firstName}`
+          }
+          {...{ closedby: "closerequest" }}
+        >
+          <div className={s.dialogBar}>
+            <span>
+              {staffId
+                ? "فريق تواصل النخبة"
+                : `${agent.firstName} · ${agent.name}`}
+            </span>
+            <form method="dialog">
+              <button type="submit" autoFocus aria-label="إغلاق المحادثة">
+                ×
               </button>
-              <button
-                aria-pressed={panel === "memory"}
-                onClick={() => setPanel("memory")}
-              >
-                <Icon type="memory" />
-                ذاكرة الموظف
-              </button>
-            </nav>
-            {panel === "memory" ? (
-              <div className={s.memoryPanel}>
-                <h3>ما يحتاج الموظف إلى تذكره</h3>
-                <p>
-                  احفظ تفضيلاتك وقراراتك ومراجعك المعتمدة لهذا التخصص. تستخدم في
-                  التكليفات القادمة، ولا تستبدل التحقق من المصادر.
-                </p>
-                <label htmlFor="office-memory">ملاحظات معتمدة</label>
-                <textarea
-                  id="office-memory"
-                  rows={13}
-                  maxLength={8000}
-                  value={memoryValue}
-                  onChange={(e) =>
-                    setMemories((prev) => ({
-                      ...prev,
-                      [selected]: e.target.value,
-                    }))
-                  }
-                  placeholder="مثلًا: الجمهور المستهدف، نبرة المشروع، مراجع معتمدة…"
+            </form>
+          </div>
+          {error && (
+            <p className={s.error} role="alert">
+              {error}
+            </p>
+          )}
+          {staffId && data?.staff?.some((p) => p.id === staffId) ? (
+            <HumanStaffPanel
+              key={staffId}
+              person={data.staff.find((p) => p.id === staffId)!}
+              portrait={
+                <Portrait
+                  staff={data.staff.find((p) => p.id === staffId)!}
+                  large
                 />
-                <button
-                  disabled={pending}
-                  className={s.primary}
-                  onClick={() => void saveMemory()}
-                >
-                  حفظ الذاكرة
-                </button>
+              }
+              onSaved={async () => {
+                await refresh();
+              }}
+            />
+          ) : (
+            <aside
+              ref={workPanelRef}
+              className={s.workPanel}
+              aria-label={`مساحة عمل ${agent.firstName}`}
+            >
+              <div className={s.agentHeader}>
+                <Portrait id={selected} large />
+                <div>
+                  <h2>{agent.firstName}</h2>
+                  <p>
+                    {agent.name} · {agent.responsibility}
+                  </p>
+                </div>
               </div>
-            ) : (
-              <>
-                <div className={s.conversationHeader}>
-                  <h3>{session ? KIND_LABELS[session.kind] : "مساحة جديدة"}</h3>
-                  <div>
-                    {session && (
-                      <button
-                        onClick={download}
-                        aria-label="تنزيل الجلسة للربط والنقل"
-                      >
-                        <Icon type="download" />
-                      </button>
-                    )}
-                    <button onClick={() => newWork()}>
-                      <Icon type="plus" />
-                      جديد
+              <div className={s.agentTools}>
+                {agent.tools.map((tool) => (
+                  <span key={tool}>{tool}</span>
+                ))}
+              </div>
+              <nav className={s.panelNav} aria-label="مساحة الموظف">
+                <button
+                  aria-pressed={panel === "work"}
+                  onClick={() => setPanel("work")}
+                >
+                  <Icon type="send" />
+                  المحادثة والعمل
+                </button>
+                <button
+                  aria-pressed={panel === "memory"}
+                  onClick={() => setPanel("memory")}
+                >
+                  <Icon type="memory" />
+                  ذاكرة الموظف
+                </button>
+              </nav>
+              {panel === "memory" ? (
+                <div className={s.memoryPanel}>
+                  <h3>ما يحتاج الموظف إلى تذكره</h3>
+                  <p>
+                    احفظ تفضيلاتك وقراراتك ومراجعك المعتمدة لهذا التخصص. تستخدم
+                    في التكليفات القادمة، ولا تستبدل التحقق من المصادر.
+                  </p>
+                  <details className={s.memoryDetails}>
+                    <summary>ملاحظات معتمدة · اضغط للتوسيع</summary>
+                    <label htmlFor="office-memory">ملاحظات معتمدة</label>
+                    <textarea
+                      id="office-memory"
+                      rows={13}
+                      maxLength={8000}
+                      value={memoryValue}
+                      onChange={(e) =>
+                        setMemories((prev) => ({
+                          ...prev,
+                          [selected]: e.target.value,
+                        }))
+                      }
+                      placeholder="مثلًا: الجمهور المستهدف، نبرة المشروع، مراجع معتمدة…"
+                    />
+                    <button
+                      disabled={pending}
+                      className={s.primary}
+                      onClick={() => void saveMemory()}
+                    >
+                      حفظ الذاكرة
                     </button>
-                  </div>
+                  </details>
                 </div>
-                {session && (
-                  <div className={s.sessionProgress}>
-                    <Status session={session} />
-                    <p>{session.progress}</p>
-                    {busy && (
-                      <progress
-                        max={stepsFor(session.kind, session.agent_id).length}
-                        value={session.step}
-                      />
-                    )}
-                  </div>
-                )}
-                <div className={s.conversation} ref={listRef}>
-                  {!messages.length ? (
-                    <div className={s.greeting}>
-                      <span className={s.greetingIcon}>
-                        <Icon type={view === "meetings" ? "meeting" : "send"} />
-                      </span>
-                      <h3>
-                        {kind === "team"
-                          ? "ماذا سننجز معًا؟"
-                          : kind === "meeting"
-                            ? "ما موضوع اجتماع الفريق؟"
-                            : `ابدأ مع ${agent.name}`}
-                      </h3>
-                      <p>
-                        {kind === "team"
-                          ? "ينتقل الطلب عبر الأدوار الستة، ثم يعود إليك بتسليم موحد للمراجعة."
-                          : kind === "meeting"
-                            ? "شارك الفكرة والقرار المطلوب. تحفظ مساهمات الفريق والمحضر هنا."
-                            : agent.greeting}
-                      </p>
+              ) : (
+                <>
+                  <div className={s.conversationHeader}>
+                    <h3>
+                      {session ? KIND_LABELS[session.kind] : "مساحة جديدة"}
+                    </h3>
+                    <div>
+                      {session && (
+                        <button
+                          onClick={download}
+                          aria-label="تنزيل الجلسة للربط والنقل"
+                        >
+                          <Icon type="download" />
+                        </button>
+                      )}
+                      <button onClick={() => newWork()}>
+                        <Icon type="plus" />
+                        جديد
+                      </button>
                     </div>
-                  ) : (
-                    messages.map((m) => (
-                      <article
-                        key={m.id}
-                        className={`${s.message} ${m.kind === "user" ? s.userMessage : m.kind === "event" ? s.eventMessage : ""}`}
-                      >
-                        <div className={s.messageMeta}>
-                          <strong>
-                            {m.kind === "user"
-                              ? "أنت"
-                              : m.kind === "event"
-                                ? "سجل المكتب"
-                                : m.agent_id
-                                  ? agentById(m.agent_id).name
-                                  : "الفريق"}
-                          </strong>
-                          <time dateTime={m.created_at}>
-                            {time(m.created_at)}
-                          </time>
-                        </div>
-                        <div className={s.messageText}>{m.content}</div>
-                        {m.citations?.length > 0 && (
-                          <ul className={s.citations}>
-                            {m.citations.map((c) => (
-                              <li key={c.url}>
-                                <a
-                                  href={c.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  {c.title}
-                                </a>
-                              </li>
-                            ))}
-                          </ul>
+                  </div>
+                  {session && (
+                    <div className={s.sessionProgress}>
+                      <Status session={session} />
+                      <p>{session.progress}</p>
+                      {busy && (
+                        <progress
+                          max={stepsFor(session.kind, session.agent_id).length}
+                          value={session.step}
+                        />
+                      )}
+                    </div>
+                  )}
+                  {session?.status === "handoff" && (
+                    <div className={s.handoffCard}>
+                      <span className={s.handoffEyebrow}>
+                        على مكتب مدير التحرير
+                      </span>
+                      <div className={s.handoffPeople}>
+                        <span>
+                          <Portrait
+                            id={
+                              stepsFor(session.kind, session.agent_id)[
+                                session.step - 1
+                              ]
+                            }
+                          />
+                          <b>
+                            {
+                              agentById(
+                                stepsFor(session.kind, session.agent_id)[
+                                  session.step - 1
+                                ],
+                              ).firstName
+                            }
+                          </b>
+                          <small>سلّم المرحلة</small>
+                        </span>
+                        <i aria-hidden="true">←</i>
+                        <span>
+                          <Portrait id={currentAgent(session)} />
+                          <b>{agentById(currentAgent(session)).firstName}</b>
+                          <small>{agentById(currentAgent(session)).name}</small>
+                        </span>
+                      </div>
+                      <p>
+                        {officeExcerpt(
+                          [...messages]
+                            .reverse()
+                            .find((m) => m.kind === "assistant")?.content ||
+                            session.title,
+                          150,
                         )}
-                      </article>
-                    ))
-                  )}
-                  {busy && (
-                    <p className={s.liveStage}>
-                      <span />
-                      {session?.status === "queued"
-                        ? "التكليف محفوظ في قائمة الانتظار."
-                        : session?.progress}
-                    </p>
-                  )}
-                </div>
-                {session && (
-                  <div className={s.sessionActions}>
-                    {session.status === "review" && (
+                      </p>
                       <button
                         className={s.primary}
-                        disabled={pending}
-                        onClick={() => void action("approve")}
+                        disabled={pending || !data?.runtime.configured}
+                        onClick={() => void action("approve_handoff")}
                       >
-                        اعتماد التسليم
+                        {pending
+                          ? "جارٍ الإسناد…"
+                          : `موافق، أسند إلى ${agentById(currentAgent(session)).firstName}`}
                       </button>
+                      <small>لن تبدأ المرحلة التالية قبل موافقتك.</small>
+                    </div>
+                  )}
+                  <div className={s.conversation} ref={listRef}>
+                    {!messages.length ? (
+                      <div className={s.greeting}>
+                        <span className={s.greetingIcon}>
+                          <Icon
+                            type={view === "meetings" ? "meeting" : "send"}
+                          />
+                        </span>
+                        <h3>
+                          {kind === "team"
+                            ? "ماذا سننجز معًا؟"
+                            : kind === "meeting"
+                              ? "ما موضوع اجتماع الفريق؟"
+                              : `ابدأ مع ${agent.firstName}`}
+                        </h3>
+                        <p>
+                          {kind === "team"
+                            ? "ينتقل الطلب عبر الأدوار الستة، ثم يعود إليك بتسليم موحد للمراجعة."
+                            : kind === "meeting"
+                              ? "شارك الفكرة والقرار المطلوب. تحفظ مساهمات الفريق والمحضر هنا."
+                              : agent.greeting}
+                        </p>
+                      </div>
+                    ) : (
+                      messages.map((m) => (
+                        <article
+                          key={m.id}
+                          data-message-id={m.id}
+                          className={`${s.message} ${focusedMessage === m.id ? s.highlightedMessage : ""} ${m.kind === "user" ? s.userMessage : m.kind === "event" ? s.eventMessage : ""}`}
+                        >
+                          <div className={s.messageMeta}>
+                            <strong>
+                              {m.kind === "user"
+                                ? "أنت"
+                                : m.kind === "event"
+                                  ? "سجل المكتب"
+                                  : m.agent_id
+                                    ? `${agentById(m.agent_id).firstName} · ${agentById(m.agent_id).name}`
+                                    : "الفريق"}
+                            </strong>
+                            <time dateTime={m.created_at}>
+                              {time(m.created_at)}
+                            </time>
+                          </div>
+                          <div className={s.messageText}>
+                            {m.kind === "assistant"
+                              ? plainOfficeText(m.content)
+                              : m.content}
+                          </div>
+                          {m.citations?.length > 0 && (
+                            <ul className={s.citations}>
+                              {m.citations.map((c) => (
+                                <li key={c.url}>
+                                  <a
+                                    href={c.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    {c.title}
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </article>
+                      ))
                     )}
                     {busy && (
-                      <button
-                        className={s.secondary}
-                        disabled={pending}
-                        onClick={() => void action("cancel")}
-                      >
-                        إلغاء التكليف
-                      </button>
-                    )}
-                    {["failed", "cancelled"].includes(session.status) && (
-                      <button
-                        className={s.secondary}
-                        disabled={pending}
-                        onClick={() => void action("retry")}
-                      >
-                        إعادة المحاولة
-                      </button>
-                    )}
-                    {selected === "art" && (
-                      <Link href="/admin/studio">فتح استوديو التصميم</Link>
-                    )}
-                    {selected === "publisher" && (
-                      <Link href="/admin/integrations">فتح مركز النشر</Link>
+                      <p className={s.liveStage}>
+                        <span />
+                        {session?.status === "queued"
+                          ? "التكليف محفوظ في قائمة الانتظار."
+                          : session?.progress}
+                      </p>
                     )}
                   </div>
-                )}
-                <form onSubmit={submit} className={s.composer}>
-                  {!session && (
-                    <>
-                      <div className={s.formRow}>
-                        <label htmlFor="office-kind">
-                          نوع الطلب
-                          <select
-                            id="office-kind"
-                            value={kind}
-                            onChange={(e) =>
-                              setKind(e.target.value as SessionKind)
-                            }
-                          >
-                            <option value="chat">محادثة الموظف</option>
-                            <option value="task">مهمة للموظف</option>
-                            <option value="team">تكليف الفريق كاملًا</option>
-                            <option value="meeting">اجتماع الفريق</option>
-                          </select>
-                        </label>
-                        <label htmlFor="office-project">
-                          المشروع
-                          <input
-                            id="office-project"
-                            value={project}
-                            maxLength={120}
-                            onChange={(e) => setProject(e.target.value)}
-                            required
-                          />
-                        </label>
-                      </div>
-                      <details className={s.references}>
-                        <summary>
-                          المصادر والسياق <small>اختياري</small>
-                        </summary>
-                        <label htmlFor="office-source-text">
-                          نصوص وحقائق مرجعية
-                        </label>
-                        <textarea
-                          id="office-source-text"
-                          value={sourceText}
-                          maxLength={30000}
-                          rows={4}
-                          onChange={(e) => setSourceText(e.target.value)}
-                        />
-                        <label htmlFor="office-source-urls">
-                          روابط المصادر، رابط في كل سطر
-                        </label>
-                        <textarea
-                          id="office-source-urls"
-                          dir="ltr"
-                          value={sourceUrls}
-                          maxLength={16000}
-                          rows={2}
-                          onChange={(e) => setSourceUrls(e.target.value)}
-                          placeholder="https://…"
-                        />
-                      </details>
-                    </>
+                  {session && (
+                    <div className={s.sessionActions}>
+                      {session.status === "review" && (
+                        <button
+                          className={s.primary}
+                          disabled={pending}
+                          onClick={() => void action("approve")}
+                        >
+                          اعتماد التسليم
+                        </button>
+                      )}
+                      {(busy || session.status === "handoff") && (
+                        <button
+                          className={s.secondary}
+                          disabled={pending}
+                          onClick={() => void action("cancel")}
+                        >
+                          إلغاء التكليف
+                        </button>
+                      )}
+                      {["failed", "cancelled"].includes(session.status) && (
+                        <button
+                          className={s.secondary}
+                          disabled={pending}
+                          onClick={() => void action("retry")}
+                        >
+                          إعادة المحاولة
+                        </button>
+                      )}
+                      {selected === "art" && (
+                        <Link href="/admin/studio">فتح استوديو التصميم</Link>
+                      )}
+                      {selected === "publisher" && (
+                        <Link href="/admin/integrations">فتح مركز النشر</Link>
+                      )}
+                    </div>
                   )}
-                  <label htmlFor="office-brief">
-                    {session ? "رسالة متابعة أو طلب تعديل" : "طلبك للفريق"}
-                  </label>
-                  <textarea
-                    id="office-brief"
-                    rows={3}
-                    value={brief}
-                    minLength={3}
-                    maxLength={12000}
-                    onChange={(e) => setBrief(e.target.value)}
-                    disabled={busy || session?.status === "cancelled"}
-                    required
-                    placeholder={
-                      session
-                        ? "وضح التعديل أو السؤال التالي…"
-                        : "اكتب الفكرة والنتيجة التي تحتاجها…"
-                    }
-                  />
-                  <div className={s.sendRow}>
-                    <small>
-                      {session
-                        ? "تُحفظ المتابعة مع سجل الجلسة."
-                        : "المخرجات تحتاج مراجعتك قبل استخدامها."}
-                    </small>
-                    <button
-                      className={s.primary}
+                  <form onSubmit={submit} className={s.composer}>
+                    {!session && (
+                      <>
+                        <div className={s.formRow}>
+                          <label htmlFor="office-kind">
+                            نوع الطلب
+                            <select
+                              id="office-kind"
+                              value={kind}
+                              onChange={(e) =>
+                                setKind(e.target.value as SessionKind)
+                              }
+                            >
+                              <option value="chat">محادثة الموظف</option>
+                              <option value="task">مهمة للموظف</option>
+                              <option value="team">تكليف الفريق كاملًا</option>
+                              <option value="meeting">اجتماع الفريق</option>
+                            </select>
+                          </label>
+                          <label htmlFor="office-project">
+                            المشروع
+                            <input
+                              id="office-project"
+                              value={project}
+                              maxLength={120}
+                              onChange={(e) => setProject(e.target.value)}
+                              required
+                            />
+                          </label>
+                        </div>
+                        <details className={s.references}>
+                          <summary>
+                            المصادر والسياق <small>اختياري</small>
+                          </summary>
+                          <label htmlFor="office-source-text">
+                            نصوص وحقائق مرجعية
+                          </label>
+                          <textarea
+                            id="office-source-text"
+                            value={sourceText}
+                            maxLength={30000}
+                            rows={4}
+                            onChange={(e) => setSourceText(e.target.value)}
+                          />
+                          <label htmlFor="office-source-urls">
+                            روابط المصادر، رابط في كل سطر
+                          </label>
+                          <textarea
+                            id="office-source-urls"
+                            dir="ltr"
+                            value={sourceUrls}
+                            maxLength={16000}
+                            rows={2}
+                            onChange={(e) => setSourceUrls(e.target.value)}
+                            placeholder="https://…"
+                          />
+                        </details>
+                      </>
+                    )}
+                    <label htmlFor="office-brief">
+                      {session ? "رسالة متابعة أو طلب تعديل" : "طلبك للفريق"}
+                    </label>
+                    <textarea
+                      id="office-brief"
+                      rows={3}
+                      value={brief}
+                      minLength={3}
+                      maxLength={12000}
+                      onChange={(e) => setBrief(e.target.value)}
                       disabled={
-                        pending ||
                         busy ||
-                        !data?.runtime.configured ||
-                        brief.trim().length < 3 ||
+                        session?.status === "handoff" ||
                         session?.status === "cancelled"
                       }
-                    >
-                      <Icon type="send" />
-                      {pending
-                        ? "جارٍ الحفظ…"
-                        : session
-                          ? "إرسال المتابعة"
-                          : kind === "meeting"
-                            ? "بدء الاجتماع"
-                            : kind === "chat"
-                              ? "إرسال"
-                              : "إسناد التكليف"}
-                    </button>
-                  </div>
-                </form>
-                {!session &&
-                  sessions.some(
-                    (v) =>
-                      v.agent_id === selected ||
-                      v.kind === "team" ||
-                      v.kind === "meeting",
-                  ) && (
-                    <details className={s.history}>
-                      <summary>جلسات الموظف والفريق السابقة</summary>
-                      <ul>
-                        {sessions
-                          .filter(
-                            (v) =>
-                              v.agent_id === selected ||
-                              v.kind === "team" ||
-                              v.kind === "meeting",
-                          )
-                          .slice(0, 12)
-                          .map((v) => (
-                            <li key={v.id}>
-                              <button onClick={() => openSession(v)}>
-                                <span>{v.title}</span>
-                                <Status session={v} />
-                              </button>
-                            </li>
-                          ))}
-                      </ul>
-                    </details>
-                  )}
-              </>
-            )}
-            <p className={s.notice} role="status">
-              {notice}
-            </p>
-          </aside>
-        )}
+                      required
+                      placeholder={
+                        session
+                          ? "وضح التعديل أو السؤال التالي…"
+                          : "اكتب الفكرة والنتيجة التي تحتاجها…"
+                      }
+                    />
+                    <div className={s.sendRow}>
+                      <small>
+                        {session
+                          ? "تُحفظ المتابعة مع سجل الجلسة."
+                          : "المخرجات تحتاج مراجعتك قبل استخدامها."}
+                      </small>
+                      <button
+                        className={s.primary}
+                        disabled={
+                          pending ||
+                          busy ||
+                          session?.status === "handoff" ||
+                          !data?.runtime.configured ||
+                          brief.trim().length < 3 ||
+                          session?.status === "cancelled"
+                        }
+                      >
+                        <Icon type="send" />
+                        {pending
+                          ? "جارٍ الحفظ…"
+                          : session
+                            ? "إرسال المتابعة"
+                            : kind === "meeting"
+                              ? "بدء الاجتماع"
+                              : kind === "chat"
+                                ? "إرسال"
+                                : "إسناد التكليف"}
+                      </button>
+                    </div>
+                  </form>
+                  {!session &&
+                    sessions.some(
+                      (v) =>
+                        v.agent_id === selected ||
+                        v.kind === "team" ||
+                        v.kind === "meeting",
+                    ) && (
+                      <details className={s.history}>
+                        <summary>جلسات الموظف والفريق السابقة</summary>
+                        <ul>
+                          {sessions
+                            .filter(
+                              (v) =>
+                                v.agent_id === selected ||
+                                v.kind === "team" ||
+                                v.kind === "meeting",
+                            )
+                            .slice(0, 12)
+                            .map((v) => (
+                              <li key={v.id}>
+                                <button onClick={() => openSession(v)}>
+                                  <span>{v.title}</span>
+                                  <Status session={v} />
+                                </button>
+                              </li>
+                            ))}
+                        </ul>
+                      </details>
+                    )}
+                </>
+              )}
+              <p className={s.notice} role="status">
+                {notice}
+              </p>
+            </aside>
+          )}
+        </dialog>
       </div>
     </div>
   );

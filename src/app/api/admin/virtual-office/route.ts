@@ -88,15 +88,13 @@ export async function POST(request: Request) {
         .maybeSingle();
       if (employee.error) throw employee.error;
       if (!employee.data) throw new OfficeError("الموظف غير متاح", 404);
-      const result = await db
-        .from("vo_staff_avatars")
-        .upsert({
-          workspace_id: actor.workspaceId,
-          employee_id: body.employeeId,
-          preset: body.preset,
-          updated_by: actor.id,
-          updated_at: new Date().toISOString(),
-        });
+      const result = await db.from("vo_staff_avatars").upsert({
+        workspace_id: actor.workspaceId,
+        employee_id: body.employeeId,
+        preset: body.preset,
+        updated_by: actor.id,
+        updated_at: new Date().toISOString(),
+      });
       if (result.error) throw result.error;
       return officeResponse({ saved: true });
     }
@@ -142,25 +140,39 @@ export async function POST(request: Request) {
       return officeResponse({ session: result.data }, 201);
     }
     if (
-      !["reply", "approve", "cancel", "retry"].includes(String(body.action)) ||
+      !["reply", "approve", "approve_handoff", "cancel", "retry"].includes(
+        String(body.action),
+      ) ||
       !uuid(body.sessionId) ||
       !uuid(body.requestId)
     )
       throw new OfficeError("إجراء أو معرف جلسة غير صالح");
     if (
-      ["reply", "retry"].includes(String(body.action)) &&
+      ["reply", "retry", "approve_handoff"].includes(String(body.action)) &&
       !runtimeInfo().configured
     )
       throw new OfficeError("مزود الذكاء الاصطناعي غير مهيأ على الخادم", 503);
+    if (
+      body.action === "approve_handoff" &&
+      (!Number.isInteger(body.step) ||
+        Number(body.step) < 1 ||
+        Number(body.step) > 6)
+    )
+      throw new OfficeError("حدّث التسليم قبل إسناد المرحلة التالية");
     const result = await db.rpc("vo_session_action", {
       p_workspace: actor.workspaceId,
       p_id: body.sessionId,
       p_action: body.action,
       p_request: body.requestId,
-      p_content: typeof body.brief === "string" ? body.brief : "",
+      p_content:
+        body.action === "approve_handoff"
+          ? String(body.step)
+          : typeof body.brief === "string"
+            ? body.brief
+            : "",
     });
     if (result.error) throw result.error;
-    if (["reply", "retry"].includes(String(body.action)))
+    if (["reply", "retry", "approve_handoff"].includes(String(body.action)))
       after(wakeOfficeWorker);
     return officeResponse({ session: result.data });
   } catch (e) {

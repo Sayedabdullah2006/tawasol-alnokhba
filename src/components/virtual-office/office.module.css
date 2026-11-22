@@ -171,7 +171,7 @@
 }
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 22px;
   align-items: start;
 }
@@ -206,15 +206,15 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 5px 8px;
-  min-height: 30px;
+  padding: 2px 7px;
+  min-height: 25px;
   white-space: nowrap;
-  background: #fffef5ee;
-  border: 1px solid #c9d3d9;
-  border-radius: 5px;
-  font-size: 0.75rem !important;
+  background: #ffffffe0;
+  border: 1px solid #ffffffb3;
+  border-radius: 20px;
+  font-size: 0.68rem !important;
   color: #203e56;
-  box-shadow: 0 3px 9px #1d385213;
+  box-shadow: 0 2px 5px #1d385210;
   direction: rtl;
   will-change: transform;
   transition: border-color 0.2s;
@@ -230,7 +230,7 @@
   font-weight: 700;
 }
 .labelSelected {
-  border: 2px solid #ad843e;
+  border: 1px solid #ad843e;
   background: #fffdf5;
 }
 .sceneCaption {
@@ -240,6 +240,7 @@
   flex-direction: column;
   gap: 3px;
   pointer-events: none;
+  max-width: calc(100% - 170px);
 }
 .sceneCaption > span {
   font-size: 0.95rem;
@@ -259,6 +260,7 @@
   justify-content: center;
   gap: 1px;
   direction: ltr;
+  flex-wrap: wrap;
 }
 .cameraTools button {
   border: 1px solid #d2dce4;
@@ -274,6 +276,369 @@
 }
 .cameraTools button:last-child {
   border-radius: 0 6px 6px 0;
+}
+.cameraTools button[aria-pressed="true"] {
+  color: #fff;
+  background: #203f68;
+}
+.personHint {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: 240px;
+  max-width: calc(100vw - 16px);
+  padding: 13px 15px;
+  border: 1px solid #c6d2dd;
+  border-radius: 10px;
+  background: #fffffff5;
+  box-shadow: 0 8px 25px #19375226;
+  color: #193752;
+  font: inherit;
+  direction: rtl;
+  flex-direction: column;
+  gap: 2px;
+}
+.personHint:is(:popover-open, :global(.\:popover-open)) {
+  display: flex;
+}
+.personHint strong {
+  font-size: 0.95rem;
+}
+.personHint span {
+  font-size: 0.8rem;
+}
+.personHint small {
+  font-size: 0.65rem;
+  color: #5d7285;
+}
+.personHint p {
+  font-size: 0.75rem;
+  line-height: 1.8;
+  padding-top: 8px;
+  margin: 7px 0 0;
+  border-top: 1px solid #dde5ed;
+}
+.sceneLabel {
+  --interest-delay-start: 0.15s;
+  interest-delay-start: var(--interest-delay-start);
+}
+.sceneLabel:hover,
+.sceneLabel:focus-visible {
+  border-color: #ac8646;
+}
+.speechBubble {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 122px;
+  padding: 6px 9px 7px 19px;
+  min-height: 43px;
+  border: 1px solid #becedd;
+  border-radius: 9px 9px 9px 2px;
+  background: #ffffffed;
+  color: #203f68;
+  text-align: right;
+  direction: rtl;
+  box-shadow: 0 3px 10px #19375214;
+  will-change: transform;
+}
+.speechBubble small {
+  display: block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #61768a;
+}
+.speechBubble span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.68rem;
+}
+.speechBubble b {
+  position: absolute;
+  left: 6px;
+  bottom: 9px;
+  font-weight: 400;
+}
+.speechBubble:hover {
+  border-color: #ac8646;
+  background: #fff;
+}
+.handoffBubble {
+  border-color: #ac8646;
+  background: #fff9e9f5;
+}
+.handoffBubble small {
+  color: #876323;
+}
+.staffNavigation {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: #ffffffe6;
+  border: 1px solid #cfdbe6;
+  border-radius: 7px;
+}
+.staffNavigation button {
+  min-width: 34px;
+  min-height: 34px;
+  background: transparent;
+  color: #203f68;
+  border: 0;
+}
+.staffNavigation span {
+  min-width: 44px;
+  text-align: center;
+  font-size: 0.75rem;
+}
+.ambientToggle {
+  position: absolute;
+  top: 58px;
+  left: 16px;
+  padding: 5px 8px;
+  min-height: 28px;
+  border: 1px solid #cfdbe6;
+  background: #ffffffd9;
+  color: #536c80;
+  border-radius: 5px;
+  font-size: 0.65rem !important;
+}
+.visitorLabel {
+  position: absolute;
+  inset: 0 auto auto 0;
+  visibility: hidden;
+  padding: 2px 10px;
+  border-radius: 12px;
+  color: white;
+  background: #203f68;
+  font-size: 0.65rem;
+  pointer-events: none;
+}
+.walkControls {
+  position: absolute;
+  left: 16px;
+  bottom: 68px;
+  color: #203f68;
+  font-size: 0.65rem;
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 8px;
+}
+.walkControls > span {
+  background: #ffffffeb;
+  padding: 4px 8px;
+  border-radius: 5px;
+}
+.walkControls > div {
+  display: grid;
+  grid-template-columns: repeat(3, 36px);
+  gap: 3px;
+}
+.walkControls button {
+  min-width: 36px;
+  min-height: 36px;
+  background: #ffffffed;
+  border: 1px solid #bacbda;
+  color: #203f68;
+  border-radius: 5px;
+}
+.walkControls button:first-child {
+  grid-column: 2;
+}
+.walkControls button:nth-child(2) {
+  grid-column: 1;
+}
+.rosterRole {
+  color: #66798b;
+  font-size: 0.65rem;
+}
+.status.handoff {
+  background: #fff1d0;
+  color: #795716;
+}
+.approvalInbox {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  padding: 13px 16px;
+  margin-top: 12px;
+  border-inline-start: 3px solid #ac8646;
+  background: #fffaec;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+.approvalInbox > span {
+  font-size: 0.7rem;
+  color: #7b612e;
+}
+.approvalInbox button {
+  margin-inline-start: auto;
+  border: 0;
+  background: transparent;
+  color: #203f68;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  padding: 5px 0;
+}
+.handoffCard {
+  margin: 12px 16px;
+  padding: 15px;
+  border: 1px solid #dbc69f;
+  border-radius: 10px;
+  background: #fffcf4;
+}
+.handoffEyebrow {
+  color: #85632d;
+  font-size: 0.7rem;
+}
+.handoffPeople {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 12px 0;
+  gap: 8px;
+}
+.handoffPeople > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.handoffPeople b {
+  font-size: 0.85rem;
+}
+.handoffPeople small {
+  color: #66798b;
+  font-size: 0.65rem;
+}
+.handoffPeople i {
+  color: #ac8646;
+  font-size: 1.5rem;
+  font-style: normal;
+}
+.handoffCard p {
+  color: #435d73;
+  font-size: 0.75rem;
+  line-height: 1.9;
+}
+.handoffCard > button {
+  width: 100%;
+  justify-content: center;
+  min-height: 42px;
+  font-size: 0.8rem !important;
+}
+.handoffCard > small {
+  display: block;
+  text-align: center;
+  font-size: 0.65rem;
+  margin-top: 9px;
+  color: #66798b;
+}
+.highlightedMessage {
+  outline: 2px solid #ac8646;
+  outline-offset: -2px;
+  background: #fffcf4;
+}
+.office .chatDialog {
+  width: min(480px, calc(100vw - 24px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1px solid #b9c9d8;
+  border-radius: 16px;
+  background: #fff;
+  color: #193752;
+  margin: auto;
+  box-shadow: 0 20px 80px #122c4c40;
+  overflow-y: auto;
+  scrollbar-color: #a7b9c9 #f0f4f8;
+}
+.chatDialog:modal {
+  overscroll-behavior: contain;
+}
+.office .chatDialog::backdrop {
+  background: #102b493d;
+  backdrop-filter: blur(2px);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+.chatDialog .agentHeader h2,
+.chatDialog .handoffPeople b {
+  color: #193752;
+}
+.chatDialog .workPanel {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.chatDialog .conversation {
+  height: clamp(200px, 28dvh, 320px);
+}
+.chatDialog .agentHeader {
+  padding-top: 15px;
+}
+.dialogBar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #203f68;
+  color: #fff;
+  padding: 8px 15px;
+  font-size: 0.8rem;
+}
+.dialogBar form {
+  margin: 0;
+}
+.dialogBar button {
+  border: 1px solid #ffffff45;
+  background: #ffffff10;
+  color: #fff;
+  border-radius: 50%;
+  width: 32px;
+  min-height: 32px;
+  font-size: 1.2rem !important;
+}
+.employeeDock {
+  margin-top: 14px;
+  padding: 12px 15px;
+  border: 1px solid #dbe4ed;
+  border-radius: 8px;
+  background: #ffffffb3;
+  font-size: 0.8rem;
+}
+.employeeDock summary {
+  cursor: pointer;
+  color: #294965;
+}
+.employeeDock p {
+  color: #66798b;
+  margin: 10px 0;
+}
+.memoryDetails summary {
+  cursor: pointer;
+  color: #294965;
+  font-size: 0.85rem;
+  padding-block: 8px;
+}
+.memoryDetails[open] label {
+  margin-top: 10px;
+}
+@media (pointer: coarse) {
+  .sceneLabel {
+    min-height: 28px;
+  }
+  .staffNavigation button,
+  .walkControls button {
+    min-width: 40px;
+    min-height: 40px;
+  }
 }
 .sceneLoading,
 .sceneFallback {
@@ -945,7 +1310,7 @@
 }
 @media (min-width: 1600px) {
   .layout {
-    grid-template-columns: minmax(0, 1fr) 400px;
+    grid-template-columns: minmax(0, 1fr);
   }
   .conversation {
     height: 300px;
@@ -962,7 +1327,7 @@
 }
 @media (max-width: 1200px) {
   .layout {
-    grid-template-columns: minmax(0, 1fr) 330px;
+    grid-template-columns: minmax(0, 1fr);
     gap: 14px;
   }
   .roster {
@@ -1081,6 +1446,7 @@
   }
   .sceneCaption {
     inset: 14px 12px auto;
+    max-width: calc(100% - 24px);
   }
   .sceneCaption small {
     font-size: 0.65rem;
@@ -1103,6 +1469,30 @@
   }
   .sceneLabel small {
     display: none;
+  }
+  .staffNavigation {
+    top: 72px;
+    left: auto;
+    right: 12px;
+  }
+  .ambientToggle {
+    top: 75px;
+    left: 12px;
+  }
+  .speechBubble {
+    width: 104px;
+    padding: 5px 7px 6px 16px;
+    min-height: 39px;
+  }
+  .speechBubble span {
+    font-size: 0.6rem;
+  }
+  .speechBubble small {
+    font-size: 0.55rem;
+  }
+  .walkControls {
+    left: 9px;
+    bottom: 95px;
   }
   .roster {
     grid-template-columns: repeat(3, minmax(0, 1fr));

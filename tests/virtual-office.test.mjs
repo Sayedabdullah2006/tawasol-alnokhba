@@ -72,6 +72,15 @@ test("durable queue, cancellation fencing, continuation, retry, idempotence and 
       ),
     );
     await db.exec(
+      await readFile(
+        new URL(
+          "../supabase/migrations/20261122171631_virtual_office_handoffs.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    );
+    await db.exec(
       "insert into public.vo_staff_avatars(workspace_id,employee_id,preset,updated_by) values('qa','00000000-0000-4000-8000-000000000004','hijab','00000000-0000-4000-8000-000000000001')",
     );
     const submit = async (req = randomUUID(), brief = "اختبار خطة تحرير") =>
@@ -110,7 +119,34 @@ test("durable queue, cancellation fencing, continuation, retry, idempotence and 
       false,
       "a completed stage cannot write twice",
     );
+    assert.equal(
+      await claim(),
+      undefined,
+      "the worker cannot start the next stage before editor approval",
+    );
+    assert.equal(
+      (
+        await db.query("select status from public.vo_sessions where id=$1", [
+          first.id,
+        ])
+      ).rows[0].status,
+      "handoff",
+    );
+    await assert.rejects(
+      () => act(first.id, "approve_handoff", randomUUID(), "2"),
+      "a stale approval must not advance a different stage",
+    );
+    await act(first.id, "cancel");
+    assert.equal(
+      (await act(first.id, "retry")).status,
+      "handoff",
+      "cancel/retry cannot bypass approval",
+    );
+    assert.equal(await claim(), undefined);
+    const approvalId = randomUUID();
+    await act(first.id, "approve_handoff", approvalId, "1");
     let next = await claim();
+    await act(first.id, "approve_handoff", approvalId, "1");
     assert.equal(next.step, 1);
     await act(first.id, "cancel");
     assert.equal(
@@ -133,8 +169,12 @@ test("durable queue, cancellation fencing, continuation, retry, idempotence and 
       "old lease cannot write after restart",
     );
     assert.equal(await finish(recovered, "researcher"), true);
-    for (const role of ["writer", "art", "reviewer", "publisher", "editor"])
+    let step = 2;
+    for (const role of ["writer", "art", "reviewer", "publisher", "editor"]) {
+      assert.equal(await claim(), undefined);
+      await act(first.id, "approve_handoff", randomUUID(), String(step++));
       assert.equal(await finish(await claim(), role), true);
+    }
     assert.equal(
       (
         await db.query("select status from public.vo_sessions where id=$1", [

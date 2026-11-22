@@ -1,8 +1,9 @@
 /** Portable office contract. No Next.js, database, auth or provider dependencies. */
-export const OFFICE_CONTRACT_VERSION = 1;
+export const OFFICE_CONTRACT_VERSION = 2;
 export const OFFICE_AGENTS = [
   {
     id: "editor",
+    firstName: "عبدالله",
     name: "مدير التحرير",
     short: "التحرير",
     initials: "تح",
@@ -14,6 +15,7 @@ export const OFFICE_AGENTS = [
   },
   {
     id: "researcher",
+    firstName: "سارة",
     name: "الباحثة",
     short: "البحث",
     initials: "بح",
@@ -25,6 +27,7 @@ export const OFFICE_AGENTS = [
   },
   {
     id: "writer",
+    firstName: "فهد",
     name: "الكاتب",
     short: "الكتابة",
     initials: "كت",
@@ -36,6 +39,7 @@ export const OFFICE_AGENTS = [
   },
   {
     id: "art",
+    firstName: "نورة",
     name: "المديرة الفنية",
     short: "التصميم",
     initials: "فن",
@@ -47,6 +51,7 @@ export const OFFICE_AGENTS = [
   },
   {
     id: "reviewer",
+    firstName: "ريم",
     name: "المراجعة",
     short: "المراجعة",
     initials: "مر",
@@ -58,6 +63,7 @@ export const OFFICE_AGENTS = [
   },
   {
     id: "publisher",
+    firstName: "خالد",
     name: "مسؤول النشر",
     short: "النشر",
     initials: "نش",
@@ -157,7 +163,13 @@ export function appearanceForStaff(preset: StaffAppearance): OfficeAppearance {
 }
 export type SessionKind = "chat" | "task" | "team" | "meeting";
 export type SessionStatus =
-  "queued" | "running" | "review" | "completed" | "failed" | "cancelled";
+  | "queued"
+  | "running"
+  | "handoff"
+  | "review"
+  | "completed"
+  | "failed"
+  | "cancelled";
 export type Citation = { title: string; url: string };
 export type OfficeMessage = {
   id: string;
@@ -177,6 +189,7 @@ export type OfficeSession = {
   brief: string;
   status: SessionStatus;
   step: number;
+  approved_step: number;
   progress: string;
   error_message: string | null;
   created_at: string;
@@ -192,10 +205,19 @@ export type OfficeSnapshot = {
   runtime: { configured: boolean; model: string; provider: string };
   staff: OfficeStaff[];
   staffAvailable: boolean;
+  activities: OfficeActivity[];
+};
+export type OfficeActivity = {
+  agentId: AgentId;
+  sessionId: string;
+  messageId?: string;
+  kind: "question" | "reply" | "result" | "handoff";
+  preview: string;
 };
 export const STATUS_LABELS: Record<SessionStatus, string> = {
   queued: "في الانتظار",
   running: "قيد العمل",
+  handoff: "بانتظار موافقة مدير التحرير",
   review: "بانتظار اعتمادك",
   completed: "معتمد",
   failed: "تعذر التنفيذ",
