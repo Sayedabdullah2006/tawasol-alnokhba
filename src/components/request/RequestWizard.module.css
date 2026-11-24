@@ -1,0 +1,158 @@
+.screen {
+  --request-ink: #0e2540;
+  --request-surface: #10283f;
+  --request-line: #456078;
+  --request-muted: #c3d1e2;
+  --request-gold: #e2bf77;
+  padding-block-end: 2.5rem;
+  accent-color: var(--request-gold);
+}
+
+.container { width: min(100%, 1280px); margin-inline: auto; padding: 1rem; }
+
+.intro {
+  margin-block-end: 1.25rem;
+  padding: clamp(1.25rem, 3.25vw, 2.25rem);
+  border: 1px solid var(--request-line);
+  border-radius: 24px;
+  background: radial-gradient(ellipse at top left, #2a4a6b, transparent 68%), var(--request-ink);
+  color: #fff7e5;
+}
+
+.intro h1 { margin-block-end: .5rem; font-weight: 900; line-height: 1.3; }
+.intro p { max-width: 48ch; color: #e0e9f6; font-size: clamp(.9375rem, 2vw, 1.125rem); line-height: 1.8; }
+
+.progress,
+.panel {
+  padding: clamp(.875rem, 2vw, 1.25rem);
+  border: 1px solid var(--request-line);
+  border-radius: 18px;
+  background: var(--request-surface);
+  color: #edf3ff;
+}
+
+.progress { margin-block-end: 1.25rem; }
+.progress p { display: flex; justify-content: space-between; gap: .5rem; margin-block-end: .5rem; font-size: .9375rem; }
+.progress p span { color: var(--request-muted); }
+.progress progress {
+  display: block;
+  width: 100%;
+  height: .5rem;
+  margin-block-end: .875rem;
+  appearance: none;
+  overflow: hidden;
+  border: 0;
+  border-radius: 10px;
+  background: #293f5a;
+}
+.progress progress::-webkit-progress-bar { background: #293f5a; }
+.progress progress::-webkit-progress-value { background: var(--request-gold); }
+.progress progress::-moz-progress-bar { background: var(--request-gold); }
+.progress ol { display: flex; gap: .5rem; }
+.progress li { flex: 1; min-width: 0; }
+.progress button {
+  display: flex;
+  align-items: center;
+  gap: .625rem;
+  width: 100%;
+  height: 100%;
+  min-height: 3.25rem;
+  padding-inline: .75rem;
+  border: 1px solid var(--request-line);
+  border-radius: 10px;
+  background: #172e48;
+  color: var(--request-muted);
+  text-align: start;
+  font-size: .9375rem;
+}
+.progress button:enabled { cursor: pointer; }
+.progress button:enabled:hover,
+.progress button[data-state="available"] { border-color: var(--request-gold); color: #fff7e5; }
+.progress button[data-state="complete"] { background: #203d5a; color: #edf3ff; }
+.progress button[data-state="current"] { background: #274663; color: white; border-color: var(--request-gold); font-weight: 800; }
+.stepNumber { display: grid; place-items: center; flex: none; width: 2rem; height: 2rem; border-radius: 50%; background: #293f5a; color: #edf3ff; font-weight: 800; }
+.progress button[data-state="complete"] .stepNumber { background: #365774; }
+.progress button[data-state="current"] .stepNumber { background: var(--request-gold); color: var(--request-ink); }
+
+.panel { padding: clamp(1rem, 2.5vw, 1.75rem); }
+.panel > h2 {
+  margin-block-end: 1.25rem;
+  color: #fff7e5;
+  font-size: clamp(1.25rem, 3vw, 1.75rem);
+  font-weight: 800;
+  line-height: 1.5;
+  scroll-margin-block-start: 7rem;
+}
+.screen :is(button, input, select, textarea, summary, h2):focus-visible { outline: 2px solid var(--request-gold); outline-offset: 3px; }
+.roleGroup legend { margin-block-end: .75rem; color: var(--request-muted); }
+.roleOptions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: .75rem; }
+.roleOptions label {
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  min-height: 5.25rem;
+  padding: .875rem;
+  border: 1px solid var(--request-line);
+  border-radius: 12px;
+  background: #172e48;
+  cursor: pointer;
+}
+.roleOptions input { flex: none; width: 1.125rem; height: 1.125rem; margin-block-start: .25rem; }
+.roleOptions label:hover,
+.roleOptions label[data-selected="true"] { border-color: var(--request-gold); }
+.roleOptions label[data-selected="true"] { background: #273e56; box-shadow: inset 0 0 0 1px var(--request-gold); }
+.roleOptions strong,
+.roleOptions label > span > span { display: block; }
+.roleOptions label > span > span { margin-block-start: .125rem; color: var(--request-muted); font-size: .9375rem; }
+
+.guidance { margin-block-end: 1rem; padding-inline: 1rem; border: 1px solid var(--request-line); border-radius: 12px; background: #172e48; }
+.guidance summary { min-height: 3rem; padding-block: .625rem; font-weight: 700; cursor: pointer; }
+.guidance :is(ul,p) { margin-block-end: .875rem; }
+.reviewGrid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 1rem; }
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: .75rem;
+  margin-block-start: .75rem;
+  padding: .75rem;
+  border: 1px solid var(--request-line);
+  border-radius: 14px;
+  background: #122b45;
+}
+
+@media (max-width: 760px) {
+  .progress ol { gap: .375rem; }
+  .progress button { justify-content: center; min-height: 3rem; padding: 0; }
+  .stepLabel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .reviewGrid { grid-template-columns: minmax(0, 1fr); }
+  .actions { position: sticky; inset-block-end: max(.5rem, env(safe-area-inset-bottom)); z-index: 3; box-shadow: 0 4px 20px #06112295; }
+  .actions button { padding-inline: .75rem; }
+  .actions button:last-child { flex: 1; }
+  .panel :is(input, textarea, select, summary) { scroll-margin-block-end: 6rem; }
+}
+
+@supports not (accent-color: auto) {
+  .screen input:is([type="radio"], [type="checkbox"]):checked {
+    outline: 2px solid var(--request-gold);
+    outline-offset: 2px;
+  }
+  .screen input:is([type="radio"], [type="checkbox"]):checked:focus-visible {
+    outline-offset: 5px;
+  }
+}
+
+.channelGroup {
+  min-width: 0;
+  margin-block-start: 1rem;
+  padding: .75rem 1rem;
+  border: 1px solid var(--request-line);
+  border-radius: 12px;
+}
+.channelGroup legend { padding-inline: .25rem; font-weight: 800; }
+.channelGroup p { color: var(--request-muted); font-size: .9375rem; }
+.channelOptions { display: flex; flex-wrap: wrap; gap: .5rem 1rem; margin-block-start: .25rem; }
+.channelOptions label { display: inline-flex; min-height: 3rem; align-items: center; gap: .5rem; padding-inline: .25rem; }
+.channelOptions input { width: 1.125rem; height: 1.125rem; }
+.channelOptions label:has(input:enabled) { cursor: pointer; }

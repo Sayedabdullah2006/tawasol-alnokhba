@@ -51,13 +51,6 @@
 .screen-home details[open] summary { color: #eaca8b; }
 .request-screen { padding-top: 12px; }
 .request-screen h1 { font-size: clamp(28px,3vw,40px); color: #fff7e5; }
-.request-screen [data-request-section] { border-width: 1px; border-radius: 24px; box-shadow: 0 12px 32px #0002; }
-.request-screen [data-request-section] > button { padding-block: 22px; }
-.request-screen [data-request-section][data-open="true"] { border-color: #d7b67490; box-shadow: 0 0 0 1px #d7b67416,0 16px 40px #0003; }
-.request-screen [data-request-section][data-complete="true"] > button > div:first-child { background: #17473e; color: #b9f1d9; box-shadow: 0 0 0 1px #70c3a14d; }
-.request-screen [data-request-section][data-open="true"] > button > div:first-child { background: #d8b875; color: #10213a; }
-.request-screen .request-progress { height: 8px; background: #8ca8c82b; }
-.request-screen .request-progress > div { background: linear-gradient(90deg,#ad8848,#efd39b); box-shadow: 0 0 14px #dfbd7755; }
 .request-screen button[aria-pressed="true"] { border-color: #e2bf77; background-color: #80652e30; box-shadow: inset 0 0 0 1px #e2bf7744; }
 .request-screen aside > * { border-radius: 24px; }
 .request-screen :is(button,a)[class*="border-green"]:hover { border-color: #f1d49d; }
@@ -78,7 +71,6 @@
   .screen-feature-shade { background: linear-gradient(180deg,#081b3010,#0a1d33ef 45%,#0a1d33fc 75%); }
   .screen-home .screen-tile { min-height: auto; padding: 22px; }
   .public-screen .site-footer { padding-inline: 10px; padding-bottom: 64px; }
-  .request-screen [data-request-section] > button { padding: 18px 16px; }
 }
 @media(prefers-reduced-motion:reduce) {
   .portal-screen *, .portal-screen *::before,.portal-screen *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }

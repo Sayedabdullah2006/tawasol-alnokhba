@@ -17,6 +17,7 @@ import RStep3Details, { type ContentDetails } from './RStep3Details'
 import RStepExtras from './RStepExtras'
 import RStep5Contact, { type ContactData } from './RStep5Contact'
 import PackageComparison from './PackageComparison'
+import styles from './RequestWizard.module.css'
 import { TERMS_TEXT } from './RStep6Terms'
 import RStepCampaignPosts, { type CampaignPostData, makeEmptyPost, isPostComplete } from './RStepCampaignPosts'
 import SuccessScreen from './SuccessScreen'
@@ -49,10 +50,10 @@ const REQUEST_TYPE_OPTIONS: { id: RequestType; icon: string; label: string; desc
   { id: 'campaign', icon: '🚀', label: 'حملة متعددة',  desc: 'عدة منشورات بخصم' },
 ]
 
-const CLIENT_TYPE_OPTIONS: { id: ClientType; icon: string; label: string }[] = [
-  { id: 'individual', icon: '👤', label: 'فرد' },
-  { id: 'business',   icon: '🏢', label: 'شركة / مؤسسة' },
-  { id: 'government', icon: '🏛️', label: 'جهة حكومية' },
+const CLIENT_TYPE_OPTIONS: { id: ClientType; label: string; desc: string }[] = [
+  { id: 'individual', label: 'فرد', desc: 'قدّم خبرًا أو إنجازًا باسمك.' },
+  { id: 'business',   label: 'شركة / مؤسسة', desc: 'قدّم خبرًا باسم شركة أو مؤسسة.' },
+  { id: 'government', label: 'جهة حكومية', desc: 'قدّم خبرًا باسم جهة حكومية.' },
 ]
 
 // تسميات قنوات النشر (لاختيار قناة الباقة الأساسية)
@@ -111,51 +112,17 @@ function resizeCampaignPosts(posts: CampaignPostData[], postCount: number): Camp
 const selectCls = 'w-full rounded-xl border-2 border-border bg-white px-3 py-3 text-sm text-dark focus:outline-none focus:border-green transition-colors'
 const fieldLabel = 'block text-sm font-bold text-dark mb-1.5'
 
-// ─── مكوّن قسم قابل للطي ─────────────────────────────────────────
-function FormSection({
-  index, title, subtitle, complete, open, onToggle, children, wide = false, disabled = false,
-}: {
+function FormSection({ index, title, open, children }: {
   index: number
   title: string
-  subtitle?: string
-  complete: boolean
   open: boolean
-  onToggle: () => void
   children: ReactNode
-  wide?: boolean
-  disabled?: boolean
 }) {
   return (
-    <div data-request-section data-request-title={title} data-complete={complete} data-open={open} className={cn(
-      'bg-card rounded-2xl border-2 overflow-hidden transition-all',
-      complete ? 'border-green/40' : 'border-border',
-    )}>
-      <button
-        type="button"
-        onClick={onToggle}
-        disabled={disabled}
-        aria-expanded={open}
-        aria-controls={`request-section-${index}`}
-        className="w-full flex items-center gap-3 px-5 py-4 text-right hover:bg-muted/5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-      >
-        <div className={cn(
-          'w-8 h-8 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0',
-          complete ? 'bg-green text-white' : 'bg-muted/15 text-muted',
-        )}>
-          {complete ? '✓' : index}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-bold text-dark text-sm">{title}</div>
-          {subtitle && <div className="text-xs text-muted mt-0.5">{subtitle}</div>}
-        </div>
-        <span className="text-muted text-xs flex-shrink-0">{open ? '▲' : '▼'}</span>
-      </button>
-      {open && !disabled && (
-        <div id={`request-section-${index}`} className={cn('px-5 pb-5 pt-2 border-t border-border wizard-enter', !wide && 'max-w-4xl mx-auto')}>
-          {children}
-        </div>
-      )}
-    </div>
+    <section id={`request-section-${index}`} aria-labelledby={`request-heading-${index}`} hidden={!open} className={styles.panel}>
+      <h2 id={`request-heading-${index}`} tabIndex={-1}>{title}</h2>
+      {open && children}
+    </section>
   )
 }
 
@@ -177,7 +144,6 @@ export default function RequestWizard() {
   const siteContent = useSiteContent(SITE_CONTENT_FALLBACK)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
-  const [reviewing, setReviewing] = useState(false)
   const [requestNumber, setRequestNumber] = useState('')
   const [membershipResult, setMembershipResult] = useState<{ membershipBalance: number | null; benefitBalances: { type: MembershipBenefitType; remaining: number }[] } | null>(null)
   const [influencers, setInfluencers] = useState<Influencer[]>([])
@@ -224,7 +190,7 @@ export default function RequestWizard() {
   const [isLoggedIn, setIsLoggedIn]     = useState(false)
   const [orgInfo, setOrgInfo]           = useState({ name: '', representative: '', license: '' })
   // الموافقة على الشروط ضمنية بالضغط على «إرسال الطلب» — مع رابط لعرضها في نافذة منبثقة
-  const [showTerms, setShowTerms] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
   // الباقة المختارة (للأفراد + المنشور الواحد فقط)
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null)
   // قناة النشر للباقة الأساسية (قناة واحدة يحددها المستخدم)
@@ -492,7 +458,7 @@ export default function RequestWizard() {
 
   const contentComplete = baseContentComplete && careerComplete
 
-  const activeSection = !identityComplete ? 0 : openSection > 1 && !aboutComplete ? 1 : openSection === 3 && showPackages && !packagesComplete ? 2 : openSection
+  const activeSection = !identityComplete ? 0 : openSection > 1 && !aboutComplete ? 1 : openSection >= 3 && showPackages && !packagesComplete ? 2 : openSection
 
   // السعر الديناميكي للباقة الأساسية = سعر التسعير التلقائي حسب نوع الخبر
   const basicDynamicPrice: number | null = (() => {
@@ -597,31 +563,6 @@ export default function RequestWizard() {
   const sectionComplete = [identityComplete, aboutComplete, packagesComplete, contentComplete, contactComplete]
   const canSubmit = sectionComplete.every(Boolean)
 
-  // أول متطلب ناقص — يُعرض كتلميح فوق زر الإرسال
-  const missingHint = (): string | null => {
-    if (!requestType) return 'اختر نوع الطلب'
-    if (!effectiveClientType) return membershipMode ? 'جارٍ التحقق من باقة العضوية' : 'اختر صفة مقدّم الطلب'
-    if (effectiveClientType !== 'individual' && orgInfo.name.trim() === '') return 'أدخل اسم الجهة'
-    if (requestType === 'single') {
-      if (!category) return 'اختر فئة المحتوى'
-      if (!subOptionSatisfied) return 'أكمل الخيار الفرعي للفئة'
-      if (details.title.trim() === '' || details.content.trim() === '') return 'أكمل عنوان ونص المنشور'
-    }
-    if (requestType === 'campaign') {
-      if (campaignSetup.postCount < 2) return 'حدّد عدد المنشورات'
-      if (!campaignPosts.every(isPostComplete)) return 'أكمل تفاصيل جميع منشورات الحملة'
-    }
-    if (showPackages && !selectedPackage) return 'اختر الباقة المناسبة'
-    if (basicNeedsChannel && !basicChannel) return 'اختر قناة النشر للباقة الأساسية'
-    if (!isLoggedIn) {
-      if (contact.fullName.trim().length < 3) return 'أدخل اسمك الكامل'
-      if (contact.phone.trim().replace(/\D/g, '').length < 9) return 'أدخل رقم جوالك'
-      if (!emailValid) return 'أدخل بريداً إلكترونياً صحيحاً'
-    }
-    return null
-  }
-
-  // ── الإرسال ─────────────────────────────────────────────────────
   const handleSubmit = async () => {
     setSubmitting(true)
     try {
@@ -748,10 +689,11 @@ export default function RequestWizard() {
     }
   }
 
-  const openReview = () => {
-    if (!canSubmit) return
-    setReviewing(true)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+  function goToStep(index: number) {
+    if (submitting) return
+    setTermsAccepted(false)
+    setOpenSection(index)
+    requestAnimationFrame(() => document.getElementById(`request-heading-${index}`)?.focus())
   }
 
   if (loading || catsLoading) return <LoadingSpinner size="lg" />
@@ -792,84 +734,71 @@ export default function RequestWizard() {
     )
   }
 
-  if (reviewing) {
+  function renderReview() {
     const summaryTitle = requestType === 'campaign'
       ? `حملة من ${campaignPosts.length} منشورات`
       : details.title
     const totalLabel = membershipMode ? 'رصيد واحد' : checkoutTotalAfterRecovery != null
       ? `${checkoutTotalAfterRecovery.toLocaleString('ar-SA')} ر.س`
       : 'سيصلك عرض سعر بعد المراجعة'
-    const canSelectExtras = requestType === 'single' && (selectedPackage === 'basic' || selectedPackage === 'v2_basic') && estimatedTotal != null
+    const canSelectExtras = showPackages && requestType === 'single' && (selectedPackage === 'basic' || selectedPackage === 'v2_basic') && estimatedTotal != null
 
     return (
-      <div className="request-screen min-h-screen pb-8">
-        <div className="max-w-2xl mx-auto w-full px-4 py-6">
-          <button
-            type="button"
-            onClick={() => setReviewing(false)}
-            className="text-sm font-bold text-green mb-5"
-          >
-            ← تعديل الطلب
-          </button>
+      <div className={styles.reviewGrid}>
+        <div className="min-w-0 space-y-3">
+          <section className="bg-card border border-border rounded-2xl p-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="font-black text-dark">الخبر</h3>
+              <Button type="button" variant="outline" size="sm" onClick={() => goToStep(3)}>تعديل</Button>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between gap-4"><span className="text-muted">نوع الطلب</span><span className="font-bold text-dark">{requestType === 'campaign' ? 'حملة متعددة' : 'منشور واحد'}</span></div>
+              <div className="flex justify-between gap-4"><span className="text-muted">المحتوى</span><span className="font-bold text-dark text-left">{summaryTitle}</span></div>
+              {details.preferredDate && requestType === 'single' && (
+                <div className="flex justify-between gap-4"><span className="text-muted">موعد النشر</span><span className="font-bold text-dark">{details.preferredDate}</span></div>
+              )}
+              {selectedCat && <div className="flex justify-between gap-4"><span className="text-muted">نوع الخبر</span><span>{selectedCat.name_ar}</span></div>}
+            </div>
+            {requestType === 'single' && <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-7">{details.content}</p>}
+          </section>
 
-          <div className="mb-5">
-            <span className="inline-flex bg-green/10 text-green text-xs font-black px-3 py-1 rounded-full mb-3">الخطوة الأخيرة</span>
-            <h1 className="text-2xl font-black text-dark mb-1">راجع طلبك</h1>
-            <p className="text-sm text-muted">تأكد من التفاصيل قبل المتابعة.</p>
-          </div>
-
-          <div className="space-y-3">
-            <section className="bg-card border border-border rounded-2xl p-5">
-              <h2 className="font-black text-dark mb-3">تفاصيل الطلب</h2>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between gap-4"><span className="text-muted">نوع الطلب</span><span className="font-bold text-dark">{requestType === 'campaign' ? 'حملة متعددة' : 'منشور واحد'}</span></div>
-                <div className="flex justify-between gap-4"><span className="text-muted">المحتوى</span><span className="font-bold text-dark text-left">{summaryTitle}</span></div>
-                {details.preferredDate && requestType === 'single' && (
-                  <div className="flex justify-between gap-4"><span className="text-muted">موعد النشر</span><span className="font-bold text-dark">{details.preferredDate}</span></div>
-                )}
+          {membershipMode && selectedMembershipBenefits.length > 0 && (
+            <section className="rounded-2xl border border-green/20 bg-green/5 p-5">
+              <h2 className="font-black text-dark">المزايا المختارة</h2>
+              <div className="mt-3 space-y-2">
+                {selectedMembershipBenefits.map(selection => (
+                  <div key={selection.type} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
+                    <span className="font-bold text-dark">{membershipBenefitSelectionLabel(selection)}</span>
+                    <span className="text-xs font-black text-green">خصم وحدة واحدة</span>
+                  </div>
+                ))}
               </div>
             </section>
+          )}
 
-            {membershipMode && selectedMembershipBenefits.length > 0 && (
-              <section className="rounded-2xl border border-green/20 bg-green/5 p-5">
-                <h2 className="font-black text-dark">المزايا المختارة</h2>
-                <div className="mt-3 space-y-2">
-                  {selectedMembershipBenefits.map(selection => (
-                    <div key={selection.type} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
-                      <span className="font-bold text-dark">{membershipBenefitSelectionLabel(selection)}</span>
-                      <span className="text-xs font-black text-green">خصم وحدة واحدة</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
+          {showPackages && selectedPackageData && (
+            <section className="bg-card border border-border rounded-2xl p-5">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <h3 className="font-black text-dark">الباقة والقنوات</h3>
+                <Button type="button" variant="outline" size="sm" onClick={() => goToStep(2)}>تعديل</Button>
+              </div>
+              <strong className="block">{selectedPackageData.name}</strong>
+              <p className="mt-2 text-sm text-muted">{(chosenV2 ? chosenChannels : basicNeedsChannel && basicChannel ? [basicChannel] : channels).map(ch => CHANNEL_LABELS[ch] ?? ch).join('، ')}</p>
+            </section>
+          )}
 
-            {showPackages && selectedPackageData && (
-              <section className="bg-card border border-border rounded-2xl p-5">
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div>
-                    <h2 className="font-black text-dark">{selectedPackageData.name}</h2>
-                    <p className="text-sm text-muted mt-1">{selectedPackageData.blurb}</p>
-                  </div>
-                  {estimatedTotal != null && <span className="text-green font-black whitespace-nowrap">{totalLabel}</span>}
-                </div>
-                <ul className="space-y-2">
-                  {(chosenV2 ? chosenV2.features : getPackageFeaturesForPostPrice(
-                    selectedPackageData,
-                    estimatedTotal == null
-                      ? null
-                      : estimatedTotal / (requestType === 'campaign' ? Math.max(campaignPosts.length, 1) : 1),
-                  )).map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm text-dark">
-                      <span className="text-green">✓</span>
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
+          <section className="rounded-2xl border border-border p-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="font-black">التواصل والمرفقات</h3>
+              <Button type="button" variant="outline" size="sm" onClick={() => goToStep(3)}>تعديل</Button>
+            </div>
+            <p className="break-words text-sm leading-7">{[contact.fullName, contact.email, contact.phone].filter(Boolean).join(' · ')}</p>
+            {requestType === 'single' && <p className="mt-1 text-sm text-muted">صور الخبر ({details.images.length}) · المرفقات الداعمة ({details.supportingDocuments?.length ?? 0})</p>}
+          </section>
 
-            {canSelectExtras && (
+          {canSelectExtras && (
+            <details className={styles.guidance}>
+              <summary>إضافات اختيارية</summary>
               <RStepExtras
                 selected={effectiveExtras}
                 onChange={setSelectedExtras}
@@ -878,69 +807,60 @@ export default function RequestWizard() {
                 included={chosenV2?.includedExtras}
                 options={chosenV2?catalog?.extras.filter(e=>e.enabled&&(e.id!=='infographic'||category==='cv')):undefined}
               />
-            )}
-
-            {!membershipMode && clientType === 'individual' && estimatedTotal != null && (
-              <section className="bg-card border border-border rounded-2xl p-5">
-                {recoveryOffer && (
-                  <div className="mb-4 rounded-xl border border-green/30 bg-green/5 px-4 py-3 text-sm text-dark">
-                    <strong className="text-green">عرض الاستكمال مفعّل</strong>
-                    <span className="block mt-1">
-                      خصم {recoveryOffer.discountPct}% بحد أقصى {recoveryOffer.maxDiscountAmount.toLocaleString('ar-SA')} ر.س، ويُثبت في بيانات الطلب عند إرساله.
-                    </span>
-                  </div>
-                )}
-                <label className={fieldLabel}>كوبون الخصم</label>
-                <input
-                  type="text"
-                  value={discountCode}
-                  onChange={(event) => {
-                    setDiscountCode(event.target.value.toUpperCase())
-                    if (recoveryOffer && event.target.value.toUpperCase() !== recoveryOffer.code) setRecoveryOffer(null)
-                  }}
-                  placeholder="أدخل الكود إن وجد"
-                  className={selectCls}
-                  autoCapitalize="characters"
-                />
-                <p className="text-xs text-muted mt-2">يُطبَّق الخصم بعد التحقق من الكود.</p>
-              </section>
-            )}
-
+            </details>
+          )}
+        </div>
+        <div className="min-w-0 space-y-3">
+          {!membershipMode && clientType === 'individual' && estimatedTotal != null && (
             <section className="bg-card border border-border rounded-2xl p-5">
-              <div className="flex justify-between items-center gap-4">
-                <div>
-                  <h2 className="font-black text-dark">{membershipMode ? 'ملخص الرصيد' : 'ملخص الدفع'}</h2>
-                  <p className="text-xs text-muted mt-1">{membershipMode ? 'سيُحجز الرصيد عند الإرسال ويُستهلك عند بدء التنفيذ.' : discountCode.trim() ? 'سيُحدّث المبلغ بعد التحقق من الكوبون.' : 'السعر قبل الخصم إن وجد.'}</p>
+              {recoveryOffer && (
+                <div className="mb-4 rounded-xl border border-green/30 bg-green/5 px-4 py-3 text-sm text-dark">
+                  <strong className="text-green">عرض الاستكمال مفعّل</strong>
+                  <span className="block mt-1">
+                    خصم {recoveryOffer.discountPct}% بحد أقصى {recoveryOffer.maxDiscountAmount.toLocaleString('ar-SA')} ر.س، ويُثبت في بيانات الطلب عند إرساله.
+                  </span>
                 </div>
-                <span className="text-green font-black text-lg text-left">{totalLabel}</span>
-              </div>
+              )}
+              <label className={fieldLabel} htmlFor="request-discount">رمز الخصم</label>
+              <input id="request-discount"
+                type="text"
+                value={discountCode}
+                onChange={(event) => {
+                  setDiscountCode(event.target.value.toUpperCase())
+                  if (recoveryOffer && event.target.value.toUpperCase() !== recoveryOffer.code) setRecoveryOffer(null)
+                }}
+                placeholder="أدخل الكود إن وجد"
+                className={selectCls}
+                autoCapitalize="characters"
+              />
+              <p className="text-xs text-muted mt-2">يُطبَّق الخصم بعد التحقق من الكود.</p>
             </section>
-          </div>
+          )}
 
-          <p className="text-[11px] text-muted text-center mt-5 mb-3 leading-relaxed">
-            بالمتابعة فإنك توافق على{' '}
-            <button type="button" onClick={() => setShowTerms(true)} className="text-green font-medium underline">الشروط والأحكام وسياسة الخصوصية</button>
-          </p>
+          <section className="bg-card border border-border rounded-2xl p-5">
+            <div className="flex justify-between items-center gap-4">
+              <div>
+                <h2 className="font-black text-dark">{membershipMode ? 'ملخص الرصيد' : 'ملخص الدفع'}</h2>
+                <p className="text-xs text-muted mt-1">{membershipMode ? 'سيُحجز الرصيد عند الإرسال ويُستهلك عند بدء التنفيذ.' : discountCode.trim() ? 'سيُحدّث المبلغ بعد التحقق من الكوبون.' : 'السعر قبل الخصم إن وجد.'}</p>
+              </div>
+              <span className="text-green font-black text-lg text-left">{totalLabel}</span>
+            </div>
+          </section>
+          <details className={styles.guidance}>
+            <summary>الشروط والأحكام وسياسة الخصوصية</summary>
+            <p className="whitespace-pre-line pb-4 text-sm leading-7">{siteContent.terms_text}</p>
+          </details>
+          <label className="flex min-h-12 items-center gap-3 text-sm">
+            <input type="checkbox" className="size-5" checked={termsAccepted} onChange={event => setTermsAccepted(event.target.checked)} />
+            أوافق على الشروط وإرسال الطلب
+          </label>
           <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-[11px] font-medium leading-5 text-red-700">
             <strong>إقرار وإخلاء مسؤولية:</strong> بإرسال الطلب، يقر مقدم الطلب بأن جميع البيانات والمعلومات والمستندات والصور المقدمة صحيحة ودقيقة ومصرح له باستخدامها ونشرها، ويتحمل وحده كامل المسؤولية القانونية عن صحتها ومشروعيتها وعدم مخالفتها لحقوق الغير. ولا تتحمل شركة تواصل النخبة للدعاية والإعلان أو حساب «أول سعودي» أي مسؤولية قانونية أو تعويضية ناشئة عن عدم صحة أو دقة أو اكتمال البيانات المقدمة.
           </p>
-          <Button onClick={handleSubmit} loading={submitting} disabled={submitting} className="w-full" size="lg">
-            {membershipMode ? 'إرسال الطلب من رصيد العضوية' : clientType === 'individual' ? 'المتابعة إلى الدفع' : 'إرسال الطلب للمراجعة'}
+          <Button type="button" onClick={handleSubmit} loading={submitting} disabled={!canSubmit || !termsAccepted || submitting} className="w-full" size="lg">
+            {membershipMode ? 'إرسال الطلب من رصيد العضوية' : showPackages ? 'المتابعة إلى الدفع' : 'إرسال الطلب للمراجعة'}
           </Button>
         </div>
-
-        {showTerms && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setShowTerms(false)}>
-            <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-                <h3 className="font-black text-dark text-base">الشروط والأحكام وسياسة الخصوصية</h3>
-                <button type="button" onClick={() => setShowTerms(false)} className="w-8 h-8 rounded-full flex items-center justify-center text-muted hover:bg-muted/10 text-lg" aria-label="إغلاق">✕</button>
-              </div>
-              <div className="px-5 py-4 overflow-y-auto text-sm text-dark/80 leading-relaxed whitespace-pre-line">{siteContent.terms_text}</div>
-              <div className="px-5 py-3 border-t border-border"><Button onClick={() => setShowTerms(false)} className="w-full">إغلاق</Button></div>
-            </div>
-          </div>
-        )}
       </div>
     )
   }
@@ -971,79 +891,79 @@ export default function RequestWizard() {
     setClientType(v)
   }
 
-  // تقدّم التعبئة — للأقسام الفعّالة فقط (الباقة للأفراد، التواصل للزائر)
-  const progressSteps = [
-    identityComplete, aboutComplete,
-    ...(showPackages ? [packagesComplete] : []),
-    contentComplete,
-    ...(!isLoggedIn ? [contactComplete] : []),
+  const includePackageStep = showPackages || (!membershipMode && !effectiveClientType)
+  const steps = [
+    { id: 0, label: 'الصفة', ready: true, next: 'متابعة إلى نوع الخبر' },
+    { id: 1, label: 'نوع الخبر', ready: identityComplete, next: showPackages ? 'متابعة إلى الباقات' : 'متابعة إلى تفاصيل الخبر' },
+    ...(includePackageStep ? [{ id: 2, label: 'الباقة والقنوات', ready: identityComplete && aboutComplete, next: 'متابعة إلى تفاصيل الخبر' }] : []),
+    { id: 3, label: 'المحتوى والمرفقات', ready: identityComplete && aboutComplete && packagesComplete, next: 'مراجعة الطلب' },
+    { id: 4, label: 'المراجعة', ready: canSubmit, next: '' },
   ]
-  const progressDone = progressSteps.filter(Boolean).length
-  const progressPct = Math.round((progressDone / progressSteps.length) * 100)
+  const currentIndex = Math.max(0, steps.findIndex(step => step.id === activeSection && step.ready))
+  const currentStep = steps[currentIndex]
+  const previousStep = steps[currentIndex - 1]
+  const nextStep = steps[currentIndex + 1]
+  const position = `الخطوة ${currentIndex + 1} من ${steps.length}`
+
   const membershipAvailable = membershipWallet
     ? membershipWallet.total_credits - membershipWallet.reserved_credits - membershipWallet.used_credits
     : null
 
   // ── العرض ───────────────────────────────────────────────────────
   return (
-    <div className="request-screen min-h-screen pb-36 lg:pb-10">
-      <div className={cn('mx-auto w-full px-4 pt-6 lg:px-6 2xl:px-8', membershipMode ? 'max-w-6xl' : 'max-w-none')}>
-        <div className="relative max-w-3xl mx-auto text-center mb-5">
+    <div className={`request-screen ${styles.screen}`}>
+      <div className={styles.container}>
+        <div className={styles.intro}>
           {membershipMode && membershipAvailable != null && (
             <div className="mb-4 inline-flex items-center gap-3 rounded-lg border border-gold/30 bg-white/80 px-4 py-2 text-right shadow-sm lg:absolute lg:left-0 lg:top-0 lg:mb-0">
               <div><p className="text-[10px] font-bold text-muted">رصيد النشر المتبقي</p><p className="text-xs text-muted">بعد هذا الطلب: {Math.max(0, membershipAvailable - 1)}</p></div>
               <strong className="text-2xl text-green">{membershipAvailable}</strong>
             </div>
           )}
-          <h1 className="text-2xl md:text-3xl font-black text-dark mb-1">طلب نشر جديد</h1>
-          <p className="text-sm text-muted">{membershipMode ? 'قدّم الخبر من رصيد عضويتك دون المرور بالدفع' : 'عبّئ بياناتك بسرعة — وبمجرد الإرسال يظهر سعرك ويصلك العرض'}</p>
+          <h1 className="text-2xl md:text-3xl font-black text-dark mb-1">تقديم طلب نشر</h1>
+          <p>{membershipMode ? 'قدّم الخبر من رصيد عضويتك دون المرور بالدفع' : 'اختر نوع الخبر، وحدد الباقة والقنوات، ثم أضف تفاصيلك وراجع الطلب قبل إرساله.'}</p>
         </div>
 
-        {/* شريط التقدّم */}
-        <div className="max-w-3xl mx-auto mb-6">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-bold text-dark">{progressDone} من {progressSteps.length} مكتمل</span>
-            <span className="text-xs font-black text-green">{progressPct}%</span>
-          </div>
-          <div role="progressbar" aria-label="اكتمال بيانات الطلب" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPct} className="request-progress h-2 rounded-full bg-muted/15 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-green transition-all duration-500 ease-out"
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
-        </div>
-
-        <RequestReviewsTrust />
+        <nav className={styles.progress} aria-label="خطوات الطلب">
+          <p><strong>{currentStep.label}</strong><span>{position}</span></p>
+          <progress max={steps.length} value={currentIndex + 1} aria-label="الخطوة الحالية في طلب النشر" aria-valuetext={position} />
+          <ol>
+            {steps.map((step, index) => (
+              <li key={step.id}>
+                <button
+                  type="button"
+                  aria-controls={`request-section-${step.id}`}
+                  aria-current={index === currentIndex ? 'step' : undefined}
+                  data-state={index === currentIndex ? 'current' : index < currentIndex ? 'complete' : step.ready ? 'available' : 'upcoming'}
+                  disabled={!step.ready || index === currentIndex || submitting}
+                  onClick={() => goToStep(step.id)}
+                >
+                  <span aria-hidden="true" className={styles.stepNumber}>{index < currentIndex ? '✓' : index + 1}</span>
+                  <span className={styles.stepLabel}>{step.label}</span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </nav>
 
         <div className={cn(membershipMode && !membershipPortalMode && 'lg:grid lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start lg:gap-6 xl:gap-8')}>
-        <main className={cn('min-w-0 mx-auto w-full', !membershipMode ? 'max-w-none' : membershipPortalMode ? 'max-w-3xl' : 'max-w-2xl lg:max-w-none lg:mx-0')}>
+        <div className={cn('min-w-0 mx-auto w-full', !membershipMode ? 'max-w-none' : membershipPortalMode ? 'max-w-3xl' : 'max-w-2xl lg:max-w-none lg:mx-0')}>
         <div className="space-y-3">
 
-          <FormSection index={1} title="الصفة" subtitle="حدد صفة مقدم الطلب" complete={identityComplete} open={activeSection===0} onToggle={()=>setOpenSection(activeSection===0?-1:0)}>
+          <FormSection index={0} title="صفة مقدم الطلب" open={currentStep.id === 0}>
             <div className="space-y-4">
-              {!membershipMode && <div>
-                <label className={fieldLabel}>صفة مقدّم الطلب *</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {CLIENT_TYPE_OPTIONS.map(o => {
-                    const active = clientType === o.id
-                    return (
-                      <button
-                        type="button"
-                        key={o.id}
-                        onClick={() => selectClientType(o.id)}
-                        aria-pressed={active}
-                        className={cn(
-                          'flex items-center gap-2 rounded-xl border-2 px-3 py-2.5 text-sm font-bold transition-all active:scale-[0.98]',
-                          active ? 'border-green bg-green/5 text-dark ring-2 ring-green/20' : 'border-border bg-white text-muted hover:border-green/40',
-                        )}
-                      >
-                        <span className="leading-tight text-right">{o.label}</span>
-                      </button>
-                    )
-                  })}
+              {!membershipMode && <fieldset className={styles.roleGroup}>
+                <legend>بأي صفة تقدّم الطلب؟</legend>
+                <div className={styles.roleOptions}>
+                  {CLIENT_TYPE_OPTIONS.map(option => (
+                    <label key={option.id} data-selected={clientType === option.id}>
+                      <input type="radio" name="request-client-type" value={option.id} checked={clientType === option.id} onChange={() => selectClientType(option.id)} />
+                      <span><strong>{option.label}</strong><span>{option.desc}</span></span>
+                    </label>
+                  ))}
                 </div>
-                <p className="text-xs text-amber-600 mt-2">⚠️ يجب اختيار الصفة الصحيحة؛ فقد يؤدي الاختيار غير الصحيح إلى إلغاء الطلب وعدم الأهلية لاسترجاع المبلغ، وفق سياسة الاسترجاع والأنظمة النافذة.</p>
-              </div>}
+                <p className="mt-3 text-sm text-muted">قد يؤثر اختيار صفة غير صحيحة على قبول الطلب وأهلية الاسترداد.</p>
+              </fieldset>}
 
               {/* بيانات الجهة — لغير الأفراد (شركة / حكومة / جمعية / وكالة) */}
               {effectiveClientType && effectiveClientType !== 'individual' && (
@@ -1082,11 +1002,12 @@ export default function RequestWizard() {
               )}
 
               {membershipMode && <p className="text-sm text-muted">الصفة مرتبطة بالعضوية الحالية.</p>}
-              <div className="flex justify-end pt-2"><Button size="sm" disabled={!identityComplete} onClick={()=>setOpenSection(1)}>التالي إلى نوع الخبر</Button></div>
+
             </div>
           </FormSection>
-          <FormSection index={2} title="نوع الخبر" subtitle="نوع الطلب والفئة والخيارات الخاصة بها" complete={aboutComplete} disabled={!identityComplete} open={activeSection===1} onToggle={()=>setOpenSection(activeSection===1?-1:1)}>
+          <FormSection index={1} title="نوع الخبر وقنوات الناشر" open={currentStep.id === 1}>
             <div className="space-y-4">
+              {selectedInf && <p className="text-sm text-muted">الناشر {selectedInf.name_ar}</p>}
               <div>
                 <label className={fieldLabel}>نوع الطلب *</label>
                 <div className={membershipMode ? 'grid grid-cols-1 gap-3' : 'grid grid-cols-2 gap-3'}>
@@ -1119,7 +1040,7 @@ export default function RequestWizard() {
               {requestType === 'single' && (
                 <>
                   <div>
-                    <label htmlFor="request-news-category" className={fieldLabel}>فئة المحتوى *</label>
+                    <label htmlFor="request-news-category" className={fieldLabel}>نوع الخبر *</label>
                     <select
                       id="request-news-category"
                       value={category ?? ''}
@@ -1231,21 +1152,13 @@ export default function RequestWizard() {
               )}
 
               {effectiveClientType && effectiveClientType!=='individual' && <p className="text-sm leading-7 text-muted">طلبات الجهات تُراجع وتُسعّر يدويًا. يصلك عرض السعر قبل الدفع.</p>}
-              <div className="flex justify-end pt-2"><Button size="sm" disabled={!aboutComplete} onClick={()=>setOpenSection(showPackages?2:3)}>{showPackages?'التالي إلى الباقات':'التالي إلى التفاصيل'}</Button></div>
+
             </div>
           </FormSection>
           {/* ③ اختيار الباقة — للأفراد، مع إبقاء مسار الحملات الحالي */}
-          {showPackages && (
-            <FormSection
-              index={3}
-              disabled={!aboutComplete}
-              title="اختر الباقة"
-              subtitle={requestType === 'campaign' ? 'باقة واحدة تنطبق على كل أخبار الحملة' : 'حدّد الباقة المناسبة لخبرك'}
-              wide={requestType === 'single'}
-              complete={packagesComplete}
-              open={activeSection === 2}
-              onToggle={() => setOpenSection(activeSection === 2 ? -1 : 2)}
-            >
+          {includePackageStep && (
+            <FormSection index={2} title="الباقة وقنوات النشر" open={currentStep.id === 2}>
+              {selectedCat && <p className="text-sm text-muted">{selectedCat.name_ar}{selectedInf ? ' · ' + selectedInf.name_ar : ''}</p>}
               {requestType === 'campaign' && (
                 <p className="text-xs text-muted mb-3 bg-cream rounded-lg p-2">
                   🚀 الباقة المختارة تنطبق على كل أخبار الحملة ({campaignPosts.length} منشورات) — السعر يشمل خصم الحملة {CAMPAIGN_DISCOUNT}%.
@@ -1343,66 +1256,39 @@ export default function RequestWizard() {
               </div>
 
               )}
-              {chosenV2 && !chosenV2.channels && chosenV2.channelCount>1 && (
-                <div className="mt-4 rounded-xl border border-border p-4">
-                  <p className={fieldLabel}>اختر {chosenV2.channelCount} قنوات مختلفة *</p>
-                  <div className="flex flex-wrap gap-2 mt-3">{availableChannels.map(ch => (
-                    <button type="button" key={ch} aria-pressed={reachChannels.includes(ch)}
-                      onClick={() => setReachChannels(prev => prev.includes(ch) ? prev.filter(c => c !== ch) : prev.length < chosenV2.channelCount ? [...prev, ch] : prev)}
-                      className={cn('rounded-lg border px-4 py-3', reachChannels.includes(ch) ? 'border-green text-green' : 'border-border')}>
-                      {CHANNEL_LABELS[ch] ?? ch}
-                    </button>
-                  ))}</div>
-                </div>
+              {showPackages && selectedPackageData && (chosenV2 || basicNeedsChannel) && (
+                <fieldset className={styles.channelGroup}>
+                  <legend>القنوات — {selectedPackageData.name}</legend>
+                  <p>{chosenV2?.channels ? 'القنوات المشمولة' : basicNeedsChannel ? 'اختر قناة واحدة' : 'اختر ' + chosenV2?.channelCount + ' من القنوات المختلفة'}</p>
+                  {availableChannels.length === 0 && <p>لا توجد قنوات متاحة لهذا الحساب</p>}
+                  <div className={styles.channelOptions}>
+                    {availableChannels.map(channel => {
+                      const fixed = !!chosenV2?.channels
+                      const checked = fixed ? chosenChannels.includes(channel)
+                        : basicNeedsChannel ? basicChannel === channel : reachChannels.includes(channel)
+                      return <label key={channel}>
+                        <input
+                          type={basicNeedsChannel ? 'radio' : 'checkbox'}
+                          name="request-channel"
+                          value={channel}
+                          checked={checked}
+                          disabled={fixed || (!basicNeedsChannel && !checked && reachChannels.length >= (chosenV2?.channelCount ?? 0))}
+                          onChange={() => {
+                            if (basicNeedsChannel) setBasicChannel(channel)
+                            else setReachChannels(current => checked ? current.filter(item => item !== channel) : [...current, channel])
+                          }}
+                        />
+                        <span>{CHANNEL_LABELS[channel] ?? channel}</span>
+                      </label>
+                    })}
+                  </div>
+                </fieldset>
               )}
-              {chosenV2 && !validV2Channels && <p role="status" className="mt-3 text-sm text-red-700">أكمل اختيار القنوات المطلوبة؛ يجب أن تتوفر جميع قنوات الباقة لدى الحساب الناشر.</p>}
-              {/* اختيار قناة النشر — للباقة الأساسية فقط (قناة واحدة) */}
-              {basicNeedsChannel && (
-                <div className="mt-4 bg-cream rounded-xl p-4">
-                  <label className={fieldLabel}>اختر قناة النشر *</label>
-                  <p className="text-xs text-muted mb-3">الباقة المختارة تشمل النشر في قناة واحدة يختارها العميل</p>
-                  {availableChannels.length === 0 ? (
-                    <p className="text-xs text-muted">لا توجد قنوات متاحة لهذا الحساب</p>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {availableChannels.map(ch => (
-                        <button
-                          type="button"
-                          key={ch}
-                          onClick={() => setBasicChannel(ch)}
-                          className={cn(
-                            'rounded-xl border-2 px-3 py-2.5 text-sm font-medium transition-all',
-                            basicChannel === ch
-                              ? 'border-green bg-green/5 text-dark'
-                              : 'border-border bg-white text-muted hover:border-green/40',
-                          )}
-                        >
-                          {basicChannel === ch && <span className="text-green">✓ </span>}
-                          {CHANNEL_LABELS[ch] ?? ch}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="flex justify-end pt-4">
-                <Button size="sm" onClick={()=>setOpenSection(3)} disabled={!packagesComplete}>
-                  التالي إلى التفاصيل
-                </Button>
-              </div>
+              {chosenV2 && !validV2Channels && <p role="status" className="mt-3 text-sm">أكمل اختيار القنوات المطلوبة للباقة.</p>}
             </FormSection>
           )}
           {/* ④ تفاصيل المحتوى — بعد الباقة، أو مباشرة للجهات */}
-          <FormSection
-            index={showPackages?4:3}
-            title="تفاصيل المحتوى"
-            subtitle={requestType === 'campaign' ? 'منشورات الحملة' : 'عنوان ونص المنشور'}
-            complete={contentComplete}
-            disabled={!aboutComplete || (showPackages && !packagesComplete)}
-            open={activeSection === 3}
-            onToggle={() => setOpenSection(activeSection === 3 ? -1 : 3)}
-          >
+          <FormSection index={3} title="تفاصيل الخبر" open={currentStep.id === 3}>
             {/* شروط قبول الخبر — شرط الفئة (للمنشور المفرد) + أي بنود عامة إن وُجدت — تُدار من لوحة الأدمن */}
             {(() => {
               const singleCondition =
@@ -1413,8 +1299,8 @@ export default function RequestWizard() {
                 !!siteContent.news_conditions_footer
               if (!hasContent) return null
               return (
-                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-[11px] leading-6 text-red-600">
-                  <p className="font-bold mb-1">⚠️ شروط قبول الخبر:</p>
+                <details className={styles.guidance}>
+                  <summary>متطلبات قبول الخبر</summary>
                   <ul className="list-disc pr-4 space-y-0.5">
                     {siteContent.news_conditions_general.map((line, i) => (
                       <li key={i}>{line}</li>
@@ -1426,7 +1312,7 @@ export default function RequestWizard() {
                   {siteContent.news_conditions_footer && (
                     <p className="font-bold mt-1">{siteContent.news_conditions_footer}</p>
                   )}
-                </div>
+                </details>
               )
             })()}
 
@@ -1442,7 +1328,11 @@ export default function RequestWizard() {
               />
             ) : (
               <>
-                <RStep3Details data={details} onChange={setDetails} />
+                <RStep3Details
+                  data={details}
+                  onChange={setDetails}
+                  contact={!isLoggedIn ? <RStep5Contact data={contact} onChange={setContact} /> : null}
+                />
                 {membershipMode && membershipBenefits.length > 0 && (
                   <MembershipBenefitPicker
                     wallets={membershipBenefits}
@@ -1458,12 +1348,22 @@ export default function RequestWizard() {
                 <label className="block text-sm">لغة السيرة<select value={career.language} onChange={e => setCareer(v => ({ ...v, language: e.target.value }))} className="block w-full border border-border rounded-lg p-3 mt-2"><option value="ar">العربية</option><option value="en">الإنجليزية</option></select></label>
                 {([['goal','الهدف المهني'],['experience','الخبرات أو الأنشطة والمشاريع'],['education','المؤهلات والتعليم']] as const).map(([key,label]) => <label className="block text-sm" key={key}>{label} *<textarea maxLength={6000} value={career[key]} onChange={e => setCareer(v => ({ ...v, [key]: e.target.value }))} className="block w-full border border-border rounded-lg p-3 mt-2" /></label>)}
               </fieldset>}
-            {!isLoggedIn && <section className="mt-6 border-t border-border pt-5"><RStep5Contact data={contact} onChange={setContact}/></section>}
-            <div className="flex justify-end pt-4"><Button size="sm" onClick={openReview} disabled={!canSubmit}>مراجعة الطلب</Button></div>
-          </FormSection>
+            {requestType === 'campaign' && !isLoggedIn && (
+              <section className="mt-6 border-t border-border pt-5"><RStep5Contact data={contact} onChange={setContact} /></section>
+            )}
 
+          </FormSection>
+          <FormSection index={4} title="مراجعة الطلب" open={currentStep.id === 4}>
+            {currentStep.id === 4 && renderReview()}
+          </FormSection>
+          <div className={styles.actions}>
+            {previousStep && <Button type="button" variant="outline" disabled={submitting} onClick={() => goToStep(previousStep.id)}>السابق</Button>}
+            {nextStep && <Button type="button" disabled={!nextStep.ready} onClick={() => goToStep(nextStep.id)}>
+              {currentStep.next}
+            </Button>}
+          </div>
         </div>
-        </main>
+        </div>
 
         {membershipMode && !membershipPortalMode && <aside className="hidden lg:block sticky top-28">
             <div className="overflow-hidden rounded-lg border border-gold/40 bg-dark p-6 text-white shadow-xl">
@@ -1475,70 +1375,8 @@ export default function RequestWizard() {
             </div>
         </aside>}
       </div>
+        <div className="mt-5"><RequestReviewsTrust /></div>
       </div>
-
-      {/* سلة الطلب الثابتة */}
-      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-card/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-lg backdrop-blur-md lg:hidden">
-        <div className="max-w-2xl mx-auto">
-          {!canSubmit && missingHint() && (
-            <p className="text-xs text-muted text-center mb-2">⬑ {missingHint()}</p>
-          )}
-          {showPackages && selectedPackageData && (
-            <div className="flex items-center justify-between gap-3 text-sm mb-2">
-              <div className="min-w-0">
-                <span className="text-muted">السلة: </span>
-                <span className="font-bold text-dark">{selectedPackageData.name}</span>
-              </div>
-              {checkoutTotalAfterRecovery != null && (
-                <div className="text-left">
-                  <span className="font-black text-green whitespace-nowrap">{checkoutTotalAfterRecovery.toLocaleString('ar-SA')} ر.س</span>
-                  {recoveryDiscountAmount > 0 && (
-                    <span className="block text-xs text-muted line-through">{checkoutSubtotal?.toLocaleString('ar-SA')} ر.س</span>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-          <Button
-            onClick={openReview}
-            disabled={!canSubmit}
-            className="w-full"
-          >
-            مراجعة الطلب
-          </Button>
-        </div>
-      </div>
-
-      {/* نافذة الشروط والأحكام */}
-      {showTerms && (
-        <div
-          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-          onClick={() => setShowTerms(false)}
-        >
-          <div
-            className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-              <h3 className="font-black text-dark text-base">الشروط والأحكام وسياسة الخصوصية</h3>
-              <button
-                type="button"
-                onClick={() => setShowTerms(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-muted hover:bg-muted/10 text-lg"
-                aria-label="إغلاق"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="px-5 py-4 overflow-y-auto text-sm text-dark/80 leading-relaxed whitespace-pre-line">
-              {siteContent.terms_text}
-            </div>
-            <div className="px-5 py-3 border-t border-border">
-              <Button onClick={() => setShowTerms(false)} className="w-full">إغلاق</Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
