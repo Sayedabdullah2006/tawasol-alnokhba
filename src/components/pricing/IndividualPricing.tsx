@@ -1,6 +1,5 @@
 'use client'
 import Link from 'next/link'
-import { FIRST1SAUDI_SERVICES_URL } from '@/lib/first1saudi-links'
 import {useIndividualCatalog} from '@/hooks/useIndividualCatalog'
 import {activePackages,packageStartingPrice,type PublishedCatalog} from '@/lib/catalog/model'
 export default function IndividualPricing({initial}:{initial:PublishedCatalog|null}){
@@ -85,7 +84,7 @@ export default function IndividualPricing({initial}:{initial:PublishedCatalog|nu
                 {tiers.map(p=>p.fixedPrice!=null?`${p.name} بسعر مستقل ${p.fixedPrice.toLocaleString('ar-SA')} ريال`:`${p.name}: سعر نوع الخبر${p.surcharge?` مع زيادة ${p.surcharge.toLocaleString('ar-SA')} ريال`:''}`).join('؛ ')}.
                 الإنتاج من مواد العميل، والتصوير الميداني والترجمة خارج النطاق. فئة «أخرى» والجهات تحتاج عرض سعر. يظهر الإجمالي المعتمد قبل الدفع.
               </p>
-              <Link href={FIRST1SAUDI_SERVICES_URL}
+              <Link href="/request"
                 className="inline-block mt-4 px-6 py-3 bg-green text-white rounded-xl text-sm font-bold hover:bg-green/90 transition-all">
                 ابدأ طلبك الآن
               </Link>
