@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { FIRST1SAUDI_SERVICES_URL } from '@/lib/first1saudi-links'
 
 export default function Footer() {
   return (
@@ -28,7 +27,7 @@ export default function Footer() {
               <Link href="/policies#google-data" className="text-cream/70 hover:text-gold transition-colors">خصوصية بيانات Google</Link>
               <Link href="/meetings" className="text-cream/70 hover:text-gold transition-colors">اجتماعات الفريق</Link>
               <Link href="/refund-policy" className="font-bold text-gold hover:text-cream transition-colors">سياسة الاسترجاع</Link>
-              <Link href={FIRST1SAUDI_SERVICES_URL} className="text-cream/70 hover:text-gold transition-colors">تقديم طلب</Link>
+              <Link href="/request" className="text-cream/70 hover:text-gold transition-colors">تقديم طلب</Link>
               <Link href="/memberships/checkout" className="text-cream/70 hover:text-gold transition-colors">العضويات</Link>
             </nav>
           </div>
