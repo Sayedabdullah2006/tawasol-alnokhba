@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase-server'
+import { PACKAGE_IDS } from '@/lib/catalog/model'
 import { ORDERABLE_PACKAGES } from '@/lib/constants'
 import {
   createDraftAccess,
@@ -76,7 +77,8 @@ export async function POST(request: Request) {
     const email = normalizeRecoveryEmail(user.email)
     const selectedPackage = String(body.selectedPackage ?? '')
     const payload = body.payload && typeof body.payload === 'object' ? body.payload : {}
-    if (!EMAIL_RE.test(email) || !ORDERABLE_PACKAGES.some(pkg => pkg.id === selectedPackage)) {
+    const knownPackage = [...ORDERABLE_PACKAGES.map(pkg => pkg.id), ...PACKAGE_IDS].includes(selectedPackage)
+    if (!EMAIL_RE.test(email) || !knownPackage) {
       return NextResponse.json({ skipped: true })
     }
     if (JSON.stringify(payload).length > MAX_PAYLOAD_CHARS) {

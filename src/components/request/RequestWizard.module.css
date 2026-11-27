@@ -110,6 +110,20 @@
 .guidance :is(ul,p) { margin-block-end: .875rem; }
 .reviewGrid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 1rem; }
 
+.accountActions { display: flex; flex-wrap: wrap; gap: .75rem; }
+.accountActions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 3rem;
+  padding-inline: 1.25rem;
+  border: 1px solid var(--request-gold);
+  border-radius: .5rem;
+  color: var(--request-gold);
+  font-weight: 700;
+}
+.accountActions a:first-child { background: var(--request-gold); color: #10263b; }
+
 .actions {
   display: flex;
   justify-content: flex-end;

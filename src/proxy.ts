@@ -43,12 +43,15 @@ export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   // Protected routes — require login.
-  // تقديم الطلب والدفع يتطلّبان تسجيل الدخول (لتعزيز الثقة وربط الطلب بحساب موثّق).
+  // Public entry to the wizard. Membership and signed recovery links still require a session.
+  const publicRequest = pathname === '/request' &&
+    !request.nextUrl.searchParams.has('membership') &&
+    !request.nextUrl.searchParams.has('resume')
   const protectedPath =
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/admin') ||
     pathname.startsWith('/employee') ||
-    pathname.startsWith('/request') ||
+    (pathname.startsWith('/request') && !publicRequest) ||
     pathname.startsWith('/payment')
 
   if (protectedPath && !user) {

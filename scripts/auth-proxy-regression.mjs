@@ -8,6 +8,17 @@ try{
  for(const path of ['/auth/sso','/auth/login','/auth/register','/oauth/consent']){const request=new NextRequest('https://localhost:8080'+path,{headers:{host:'evil.invalid','x-forwarded-host':'evil.invalid'}});const r=await proxy.proxy(request);assert((r.headers.get('cache-control')||'').includes('no-store'));assert.equal(r.cookies.getAll().length,2);assert.equal(r.cookies.get('sb-fixture.0').value,'fixture-rotated-a');assert(r.cookies.get('sb-fixture.0').secure);assert((r.headers.get('x-middleware-request-cookie')||'').includes('fixture-rotated-a'));}
  assert(proxy.config.matcher.includes('/auth/:path*'));assert(proxy.config.matcher.includes('/oauth/consent'));checks.push('Native/SSO auth pages and consent preserve rotated cookie chunks in both incoming request and outgoing browser response with Secure/Lax and no-store');
  user=null;const r=await proxy.proxy(new NextRequest('https://localhost:8080/dashboard?view=mine'));assert.equal(new URL(r.headers.get('location')).origin,origin.AUTH_ORIGIN);assert.equal(r.cookies.get('sb-fixture.0').value,'');assert.equal(r.cookies.get('sb-fixture.1').maxAge,0);checks.push('Protected-page redirect uses fixed public origin and preserves session-deletion cookies instead of dropping them');
+ for(const path of ['/request','/request?package=v2_basic','/request?continue=details']){
+  const response=await proxy.proxy(new NextRequest('https://localhost:8080'+path));
+  assert.equal(response.headers.get('location'),null);
+  assert((response.headers.get('cache-control')||'').includes('no-store'));
+ }
+ for(const path of ['/request/start','/request?membership=fixture','/request?resume=fixture','/payment/fixture']){
+  const response=await proxy.proxy(new NextRequest('https://localhost:8080'+path));
+  assert.equal(new URL(response.headers.get('location')).searchParams.get('next'),path);
+ }
+ for(const role of ['client','admin','employee'])assert.equal(portal.portalLoginDestination(role,portal.REQUEST_AFTER_LOGIN),'/request?continue=details');
+ checks.push('Public wizard entry remains uncached, protected subflows still require a session, and native login returns to the wizard');
  const route=load('src/app/api/oauth/decision/route.ts',name=>name==='next/server'?{NextResponse}:name==='@/lib/auth-origin'?origin:name==='@/lib/sso'?sso:{createServerSupabaseClient:async()=>({auth:{getUser:async()=>({data:{user},error:authError}),signOut:async()=>{signouts++;return {error:null}},oauth:{getAuthorizationDetails:async()=>details,approveAuthorization:async()=>details,denyAuthorization:async()=>details}}})});
  const call=(body,requestOrigin='https://nukhba.media')=>route.POST(new Request('https://localhost:8080/api/oauth/decision',{method:'POST',headers:{Origin:requestOrigin,'Content-Type':'application/x-www-form-urlencoded',host:'evil.invalid','x-forwarded-host':'evil.invalid'},body}));
  for(const decision of ['approve','deny','switch']){const response=await call('authorization_id=valid-fixture-authorization&decision='+decision);assert.equal(response.status,303);assert.equal(new URL(response.headers.get('location')).origin,origin.AUTH_ORIGIN);assert((response.headers.get('cache-control')||'').includes('no-store'));}checks.push('All no-session consent actions reproduce internal localhost listener yet redirect only to the public HTTPS origin');

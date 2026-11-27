@@ -5,6 +5,8 @@ import {activePackages, newsPrice, PACKAGE_IDS} from '@/lib/catalog/model'
 import { getIndividualPackage, packagePrice, resolvePackageChannels } from '@/lib/individual-packages'
 import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { REQUEST_AFTER_LOGIN } from '@/lib/portal-login'
 import { createClient } from '@/lib/supabase'
 import { useCategories, useSiteContent, type DBCategory, type SiteContent } from '@/lib/hooks'
 import { useToast } from '@/components/ui/Toast'
@@ -73,6 +75,7 @@ const DURATION_OPTIONS = [
 
 // مفتاح حفظ المسودة محلياً + مدة صلاحيتها (7 أيام)
 const DRAFT_KEY = 'tn_request_draft_v1'
+const GUEST_SELECTION_KEY = 'tn_request_guest_selection'
 const RECOVERY_TOKEN_KEY = 'tn_request_recovery_token_v1'
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -136,6 +139,7 @@ export default function RequestWizard() {
   const membershipId = searchParams.get('membership')
   const resumeTokenParam = searchParams.get('resume')
   const requestedPackage = searchParams.get('package')
+  const continueAfterLogin = searchParams.get('continue') === 'details'
   const membershipMode = !!membershipId
   const membershipPortalMode = membershipMode && pathname.startsWith('/dashboard/membership/request')
   const { showToast } = useToast()
@@ -187,7 +191,12 @@ export default function RequestWizard() {
   const [selectedExtras, setSelectedExtras] = useState<string[]>([])
   const [discountCode, setDiscountCode] = useState('')
   const [contact, setContact]           = useState<ContactData>({ fullName: '', phone: '', email: '', city: '', xHandle: '' })
-  const [isLoggedIn, setIsLoggedIn]     = useState(false)
+  const [userId, setUserId] = useState<string | null>()
+  const isLoggedIn = !!userId
+  const [showAccountOptions, setShowAccountOptions] = useState(false)
+  const [guestSubtotal, setGuestSubtotal] = useState<number | null>(null)
+  const guestSelectionRestored = useRef(false)
+  const focusResumedStep = useRef(false)
   const [orgInfo, setOrgInfo]           = useState({ name: '', representative: '', license: '' })
   // الموافقة على الشروط ضمنية بالضغط على «إرسال الطلب» — مع رابط لعرضها في نافذة منبثقة
   const [termsAccepted, setTermsAccepted] = useState(false)
@@ -240,8 +249,9 @@ export default function RequestWizard() {
       setLoading(false)
     })
     supabase.auth.getUser().then(({ data: { user } }) => {
+      setUserId(user?.id ?? null)
       if (user) {
-        setIsLoggedIn(true)
+        setContact(prev => ({ ...prev, email: user.email || prev.email }))
         supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data: profile }) => {
           if (profile) {
             setContact(prev => ({
@@ -265,19 +275,34 @@ export default function RequestWizard() {
             if (data && data.length > 0) setPendingQuote(data[0] as PendingQuote)
           })
       }
-    })
+    }).catch(() => setUserId(null))
   }, [])
 
   // ── استرجاع مسودة غير مكتملة (مرة واحدة عند الفتح) ──────────────
   useEffect(() => {
+    if (userId === undefined || hydrated) return
     let cancelled = false
     const restoreDraft = () => {
       if (cancelled) return
       try {
-        const raw = localStorage.getItem(DRAFT_KEY)
+        const guestSelection = !membershipMode && (!userId || continueAfterLogin)
+          ? sessionStorage.getItem(GUEST_SELECTION_KEY)
+          : null
+        const raw = guestSelection ?? (userId ? localStorage.getItem(DRAFT_KEY) : null)
         if (raw) {
           const d = JSON.parse(raw)
-          if (d && typeof d.savedAt === 'number' && Date.now() - d.savedAt < DRAFT_TTL_MS) {
+          if (d && typeof d.savedAt === 'number' && Date.now() - d.savedAt < DRAFT_TTL_MS &&
+              (guestSelection || !d.userId || d.userId === userId)) {
+          if (guestSelection) {
+            guestSelectionRestored.current = true
+            setOpenSection(userId ? 3 : d.selectedPackage ? 2 : 1)
+            focusResumedStep.current = !!userId
+            if (userId && typeof d.subtotal === 'number') setGuestSubtotal(d.subtotal)
+          } else if (continueAfterLogin && d.userId === userId) {
+            setOpenSection(3)
+            focusResumedStep.current = true
+            if (typeof d.guestSubtotal === 'number') setGuestSubtotal(d.guestSubtotal)
+          }
           if (d.selectedInfluencer)   setSelectedInfluencer(d.selectedInfluencer)
           if (d.requestType)          setRequestType(d.requestType)
           if (d.clientType)           setClientType(d.clientType)
@@ -291,7 +316,6 @@ export default function RequestWizard() {
               supportingDocuments: Array.isArray(d.details.supportingDocuments) ? d.details.supportingDocuments : [],
             })
           }
-          if (d.contact)              setContact(d.contact)
           if (d.orgInfo)              setOrgInfo(d.orgInfo)
           if (d.campaignSetup)        setCampaignSetup(d.campaignSetup)
           if ((d.selectedPackage === 'basic' || d.selectedPackage === 'v2_basic') && Array.isArray(d.selectedExtras)) setSelectedExtras(d.selectedExtras)
@@ -317,10 +341,11 @@ export default function RequestWizard() {
     }
     queueMicrotask(restoreDraft)
     return () => { cancelled = true }
-  }, [showToast])
+  }, [continueAfterLogin, hydrated, membershipMode, showToast, userId])
 
   // Restore a server-side draft from a signed email link. Local drafts still work as before.
   useEffect(() => {
+    if (!hydrated || !userId || (guestSelectionRestored.current && !resumeTokenParam)) return
     const resumeToken = resumeTokenParam
     const storedToken = (() => {
       try { return localStorage.getItem(RECOVERY_TOKEN_KEY) } catch { return null }
@@ -362,10 +387,11 @@ export default function RequestWizard() {
         }
         if (d.campaignSetup && typeof d.campaignSetup === 'object') setCampaignSetup(d.campaignSetup as CampaignSetup)
         if (Array.isArray(d.campaignPosts)) setCampaignPosts(d.campaignPosts as CampaignPostData[])
-        if (typeof d.selectedPackage === 'string' && ORDERABLE_PACKAGES.some(pkg => pkg.id === d.selectedPackage)) {
-          setSelectedPackage(d.selectedPackage)
+        if ([...ORDERABLE_PACKAGES.map(pkg => pkg.id), ...PACKAGE_IDS].includes(d.selectedPackage as string)) {
+          setSelectedPackage(d.selectedPackage as string)
         }
         if (typeof d.basicChannel === 'string') setBasicChannel(d.basicChannel)
+        if (Array.isArray(d.reachChannels)) setReachChannels(d.reachChannels.filter((item): item is string => typeof item === 'string'))
         if (Array.isArray(d.selectedExtras)) setSelectedExtras(d.selectedExtras.filter((item): item is string => typeof item === 'string'))
         setRecoveryToken(token)
         try { localStorage.setItem(RECOVERY_TOKEN_KEY, token) } catch { /* Storage is optional. */ }
@@ -379,23 +405,30 @@ export default function RequestWizard() {
       })
       .catch(() => undefined)
     return () => { cancelled = true }
-  }, [membershipMode, resumeTokenParam, showToast])
+  }, [hydrated, membershipMode, resumeTokenParam, showToast, userId])
 
   // ── عند اختيار الحساب: النشر تلقائياً على كل قنواته المتاحة ───
   // السعر موحّد لكل القنوات، فلا حاجة لاختيار القناة يدوياً
   // ── حفظ المسودة تلقائياً بعد أي تغيير ───────────────────────────
   useEffect(() => {
-    if (!hydrated) return
+    if (!hydrated || !userId || success) return
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        userId,
+        guestSubtotal,
         savedAt: Date.now(),
         selectedInfluencer, requestType, clientType, category, subOption,
         competitionSelection, details, channels, contact, orgInfo,
         campaignSetup, campaignPosts, selectedPackage, basicChannel, reachChannels, career, selectedExtras, discountCode,
       }))
+      if (guestSelectionRestored.current) {
+        localStorage.removeItem(RECOVERY_TOKEN_KEY)
+        sessionStorage.removeItem(GUEST_SELECTION_KEY)
+        guestSelectionRestored.current = false
+      }
     } catch { /* تجاوز سعة التخزين — نتجاهل بهدوء */ }
   }, [
-    hydrated, selectedInfluencer, requestType, clientType, category, subOption,
+    hydrated, userId, guestSubtotal, success, selectedInfluencer, requestType, clientType, category, subOption,
     competitionSelection, details, channels, contact, orgInfo,
     campaignSetup, campaignPosts, selectedPackage, basicChannel, reachChannels, career, selectedExtras, discountCode,
   ])
@@ -458,8 +491,6 @@ export default function RequestWizard() {
 
   const contentComplete = baseContentComplete && careerComplete
 
-  const activeSection = !identityComplete ? 0 : openSection > 1 && !aboutComplete ? 1 : openSection >= 3 && showPackages && !packagesComplete ? 2 : openSection
-
   // السعر الديناميكي للباقة الأساسية = سعر التسعير التلقائي حسب نوع الخبر
   const basicDynamicPrice: number | null = (() => {
     if (!showPackages || requestType !== 'single' || !category || !subOptionSatisfied) return null
@@ -511,6 +542,11 @@ export default function RequestWizard() {
   // بيانات تواصل الضيف (الزائر غير المسجَّل) — إلزامية لإنشاء حسابه ومتابعة طلبه.
   const emailValid = /^\S+@\S+\.\S+$/.test(contact.email.trim())
   const checkoutSubtotal = estimatedTotal != null ? estimatedTotal + extrasTotal : null
+  const priceChanged = guestSubtotal != null && checkoutSubtotal != null && checkoutSubtotal !== guestSubtotal
+  const activeSection = !identityComplete ? 0
+    : openSection > 1 && !aboutComplete ? 1
+    : openSection >= 3 && showPackages && (!packagesComplete || priceChanged) ? 2
+    : openSection
   const recoveryDiscountAmount = recoveryOffer && checkoutSubtotal != null && discountCode === recoveryOffer.code
     ? Math.min(Math.round(Math.max(0, checkoutSubtotal - (requestType === 'single' ? chosenV2?.sponsoredCampaignBudget ?? 0 : 0)) * recoveryOffer.discountPct) / 100, recoveryOffer.maxDiscountAmount)
     : 0
@@ -523,12 +559,12 @@ export default function RequestWizard() {
 
   // Persist only viable package selections. The debounce prevents a request on every keystroke.
   useEffect(() => {
-    if (!hydrated || membershipMode || !selectedPackage || !emailValid || success) return
+    if (!hydrated || !userId || membershipMode || !packagesComplete || !selectedPackage || !emailValid || success) return
     const timeout = window.setTimeout(async () => {
       const payload = {
         selectedInfluencer, requestType, clientType, category, subOption,
         competitionSelection, details, contact, orgInfo, campaignSetup, campaignPosts,
-        selectedPackage, basicChannel, selectedExtras,
+        selectedPackage, basicChannel, reachChannels, selectedExtras,
       }
       try {
         const response = await fetch('/api/request-drafts', {
@@ -554,16 +590,17 @@ export default function RequestWizard() {
     }, 1200)
     return () => window.clearTimeout(timeout)
   }, [
-    hydrated, membershipMode, selectedPackage, emailValid, success, recoveryToken,
+    hydrated, userId, membershipMode, packagesComplete, selectedPackage, emailValid, success, recoveryToken,
     selectedInfluencer, requestType, clientType, category, subOption, competitionSelection,
-    details, contact, orgInfo, campaignSetup, campaignPosts, basicChannel, selectedExtras,
+    details, contact, orgInfo, campaignSetup, campaignPosts, basicChannel, reachChannels, selectedExtras,
     estimatedTotal, extrasTotal,
   ])
 
   const sectionComplete = [identityComplete, aboutComplete, packagesComplete, contentComplete, contactComplete]
-  const canSubmit = sectionComplete.every(Boolean)
+  const canSubmit = isLoggedIn && sectionComplete.every(Boolean)
 
   const handleSubmit = async () => {
+    if (!canSubmit) return
     setSubmitting(true)
     try {
       let body: Record<string, unknown>
@@ -689,14 +726,41 @@ export default function RequestWizard() {
     }
   }
 
+  useEffect(() => {
+    if (!focusResumedStep.current || loading || catsLoading || pendingQuote || (activeSection !== 3 && !priceChanged)) return
+    focusResumedStep.current = false
+    document.getElementById(`request-heading-${activeSection}`)?.focus()
+  }, [activeSection, catsLoading, loading, pendingQuote, priceChanged])
+
   function goToStep(index: number) {
     if (submitting) return
+    if (index === 3 && !isLoggedIn) {
+      setShowAccountOptions(true)
+      requestAnimationFrame(() => document.getElementById('request-account-heading')?.focus())
+      return
+    }
+    if (index === 3) setGuestSubtotal(null)
+    setShowAccountOptions(false)
     setTermsAccepted(false)
     setOpenSection(index)
     requestAnimationFrame(() => document.getElementById(`request-heading-${index}`)?.focus())
   }
 
-  if (loading || catsLoading) return <LoadingSpinner size="lg" />
+  function preserveGuestSelection(event: React.MouseEvent<HTMLAnchorElement>) {
+    try {
+      sessionStorage.setItem(GUEST_SELECTION_KEY, JSON.stringify({
+        savedAt: Date.now(),
+        selectedInfluencer, requestType, clientType, category, subOption, competitionSelection,
+        orgInfo, campaignSetup, selectedPackage, basicChannel, reachChannels, selectedExtras, discountCode,
+        subtotal: checkoutSubtotal,
+      }))
+    } catch {
+      event.preventDefault()
+      showToast('تعذّر حفظ اختيارك. اسمح بتخزين بيانات الموقع ثم حاول مرة أخرى.', 'error')
+    }
+  }
+
+  if (loading || catsLoading || !hydrated) return <LoadingSpinner size="lg" />
   if (success) return <SuccessScreen requestNumber={requestNumber} membershipBalance={membershipResult?.membershipBalance} benefitBalances={membershipResult?.benefitBalances} />
 
   // طلب قائم بانتظار الموافقة — يُمنع تقديم طلب جديد حتى اتخاذ إجراء
@@ -1158,6 +1222,11 @@ export default function RequestWizard() {
           {/* ③ اختيار الباقة — للأفراد، مع إبقاء مسار الحملات الحالي */}
           {includePackageStep && (
             <FormSection index={2} title="الباقة وقنوات النشر" open={currentStep.id === 2}>
+              {priceChanged && (
+                <p className={styles.guidance + ' py-3 text-sm'} role="status">
+                  تغيّر السعر منذ حفظ اختيارك. راجع السعر الحالي للباقة قبل المتابعة.
+                </p>
+              )}
               {selectedCat && <p className="text-sm text-muted">{selectedCat.name_ar}{selectedInf ? ' · ' + selectedInf.name_ar : ''}</p>}
               {requestType === 'campaign' && (
                 <p className="text-xs text-muted mb-3 bg-cream rounded-lg p-2">
@@ -1356,9 +1425,27 @@ export default function RequestWizard() {
           <FormSection index={4} title="مراجعة الطلب" open={currentStep.id === 4}>
             {currentStep.id === 4 && renderReview()}
           </FormSection>
+          {showAccountOptions && !isLoggedIn && nextStep?.id === 3 && nextStep.ready && (
+            <section id="request-account-options" className={styles.panel} aria-labelledby="request-account-heading">
+              <h2 id="request-account-heading" tabIndex={-1}>أكمل طلبك بحسابك</h2>
+              <p className="mb-4 text-sm">سجّل الدخول أو أنشئ حسابًا للمتابعة إلى المحتوى والمرفقات. سنحتفظ باختيارك.</p>
+              {selectedPackageData && (
+                <p className="mb-4 text-sm font-bold">
+                  {selectedPackageData.name}
+                  {checkoutSubtotal != null && ` · ${checkoutSubtotal.toLocaleString('ar-SA')} ر.س`}
+                </p>
+              )}
+              <div className={styles.accountActions}>
+                <Link href={`/auth/register?next=${encodeURIComponent(REQUEST_AFTER_LOGIN)}`} onClick={preserveGuestSelection}>إنشاء حساب</Link>
+                <Link href={`/auth/login?next=${encodeURIComponent(REQUEST_AFTER_LOGIN)}`} onClick={preserveGuestSelection}>تسجيل الدخول</Link>
+              </div>
+            </section>
+          )}
           <div className={styles.actions}>
             {previousStep && <Button type="button" variant="outline" disabled={submitting} onClick={() => goToStep(previousStep.id)}>السابق</Button>}
-            {nextStep && <Button type="button" disabled={!nextStep.ready} onClick={() => goToStep(nextStep.id)}>
+            {nextStep && <Button type="button" disabled={!nextStep.ready} onClick={() => goToStep(nextStep.id)}
+              aria-expanded={nextStep.id === 3 && !isLoggedIn ? showAccountOptions : undefined}
+              aria-controls={nextStep.id === 3 && !isLoggedIn && showAccountOptions ? 'request-account-options' : undefined}>
               {currentStep.next}
             </Button>}
           </div>
