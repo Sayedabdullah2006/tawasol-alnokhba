@@ -19,6 +19,24 @@ try{
  }
  for(const role of ['client','admin','employee'])assert.equal(portal.portalLoginDestination(role,portal.REQUEST_AFTER_LOGIN),'/request?continue=details');
  checks.push('Public wizard entry remains uncached, protected subflows still require a session, and native login returns to the wizard');
+ const google=load('src/app/auth/google/callback/route.ts',name=>name==='next/server'?{NextResponse}:name==='@/lib/auth-origin'?origin:name==='@/lib/portal-login'?portal:{
+  createServerSupabaseClient:async()=>({auth:{exchangeCodeForSession:async code=>code==='fixture-code'
+   ?{data:{user:{id:'actor-a'},session:{access_token:'fixture-session'}},error:null}
+   :{data:{user:null,session:null},error:{message:'exchange failed'}}}}),
+ });
+ const googleReturn=portal.GOOGLE_RETURN_COOKIE+'='+encodeURIComponent(portal.REQUEST_AFTER_LOGIN);
+ const googleCallback=(query,cookie=googleReturn)=>google.GET(new NextRequest('https://nukhba.media/auth/google/callback?'+query,{headers:{cookie}}));
+ const googleSuccess=await googleCallback('code=fixture-code');
+ assert.equal(googleSuccess.status,303);
+ assert.equal(new URL(googleSuccess.headers.get('location')).pathname,'/auth/complete-profile');
+ assert.equal(new URL(googleSuccess.headers.get('location')).searchParams.get('next'),portal.REQUEST_AFTER_LOGIN);
+ assert.equal(googleSuccess.cookies.get(portal.GOOGLE_RETURN_COOKIE).maxAge,0);
+ const googleFailed=await googleCallback('error=access_denied');
+ assert.equal(new URL(googleFailed.headers.get('location')).searchParams.get('next'),portal.REQUEST_AFTER_LOGIN);
+ assert.equal(new URL(googleFailed.headers.get('location')).searchParams.get('google'),'failed');
+ const googleForeign=await googleCallback('code=fixture-code&next=https://evil.invalid',portal.GOOGLE_RETURN_COOKIE+'=%2F%2Fevil.invalid');
+ assert.equal(new URL(googleForeign.headers.get('location')).searchParams.get('next'),null);
+ checks.push('Google callback sends a successful exchange to profile completion, preserves same-site resume on cancellation, and clears the return cookie');
  const route=load('src/app/api/oauth/decision/route.ts',name=>name==='next/server'?{NextResponse}:name==='@/lib/auth-origin'?origin:name==='@/lib/sso'?sso:{createServerSupabaseClient:async()=>({auth:{getUser:async()=>({data:{user},error:authError}),signOut:async()=>{signouts++;return {error:null}},oauth:{getAuthorizationDetails:async()=>details,approveAuthorization:async()=>details,denyAuthorization:async()=>details}}})});
  const call=(body,requestOrigin='https://nukhba.media')=>route.POST(new Request('https://localhost:8080/api/oauth/decision',{method:'POST',headers:{Origin:requestOrigin,'Content-Type':'application/x-www-form-urlencoded',host:'evil.invalid','x-forwarded-host':'evil.invalid'},body}));
  for(const decision of ['approve','deny','switch']){const response=await call('authorization_id=valid-fixture-authorization&decision='+decision);assert.equal(response.status,303);assert.equal(new URL(response.headers.get('location')).origin,origin.AUTH_ORIGIN);assert((response.headers.get('cache-control')||'').includes('no-store'));}checks.push('All no-session consent actions reproduce internal localhost listener yet redirect only to the public HTTPS origin');

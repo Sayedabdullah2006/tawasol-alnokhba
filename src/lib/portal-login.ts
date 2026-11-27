@@ -1,4 +1,6 @@
 export const REQUEST_AFTER_LOGIN = '/request?continue=details'
+export const GOOGLE_RETURN_COOKIE = 'nukhba_google_return'
+export const GOOGLE_AUTH_PATH = '/auth/google'
 
 // Preserve authenticated meeting entry after login without widening role routes.
 export function safePortalReturnPath(requested:string|null){

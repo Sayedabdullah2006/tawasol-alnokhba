@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Button from '@/components/ui/Button'
 import { publicAuthUrl } from '@/lib/auth-origin'
-import { safePortalReturnPath } from '@/lib/portal-login'
+import { GOOGLE_AUTH_PATH, GOOGLE_RETURN_COOKIE, safePortalReturnPath } from '@/lib/portal-login'
 import { createClient } from '@/lib/supabase'
 
 export default function GoogleSignIn({ next, failed = false }: { next: string | null; failed?: boolean }) {
@@ -37,7 +37,9 @@ export default function GoogleSignIn({ next, failed = false }: { next: string | 
         ? publicAuthUrl('/auth/google/callback')
         : new URL('/auth/google/callback', window.location.origin)
       const destination = safePortalReturnPath(next)
-      if (destination) callback.searchParams.set('next', destination)
+      const secure = window.location.protocol === 'https:' ? '; Secure' : ''
+      const returnPath = destination ? encodeURIComponent(destination) : ''
+      document.cookie = `${GOOGLE_RETURN_COOKIE}=${returnPath}; Path=${GOOGLE_AUTH_PATH}; Max-Age=${destination ? 900 : 0}; SameSite=Lax${secure}`
       const { data, error } = await createClient().auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: callback.href, skipBrowserRedirect: true, queryParams: { prompt: 'select_account' } },
