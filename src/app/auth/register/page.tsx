@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import GoogleSignIn from '@/components/auth/GoogleSignIn'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import TurnstileWidget from '@/components/ui/TurnstileWidget'
@@ -91,6 +92,7 @@ export default function RegisterPage() {
         </div>
 
         <form onSubmit={handleRegister} className="bg-card rounded-2xl p-6 md:p-8 border border-border space-y-4">
+          <GoogleSignIn next={nextParam} failed={searchParams.get('google') === 'failed'} />
           <Input id="fullName" label="الاسم الكامل *" placeholder="أدخل اسمك الكامل"
             value={fullName} onChange={e => setFullName(e.target.value)} required />
           <Input id="email" label="البريد الإلكتروني *" type="email" dir="ltr"
