@@ -526,8 +526,11 @@ export default function RequestWizard() {
   })()
 
   const selectedPackageData = offeredPackages.find((pkg) => pkg.id === selectedPackage) ?? null
-  const effectiveExtras = chosenV2 ? selectedExtras.filter(id=>catalog?.extras.some(e=>e.id===id&&e.enabled&&(id!=='infographic'||category==='cv'))) : selectedExtras
-  const extrasTotal = effectiveExtras.filter(id => !chosenV2?.includedExtras.includes(id)).reduce((total, id) => total + (chosenV2 ? catalog?.extras.find(e=>e.id===id&&e.enabled)?.price??0 : AQ_EXTRAS_PRICES[id]??0), 0)
+  const catalogExtras = chosenV2 ? catalog?.extras.filter(extra => extra.enabled && (extra.id !== 'infographic' || category === 'cv')) : undefined
+  const effectiveExtras = [...new Set(selectedExtras)].filter(id => !chosenV2 || catalogExtras?.some(extra => extra.id === id))
+  const extrasTotal = effectiveExtras
+    .filter(id => !chosenV2?.includedExtras.includes(id))
+    .reduce((total, id) => total + (chosenV2 ? catalogExtras?.find(extra => extra.id === id)?.price ?? 0 : AQ_EXTRAS_PRICES[id] ?? 0), 0)
   const estimatedTotal = (() => {
     if (!showPackages || !selectedPackageData) return null
     if (requestType === 'campaign' && campaignBaseSubtotal != null) {
@@ -543,7 +546,8 @@ export default function RequestWizard() {
   // بيانات تواصل الضيف (الزائر غير المسجَّل) — إلزامية لإنشاء حسابه ومتابعة طلبه.
   const emailValid = /^\S+@\S+\.\S+$/.test(contact.email.trim())
   const checkoutSubtotal = estimatedTotal != null ? estimatedTotal + extrasTotal : null
-  const priceChanged = guestSubtotal != null && checkoutSubtotal != null && checkoutSubtotal !== guestSubtotal
+  // The saved guest price is only checked when resuming at the content step.
+  const priceChanged = openSection === 3 && guestSubtotal != null && checkoutSubtotal != null && checkoutSubtotal !== guestSubtotal
   const activeSection = !identityComplete ? 0
     : openSection > 1 && !aboutComplete ? 1
     : openSection >= 3 && showPackages && (!packagesComplete || priceChanged) ? 2
@@ -740,7 +744,7 @@ export default function RequestWizard() {
       requestAnimationFrame(() => document.getElementById('request-account-heading')?.focus())
       return
     }
-    if (index === 3) setGuestSubtotal(null)
+    if (index >= 3) setGuestSubtotal(null)
     setShowAccountOptions(false)
     setTermsAccepted(false)
     setOpenSection(index)
@@ -871,7 +875,7 @@ export default function RequestWizard() {
                 basePrice={estimatedTotal}
                 baseLabel="سعر الباقة الأساسية"
                 included={chosenV2?.includedExtras}
-                options={chosenV2?catalog?.extras.filter(e=>e.enabled&&(e.id!=='infographic'||category==='cv')):undefined}
+                options={catalogExtras}
               />
             </details>
           )}

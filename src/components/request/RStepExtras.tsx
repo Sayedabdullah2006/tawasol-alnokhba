@@ -29,8 +29,10 @@ export default function RStepExtras({ selected, onChange, basePrice, baseLabel, 
   }
 
   const available = options ?? AQ_EXTRAS_LIST.map(id=>({id,name:AQ_EXTRAS_NAMES[id],price:AQ_EXTRAS_PRICES[id]}))
-  const extrasTotal = selected.filter(id => !included.includes(id)).reduce((s, id) => s + (available.find(e=>e.id===id)?.price??0), 0)
-  const total       = basePrice + extrasTotal
+  const optional = available.filter(extra => !included.includes(extra.id))
+  const charged = optional.filter(extra => selected.includes(extra.id))
+  const extrasTotal = charged.reduce((total, extra) => total + extra.price, 0)
+  const total = basePrice + extrasTotal
 
   return (
     <div className="wizard-enter max-w-lg mx-auto pb-2">
@@ -42,7 +44,7 @@ export default function RStepExtras({ selected, onChange, basePrice, baseLabel, 
       </p>
 
       <div className="grid grid-cols-2 gap-3 mb-4">
-        {available.filter(e => !included.includes(e.id)).map(extra => {
+        {optional.map(extra => {
           const {id}=extra
           const isSelected = selected.includes(id)
           return (
@@ -50,6 +52,7 @@ export default function RStepExtras({ selected, onChange, basePrice, baseLabel, 
               key={id}
               type="button"
               onClick={() => toggle(id)}
+              aria-pressed={isSelected}
               className={`
                 relative text-right p-3 rounded-xl border-2 transition-all
                 ${isSelected
@@ -83,11 +86,11 @@ export default function RStepExtras({ selected, onChange, basePrice, baseLabel, 
         </div>
         {extrasTotal > 0 && (
           <div className="flex justify-between text-muted">
-            <span>الخدمات الإضافية ({selected.length})</span>
+            <span>الخدمات الإضافية ({charged.length})</span>
             <span>+{formatNumber(extrasTotal)} ر.س</span>
           </div>
         )}
-        <div className="flex justify-between font-black text-dark text-base border-t border-border pt-2 mt-1">
+        <div role="status" className="flex justify-between font-black text-dark text-base border-t border-border pt-2 mt-1">
           <span>الإجمالي</span>
           <span className="text-green">{formatNumber(total)} ر.س</span>
         </div>
