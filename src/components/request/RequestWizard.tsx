@@ -6,6 +6,7 @@ import { getIndividualPackage, packagePrice, resolvePackageChannels } from '@/li
 import { useState, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import GoogleSignIn from '@/components/auth/GoogleSignIn'
 import { REQUEST_AFTER_LOGIN } from '@/lib/portal-login'
 import { createClient } from '@/lib/supabase'
 import { useCategories, useSiteContent, type DBCategory, type SiteContent } from '@/lib/hooks'
@@ -746,7 +747,7 @@ export default function RequestWizard() {
     requestAnimationFrame(() => document.getElementById(`request-heading-${index}`)?.focus())
   }
 
-  function preserveGuestSelection(event: React.MouseEvent<HTMLAnchorElement>) {
+  function preserveGuestSelection() {
     try {
       sessionStorage.setItem(GUEST_SELECTION_KEY, JSON.stringify({
         savedAt: Date.now(),
@@ -754,9 +755,10 @@ export default function RequestWizard() {
         orgInfo, campaignSetup, selectedPackage, basicChannel, reachChannels, selectedExtras, discountCode,
         subtotal: checkoutSubtotal,
       }))
+      return true
     } catch {
-      event.preventDefault()
       showToast('تعذّر حفظ اختيارك. اسمح بتخزين بيانات الموقع ثم حاول مرة أخرى.', 'error')
+      return false
     }
   }
 
@@ -1435,9 +1437,12 @@ export default function RequestWizard() {
                   {checkoutSubtotal != null && ` · ${checkoutSubtotal.toLocaleString('ar-SA')} ر.س`}
                 </p>
               )}
+              <div className="mb-3 max-w-xs">
+                <GoogleSignIn next={REQUEST_AFTER_LOGIN} beforeSignIn={preserveGuestSelection} />
+              </div>
               <div className={styles.accountActions}>
-                <Link href={`/auth/register?next=${encodeURIComponent(REQUEST_AFTER_LOGIN)}`} onClick={preserveGuestSelection}>إنشاء حساب</Link>
-                <Link href={`/auth/login?next=${encodeURIComponent(REQUEST_AFTER_LOGIN)}`} onClick={preserveGuestSelection}>تسجيل الدخول</Link>
+                <Link href={`/auth/register?next=${encodeURIComponent(REQUEST_AFTER_LOGIN)}`} onClick={event => { if (!preserveGuestSelection()) event.preventDefault() }}>إنشاء حساب</Link>
+                <Link href={`/auth/login?next=${encodeURIComponent(REQUEST_AFTER_LOGIN)}`} onClick={event => { if (!preserveGuestSelection()) event.preventDefault() }}>تسجيل الدخول</Link>
               </div>
             </section>
           )}

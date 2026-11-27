@@ -13,6 +13,10 @@ export async function proxy(request: NextRequest) {
     })
   }
 
+  if (request.nextUrl.pathname === '/auth/google/callback') {
+    return NextResponse.next({ headers: { 'Cache-Control': 'private, no-store' } })
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = requireActiveAuthSession(createServerClient(
