@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 import { cn } from '@/lib/utils'
 import { CATEGORY_CONDITIONS } from '@/lib/constants'
 import type { DBCategory } from '@/lib/hooks'
@@ -85,7 +85,7 @@ export function isPostComplete(post: CampaignPostData): boolean {
 interface PostCardProps {
   index: number
   post: CampaignPostData
-  onChange: (p: CampaignPostData) => void
+  onChange: (changes: Partial<CampaignPostData>) => void
   clientType: string | null
   categories: DBCategory[]
   categoryConditions?: Record<string, string>
@@ -154,7 +154,7 @@ function PostCard({ index, post, onChange, clientType, categories, categoryCondi
             <label className={label}>الفئة *</label>
             <select
               value={post.category}
-              onChange={e => onChange({ ...post, category: e.target.value, subOption: null })}
+              onChange={e => onChange({ category: e.target.value, subOption: null })}
               className={select}
             >
               <option value="">— اختر الفئة —</option>
@@ -172,7 +172,6 @@ function PostCard({ index, post, onChange, clientType, categories, categoryCondi
                 <select
                   value={compSub?.subcategory ?? ''}
                   onChange={e => onChange({
-                    ...post,
                     subOption: { subcategory: e.target.value, position: '' },
                   })}
                   className={select}
@@ -189,7 +188,6 @@ function PostCard({ index, post, onChange, clientType, categories, categoryCondi
                   <select
                     value={compSub.position ?? ''}
                     onChange={e => onChange({
-                      ...post,
                       subOption: { subcategory: compSub!.subcategory, position: e.target.value },
                     })}
                     className={select}
@@ -213,7 +211,7 @@ function PostCard({ index, post, onChange, clientType, categories, categoryCondi
                   <button
                     key={o.id}
                     type="button"
-                    onClick={() => onChange({ ...post, subOption: o.id })}
+                    onClick={() => onChange({ subOption: o.id })}
                     className={cn(
                       'py-2 px-3 rounded-xl border-2 text-sm font-semibold transition-all',
                       post.subOption === o.id
@@ -234,7 +232,7 @@ function PostCard({ index, post, onChange, clientType, categories, categoryCondi
             <input
               type="text"
               value={post.title}
-              onChange={e => onChange({ ...post, title: e.target.value })}
+              onChange={e => onChange({ title: e.target.value })}
               placeholder="عنوان المنشور..."
               maxLength={200}
               className={input}
@@ -246,7 +244,7 @@ function PostCard({ index, post, onChange, clientType, categories, categoryCondi
             <label className={label}>المحتوى *</label>
             <textarea
               value={post.content}
-              onChange={e => onChange({ ...post, content: e.target.value })}
+              onChange={e => onChange({ content: e.target.value })}
               placeholder="تفاصيل ما تودّ نشره..."
               rows={3}
               className={cn(input, 'resize-none')}
@@ -267,7 +265,7 @@ function PostCard({ index, post, onChange, clientType, categories, categoryCondi
             <input
               type="date"
               value={post.preferredDate}
-              onChange={e => onChange({ ...post, preferredDate: e.target.value })}
+              onChange={e => onChange({ preferredDate: e.target.value })}
               className={input}
             />
           </div>
@@ -277,7 +275,7 @@ function PostCard({ index, post, onChange, clientType, categories, categoryCondi
             <p className="mb-2 text-[11px] leading-5 text-muted">هذه الصور فقط ستدخل ضمن مراجع توليد تصميم هذا المنشور.</p>
             <ContentImagesUploader
               images={post.images}
-              onChange={imgs => onChange({ ...post, images: imgs })}
+              onChange={imgs => onChange({ images: imgs })}
               maxImages={4}
             />
           </div>
@@ -286,7 +284,7 @@ function PostCard({ index, post, onChange, clientType, categories, categoryCondi
             <p className="mb-2 text-[11px] leading-5 text-muted">للمراجعة والإثبات فقط، ولا تُستخدم في التصميم.</p>
             <SupportingDocumentsUploader
               documents={post.supportingDocuments ?? []}
-              onChange={supportingDocuments => onChange({ ...post, supportingDocuments })}
+              onChange={supportingDocuments => onChange({ supportingDocuments })}
               maxFiles={4}
             />
           </div>
@@ -300,7 +298,7 @@ function PostCard({ index, post, onChange, clientType, categories, categoryCondi
 
 interface Props {
   posts: CampaignPostData[]
-  onChange: (posts: CampaignPostData[]) => void
+  onChange: Dispatch<SetStateAction<CampaignPostData[]>>
   clientType: string | null
   categories: DBCategory[]
   categoryConditions?: Record<string, string>
@@ -309,10 +307,8 @@ interface Props {
 export default function RStepCampaignPosts({ posts, onChange, clientType, categories, categoryConditions }: Props) {
   const [openIndex, setOpenIndex] = useState(0)
 
-  const updatePost = (i: number, p: CampaignPostData) => {
-    const next = [...posts]
-    next[i] = p
-    onChange(next)
+  const updatePost = (index: number, changes: Partial<CampaignPostData>) => {
+    onChange(current => current.map((post, i) => i === index ? { ...post, ...changes } : post))
   }
 
   const completedCount  = posts.filter(isPostComplete).length

@@ -77,6 +77,7 @@ const DURATION_OPTIONS = [
 // مفتاح حفظ المسودة محلياً + مدة صلاحيتها (7 أيام)
 const DRAFT_KEY = 'tn_request_draft_v1'
 const GUEST_SELECTION_KEY = 'tn_request_guest_selection'
+const GUEST_DRAFT_KEY = 'tn_request_guest_draft'
 const RECOVERY_TOKEN_KEY = 'tn_request_recovery_token_v1'
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -198,10 +199,12 @@ export default function RequestWizard() {
   const [contact, setContact]           = useState<ContactData>({ fullName: '', phone: '', email: '', city: '', xHandle: '' })
   const [userId, setUserId] = useState<string | null>()
   const isLoggedIn = !!userId
+  const accountDraftKey = userId ? `${DRAFT_KEY}:${userId}:${membershipId ?? 'publication'}` : null
   const [showAccountOptions, setShowAccountOptions] = useState(false)
   const [guestSubtotal, setGuestSubtotal] = useState<number | null>(null)
   const guestSelectionRestored = useRef(false)
   const localProgressRestored = useRef(false)
+  const legacyDraftRestored = useRef(false)
   const focusResumedStep = useRef(false)
   const [orgInfo, setOrgInfo]           = useState({ name: '', representative: '', license: '' })
   // الموافقة على الشروط ضمنية بالضغط على «إرسال الطلب» — مع رابط لعرضها في نافذة منبثقة
@@ -292,7 +295,7 @@ export default function RequestWizard() {
       if (cancelled) return
       try {
         const guestRaw = !membershipMode && (!userId || continueAfterLogin)
-          ? sessionStorage.getItem(GUEST_SELECTION_KEY)
+          ? (userId ? null : localStorage.getItem(GUEST_DRAFT_KEY)) ?? sessionStorage.getItem(GUEST_SELECTION_KEY)
           : null
         let guest = null
         if (guestRaw) {
@@ -302,8 +305,19 @@ export default function RequestWizard() {
           } catch { /* A damaged guest draft should not block the signed-in draft. */ }
         }
         const authHandoff = !!(userId && continueAfterLogin && guest && guest.resumeAfterLogin !== false)
-        const signedRaw = userId && !authHandoff ? localStorage.getItem(DRAFT_KEY) : null
-        const d = authHandoff || !userId ? guest : signedRaw ? JSON.parse(signedRaw) : null
+        let d = guest
+        if (accountDraftKey && !authHandoff) {
+          const saved = localStorage.getItem(accountDraftKey)
+          d = saved ? JSON.parse(saved) : null
+          if (!d) {
+            const legacy = localStorage.getItem(DRAFT_KEY)
+            const previous = legacy ? JSON.parse(legacy) : null
+            if (previous?.userId === userId && (previous.membershipId ?? null) === membershipId) {
+              d = previous
+              legacyDraftRestored.current = true
+            }
+          }
+        }
         if (d && typeof d.savedAt === 'number' && Date.now() - d.savedAt < DRAFT_TTL_MS &&
             (!d.userId || d.userId === userId)) {
           const priorStep = (d.membershipId ?? null) === membershipId ? savedStep(d.openSection, userId ? 4 : 2) : null
@@ -364,7 +378,7 @@ export default function RequestWizard() {
     }
     queueMicrotask(restoreDraft)
     return () => { cancelled = true }
-  }, [continueAfterLogin, hydrated, membershipId, membershipMode, requestedPackage, showToast, userId])
+  }, [accountDraftKey, continueAfterLogin, hydrated, membershipId, membershipMode, requestedPackage, showToast, userId])
 
   // Restore a server-side draft from a signed email link. Local drafts still work as before.
   useEffect(() => {
@@ -389,6 +403,10 @@ export default function RequestWizard() {
         if (!result || cancelled) return
         if (resumeToken || !localProgressRestored.current) {
           const d = result.payload ?? {}
+          const step = savedStep(d.openSection, 4)
+          if (step != null) setOpenSection(step)
+          if (typeof d.discountCode === 'string') setDiscountCode(d.discountCode)
+          if (d.career && typeof d.career === 'object') setCareer(d.career as typeof career)
           if (typeof d.selectedInfluencer === 'string') setSelectedInfluencer(d.selectedInfluencer)
           if (d.requestType === 'single' || d.requestType === 'campaign') setRequestType(d.requestType)
           if (typeof d.clientType === 'string') setClientType(d.clientType as ClientType)
@@ -436,9 +454,9 @@ export default function RequestWizard() {
   // السعر موحّد لكل القنوات، فلا حاجة لاختيار القناة يدوياً
   // ── حفظ المسودة تلقائياً بعد أي تغيير ───────────────────────────
   useEffect(() => {
-    if (!hydrated || !userId || success) return
+    if (!hydrated || !accountDraftKey || success) return
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      localStorage.setItem(accountDraftKey, JSON.stringify({
         userId,
         membershipId,
         openSection,
@@ -449,14 +467,19 @@ export default function RequestWizard() {
         competitionSelection, details, channels, contact, orgInfo,
         campaignSetup, campaignPosts, selectedPackage, basicChannel, reachChannels, career, selectedExtras, discountCode,
       }))
+      if (legacyDraftRestored.current) {
+        localStorage.removeItem(DRAFT_KEY)
+        legacyDraftRestored.current = false
+      }
       if (guestSelectionRestored.current) {
+        localStorage.removeItem(GUEST_DRAFT_KEY)
         localStorage.removeItem(RECOVERY_TOKEN_KEY)
         sessionStorage.removeItem(GUEST_SELECTION_KEY)
         guestSelectionRestored.current = false
       }
     } catch { /* تجاوز سعة التخزين — نتجاهل بهدوء */ }
   }, [
-    hydrated, userId, membershipId, openSection, guestSubtotal, success, selectedInfluencer, requestType, clientType, category, subOption,
+    hydrated, userId, accountDraftKey, membershipId, openSection, guestSubtotal, success, selectedInfluencer, requestType, clientType, category, subOption,
     competitionSelection, details, channels, contact, orgInfo,
     campaignSetup, campaignPosts, selectedPackage, basicChannel, reachChannels, career, selectedExtras, discountCode,
   ])
@@ -475,7 +498,7 @@ export default function RequestWizard() {
   useEffect(() => {
     if (!hydrated || userId || membershipMode || !guestDraft.clientType) return
     try {
-      sessionStorage.setItem(GUEST_SELECTION_KEY, JSON.stringify({
+      localStorage.setItem(GUEST_DRAFT_KEY, JSON.stringify({
         ...guestDraft,
         packageLink: appliedPackageLink.current,
         savedAt: Date.now(),
@@ -617,9 +640,9 @@ export default function RequestWizard() {
     if (!hydrated || !userId || membershipMode || !packagesComplete || !selectedPackage || !emailValid || success) return
     const timeout = window.setTimeout(async () => {
       const payload = {
-        selectedInfluencer, requestType, clientType, category, subOption,
+        openSection, selectedInfluencer, requestType, clientType, category, subOption,
         competitionSelection, details, contact, orgInfo, campaignSetup, campaignPosts,
-        selectedPackage, basicChannel, reachChannels, selectedExtras,
+        selectedPackage, basicChannel, reachChannels, selectedExtras, career, discountCode,
       }
       try {
         const response = await fetch('/api/request-drafts', {
@@ -645,9 +668,9 @@ export default function RequestWizard() {
     }, 1200)
     return () => window.clearTimeout(timeout)
   }, [
-    hydrated, userId, membershipMode, packagesComplete, selectedPackage, emailValid, success, recoveryToken,
+    hydrated, userId, membershipMode, packagesComplete, selectedPackage, emailValid, success, recoveryToken, openSection,
     selectedInfluencer, requestType, clientType, category, subOption, competitionSelection,
-    details, contact, orgInfo, campaignSetup, campaignPosts, basicChannel, reachChannels, selectedExtras,
+    details, contact, orgInfo, campaignSetup, campaignPosts, basicChannel, reachChannels, selectedExtras, career, discountCode,
     estimatedTotal, extrasTotal,
   ])
 
@@ -745,7 +768,7 @@ export default function RequestWizard() {
       if(data.code==='CATALOG_CHANGED') void refreshCatalog()
       if (!res.ok) throw new Error(data.error ?? 'حدث خطأ')
 
-      try { localStorage.removeItem(DRAFT_KEY) } catch { /* تجاهل */ }
+      try { if (accountDraftKey) localStorage.removeItem(accountDraftKey) } catch { /* تجاهل */ }
       if (recoveryToken) {
         fetch('/api/request-drafts', {
           method: 'DELETE',

@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import Input from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
 import ContentImagesUploader from './ContentImagesUploader'
@@ -19,13 +19,13 @@ export interface ContentDetails {
 
 interface Props {
   data: ContentDetails
-  onChange: (data: ContentDetails) => void
+  onChange: Dispatch<SetStateAction<ContentDetails>>
   contact?: ReactNode
 }
 
 export default function RStep3Details({ data, onChange, contact }: Props) {
   const update = <K extends keyof ContentDetails>(field: K, value: ContentDetails[K]) => {
-    onChange({ ...data, [field]: value })
+    onChange(current => ({ ...current, [field]: value }))
   }
 
   return (
