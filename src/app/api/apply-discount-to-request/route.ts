@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     const service = await createServiceRoleClient()
     const { data: req } = await service
       .from('publish_requests')
-      .select('id, user_id, status, admin_quoted_price, discount_code_id, package_snapshot')
+      .select('id, user_id, status, admin_quoted_price, discount_code_id, package_snapshot, discount_codes_disabled')
       .eq('id', requestId)
       .single()
 
@@ -28,6 +28,9 @@ export async function POST(request: Request) {
     if (req.user_id !== user.id) return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
     if (req.status !== 'approved') {
       return NextResponse.json({ error: 'لا يمكن تطبيق الخصم على هذا الطلب' }, { status: 400 })
+    }
+    if (req.discount_codes_disabled) {
+      return NextResponse.json({ error: 'السعر يشمل خصماً خاصاً لهذا الطلب' }, { status: 409 })
     }
 
     const { data: dc } = await service

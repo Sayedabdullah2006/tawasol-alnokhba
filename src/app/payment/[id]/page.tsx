@@ -34,6 +34,7 @@ interface PaymentRequest {
   discount_pct?: number | null
   discount_amount?: number | null
   discount_code?: string | null
+  discount_codes_disabled?: boolean
 }
 
 export default function PaymentPage({ params }: { params: Promise<{ id: string }> }) {
@@ -221,7 +222,7 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
             </dl>
 
             {/* كود الخصم — قبل الدفع */}
-            {!isPaid && (
+            {!isPaid && !request.discount_codes_disabled && (
               <div className="pt-2 border-t border-border">
                 <label className="text-xs text-muted block mb-1">لديك كود خصم؟</label>
                 <div className="flex gap-2">

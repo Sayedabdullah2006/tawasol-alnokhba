@@ -37,6 +37,7 @@ interface Props {
   scope: 'single' | 'all'
   adminNotes?: string | null
   negotiationRejected?: boolean
+  discountCodesDisabled?: boolean
   negotiationRound?: number
   quoteExpiresAt?: string | null
   category?: string
@@ -57,7 +58,7 @@ function formatCountdown(ms: number): string {
 
 export default function QuoteApproval({
   requestId, quotedPrice, offeredExtras, influencer, scope, adminNotes, negotiationRejected,
-  negotiationRound = 0, quoteExpiresAt, category, subOption,
+  discountCodesDisabled, negotiationRound = 0, quoteExpiresAt, category, subOption,
 }: Props) {
   const router = useRouter()
   const { showToast } = useToast()
@@ -368,7 +369,7 @@ export default function QuoteApproval({
       </div>
 
       {/* ── كود الخصم ── */}
-      {!isFreeBase && !quoteExpired && (
+      {!discountCodesDisabled && !isFreeBase && !quoteExpired && (
         <div className="bg-card rounded-2xl border border-border p-4">
           {appliedDiscount ? (
             <div className="flex items-center justify-between">

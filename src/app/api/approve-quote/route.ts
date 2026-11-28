@@ -56,6 +56,10 @@ export async function POST(request: Request) {
     const basePrice = Number(req.admin_quoted_price ?? 0)
     const rawTotal  = basePrice + extrasTotal
 
+    if (discountCode && req.discount_codes_disabled) {
+      return NextResponse.json({ error: 'السعر يشمل خصماً خاصاً لهذا الطلب' }, { status: 409 })
+    }
+
     // تطبيق كود الخصم على الاعتماد (فقط إذا لم يُطبَّق مسبقاً عند الإرسال)
     let finalTotal = rawTotal
     let discountRow: { id:string; code:string; discount_pct:number; max_discount_amount:number|null } | null = null

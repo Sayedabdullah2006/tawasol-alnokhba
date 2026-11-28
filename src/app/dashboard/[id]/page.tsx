@@ -278,6 +278,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ id: st
               scope={scope}
               adminNotes={request.admin_notes}
               negotiationRejected={!!request.negotiation_rejected}
+              discountCodesDisabled={!!request.discount_codes_disabled}
               negotiationRound={request.negotiation_round ?? 0}
               quoteExpiresAt={request.quote_expires_at}
               category={request.category}
