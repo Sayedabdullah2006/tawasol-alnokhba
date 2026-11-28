@@ -80,6 +80,10 @@ const GUEST_SELECTION_KEY = 'tn_request_guest_selection'
 const RECOVERY_TOKEN_KEY = 'tn_request_recovery_token_v1'
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
+function savedStep(value: unknown, max: number) {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= max ? value : null
+}
+
 type RecoveryOffer = {
   code: string
   discountPct: number
@@ -197,6 +201,7 @@ export default function RequestWizard() {
   const [showAccountOptions, setShowAccountOptions] = useState(false)
   const [guestSubtotal, setGuestSubtotal] = useState<number | null>(null)
   const guestSelectionRestored = useRef(false)
+  const localProgressRestored = useRef(false)
   const focusResumedStep = useRef(false)
   const [orgInfo, setOrgInfo]           = useState({ name: '', representative: '', license: '' })
   // الموافقة على الشروط ضمنية بالضغط على «إرسال الطلب» — مع رابط لعرضها في نافذة منبثقة
@@ -286,23 +291,41 @@ export default function RequestWizard() {
     const restoreDraft = () => {
       if (cancelled) return
       try {
-        const guestSelection = !membershipMode && (!userId || continueAfterLogin)
+        const guestRaw = !membershipMode && (!userId || continueAfterLogin)
           ? sessionStorage.getItem(GUEST_SELECTION_KEY)
           : null
-        const raw = guestSelection ?? (userId ? localStorage.getItem(DRAFT_KEY) : null)
-        if (raw) {
-          const d = JSON.parse(raw)
-          if (d && typeof d.savedAt === 'number' && Date.now() - d.savedAt < DRAFT_TTL_MS &&
-              (guestSelection || !d.userId || d.userId === userId)) {
-          if (guestSelection) {
+        let guest = null
+        if (guestRaw) {
+          try {
+            const parsed = JSON.parse(guestRaw)
+            if (typeof parsed?.savedAt === 'number' && Date.now() - parsed.savedAt < DRAFT_TTL_MS) guest = parsed
+          } catch { /* A damaged guest draft should not block the signed-in draft. */ }
+        }
+        const authHandoff = !!(userId && continueAfterLogin && guest && guest.resumeAfterLogin !== false)
+        const signedRaw = userId && !authHandoff ? localStorage.getItem(DRAFT_KEY) : null
+        const d = authHandoff || !userId ? guest : signedRaw ? JSON.parse(signedRaw) : null
+        if (d && typeof d.savedAt === 'number' && Date.now() - d.savedAt < DRAFT_TTL_MS &&
+            (!d.userId || d.userId === userId)) {
+          const priorStep = (d.membershipId ?? null) === membershipId ? savedStep(d.openSection, userId ? 4 : 2) : null
+          if (requestedPackage && !membershipMode && d.packageLink === requestedPackage) {
+            appliedPackageLink.current = requestedPackage
+          }
+          if (authHandoff) {
             guestSelectionRestored.current = true
-            setOpenSection(userId ? 3 : d.selectedPackage ? 2 : 1)
-            focusResumedStep.current = !!userId
-            if (userId && typeof d.subtotal === 'number') setGuestSubtotal(d.subtotal)
-          } else if (continueAfterLogin && d.userId === userId) {
+            setOpenSection(3)
+            focusResumedStep.current = true
+            if (typeof d.subtotal === 'number') setGuestSubtotal(d.subtotal)
+          } else if (priorStep != null) {
+            setOpenSection(priorStep)
+            localProgressRestored.current = !!userId
+            if (!userId) setShowAccountOptions(d.showAccountOptions === true)
+            if (userId && typeof d.guestSubtotal === 'number') setGuestSubtotal(d.guestSubtotal)
+          } else if (continueAfterLogin && d.userId === userId && userId) {
             setOpenSection(3)
             focusResumedStep.current = true
             if (typeof d.guestSubtotal === 'number') setGuestSubtotal(d.guestSubtotal)
+          } else if (!userId && d.resumeAfterLogin !== false) {
+            setOpenSection(d.selectedPackage ? 2 : 1)
           }
           if (d.selectedInfluencer)   setSelectedInfluencer(d.selectedInfluencer)
           if (d.requestType)          setRequestType(d.requestType)
@@ -336,13 +359,12 @@ export default function RequestWizard() {
           }
           showToast('تم استرجاع طلبك غير المكتمل ✨', 'info')
         }
-      }
       } catch { /* Ignore corrupt drafts. */ }
       setHydrated(true)
     }
     queueMicrotask(restoreDraft)
     return () => { cancelled = true }
-  }, [continueAfterLogin, hydrated, membershipMode, showToast, userId])
+  }, [continueAfterLogin, hydrated, membershipId, membershipMode, requestedPackage, showToast, userId])
 
   // Restore a server-side draft from a signed email link. Local drafts still work as before.
   useEffect(() => {
@@ -365,35 +387,37 @@ export default function RequestWizard() {
       })
       .then(result => {
         if (!result || cancelled) return
-        const d = result.payload ?? {}
-        if (typeof d.selectedInfluencer === 'string') setSelectedInfluencer(d.selectedInfluencer)
-        if (d.requestType === 'single' || d.requestType === 'campaign') setRequestType(d.requestType)
-        if (typeof d.clientType === 'string') setClientType(d.clientType as ClientType)
-        if (typeof d.category === 'string') setCategory(d.category)
-        if (typeof d.subOption === 'string') setSubOption(d.subOption)
-        if (d.competitionSelection && typeof d.competitionSelection === 'object') {
-          setCompetitionSelection(d.competitionSelection as { subcategory: string; position: string })
+        if (resumeToken || !localProgressRestored.current) {
+          const d = result.payload ?? {}
+          if (typeof d.selectedInfluencer === 'string') setSelectedInfluencer(d.selectedInfluencer)
+          if (d.requestType === 'single' || d.requestType === 'campaign') setRequestType(d.requestType)
+          if (typeof d.clientType === 'string') setClientType(d.clientType as ClientType)
+          if (typeof d.category === 'string') setCategory(d.category)
+          if (typeof d.subOption === 'string') setSubOption(d.subOption)
+          if (d.competitionSelection && typeof d.competitionSelection === 'object') {
+            setCompetitionSelection(d.competitionSelection as { subcategory: string; position: string })
+          }
+          if (d.details && typeof d.details === 'object') {
+            const restored = d.details as ContentDetails
+            setDetails({
+              ...restored,
+              images: Array.isArray(restored.images) ? restored.images : [],
+              supportingDocuments: Array.isArray(restored.supportingDocuments) ? restored.supportingDocuments : [],
+            })
+          }
+          if (d.contact && typeof d.contact === 'object') setContact(d.contact as ContactData)
+          if (d.orgInfo && typeof d.orgInfo === 'object') {
+            setOrgInfo(d.orgInfo as { name: string; representative: string; license: string })
+          }
+          if (d.campaignSetup && typeof d.campaignSetup === 'object') setCampaignSetup(d.campaignSetup as CampaignSetup)
+          if (Array.isArray(d.campaignPosts)) setCampaignPosts(d.campaignPosts as CampaignPostData[])
+          if ([...ORDERABLE_PACKAGES.map(pkg => pkg.id), ...PACKAGE_IDS].includes(d.selectedPackage as string)) {
+            setSelectedPackage(d.selectedPackage as string)
+          }
+          if (typeof d.basicChannel === 'string') setBasicChannel(d.basicChannel)
+          if (Array.isArray(d.reachChannels)) setReachChannels(d.reachChannels.filter((item): item is string => typeof item === 'string'))
+          if (Array.isArray(d.selectedExtras)) setSelectedExtras(d.selectedExtras.filter((item): item is string => typeof item === 'string'))
         }
-        if (d.details && typeof d.details === 'object') {
-          const restored = d.details as ContentDetails
-          setDetails({
-            ...restored,
-            images: Array.isArray(restored.images) ? restored.images : [],
-            supportingDocuments: Array.isArray(restored.supportingDocuments) ? restored.supportingDocuments : [],
-          })
-        }
-        if (d.contact && typeof d.contact === 'object') setContact(d.contact as ContactData)
-        if (d.orgInfo && typeof d.orgInfo === 'object') {
-          setOrgInfo(d.orgInfo as { name: string; representative: string; license: string })
-        }
-        if (d.campaignSetup && typeof d.campaignSetup === 'object') setCampaignSetup(d.campaignSetup as CampaignSetup)
-        if (Array.isArray(d.campaignPosts)) setCampaignPosts(d.campaignPosts as CampaignPostData[])
-        if ([...ORDERABLE_PACKAGES.map(pkg => pkg.id), ...PACKAGE_IDS].includes(d.selectedPackage as string)) {
-          setSelectedPackage(d.selectedPackage as string)
-        }
-        if (typeof d.basicChannel === 'string') setBasicChannel(d.basicChannel)
-        if (Array.isArray(d.reachChannels)) setReachChannels(d.reachChannels.filter((item): item is string => typeof item === 'string'))
-        if (Array.isArray(d.selectedExtras)) setSelectedExtras(d.selectedExtras.filter((item): item is string => typeof item === 'string'))
         setRecoveryToken(token)
         try { localStorage.setItem(RECOVERY_TOKEN_KEY, token) } catch { /* Storage is optional. */ }
         if (result.offer) {
@@ -416,6 +440,9 @@ export default function RequestWizard() {
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({
         userId,
+        membershipId,
+        openSection,
+        packageLink: appliedPackageLink.current,
         guestSubtotal,
         savedAt: Date.now(),
         selectedInfluencer, requestType, clientType, category, subOption,
@@ -429,10 +456,33 @@ export default function RequestWizard() {
       }
     } catch { /* تجاوز سعة التخزين — نتجاهل بهدوء */ }
   }, [
-    hydrated, userId, guestSubtotal, success, selectedInfluencer, requestType, clientType, category, subOption,
+    hydrated, userId, membershipId, openSection, guestSubtotal, success, selectedInfluencer, requestType, clientType, category, subOption,
     competitionSelection, details, channels, contact, orgInfo,
     campaignSetup, campaignPosts, selectedPackage, basicChannel, reachChannels, career, selectedExtras, discountCode,
   ])
+
+  const guestDraft = useMemo(() => ({
+    openSection,
+    showAccountOptions,
+    selectedInfluencer, requestType, clientType, category, subOption, competitionSelection,
+    orgInfo, campaignSetup, selectedPackage, basicChannel, reachChannels, selectedExtras, discountCode,
+  }), [
+    openSection, showAccountOptions, selectedInfluencer, requestType, clientType, category,
+    subOption, competitionSelection, orgInfo, campaignSetup, selectedPackage, basicChannel,
+    reachChannels, selectedExtras, discountCode,
+  ])
+
+  useEffect(() => {
+    if (!hydrated || userId || membershipMode || !guestDraft.clientType) return
+    try {
+      sessionStorage.setItem(GUEST_SELECTION_KEY, JSON.stringify({
+        ...guestDraft,
+        packageLink: appliedPackageLink.current,
+        savedAt: Date.now(),
+        resumeAfterLogin: false,
+      }))
+    } catch { /* Browser storage may be unavailable. */ }
+  }, [guestDraft, hydrated, membershipMode, userId])
 
   useEffect(() => {
     const pkg = getIndividualPackage(requestedPackage ?? '',singlePackages)
@@ -754,9 +804,10 @@ export default function RequestWizard() {
   function preserveGuestSelection() {
     try {
       sessionStorage.setItem(GUEST_SELECTION_KEY, JSON.stringify({
+        ...guestDraft,
+        packageLink: appliedPackageLink.current,
         savedAt: Date.now(),
-        selectedInfluencer, requestType, clientType, category, subOption, competitionSelection,
-        orgInfo, campaignSetup, selectedPackage, basicChannel, reachChannels, selectedExtras, discountCode,
+        resumeAfterLogin: true,
         subtotal: checkoutSubtotal,
       }))
       return true
@@ -969,7 +1020,7 @@ export default function RequestWizard() {
     { id: 3, label: 'المحتوى والمرفقات', ready: identityComplete && aboutComplete && packagesComplete, next: 'مراجعة الطلب' },
     { id: 4, label: 'المراجعة', ready: canSubmit, next: '' },
   ]
-  const currentIndex = Math.max(0, steps.findIndex(step => step.id === activeSection && step.ready))
+  const currentIndex = Math.max(0, steps.findLastIndex(step => step.id <= activeSection && step.ready))
   const currentStep = steps[currentIndex]
   const previousStep = steps[currentIndex - 1]
   const nextStep = steps[currentIndex + 1]
