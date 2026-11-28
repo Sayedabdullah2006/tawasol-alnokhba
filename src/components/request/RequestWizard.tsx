@@ -1233,7 +1233,15 @@ export default function RequestWizard() {
                   تغيّر السعر منذ حفظ اختيارك. راجع السعر الحالي للباقة قبل المتابعة.
                 </p>
               )}
-              {selectedCat && <p className="text-sm text-muted">{selectedCat.name_ar}{selectedInf ? ' · ' + selectedInf.name_ar : ''}</p>}
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                {selectedCat && <p className="text-sm text-muted">{selectedCat.name_ar}{selectedInf ? ' · ' + selectedInf.name_ar : ''}</p>}
+                {showPackages && (
+                  <div className="ms-auto flex flex-col items-end gap-1">
+                    <span className="rounded-full bg-[#eadcff] px-3 py-0.5 text-xs font-black text-[#3d1152]">تمارا</span>
+                    <span className="text-xs text-muted">تقدر تقسّط المبلغ</span>
+                  </div>
+                )}
+              </div>
               {requestType === 'campaign' && (
                 <p className="text-xs text-muted mb-3 bg-cream rounded-lg p-2">
                   🚀 الباقة المختارة تنطبق على كل أخبار الحملة ({campaignPosts.length} منشورات) — السعر يشمل خصم الحملة {CAMPAIGN_DISCOUNT}%.

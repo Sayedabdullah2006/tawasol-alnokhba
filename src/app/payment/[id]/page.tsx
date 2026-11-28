@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { formatNumber, formatNumberShort, generateRequestNumber } from '@/lib/utils'
 import { CATEGORIES } from '@/lib/constants'
+import { AQ_EXTRAS_NAMES } from '@/lib/auto-quote'
+import type { priceIndividualPackage } from '@/lib/individual-packages'
 import { useToast } from '@/components/ui/Toast'
 import PaymentForm from '@/components/payment/PaymentForm'
 import ReceiptUploader from '@/components/request/ReceiptUploader'
@@ -26,6 +28,7 @@ interface PaymentRequest {
   final_total?: number | null
   admin_quoted_price?: number | null
   estimated_reach?: number | null
+  package_snapshot?: { pricing?: Pick<ReturnType<typeof priceIndividualPackage>, 'subtotal' | 'extras'> } | null
   admin_offered_extras?: Array<{ id: string; name: string; price: number }> | null
   user_selected_extras?: string[] | null
   discount_pct?: number | null
@@ -162,12 +165,22 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
   const cat = CATEGORIES.find(c => c.id === request.category)
   const isPaid = request.status === 'paid'
   const totalDue = Number(request.final_total ?? request.admin_quoted_price ?? 0)
-  const quotedPrice = Number(request.admin_quoted_price ?? 0)
   const discountAmount = Number(request.discount_amount ?? 0)
   const estimatedReach = Number(request.estimated_reach ?? 0)
   const offered = (request.admin_offered_extras ?? []) as { id: string; name: string; price: number }[]
   const selected = (request.user_selected_extras ?? []) as string[]
-  const extrasDetail = offered.filter(e => selected.includes(e.id))
+  const savedPricing = request.package_snapshot?.pricing
+  const savedExtras = Array.isArray(savedPricing?.extras) ? savedPricing.extras : null
+  const extrasDetail = savedExtras
+    ? savedExtras.map(extra => ({
+        id: extra.id,
+        name: extra.name ?? AQ_EXTRAS_NAMES[extra.id] ?? extra.id,
+        price: extra.price / 100,
+      }))
+    : offered.filter(extra => selected.includes(extra.id))
+  const packageAmount = savedPricing && savedExtras
+    ? (savedPricing.subtotal - savedExtras.reduce((sum, extra) => sum + extra.price, 0)) / 100
+    : Number(request.admin_quoted_price ?? 0)
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
@@ -184,26 +197,28 @@ export default function PaymentPage({ params }: { params: Promise<{ id: string }
         <div className="p-5 space-y-5">
           {/* Order summary (read-only) */}
           <div className="bg-cream rounded-xl p-4 text-sm space-y-2">
-            <div className="flex justify-between">
-              <span className="text-muted">{cat?.icon} {cat?.nameAr}</span>
-              <span className="font-medium">{formatNumber(quotedPrice)} ر.س</span>
-            </div>
-            {extrasDetail.map(e => (
-              <div key={e.id} className="flex justify-between text-xs">
-                <span className="text-muted">+ {e.name}</span>
-                <span>+{formatNumber(e.price)} ر.س</span>
+            <dl className="space-y-2">
+              <div className="flex justify-between">
+                <dt className="text-muted">{cat?.icon} {cat?.nameAr}</dt>
+                <dd className="font-medium">{formatNumber(packageAmount)} ر.س</dd>
               </div>
-            ))}
-            {discountAmount > 0 && (
-              <div className="flex justify-between text-xs text-green font-semibold">
-                <span>خصم{request.discount_code ? ` (${request.discount_code})` : ''} {request.discount_pct ? `${request.discount_pct}%` : ''}</span>
-                <span>−{formatNumber(discountAmount)} ر.س</span>
+              {extrasDetail.map(e => (
+                <div key={e.id} className="flex justify-between text-xs">
+                  <dt className="text-muted">+ {e.name}</dt>
+                  <dd>+{formatNumber(e.price)} ر.س</dd>
+                </div>
+              ))}
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-xs text-green font-semibold">
+                  <dt>خصم{request.discount_code ? ` (${request.discount_code})` : ''} {request.discount_pct ? `${request.discount_pct}%` : ''}</dt>
+                  <dd>−{formatNumber(discountAmount)} ر.س</dd>
+                </div>
+              )}
+              <div className="flex justify-between border-t border-border pt-2 mt-2">
+                <dt className="font-bold">المطلوب دفعه</dt>
+                <dd className="font-black text-2xl text-gold">{formatNumber(totalDue)} ر.س</dd>
               </div>
-            )}
-            <div className="flex justify-between border-t border-border pt-2 mt-2">
-              <span className="font-bold">المطلوب دفعه</span>
-              <span className="font-black text-2xl text-gold">{formatNumber(totalDue)} ر.س</span>
-            </div>
+            </dl>
 
             {/* كود الخصم — قبل الدفع */}
             {!isPaid && (

@@ -417,11 +417,12 @@ export async function POST(request: Request) {
     if (v2Price) { v2Price.discount = Math.round(singleDiscountAmt * 100); v2Price.total = v2Price.subtotal - v2Price.discount }
     const singleFinalPrice = Math.round((packagePrice - singleDiscountAmt)*100)/100
 
-    // قيم التسعير المخزَّنة: باقات الاحتراف/التميز تُخزَّن بسعرها الكامل بلا إضافات منفصلة
-    const isUpgradedPackage = pkg != null
-    const storedBasePrice   = isUpgradedPackage ? packagePrice : priceCalc.basePrice
-    const storedExtrasTotal = isUpgradedPackage ? 0 : priceCalc.extrasTotal
-    const storedTotalAmount = isUpgradedPackage ? packagePrice : priceCalc.total
+    // Store the package and paid add-ons separately while preserving the approved total.
+    const extrasHalalas = v2Price?.extras.reduce((sum, extra) => sum + extra.price, 0) ?? 0
+    const storedBasePrice = v2Price ? (v2Price.subtotal - extrasHalalas) / 100 : priceCalc.basePrice
+    const storedExtrasTotal = v2Price ? extrasHalalas / 100 : priceCalc.extrasTotal
+    const storedTotalAmount = packagePrice
+    const recordedExtras = [...new Set([...packageIncludedExtras, ...(v2Price?.extras ?? []).map(extra => extra.id)])]
 
     const { data, error } = await serviceClient
       .from('publish_requests')
@@ -464,7 +465,7 @@ export async function POST(request: Request) {
         vat_amount:            0,
         total_amount:          storedTotalAmount,
         admin_offered_extras:  [],
-        user_selected_extras:  packageIncludedExtras,
+        user_selected_extras:  recordedExtras,
         extras_selected_total: 0,
         estimated_reach:       0,
 
